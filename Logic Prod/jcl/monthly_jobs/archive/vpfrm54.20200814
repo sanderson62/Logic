@@ -1,0 +1,89 @@
+################################################################################
+#
+#  Job:  vpfrm54
+#
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=FNB167
+################################################################################
+#  DATE: MMDDYYYY   
+#  FROM: CILGM17    
+ASSGNDD ddname='SYS010' dataset='VP.XX.GAAP' gdg='0' filename='$SEQFILES/VP.XX.GAAP' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/FN.DL.FX.VPPLFRS' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYS012' type='DUMMY' 
+
+EXECPGM pgmname='FNB167' stepname='FNB167' parm='@MEMMDDYYYY' 
+
+################################################################################
+LABEL name=FNB170
+################################################################################
+#  *                                                                     
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='$SEQFILES/VPFRM54A' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/FN.DL.FX.VPPLFRS' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='VPPLFRS'
+
+################################################################################
+LABEL name=CPYM54A
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/addcrlf.pl $SEQFILES/VPFRM54A $SEQFILES/VP.DL.FN.FX.FRM54 133
+!
+EXECPGM pgmname='BPXBATCH' stepname='CPYM54A' parm='SH'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+#  ***                                                                   
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/VPFRM54A' disp='i-o' 
+ASSGNDD ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY1   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR DCC 
+#  *
+#  *  SYSUT2 is ftp'd to ntfree2
+#  *------------------------------------------------------------------- 
+#  * 
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/FN.DL.FX.VPPLFRS' disp='i-o' abend='k' normal='k' recfmt='F'
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/VPPLFAHRS_@MEMM-DD-YY.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+EXECPGM pgmname='IDCAMS' stepname='COPY1'   
+
+################################################################################
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+   ftp -n ntcso1 < $JCLLIB/ftp-vpfrm54
+   "ftp -n ntfree2 < $JCLLIB/ftp-vpfrm54-ntfree2"
+   echo " Job completed successfully "
+else
+  echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 040517 CR2015082500001 PEMA   NEW JOB for VPP

@@ -1,0 +1,113 @@
+################################################################################
+BEGINJOB mode='MVS'
+
+if ($EBMSYS != "cid1t") then
+   echo "Job Aborting, not cid1t"
+   exit 1
+endif
+
+################################################################################
+LABEL name=EL300
+################################################################################
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.EL501' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCCID1
+CLAS053107                          1
+PRCO-501-2
+!
+
+EXECPGM pgmname='EL300' stepname='EL300'
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d ELCNTLT
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=STEP2
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d ERACCTS
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP2' parm='SH'
+
+################################################################################
+LABEL name=BKPCNTL 
+################################################################################
+ASSGNDD ddname='SYSUT1' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYSUT2' filename='/tmp/elcntl.bkp' type='FS' disp='o' normal='k' abend='d' recsize='750' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO INFILE(SYSUT1) OUTFILE(SYSUT2)                                  
+  SET MAXCC=0                                   
+!
+
+EXECPGM pgmname='IDCAMS' stepname='BKPCNTL' 
+
+################################################################################
+LABEL name=LOADCNTL 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='/tmp/elcntl.bkp' disp='i' 
+ASSGNDD ddname='SYSUT2' type='VS' filename='ELCNTLT' disp='i-o' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO INFILE(SYSUT1) OUTFILE(SYSUT2)                                  
+  SET MAXCC=0                                   
+!
+
+EXECPGM pgmname='IDCAMS' stepname='LOADCNTL' 
+
+################################################################################
+LABEL name=EL349 
+################################################################################
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCTS' disp='i-o' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+ERACCT  LOAD                                                            
+!
+
+EXECPGM pgmname='EL349' stepname='EL349' 
+
+################################################################################
+LABEL name=EL501 
+################################################################################
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.EL501' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='/data/seqfiles/CI.XX.ACCT_00' disp='i' 
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCTS' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTLT' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY'
+ASSGNDD ddname='ERMEBL' type='DUMMY'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+ASSGNDD ddname='SORTWK06' type='TEMP' 
+
+EXECPGM pgmname='EL501' stepname='EL501' 
+
+################################################################################
+LABEL name=CPY501
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL501/SYS008_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.FICH501' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY501' parm='ALL' 
+
+if ($JOBSTATUS == 0) then
+    echo " Test job, dont want any print "
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

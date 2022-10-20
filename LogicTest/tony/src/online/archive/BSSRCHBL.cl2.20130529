@@ -1,0 +1,956 @@
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2013 by Central States Health and Life          *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       identification division.
+       program-id. BSSRCHBL.
+      *
+      *AUTHOR.    Pablo.
+      *           Colleyville, TEXAS.
+      
+      ********************************************
+      *   Balance sheet creator
+      ********************************************
+      
+       environment division.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+       
+       SELECT CLMS-DETAIL-OUT ASSIGN TO
+          '/data/seqfiles/clms.out.tst.txt'
+          FILE STATUS IS CLMS-STATUS
+                                  ORGANIZATION IS LINE SEQUENTIAL.
+       
+      *SELECT COMM-DETAIL-OUT ASSIGN TO
+      *   '/data/seqfiles/comm.out.tst.txt'
+      *   FILE STATUS IS COMM-STATUS
+      *                           ORGANIZATION IS LINE SEQUENTIAL.
+       data division.
+       FILE SECTION.
+       
+       FD  clms-detail-out
+           BLOCK CONTAINS 0
+           RECORDING MODE F.
+       01  clms-detail-out-rec         pic x(107).
+
+      *FD  comm-detail-out
+      *    BLOCK CONTAINS 0
+      *    RECORDING MODE F.
+      *01  comm-detail-out-rec         pic x(103).
+
+       working-storage section.
+       77  sub                         pic s999 comp-3 value +0.
+       77  s1                          pic s999 value +0 comp-3.
+       77  ws-eom-bin-dt               pic xx value low-values.
+       77  ws-cur-bin-dt               pic xx value low-values.
+       77  ws-bin-6-months-ago         pic xx value low-values.
+       77  ws-company-cd               pic x  value low-values.
+       77  GOOD-STARTBR                pic xxx value spaces.
+       77  GOOD-TRLR-STARTBR           pic xxx value spaces.
+       77  cnc-fact                    pic s999v9(7) comp-3 value +0.
+       77  CLMS-STATUS                 pic xx  value zeros.
+       77  Comm-STATUS                 pic xx  value zeros.
+       77  b1                          pic s999 value +0 comp-3.
+       77  ws-cert-status              pic x   value spaces.
+           88  good-cert                   value 'Y'.
+      
+       01  ws-work-date.
+           05  ws-work-mo              pic xx.
+           05  f                       pic x.
+           05  ws-work-da              pic xx.
+           05  f                       pic x.
+           05  ws-work-yr              pic xxxx.
+      
+       01  response-code         pic s9(8) comp.
+       01  display-response      pic 9(8).
+       01  bl-index              pic 9(8) comp.
+
+       01  WS-RESPONSE                 PIC S9(8) COMP VALUE +0.
+           88  RESP-NORMAL                    VALUE +0.
+           88  resp-file-notfnd               value +12.
+           88  RESP-NOTFND                    VALUE +13.
+           88  resp-duprec                    value +14.
+           88  resp-dupkey                    value +15.
+           88  resp-invreq                    value +16.
+           88  RESP-NOTOPEN                   VALUE +19.
+           88  RESP-ENDFILE                   VALUE +20.
+           88  resp-lengtherr                 value +22.
+      
+       01  ERACCT-key.
+           16  acct-company-cd         PIC X     VALUE SPACES.
+           16  acct-carrier            PIC X     VALUE SPACES.
+           16  acct-grouping           PIC X(6)  VALUE SPACES.
+           16  acct-state              PIC XX    VALUE SPACES.
+           16  acct-account            PIC X(10) VALUE SPACES.
+           16  acct-exp-date           PIC XX    VALUE SPACES.
+           16  FILLER                  PIC X(4)  VALUE SPACES.
+
+       01  ELCNTL-KEY.
+           12  CNTL-COMP-ID            PIC  X(3).             
+           12  CNTL-REC-TYPE           PIC  X.                
+           12  CNTL-ACCESS             PIC  X(4).             
+           12  CNTL-SEQ-NO             PIC S9(4)    COMP.     
+      
+       01  WS-CARRIER-TABLE.
+           12  FILLER OCCURS 30.
+               16  WS-CARRIER-CODE     PIC X.
+               16  WS-SEC-PAY-CARRIER  PIC X.
+      
+       01  ELMSTR-KEY.
+           12  MSTR-COMPANY-CD         PIC X.
+           12  MSTR-CARRIER            PIC X.
+           12  MSTR-CLAIM-NO           PIC X(7).
+           12  MSTR-CERT-NO            PIC X(11).
+
+       01  ELCERT-KEY.
+           12  CERT-COMPANY-CD         PIC X.
+           12  CERT-CARRIER            PIC X.
+           12  CERT-GROUPING           PIC X(6).
+           12  CERT-STATE              PIC XX.
+           12  CERT-ACCOUNT            PIC X(10).
+           12  CERT-EFF-DT             PIC XX.
+           12  CERT-CERT-NO            PIC X(11).
+
+       01  ELTRLR-KEY.
+           12  TRLR-COMPANY-CD         PIC X.
+           12  TRLR-CARRIER            PIC X.
+           12  TRLR-CLAIM-NO           PIC X(7).
+           12  TRLR-CERT-NO            PIC X(11).
+           12  TRLR-SEQ-NO             PIC S9(4) COMP VALUE +0.
+
+       01  ERPNDB-KEY.                                       
+           12  PNDB-COMPANY-CD         PIC  X.           
+           12  PNDB-BATCH              PIC  X(6).        
+           12  PNDB-BATCH-SEQ-NO       PIC  S9(4) COMP.  
+           12  PNDB-BATCH-CHG-SEQ-NO   PIC  S9(4) COMP.  
+      
+       01  clms-detail-record.
+           05  clm-type                pic x.
+           05  clm-no                  pic x(7).
+           05  crt-no                  pic x(11).
+           05  chk-no                  pic x(10).
+           05  chk-amt                 pic -9(9).99.
+           05  chk-good-bad            pic x(4).
+           05  chk-no-sel-dt           pic x.
+           05  chk-who                 pic x(4).
+           05  chk-when                pic x(4).
+
+       01  comm-detail-record.
+           05  comm-batch              pic x(6).
+           05  comm-carrier            pic x.
+           05  comm-account            pic x(10).
+           05  comm-cert-no            pic x(11).
+           05  comm-iss-can            pic x.
+           05  comm-amt                pic -9(9).99.
+
+       01  filler.
+           12  ws-dcc-product-code         pic xxx     value spaces.
+           12  WS-AH-CATEGORY              PIC X       VALUE ' '.
+           12  CLAS-LOOK                   PIC XX      VALUE '  '.
+
+       01  FILLER.
+           12  PEND-SW                 PIC  X  VALUE '0'.
+               88  GOOD-PEND              VALUE '0'.
+
+           12  filler occurs 3.
+               16  BAL-LF-PREM         PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-AH-PREM         PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-TOT-PREM        PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-LF-REF          PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-AH-REF          PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-TOT-REF         PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-LF-NET          PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-AH-NET          PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-TOT-NET         PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-LF-ISS-COMM     PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-AH-ISS-COMM     PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-LF-REF-COMM     PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-AH-REF-COMM     PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-TOT-NET-COMM    PIC S9(9)V99 VALUE +0 comp-3.
+               16  BAL-ISS-CNT         PIC S9(9)    VALUE +0 comp-3.
+               16  BAL-CAN-CNT         PIC S9(9)    VALUE +0 comp-3.
+               16  BAL-NET-CNT         PIC S9(9)V99 VALUE +0 comp-3.
+           12  BAL-LF-CLMS-PD          PIC S9(9)V99 VALUE +0 comp-3.
+           12  BAL-AH-CLMS-PD          PIC S9(9)V99 VALUE +0 comp-3.
+           12  BAL-LF-CLMS-VOID        PIC S9(9)V99 VALUE +0 comp-3.
+           12  BAL-AH-CLMS-VOID        PIC S9(9)V99 VALUE +0 comp-3.
+           12  BAL-LF-CLMS-PD-CUR      PIC S9(9)V99 VALUE +0 comp-3.
+           12  BAL-AH-CLMS-PD-CUR      PIC S9(9)V99 VALUE +0 comp-3.
+           12  BAL-LF-CLMS-VOID-CUR    PIC S9(9)V99 VALUE +0 comp-3.
+           12  BAL-AH-CLMS-VOID-CUR    PIC S9(9)V99 VALUE +0 comp-3.
+      
+                                       copy ELCFUNDT.
+                                       COPY ELCCNTL.
+                                       copy ERCPNDB.
+                                       copy ELCCERT.
+                                       copy ELCMSTR.
+                                       COPY ELCTRLR.
+                                       copy ERCACCT.
+                                       copy ELCDATE.
+      
+       linkage section.
+       
+       01 dfhcommarea. 
+                                       copy BSSRCH-COMMAREA.
+      
+       procedure division.
+      
+      *****************************************************
+      * Using the month end date and company id provided
+      * by the user, read the control file company and carrier
+      * records then start at the beginning of the ERPNDB
+      * file for that company and read until end of file
+      * or new company reached. Accumulate processable data of
+      * gross premium, refunds and commissions.
+      *****************************************************
+      
+       0000-begin.
+      
+           MOVE FUNCTION CURRENT-DATE  TO FUNCTION-DATE
+           move ws-fn-date             to dc-greg-date-cymd
+           move 'L'                    to dc-option-code
+           perform 8500-date-convert   thru 8500-exit
+           if no-conversion-error
+              move dc-bin-date-1       to ws-cur-bin-dt
+           else
+              move ' Invalid current Date '
+                                       to bl-output-message
+              set bl-fail to true
+              go to 6000-go-back
+           end-if
+
+           move bl-input-eom-date      to ws-work-date
+           move ' Please review totals and approve '
+                                       to bl-output-message
+           string ws-work-yr ws-work-mo ws-work-da 
+              delimited by size
+              into dc-greg-date-cymd-r
+           end-string
+           move 'L'                    to dc-option-code
+           perform 8500-date-convert   thru 8500-exit
+           if no-conversion-error
+              move dc-bin-date-1       to ws-eom-bin-dt
+              move dc-greg-date-1-alpha to bl-out-formated-date
+           else
+              move ' Invalid Month End Date '
+                                       to bl-output-message
+              set bl-fail to true
+              go to 6000-go-back
+           end-if
+
+           move ws-eom-bin-dt          to dc-bin-date-1
+           move -6                     to dc-elapsed-months
+           move '6'                    to dc-option-code
+           perform 8500-date-convert   thru 8500-exit
+           if no-conversion-error
+              move dc-bin-date-2       to ws-bin-6-months-ago
+           else
+              move ' Error in date routine  '
+                                       to bl-output-message
+              set bl-fail to true
+              go to 6000-go-back
+           end-if
+
+           MOVE bl-input-comp-id       TO  CNTL-COMP-ID
+           MOVE SPACES                 TO  CNTL-ACCESS
+           MOVE '1'                    TO  CNTL-REC-TYPE
+           MOVE +0                     TO  CNTL-SEQ-NO
+                                                                       
+           EXEC CICS  READ
+               DATASET  ('ELCNTL')
+               INTO     (CONTROL-FILE)
+               RIDFLD   (ELCNTL-KEY)
+               resp     (ws-response)
+           END-EXEC
+
+           if not resp-normal
+              move ' Invalid Company ID '
+                                       to bl-output-message
+              set bl-fail to true
+              go to 6000-go-back
+           end-if
+
+           MOVE CF-CL-MAIL-TO-NAME     TO bl-out-company-name
+           move cf-company-cd          to ws-company-cd
+           
+           MOVE bl-input-comp-id       TO  CNTL-COMP-ID
+           MOVE LOW-VALUES             TO  CNTL-ACCESS
+           MOVE '6'                    TO  CNTL-REC-TYPE
+           MOVE +0                     TO  CNTL-SEQ-NO
+      
+           EXEC CICS  STARTBR
+               DATASET  ('ELCNTL')
+               RIDFLD   (ELCNTL-KEY)
+               RESP     (WS-RESPONSE)
+           END-EXEC
+      
+           IF NOT RESP-NORMAL
+              move ' Bad start on elcntl getting carrier recs '
+                                       to bl-output-message
+              set bl-fail to true
+              go to 6000-go-back
+           END-IF
+      
+           PERFORM VARYING SUB FROM +1 BY +1 UNTIL
+              (SUB > +30)
+              EXEC CICS  READNEXT
+                   DATASET ('ELCNTL')
+                   INTO     (CONTROL-FILE)
+                   RIDFLD  (ELCNTL-KEY)
+                   RESP    (WS-RESPONSE)
+              END-EXEC
+          
+              IF (RESP-NORMAL)
+                 AND (CF-COMPANY-ID = bl-input-comp-id)
+                 AND (CF-RECORD-TYPE = '6')
+                 MOVE CF-CARRIER-CNTL  TO WS-CARRIER-CODE (SUB)
+                 MOVE CF-SECPAY-SWITCH TO WS-SEC-PAY-CARRIER (SUB)
+              ELSE
+                 MOVE +31              TO SUB
+              END-IF
+           END-PERFORM
+
+           exec cics endbr
+              dataset ('ELCNTL')
+           end-exec
+
+           .
+       3100-START-BROWSE.                                              
+
+           MOVE LOW-VALUES             TO  ERPNDB-KEY
+           MOVE ws-company-cd          TO  PNDB-COMPANY-CD
+                                                                       
+           EXEC CICS  STARTBR                                          
+               DATASET  ('ERPNDB')                                  
+               RIDFLD   (ERPNDB-KEY)                                   
+               resp     (ws-response)
+           END-EXEC
+                                                                       
+           IF RESP-NORMAL
+              MOVE 'YES'               TO GOOD-STARTBR
+           else
+              move ' Bad start on erpndb '
+                                       to bl-output-message
+              set bl-fail to true
+              go to 6000-go-back
+           END-IF
+
+      *    open output comm-detail-out
+
+           .
+       4000-READNEXT.                                                  
+      
+           EXEC CICS  READNEXT                                         
+               DATASET  ('ERPNDB')                                  
+               INTO      (PENDING-BUSINESS)                   
+               RIDFLD   (ERPNDB-KEY)                                   
+               resp     (ws-response)
+           END-EXEC
+                                                                       
+           if (not resp-normal)
+              or (PB-COMPANY-CD  NOT = WS-COMPANY-CD)
+              GO TO 4900-ENDBR
+           END-IF
+                                                                       
+           IF (PB-ISSUE                                                
+              OR PB-CANCELLATION)
+              and pb-alt-chg-seq-no = zeros                            
+              CONTINUE
+           ELSE                                                        
+              GO TO 4000-READNEXT
+           END-IF
+      
+           if (pb-credit-select-dt <= ws-eom-bin-dt)
+              and (pb-credit-accept-dt = low-values)
+              continue
+           else
+              go to 4000-readnext
+           end-if
+      
+           IF PB-RECORD-ON-HOLD
+              OR PB-RECORD-RETURNED
+              OR PB-FATAL-ERRORS
+              OR PB-UNFORCED-ERRORS
+              move +2                  to b1
+           else
+              move +1                  to b1
+           end-if
+                                                                   
+           IF PB-ISSUE                                             
+              IF PB-REIN-ONLY-CERT                                
+                 OR PB-REISSUED-CERT                              
+                 OR PB-MONTHLY-CERT
+                 OR PB-POLICY-IS-DECLINED                         
+                 OR PB-POLICY-IS-VOIDED                           
+                 ADD +1                TO BAL-ISS-CNT (b1)
+                 GO TO 4000-READNEXT
+              end-if
+           end-if
+
+           IF PB-CANCELLATION
+              IF PB-CI-ENTRY-STATUS  = '9'
+                 add +1                to bal-can-cnt (b1)
+                 GO TO 4000-READNEXT
+               end-if
+           end-if
+
+           IF PB-OVERRIDE-LIFE                                         
+              OR  PB-OVERRIDE-BOTH                                      
+              IF PB-ISSUE                                             
+                 MOVE PB-I-LF-PREM-CALC
+                                       TO PB-I-LF-PREMIUM-AMT     
+                 MOVE PB-I-LF-ALT-PREM-CALC
+                                       TO PB-I-LF-ALT-PREMIUM-AMT
+              ELSE                                                    
+                 MOVE PB-C-LF-REF-CALC TO PB-C-LF-CANCEL-AMT
+              end-if
+           end-if
+
+           IF PB-OVERRIDE-AH
+              OR PB-OVERRIDE-BOTH
+              IF PB-ISSUE
+                 MOVE PB-I-AH-PREM-CALC
+                                       TO PB-I-AH-PREMIUM-AMT
+              ELSE
+                 MOVE PB-C-AH-REF-CALC TO PB-C-AH-CANCEL-AMT
+              end-if
+           end-if
+
+           if pb-i-ob and pb-issue
+              if pb-i-lf-benefit-cd = spaces or zeros
+                 display ' ob without ben code ' pb-cert-no.
+
+           if bl-input-comp-id = 'DCC'
+              if pb-carrier not = ws-carrier-code (sub)
+                 perform varying sub from +1 by +1 until
+                    sub > 30
+                    or pb-carrier = ws-carrier-code (sub)
+                 end-perform
+                 if sub > 30
+                    move 30 to sub
+                 end-if
+              end-if
+           end-if
+
+           IF PB-ISSUE                                                 
+              ADD +1                   TO BAL-ISS-CNT (b1)
+              IF PB-I-LF-BENEFIT-CD NOT = SPACES AND ZEROS AND 'DD'
+                 COMPUTE BAL-LF-PREM (b1) =
+                      (BAL-LF-PREM (b1) + PB-I-LF-PREMIUM-AMT
+                      + PB-I-LF-ALT-PREMIUM-AMT)
+                 COMPUTE BAL-LF-ISS-COMM (b1) ROUNDED =
+                      (BAL-LF-ISS-COMM (b1) + (PB-I-LF-PREMIUM-AMT
+                      * PB-I-LIFE-COMMISSION))
+                 COMPUTE BAL-LF-ISS-COMM (b1) ROUNDED =
+                      (BAL-LF-ISS-COMM (b1) +
+                      (PB-I-LF-ALT-PREMIUM-AMT *
+                      PB-I-LIFE-COMMISSION))
+              END-IF
+              COMPUTE BAL-AH-PREM (b1) =
+                   (BAL-AH-PREM (b1) + PB-I-AH-PREMIUM-AMT)
+
+              IF WS-SEC-PAY-CARRIER (SUB) = 'Y'
+                 COMPUTE BAL-AH-ISS-COMM (b1) =
+                      BAL-AH-ISS-COMM (b1) +
+                      (PB-I-AH-PREMIUM-AMT
+                       - PB-I-LF-ALT-PREMIUM-AMT
+                       - PB-I-ADDL-CLP)
+                 compute comm-amt = (PB-I-AH-PREMIUM-AMT
+                    - PB-I-LF-ALT-PREMIUM-AMT
+                    - PB-I-ADDL-CLP)
+              ELSE
+                 COMPUTE BAL-AH-ISS-COMM (b1) ROUNDED =
+                    (BAL-AH-ISS-COMM (b1) + (PB-I-AH-PREMIUM-AMT
+                    * PB-I-AH-COMMISSION))
+                 compute comm-amt = pb-i-ah-premium-amt
+                    * pb-i-ah-commission
+              END-IF
+              move pb-entry-batch      to comm-batch
+              move pb-carrier          to comm-carrier
+              move pb-account          to comm-account
+              move pb-cert-no          to comm-cert-no
+              move 'I'                 to comm-iss-can
+      *       write comm-detail-out-rec from comm-detail-record
+           end-if
+
+           IF PB-CANCELLATION
+              IF (bl-input-comp-id = 'DCC')
+                 AND (PB-CI-AH-BENEFIT-CD NOT = SPACES AND ZEROS)
+                 MOVE SPACES           TO WS-AH-CATEGORY
+                                          ws-dcc-product-code
+                 MOVE SPACES           TO ELCNTL-KEY
+                 MOVE bl-input-comp-id TO CNTL-COMP-ID
+                 MOVE '5'              TO CNTL-REC-TYPE
+                 MOVE PB-CI-AH-BENEFIT-CD
+                                       TO CNTL-ACCESS (3:2)
+                                          CLAS-LOOK
+                 MOVE +0               TO CNTL-SEQ-NO
+                 PERFORM 6130-FIND-BENEFIT-CD
+                                       THRU 6130-EXIT
+                 perform 6200-get-acct thru 6200-exit
+              END-IF
+              ADD +1                TO BAL-CAN-CNT (b1)
+              COMPUTE BAL-LF-REF (b1) =
+                    (BAL-LF-REF (b1) + PB-C-LF-CANCEL-AMT)
+              COMPUTE BAL-LF-REF-COMM (b1) ROUNDED =
+                    BAL-LF-REF-COMM (b1) + (PB-C-LF-CANCEL-AMT
+                    * PB-CI-LIFE-COMMISSION)
+              COMPUTE BAL-AH-REF (b1) =
+                    (BAL-AH-REF (b1) + PB-C-AH-CANCEL-AMT)
+              if ws-ah-category = 'G' or 'L'
+                 if ws-dcc-product-code = 'DDF'
+                    compute cnc-fact = pb-c-ah-rfnd-clp /
+                       pb-ci-lf-alt-premium-amt
+                 else
+                    COMPUTE CNC-FACT = PB-C-AH-CANCEL-AMT /
+                       PB-CI-AH-PREMIUM-AMT
+                 END-IF
+                 COMPUTE BAL-AH-REF-COMM (b1) =
+                    BAL-AH-REF-COMM (b1) +
+                    (CNC-FACT * (PB-CI-AH-PREMIUM-AMT -
+                    PB-CI-LF-ALT-PREMIUM-AMT
+                    - PB-CI-ADDL-CLP))
+                 compute comm-amt = (cnc-fact * (pb-ci-ah-premium-amt
+                    - PB-CI-LF-ALT-PREMIUM-AMT - PB-CI-ADDL-CLP))
+              ELSE
+                 COMPUTE BAL-AH-REF-COMM (b1) ROUNDED =
+                    BAL-AH-REF-COMM (b1) + (PB-C-AH-CANCEL-AMT
+                    * PB-CI-AH-COMMISSION)
+                 compute comm-amt = pb-c-ah-cancel-amt
+                    * pb-ci-ah-commission
+              END-IF
+              move pb-entry-batch      to comm-batch
+              move pb-carrier          to comm-carrier
+              move pb-account          to comm-account
+              move pb-cert-no          to comm-cert-no
+              move 'C'                 to comm-iss-can
+      *       write comm-detail-out-rec from comm-detail-record
+           end-if
+
+           GO TO 4000-READNEXT
+
+           .
+       4900-ENDBR.
+      
+           IF GOOD-STARTBR = 'YES'
+              EXEC CICS ENDBR
+                 DATASET   ('ERPNDB')
+              END-EXEC
+           END-IF
+
+           compute bal-lf-prem (3) =
+              bal-lf-prem (1) + bal-lf-prem (2)
+           compute bal-ah-prem (3) =
+              bal-ah-prem (1) + bal-ah-prem (2)
+           compute bal-lf-ref (3) =
+              bal-lf-ref (1) + bal-lf-ref (2)
+           compute bal-ah-ref (3) =
+              bal-ah-ref (1) + bal-ah-ref (2)
+           compute bal-lf-iss-comm (3) =
+              bal-lf-iss-comm (1) + bal-lf-iss-comm (2)
+           compute bal-ah-iss-comm (3) =
+              bal-ah-iss-comm (1) + bal-ah-iss-comm (2)
+           compute bal-lf-ref-comm (3) =
+              bal-lf-ref-comm (1) + bal-lf-ref-comm (2)
+           compute bal-ah-ref-comm (3) =
+              bal-ah-ref-comm (1) + bal-ah-ref-comm (2)
+           compute bal-iss-cnt (3) =
+              bal-iss-cnt (1) + bal-iss-cnt (2)
+           compute bal-can-cnt (3) =
+              bal-can-cnt (1) + bal-can-cnt (2)
+
+
+           perform varying b1 from +1 by +1 until b1 > +3
+              COMPUTE BAL-TOT-PREM (b1) = 
+                 BAL-LF-PREM (b1) + BAL-AH-PREM (b1)
+              COMPUTE BAL-TOT-REF (b1) = 
+                 BAL-LF-REF (b1) + BAL-AH-REF (b1)
+              COMPUTE BAL-LF-NET (b1) =
+                  BAL-LF-PREM (b1) - BAL-LF-REF (b1)
+              COMPUTE BAL-AH-NET (b1) =
+                  BAL-AH-PREM (b1) - BAL-AH-REF (b1)
+              COMPUTE BAL-TOT-NET (b1) =
+                 BAL-LF-NET (b1) + BAL-AH-NET (b1)
+              COMPUTE BAL-TOT-NET-COMM (b1) =
+                 (BAL-LF-ISS-COMM (b1) + BAL-AH-ISS-COMM (b1)) -
+                 (BAL-LF-REF-COMM (b1) + BAL-AH-REF-COMM (b1))
+           end-perform
+
+           perform varying b1 from +1 by +1 until b1 > +3
+              move bal-lf-prem (b1)    to bl-out-lf-prem (b1)
+              move bal-ah-prem (b1)    to bl-out-ah-prem (b1)
+              move bal-lf-ref  (b1)    to bl-out-lf-ref  (b1)
+              move bal-ah-ref  (b1)    to bl-out-ah-ref  (b1)
+              move bal-lf-net  (b1)    to bl-out-lf-net  (b1)
+              move bal-ah-net  (b1)    to bl-out-ah-net  (b1)
+              move bal-lf-iss-comm (b1) to bl-out-lf-iss-com  (b1)
+              move bal-ah-iss-comm (b1) to bl-out-ah-iss-com  (b1)
+              move bal-lf-ref-comm (b1) to bl-out-lf-ref-com  (b1)
+              move bal-ah-ref-comm (b1) to bl-out-ah-ref-com  (b1)
+              compute bl-out-lf-net-com (b1) =
+                 bal-lf-iss-comm (b1) - bal-lf-ref-comm (b1)
+              compute bl-out-ah-net-com (b1) =
+                 bal-ah-iss-comm (b1) - bal-ah-ref-comm (b1)
+              compute bl-out-iss-com (b1) =
+                 bal-lf-iss-comm (b1) + bal-ah-iss-comm (b1)
+              compute bl-out-ref-com (b1) =
+                 bal-lf-ref-comm (b1) + bal-ah-ref-comm (b1)
+              compute bl-out-net-com (b1) =
+                 (bal-lf-iss-comm (b1) + bal-ah-iss-comm (b1))
+                 - (bal-lf-ref-comm (b1) + bal-ah-ref-comm (b1))
+              move bal-iss-cnt (b1)    to bl-out-iss-cnt (b1)
+              move bal-can-cnt (b1)    to bl-out-can-cnt (b1)
+              compute bl-out-net-cnt (b1) =
+                 bal-iss-cnt (b1) - bal-can-cnt (b1)
+              compute bl-out-tot-prm (b1) =
+                 bal-lf-prem (b1) + bal-ah-prem (b1)
+              compute bl-out-tot-ref (b1) =
+                 bal-lf-ref (b1) + bal-ah-ref (b1)
+              move bal-tot-net-comm (b1)
+                                       to bl-out-net-com (b1)
+              move bal-tot-net (b1)    to bl-out-net-tot (b1)
+           end-perform
+
+           .
+       5000-CLAIMS.
+
+           move spaces                 to good-startbr
+
+           MOVE LOW-VALUES             TO  ELMSTR-KEY
+           MOVE ws-company-cd          TO  MSTR-COMPANY-CD
+                                                                       
+           EXEC CICS  STARTBR                                          
+               DATASET  ('ELMSTR')
+               RIDFLD   (ELMSTR-KEY)                                   
+               resp     (ws-response)
+           END-EXEC
+                                                                       
+           IF RESP-NORMAL
+              MOVE 'YES'               TO GOOD-STARTBR
+           else
+              move ' Bad start on elmstr '
+                                       to bl-output-message
+              set bl-fail to true
+              go to 6000-go-back
+           END-IF
+
+           open output clms-detail-out
+
+           .
+       5100-READNEXT.                                                  
+      
+           EXEC CICS  READNEXT                                         
+               DATASET  ('ELMSTR')                                  
+               INTO     (CLAIM-MASTER)                  
+               RIDFLD   (ELMSTR-KEY)
+               resp     (ws-response)
+           END-EXEC
+                                                                       
+           if (not resp-normal)
+              or (CL-COMPANY-CD  NOT = WS-COMPANY-CD)
+              GO TO 5900-ENDBR
+           END-IF
+
+           if cl-last-maint-dt <= ws-bin-6-months-ago
+              go to 5100-readnext
+           end-if
+
+           MOVE SPACES                 TO GOOD-TRLR-STARTBR
+           MOVE CL-CONTROL-PRIMARY     TO ELTRLR-KEY
+           MOVE +99                    TO TRLR-SEQ-NO
+                                                                       
+           EXEC CICS  STARTBR                                          
+               DATASET  ('ELTRLR')
+               RIDFLD   (ELTRLR-KEY)                                   
+               resp     (ws-response)
+           END-EXEC
+                                                                       
+           IF RESP-NORMAL
+              MOVE 'YES'               TO GOOD-TRLR-STARTBR
+           else
+              display ' Error-eltrlr-startbr ' 
+              go to 5100-readnext
+           END-IF
+
+           .
+       5200-READNEXT.
+      
+           EXEC CICS  READNEXT                                         
+               DATASET  ('ELTRLR')                                  
+               INTO     (ACTIVITY-TRAILERS)                  
+               RIDFLD   (ELTRLR-KEY)
+               resp     (ws-response)
+           END-EXEC
+
+           if (not resp-normal)
+              or (AT-CONTROL-PRIMARY (1:20) NOT = CL-CONTROL-PRIMARY)
+              GO TO 5300-ENDBR
+           END-IF
+
+           if at-trailer-type not = '2'
+              go to 5200-readnext
+           end-if
+
+           if at-payment-type = 'I'
+              go to 5200-readnext
+           end-if
+
+           if at-void-dt not = low-values
+              and at-check-written-dt = low-values
+              go to 5200-readnext
+           end-if
+
+           move spaces to chk-who chk-when
+           if at-pmt-accept-dt = low-values
+      *       and at-check-written-dt not = low-values
+      *       and at-pmt-select-dt not = low-values
+              and at-pmt-select-dt <= ws-eom-bin-dt
+              and at-to-be-written-dt <= ws-cur-bin-dt
+              move ' ' to chk-no-sel-dt
+              move 'CURR'              to chk-when
+              perform 7000-confirm-status
+                                       thru 7000-exit
+      *       if at-approved-level < at-approval-level-reqd
+              if at-payment-approval-sw = 'U'
+                 and at-pmt-select-dt = low-values
+                 move 'APRV'           to at-recorded-by
+                                          chk-when
+                 move +0               to at-amount-paid
+              end-if
+              if good-cert
+                 if at-claim-type = 'L'
+                    compute bal-lf-clms-pd = bal-lf-clms-pd +
+                       at-amount-paid
+                 else
+                    compute bal-ah-clms-pd = bal-ah-clms-pd +
+                       at-amount-paid
+                 end-if
+              end-if
+              if at-claim-type = 'L'
+                 move 'L'           to clm-type
+              else
+                 move 'A'           to clm-type
+              end-if
+              if at-pmt-select-dt = low-values
+                 move 'Y'              to chk-no-sel-dt
+                 move at-recorded-by   to chk-who
+                 move 'FUTR'           to chk-when
+              end-if
+              move cl-claim-no         to clm-no
+              move cl-cert-no          to crt-no
+              move at-check-no         to chk-no
+              move at-amount-paid      to chk-amt
+              if at-pmt-select-dt < ws-eom-bin-dt
+                 and at-pmt-select-dt > low-values
+                 move 'PREV'           to chk-when
+              end-if
+              write clms-detail-out-rec from clms-detail-record
+           end-if
+
+           if at-pmt-accept-dt = low-values
+      *       and at-check-written-dt not = low-values
+              and at-to-be-written-dt <= ws-cur-bin-dt
+              and ((at-pmt-select-dt = ws-eom-bin-dt)
+                           or
+                   (at-pmt-select-dt = low-values))
+      *       if good-cert
+                 if at-claim-type = 'L'
+                    compute bal-lf-clms-pd-cur = bal-lf-clms-pd-cur +
+                       at-amount-paid
+                 else
+                    compute bal-ah-clms-pd-cur = bal-ah-clms-pd-cur +
+                       at-amount-paid
+                 end-if
+      *       end-if
+           end-if
+
+           if at-void-accept-dt = low-values
+              and at-void-select-dt not = low-values
+              and at-void-select-dt <= ws-eom-bin-dt
+              move 'CURR'              to chk-when
+              perform 7000-confirm-status
+                                       thru 7000-exit
+              if at-claim-type = 'L'
+                 move 'L'              to clm-type
+                 compute bal-lf-clms-void = bal-lf-clms-void +
+                    at-amount-paid
+              else
+                 move 'A'              to clm-type
+                 compute bal-ah-clms-void = bal-ah-clms-void +
+                    at-amount-paid
+              end-if
+              move cl-claim-no         to clm-no
+              move cl-cert-no          to crt-no
+              move at-check-no         to chk-no
+              compute chk-amt = at-amount-paid * -1
+              if at-void-select-dt < ws-eom-bin-dt
+                 move 'PREV'           to chk-when
+              end-if
+              write clms-detail-out-rec from clms-detail-record
+           end-if
+
+           if at-void-accept-dt = low-values
+              and at-void-select-dt not = low-values
+              and at-void-select-dt = ws-eom-bin-dt
+              if at-claim-type = 'L'
+                 compute bal-lf-clms-pd-cur = bal-lf-clms-pd-cur +
+                    (at-amount-paid * -1)
+              else
+                 compute bal-ah-clms-pd-cur = bal-ah-clms-pd-cur +
+                    (at-amount-paid * -1)
+              end-if
+           end-if
+
+
+           go to 5200-readnext
+
+           .
+       5300-ENDBR.
+
+           IF GOOD-TRLR-STARTBR = 'YES'
+              EXEC CICS ENDBR
+                 DATASET   ('ELTRLR')
+              END-EXEC
+           END-IF
+
+           GO TO 5100-READNEXT
+
+           .
+       5900-ENDBR.
+      
+           close clms-detail-out
+      *          comm-detail-out
+
+           IF GOOD-STARTBR = 'YES'
+              EXEC CICS ENDBR
+                 DATASET   ('ELMSTR')
+              END-EXEC
+           END-IF
+
+           move bal-lf-clms-pd         to bl-out-lf-clms-pd
+           move bal-lf-clms-void       to bl-out-lf-clms-void
+           compute bl-out-lf-tot-clms  = bal-lf-clms-pd -
+              bal-lf-clms-void
+           move bal-ah-clms-pd         to bl-out-ah-clms-pd
+           move bal-ah-clms-void       to bl-out-ah-clms-void
+           compute bl-out-ah-tot-clms  = bal-ah-clms-pd -
+              bal-ah-clms-void
+           compute bl-out-clms-pd      = bal-lf-clms-pd +
+              bal-ah-clms-pd
+           compute bl-out-clms-void    = bal-lf-clms-void +
+              bal-ah-clms-void
+           compute bl-out-tot-clms     = bl-out-clms-pd -
+              bl-out-clms-void
+           move bal-lf-clms-pd-cur     to bl-out-lf-clms-cur
+           move bal-ah-clms-pd-cur     to bl-out-ah-clms-cur
+           compute bl-out-tot-clms-cur =
+              bal-lf-clms-pd-cur + bal-ah-clms-pd-cur
+
+           set bl-ok to true
+
+           .
+       6000-go-BACK.
+
+           exec cics return
+           end-exec
+
+           .         
+       6130-FIND-BENEFIT-CD.
+
+           EXEC CICS READ
+              DATASET ('ELCNTL')
+              into    (CONTROL-FILE)
+              RIDFLD  (ELCNTL-KEY)
+              GTEQ
+              RESP    (WS-RESPONSE)
+           END-EXEC
+           
+           IF RESP-NORMAL
+              IF (CF-COMPANY-ID = bl-input-comp-id)
+                 AND (CF-RECORD-TYPE = '5')
+                 PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+                    (S1 > +8)
+                    OR (CF-BENEFIT-CODE (S1) = CLAS-LOOK)
+                 END-PERFORM
+                 IF S1 NOT > +8
+                    MOVE CF-BENEFIT-CATEGORY (S1)
+                                       TO WS-AH-CATEGORY
+                    GO TO 6130-EXIT
+                 END-IF
+              END-IF
+           END-IF
+
+           .
+       6130-EXIT.
+           EXIT.
+
+       6200-get-acct.
+
+           if pb-control-by-account (2:19) = am-control-a
+              and pb-cert-eff-dt < am-expiration-dt
+              and pb-cert-eff-dt >= am-effective-dt
+              go to 6200-exit
+           end-if
+
+           move low-values             to eracct-key
+           move pb-control-by-account (1:20)
+                                       to eracct-key (1:20)
+           move pb-acct-exp-dt         to acct-exp-date
+           exec cics read
+              dataset       ('ERACCT')
+              ridfld        (eracct-key)
+              into          (account-master)
+              resp          (ws-response)
+           end-exec
+
+           if resp-normal
+              move am-dcc-product-code to ws-dcc-product-code
+           end-if
+
+           .
+       6200-exit.
+           exit.
+
+       7000-confirm-status.
+
+           move spaces                 to ws-cert-status
+           move 'BAD'                  to chk-good-bad
+           move cl-company-cd          to cert-company-cd
+           move cl-cert-key-data       to elcert-key (2:21)
+           move cl-cert-no             to cert-cert-no
+
+           EXEC CICS  READ
+               DATASET  ('ELCERT')                                  
+               INTO     (CERTIFICATE-MASTER)                 
+               RIDFLD   (ELCERT-KEY)
+               resp     (ws-response)
+           END-EXEC
+
+           if not resp-normal
+              continue
+           else
+              if (cert-added-online
+                 or cert-added-batch)
+                 and (not cert-was-created-for-claim)
+                 move 'Good'           to chk-good-bad
+                 set good-cert         to true
+              end-if
+           end-if
+
+           .
+       7000-exit.
+           exit.
+
+       8500-DATE-CONVERT.                         
+
+           EXEC CICS LINK
+               PROGRAM   ('ELDATCV')
+               COMMAREA  (DATE-CONVERSION-DATA)
+               LENGTH    (DC-COMM-LENGTH)
+           END-EXEC
+
+           .
+       8500-EXIT.
+           EXIT.

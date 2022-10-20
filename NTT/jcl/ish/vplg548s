@@ -1,0 +1,98 @@
+################################################################################
+#                                                                              #
+#     JOB: vplg548s
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job aborted, not CID1T"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=EL300
+################################################################################
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD.EL501' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCVPP1
+CLAS113021                          1
+PRCO-501-2
+!
+
+EXECPGM pgmname='EL300' stepname='EL300'
+
+################################################################################
+LABEL name=STEP2
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d ERACCTS
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP2' parm='SH'
+
+################################################################################
+LABEL name=EL501 
+################################################################################
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD.EL501' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/VP.XX.ACCT_00' disp='i-o' 
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCTS' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTLT' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY'
+ASSGNDD ddname='ERMEBL' type='DUMMY'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+ASSGNDD ddname='SORTWK06' type='TEMP' 
+
+EXECPGM pgmname='EL501' stepname='EL501' 
+
+################################################################################
+LABEL name=CPY501
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL501/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH501S' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY501' parm='ALL' 
+
+################################################################################
+LABEL name=EL548S
+################################################################################
+ONRETCODE MAXRC GT '11' BYPASS scope='STEP'  
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCTS' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o'
+ASSGNDD ddname='ACCTOUT' filename='$SEQFILES/ERACCTS_VPP.TMP' disp='o' normal='k' abend='d' recfmt='V' recsize='1770'
+ASSGNDD ddname='SYS008' type='SYSOUT'
+
+EXECPGM pgmname='EL548A' stepname='EL548S'
+
+################################################################################
+LABEL name=PRL548S
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+perl $HOME/bin/fix_eracct.pl $SEQFILES/ERACCTS_VPP.TMP $SEQFILES/ERACCTS_VPP.TXT $HOME/bin/fix_eraccts.msgs
+!
+EXECPGM pgmname='BPXBATCH' stepname='PRL548S' parm='SH'
+
+if ($JOBSTATUS == 0) then
+   ftp -n ntis1.cso.local < $JCLLIB/ftp-vplg548s
+else
+    echo " Job aborted, print not released "
+endif
+ENDJOB
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 071807  2007021400002  PEMA   NEW JOB

@@ -1,0 +1,156 @@
+cd $PROJECT_ROOT/jcl
+
+echo "Begin Cycle Date Test "
+if (`date +%Y%m%d` != @CCYYYYMMDD) then
+   echo "Cycle Date NOT equal Current date, aborting "
+   "echo 'Bad cycle date' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+   exit 1
+endif
+echo "Cycle Date Test Complete"
+
+rm -f $SEQFILES/runtimes/CPSDAILY
+setenv JOBSTART `date +%Y/%m/%d/%H/%M/%S`
+echo $JOBSTART
+perl $HOME/bin/run_time_start.pl CPSDAILY CPSDAILY
+
+################################################################################
+rm -f $PROJECT_ROOT/emails/printemail.txt $PROJECT_ROOT/reprints/dailycycle
+cp $PROJECT_ROOT/emails/emailinit.txt $PROJECT_ROOT/emails/printemail.txt
+touch $PROJECT_ROOT/reprints/dailycycle
+################################################################################
+
+perl $HOME/bin/DailyMonitor.pl >> $HOME/CPSFRIDAY.OUTPUT &
+
+echo "clsvsam is about to start"
+unikixjob clsvsam -w -ca
+if ($status != 0) then
+    echo "clsvsam aborted"
+   "echo 'CLSVSAM' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "clsvsam terminated successfully"
+
+
+echo "ciddaily1 is about to start"
+unikixjob ciddaily1 -w -ca
+if ($status != 0) then
+    echo "ciddaily1 aborted"
+   "echo 'In CIDDAILY1' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "ciddaily1 terminated successfully"
+
+
+echo "cidfriday is about to start"
+unikixjob cidfriday -w -ca
+if ($status != 0) then
+    echo "cidfriday aborted"
+   "echo 'In CIDFRIDAY' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidfriday terminated successfully"
+
+
+echo "dccdaily1 is about to start"
+unikixjob dccdaily1 -w -ca
+if ($status != 0) then
+    echo "dccdaily1 aborted"
+   "echo 'In DCCDAILY1' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "dccdaily1 terminated successfully"
+
+
+echo "dccfriday is about to start"
+unikixjob dccfriday -w -ca
+if ($status != 0) then
+    echo "dccfriday aborted"
+   "echo 'In DCCFRIDAY' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "dccfriday terminated successfully"
+
+
+echo "opnvsam is about to start"
+unikixjob opnvsam -w -ca
+if ($status != 0) then
+    echo "opnvsam aborted"
+   "echo 'OPNVSAM' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "opnvsam terminated successfully"
+
+rm $JCLLIB/date_hash
+
+setenv cdte `date +%Y%m%d%H%M`
+"cat $PROJECT_ROOT/emails/printemail.txt | mutt -s 'Todays print list'  CPSPrintList@cso.com"
+"echo 'Logic cycle complete' | mutt -s 'Cycle COMPLETE'  pager.pema@cso.com,cycle@cso.com,pager.sdga@cso.com"
+cp $PROJECT_ROOT/reprints/dailycycle $PROJECT_ROOT/reprints/dailycycle.$cdte
+
+echo "cilgcff1 is about to start"
+unikixjob cilgcff1 -w -ca
+if ($status != 0) then
+    echo "cilgcff1 aborted"
+   "echo 'CILGCFF1' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cilgcff1 terminated successfully"
+
+echo "cilgbkp4mo is about to start"
+unikixjob cilgbkp4mo -w -ca
+if ($status != 0) then
+    echo "cilgbkp4mo aborted"
+   "echo 'CILGBKP4MO' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cilgbkp4mo terminated successfully"
+
+echo "cimolgbld is about to start"
+unikixjob cimolgbld -k mdoff -w -ca
+if ($status != 0) then
+    echo "cimolgbld aborted"
+   "echo 'CIMOLGBLD' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cimolgbld terminated successfully"
+
+echo "cimocff1 is about to start"
+unikixjob cimocff1 -k mdoff -w -ca
+if ($status != 0) then
+    echo "cimocff1 aborted"
+   "echo 'CIMOCFF1' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cimocff1 terminated successfully"
+
+echo "File compression has been started"
+/export/home/mtpadmin/bin/gdgcomp
+
+echo "daily backup is about to start"
+unikixjob dayunibkp -w -ca
+if ($status != 0) then
+   echo "dayunibkp aborted"
+   "echo 'dayunibkp' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+   exit 1
+endif
+echo "daily backup terminated successfully"
+"echo 'Daily backup submitted' | mutt -s 'Backup Started'  pager.pema@cso.com,cycle@cso.com"
+
+echo "@ccyyyymmdd" > $SEQFILES/Logic.daily.postcycle.done
+ftp -n ntis1.cso.local < $JCLLIB/ftp-postcycle
+
+perl $HOME/bin/run_time_dura.pl $JOBSTART CPSDAILY CPSDAILY
+cp $SEQFILES/runtimes/CPSDAILY $SEQFILES/runtimes/CPSDAILY.$cdte
+
+echo "ci1tlgbld is about to start"
+unikixjob ci1tlgbld -k cid1t
+
+echo "cilgdrpt is about to start"
+unikixjob cilgdrpt
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOBS
+# 052914  2014042300003  TANA   CHANGE SMTP TO USE DIST GROUP

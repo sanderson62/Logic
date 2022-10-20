@@ -1,0 +1,152 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' verbose
+#
+################################################################################
+setenv cdte `date +%Y%m%d`
+################################################################################
+LABEL name=REMOVE
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/*Cancelled.xlsx
+rm -f $SEQFILES/fpbcancels.xlsx
+!
+EXECPGM pgmname='BPXBATCH' stepname='REMOVE' parm='SH'
+
+#*******************************************************************************
+#   Get the cancel file from  //Ntcso1/userdata/wrk_grp/ci/adm/alwa
+#*******************************************************************************
+################################################################################
+LABEL name=FTP1
+################################################################################
+#
+# This step gets file LAS185M.TXT from ntcso1/userdata/wrk_grp/ci/adm/alwa
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < $JCLLIB/ftp-cifpcanin
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+################################################################################
+LABEL name=CAT1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cat $SEQFILES/*Cancelled.xlsx > $SEQFILES/fpbcancels.xlsx
+!
+EXECPGM pgmname='BPXBATCH' stepname='CAT1' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step removes low values from the input file LAS185M.TXT
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/readfpbcancss.pl $SEQFILES/fpbcancels.xlsx $SEQFILES/FPCancels.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=SORTLGX 
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/FPCancels.txt' disp='i-o' normal='k' abend='k' recfmt='F' recsize='100'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.DD.FPBCAN.LOGIC.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='80'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 20)(79 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTLGX'
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                   * 
+#  *   PREPARE RECORDS TO LOAD TO PEND. BUS. FILE                      * 
+#  *                                                                   * 
+#  ********************************************************************* 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.DD.FPBCAN.LOGIC.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DD.FPBCAN.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='CFCNTL' disp='i-o' normal='k' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL512/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH512.FPBCAN' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL' 
+
+#*******************************************************************************
+#   delete the cancel file from //Ntcso1/userdata/wrk_grp/ci/adm/alwa
+#*******************************************************************************
+################################################################################
+LABEL name=PERL2
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/CI.DL.CIADM.FICH512.FPBCAN $SEQFILES/CI.EL512.FPB.CANCELS.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL2' parm='SH'
+
+################################################################################
+
+
+if ($JOBSTATUS == 0) then
+   "smtp -f slunikix -t dcpsfirstpremier -s 'EL512 FOR FIRST PREMIER CANCELS IS COMPLETE' "
+#    "uuencode $SEQFILES/CI.EL512.FPB.CANCELS.pdf CI.EL512.FPB.CANCELS.pdf|mailx -s 'FPB Cancels EL512 ' -r 'slunikix@cso.com' dcpsfirstpremier@cso.com"
+    "mutt -s 'FPB Cancels EL512 ' -a $SEQFILES/CI.EL512.FPB.CANCELS.pdf dcpsfirstpremier@cso.com -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"
+else
+   echo " Job aborted, print not released "
+    "mutt -s 'Job CIFPCAN512 Aborted ' -a $SEQFILES/fpbcancels.xlsx -i $JOB_OUTPUT_FILE dcpsfirstpremier@cso.com < /dev/null"
+endif
+
+################################################################################
+LABEL name=FTP2
+################################################################################
+#
+# This step attempts to delete *Cancelled.xlsx from ntcso1/userdata/wrk_grp/ci/adm/alwa
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cp $SEQFILES/fpbcancels.xlsx $SEQFILES/$cdte.fpbcancels.xlsx
+ftp -n ntcso1 < $JCLLIB/ftp-cifpcandel
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP2' parm='SH'
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#081507  2007061300001   AJRA   New Job
+#111412  2012110500001   PEMA   add steps to process xlsx file
+# 052914 2014042300003   TANA   CHANGE MAILX TO MUTT EMAIL

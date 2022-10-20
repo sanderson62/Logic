@@ -1,0 +1,116 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+################################################################################
+LABEL name=EL300A
+################################################################################
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/ZI.DD.ER.DATECARD' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCCID1
+CLAS063008                          1
+PRTO-515-F
+!
+
+EXECPGM pgmname='EL300' stepname='EL300A'
+
+################################################################################
+LABEL name=EL515 
+################################################################################
+ASSGNDD ddname='ERPNDB' dataset='CI.DD.LG.ERPNDB' type='VS' disp='i-o' 
+ASSGNDD ddname='ERPNDC' dataset='CI.DD.LG.ERPNDC' type='VS' disp='i-o' 
+ASSGNDD ddname='ERCRTC' dataset='CI.DD.LG.ERCRTC' type='VS' disp='i-o' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' disp='i-o' 
+ASSGNDD ddname='ELERRS' dataset='CI.DD.LG.ELERRS' type='VS' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/ZI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='S' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/ZI.EX.FICH515' disp='o' normal='k' recsize='133' recfmt='F'
+#  ************************************************   SORT WORK FILES    
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL515T' stepname='EL515' 
+
+################################################################################
+LABEL name=CIB003
+################################################################################
+#  ******************************************************************** 
+#  *                                                                  * 
+#  *   READ THE PRINT LINES AND CREATE CSR REPORT FILE                * 
+#  *                                                                  * 
+#  ******************************************************************** 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.EX.FICH515' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.WW.CSR.REPORT1' disp='o' normal='k' abend='d' recsize='146' recfmt='F' 
+
+EXECPGM pgmname='CIB003' stepname='CIB003' 
+
+################################################################################
+LABEL name=REMWORK
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm $SEQFILES/EL515WORK/*
+!
+EXECPGM pgmname='BPXBATCH' stepname='REMWORK' parm='SH'
+
+################################################################################
+LABEL name=SORT01
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.WW.CSR.REPORT1' disp='i-o' normal='k' abend='k' recsize='146' recfmt='F'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.WW.CSR.REPORT1.SRTD' disp='o' normal='k' abend='d' recfmt='F' recsize='146'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 13)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT01'
+
+################################################################################
+LABEL name=PERL01
+################################################################################
+#
+# This step reads the file from above and creates multiple print files based
+# on how many unique CSR's there are.  The csr is in positions 1 thru 4
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/create_el515_csr.pl $SEQFILES/CI.WW.CSR.REPORT1.SRTD $SEQFILES/EL515WORK/ EL515
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL01' parm='SH'
+
+################################################################################
+LABEL name=PERL02
+################################################################################
+#
+# This step reads the multiple files created from above and generates print
+# statements (exelpr.sh) for each one.
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/print_el515_csr.pl $SEQFILES/EL515WORK $HOME EL515 p60w1s.parms
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL02' parm='SH'
+
+################################################################################
+LABEL name=CPY515
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M'
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.EX.FICH515' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.FICH515' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+EXECPGM pgmname='CIB009L' stepname='CPY515' parm='ALL'
+
+ENDJOB 
+################################################################################

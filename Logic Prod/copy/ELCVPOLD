@@ -1,0 +1,164 @@
+00001 ******************************************************************00000010
+00002 ***                                                              *00000020
+00003 ***                          ELPRTCVP.                           *00000030
+00004 ***                          VMOD=2.001                          *00000040
+00005 ***                                                              *00000050
+00006 ***     COPY MEMBER FOR TERMINAL ONLINE PRINT ROUTINE.           *00000060
+00007 ***     THIS ROUTINE WILL ACCOMODATE PRINTING TO A 3270          *00000070
+00008 ***     TERMINAL PRINTER. A BUFFER OF UP TO 1920 CHARACTERS      *00000080
+00009 ***     IS ACCUMULATED AND PRINTED COLLECTIVELY.                 *00000090
+00010 ***                                                              *00000100
+00011 ***     THIS ROUTINE TO BE USED ONLY WITH ACCOMPANIMENT          *00000110
+00012 ***      OF THE WORKING-STORAGE COPY MEMBER ( ELPRTCVD )         *00000120
+00013 ***     THE HOST PROGRAM MUST INITIALIZE THE FOLLOWING 3 FIELDS  *00000130
+00014 ***      FROM THE ABOVE COPY MEMBER FOR THIS PROCEDURE TO BE     *00000140
+00015 ***      SUCCESSFUL.                                             *00000150
+00016 ***      05  WS-LINE-LEN    PIC  S9(4)  COMP  VALUE +80.         *00000160
+00017 ***                         LENGTH OF THE LINE TO BE PRINTED     *00000170
+00018 ***                         DEFAULT IS 80, YOU CAN USE ANY NUMBER*00000180
+00019 ***                         UP TO 132.  THIS FIELD IS ONLY ACCEP-*00000190
+00020 ***                         TED THE FIRST TIME THRU THE ROUTINE. *00000200
+00021 ***      05  WS-PROG-END    PIC  X  VALUE SPACES.                *00000210
+00022 ***                         PROGRAM END SWITCH. INITIALIZED      *00000220
+00023 ***                         TO SPACE-     MOVE IN ANY NONBLANK   *00000230
+00024 ***                         TO IT WHEN PROGRAM IS FINISHED.      *00000240
+00025 ***      05  WS-PRINT-AREA.                                      *00000250
+00026 ***          10  WS-PASSED-CNTL-CHAR     PIC X.                  *00000260
+00027 ***          10  WS-PASSED-DATA          PIC X(132).             *00000270
+00028 ***                         USE THE DATA TO BE PRINTED IN THE    *00000280
+00029 ***                         WS-PASSED-DATA.                      *00000290
+00030 ***                         USE THE STANDARD CARRIAGE CONTROL    *00000300
+00031 ***                         CHARACTER IN THE WS-PASSED-CNTL-CHAR *00000310
+00032 ***                           SINGLE-SPACE            VALUE ' '  *00000320
+00033 ***                           DOUBLE-SPACE            VALUE '0'  *00000330
+00034 ***                           TRIPLE-SPACE            VALUE '-'  *00000340
+00035 ***                           TOP-PAGE                VALUE '1'  *00000350
+00036 ***      NOTE: A LINE COUNT IS PROVIDED IN FIELDNAME -WS-LINE-CNT*00000360
+00037 ***            THE USE OF THIS FIELD IS OPTIONAL.                *00000370
+00038 ***            THIS ROUTINE WILL ONLY ADD 1, 2, OR 3             *00000380
+00039 ***            TO THIS COUNT DEPENDING ON THE WS-PASSED-CNTL-CHAR*00000390
+00040 ***            AND RESET THE COUNT TO ZERO WHEN TOP-PAGE         *00000400
+00041 ***            CONDITION.                                        *00000410
+00042 ***                                                              *00000420
+00043 ******************************************************************00000430
+00044                                                                   00000440
+00045  ELPRTCVP.                                                        00000450
+00046      IF NOT FIRST-TIME                                            00000460
+00047          GO TO ELPRTCVP-020.                                      00000470
+00048                                                                   00000480
+00049      IF WS-LINE-LEN NOT GREATER ZERO                              00000490
+00050          GO TO ELPRTCVP-EXIT.                                     00000500
+00051                                                                   00000510
+00052      MOVE '2'                    TO WS-FIRST-TIME-SW.             00000520
+00053      MOVE LOW-VALUES             TO WS-BUFFER-AREA.               00000530
+00054                                                                   00000540
+00055      SET BUFFER-INDEX TO +1                                       00000550
+00056                                                                   00000560
+00057      IF NOT TOP-PAGE                                              00000570
+00058          MOVE T-TP               TO WS-BUFFER-BYTE (BUFFER-INDEX) 00000580
+00059          SET BUFFER-INDEX UP BY +1.                               00000590
+00060                                                                   00000600
+00061  ELPRTCVP-020.                                                    00000610
+00062      IF WS-PROG-END = SPACES                                      00000620
+00063          GO TO ELPRTCVP-030.                                      00000630
+00064                                                                   00000640
+00065      MOVE SPACES                 TO WS-PROG-END.                  00000650
+00066                                                                   00000660
+00067      IF BUFFER-INDEX GREATER +1                                   00000670
+00068          PERFORM ELPRTCVP-PRINT-BUFFER THRU ELPRTCVP-PRINT-EXIT.  00000680
+00069                                                                   00000690
+00070      MOVE '1'                    TO WS-FIRST-TIME-SW.             00000700
+00071                                                                   00000710
+00072      GO TO ELPRTCVP-EXIT.                                         00000720
+00073                                                                   00000730
+00074  ELPRTCVP-030.                                                    00000740
+00075      IF WS-PASSED-DATA = SPACES                                   00000750
+00076          SET PRT-INDEX TO +1                                      00000760
+00077          GO TO ELPRTCVP-050.                                      00000770
+00078                                                                   00000780
+00079      SET PRT-INDEX TO WS-LINE-LEN.                                00000790
+00080                                                                   00000800
+00081  ELPRTCVP-040.                                                    00000810
+00082      IF WS-PRINT-BYTE (PRT-INDEX) NOT = SPACES                    00000820
+00083          GO TO ELPRTCVP-050.                                      00000830
+00084                                                                   00000840
+00085      IF PRT-INDEX GREATER +1                                      00000850
+00086          SET PRT-INDEX DOWN BY +1                                 00000860
+00087          GO TO ELPRTCVP-040.                                      00000870
+00088                                                                   00000880
+00089  ELPRTCVP-050.                                                    00000890
+00090      SET WS-LINE-LENGTH TO PRT-INDEX.                             00000900
+00091      SET BUFFER-INDEX2 TO BUFFER-INDEX.                           00000910
+00092      SET BUFFER-INDEX2 UP BY WS-LINE-LENGTH.                      00000920
+00093                                                                   00000930
+00094      IF BUFFER-INDEX2 NOT LESS WS-BUFFER-SIZE                     00000940
+00095          PERFORM ELPRTCVP-PRINT-BUFFER THRU ELPRTCVP-PRINT-EXIT.  00000950
+00096                                                                   00000960
+00097      IF TRIPLE-SPACE                                              00000970
+00098           ADD +2  TO  WS-LINE-CNT                                 00000980
+00099           MOVE T-SS           TO WS-BUFFER-BYTE (BUFFER-INDEX)    00000990
+00100                                  WS-BUFFER-BYTE (BUFFER-INDEX + 1)00001000
+00101           SET BUFFER-INDEX UP BY +2.                              00001010
+00102                                                                   00001020
+00103      IF DOUBLE-SPACE                                              00001030
+00104           ADD +1  TO  WS-LINE-CNT                                 00001040
+00105           MOVE T-SS             TO WS-BUFFER-BYTE (BUFFER-INDEX)  00001050
+00106           SET BUFFER-INDEX UP BY +1.                              00001060
+00107                                                                   00001070
+00108      ADD +1 TO WS-LINE-CNT                                        00001080
+00109 ************************************************************      00001090
+00110 *     BYPASS NEW LINE SYMBOL                               *      00001100
+00111 *        IF FIRST BUFFER SENT AND TOP-OF-FORM SET.         *      00001110
+00112 *     OR IF FIRST LINE OF SUBSEQUENT BUFFERS.              *      00001120
+00113 ************************************************************      00001130
+00114                                                                   00001140
+00115      IF (BUFFER-INDEX GREATER +1 AND                              00001150
+00116          WS-BUFFER-BYTE (BUFFER-INDEX - 1) = T-TP)  OR            00001160
+00117          FIRST-LINE-NEXT-BUFFER                                   00001170
+00118          MOVE ZERO               TO WS-FIRST-TIME-SW              00001180
+00119      ELSE                                                         00001190
+00120          MOVE T-SS               TO WS-BUFFER-BYTE (BUFFER-INDEX) 00001200
+00121          SET BUFFER-INDEX UP BY +1.                               00001210
+00122                                                                   00001220
+00123 **   NOTE, SINGLE SPACE IS REQUIRED BEFORE TOP PAGE CHAR          00001230
+00124                                                                   00001240
+00125      IF TOP-PAGE                                                  00001250
+00126          MOVE +1                TO WS-LINE-CNT                    00001260
+00127          MOVE T-TP              TO WS-BUFFER-BYTE (BUFFER-INDEX)  00001270
+00128          SET BUFFER-INDEX UP BY +1.                               00001280
+00129                                                                   00001290
+00130      SET PRT-INDEX TO +1.                                         00001300
+00131                                                                   00001310
+00132  ELPRTCVP-060.                                                    00001320
+00133      MOVE WS-PRINT-BYTE (PRT-INDEX)                               00001330
+00134                                  TO WS-BUFFER-BYTE (BUFFER-INDEX).00001340
+00135      SET BUFFER-INDEX UP BY +1.                                   00001350
+00136                                                                   00001360
+00137      IF PRT-INDEX LESS WS-LINE-LENGTH                             00001370
+00138          SET PRT-INDEX UP BY +1                                   00001380
+00139          GO TO ELPRTCVP-060.                                      00001390
+00140                                                                   00001400
+00141  ELPRTCVP-EXIT.                                                   00001410
+00142      EXIT.                                                        00001420
+00143                                                                   00001430
+00144  ELPRTCVP-PRINT-BUFFER.                                           00001440
+00145      IF WS-BUFFER-BYTE (BUFFER-INDEX - 1) = T-SS                  00001450
+00146         MOVE SPACE               TO WS-BUFFER-BYTE (BUFFER-INDEX) 00001460
+00147         SET BUFFER-INDEX UP BY 1.                                 00001470
+00148                                                                   00001480
+00149      MOVE  T-EM                  TO  WS-BUFFER-BYTE (BUFFER-INDEX)00001490
+00150      SET WS-BUFFER-LENGTH TO BUFFER-INDEX.                        00001500
+00151                                                                   00001510
+00152      EXEC CICS SEND                                               00001520
+00153          FROM    (WS-BUFFER-AREA)                                 00001530
+00154          LENGTH  (WS-BUFFER-LENGTH)                               00001540
+00155          CTLCHAR (WS-WCC-CNTL)                                    00001550
+00156          ERASE                                                    00001560
+00157      END-EXEC.                                                    00001570
+00158                                                                   00001580
+00159      SET BUFFER-INDEX TO +1.                                      00001590
+00160      MOVE '2'                    TO WS-FIRST-TIME-SW.             00001600
+00161                                                                   00001610
+00162  ELPRTCVP-PRINT-EXIT.                                             00001620
+00163      EXIT.                                                        00001630
+00164                                                                   00001640

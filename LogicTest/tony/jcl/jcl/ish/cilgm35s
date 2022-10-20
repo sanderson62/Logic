@@ -1,0 +1,79 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE EQ 64 GOTO END_JOB 
+
+################################################################################
+LABEL name=CIB011
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1t/exe/bat'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.WW.REST.OF.STMTS2' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERCOMP' type='VS' filename='ERCOMPT' disp='i-o' 
+ASSGNDD ddname='ERCOBI' type='VS' filename='ERCOBI' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+****************************** REMIT STMTS      
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.WW.OTHER.STMTS' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/ZI.WW.SPEC.STMTS.TEMP' disp='o' normal='k' abend='d' recsize='156' recfmt='F' 
+****************************** REFUND STMTS     
+
+EXECPGM pgmname='CIB011' stepname='CIB011'
+
+################################################################################
+LABEL name=SORT01
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/ZI.WW.SPEC.STMTS.TEMP' disp='i-o' normal='k' abend='k' recsize='156' recfmt='F'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/ZI.WW.SPEC.STMTS.SRTD' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 23)
+       ARRANGE=(24,133)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT04'
+
+################################################################################
+LABEL name=PERLS
+################################################################################
+#
+# This step reads the file from above and removes the duplicate cover letters
+# and address pages
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/cib011a.pl $SEQFILES/ZI.WW.SPEC.STMTS.SRTD $SEQFILES/ZI.WW.SPEC.STMTS
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERLS' parm='SH'
+
+################################################################################
+LABEL name=PRTCVR
+################################################################################
+#
+# This step reads the file from above and selects the cover letters and
+# and address pages only
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/prtspec.pl $SEQFILES/ZI.WW.SPEC.STMTS $SEQFILES/ZI.WW.SPEC.COVER
+!
+EXECPGM pgmname='BPXBATCH' stepname='PRTCVR' parm='SH'
+
+################################################################################
+LABEL name=CPYSPEC
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M'
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.WW.SPEC.COVER' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.SPEC.COVER' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+EXECPGM pgmname='CIB009L' stepname='CPYSPEC' parm='ALL'
+
+
+if ($JOBSTATUS == 0) then
+    "exelpr.sh cim014t.parms '-ode=CI -oti=SPECIAL_HANDLING' $SEQFILES/ZI.WW.SPEC.COVER"
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

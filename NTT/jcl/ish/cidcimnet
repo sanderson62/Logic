@@ -1,0 +1,115 @@
+################################################################################
+#                       
+#     JOB: cidcimnet       
+#                         
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=BLDHDR 
+################################################################################
+#  THE INPUT FILES ARE CREATED IN JOB CIIMNET AND OF COURSE IT MUST RUN FIRST
+#
+#  *   BUILD IMNET HEADER RECORDS FROM     CLAIM, CRTC AND PNDB          
+#  *      ONLINE FILES.                                                  
+#  *                                                                     
+#  *   ONLINE CERTIFICATE MASTER FILE IS NOT USED AT THIS TIME.          
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='CLMFILE' filename='$SEQFILES/CI.SORTED.CLMS' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='CRTCFILE' filename='$SEQFILES/CI.SORTED.CRTC' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='PNDBFILE' filename='$SEQFILES/CI.SORTED.PNDB' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ELCERT' type='VS' filename='ELCERT' disp='i-o'
+ASSGNDD ddname='CLMSFILE' dataset='DC.XX.CIIMNET.CLMS' gdg='+1' filename='$SEQFILES/DC.XX.CIIMNET.CLMS' disp='o' normal='k' abend='d' recfmt='F' recsize='90'
+ASSGNDD ddname='CERTFILE' dataset='DC.XX.CIIMNET.CRTS' gdg='+1' filename='$SEQFILES/DC.XX.CIIMNET.CRTS' disp='o' normal='k' abend='d' recfmt='F' recsize='90'
+ASSGNDD ddname='SYS022' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS023' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+00/00/00 PREV CYC DATE = 10-18-22
+!
+
+EXECPGM pgmname='CIDMNET' stepname='BLDHDR' 
+
+################################################################################
+LABEL name=CPYHDR1
+################################################################################
+#  **--                                                                  
+#  **--      BACKUP BATCH COMM FILE ON CART                              
+#  **--                                                                  
+#  ********************************************************************* 
+ASSGNDD ddname='INPUT' dataset='DC.XX.CIIMNET.CLMS' gdg='+1' filename='$SEQFILES/DC.XX.CIIMNET.CLMS' disp='i-o' normal='k' abend='k' recfmt='F'
+ASSGNDD ddname='OUTPUT' filename='$SEQFILES/DCC.CLM.HDR.NEW' disp='o' normal='k' recsize='90' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(INPUT) -                                                 
+         OFILE(OUTPUT)                                                  
+!
+EXECPGM pgmname='IDCAMS' stepname='CPYHDR1'
+
+################################################################################
+LABEL name=CPYHDR2
+################################################################################
+#  **--                                                                  
+#  **--      BACKUP BATCH COMM FILE ON CART                              
+#  **--                                                                  
+#  ********************************************************************* 
+ASSGNDD ddname='INPUT' dataset='DC.XX.CIIMNET.CRTS' gdg='+1' filename='$SEQFILES/DC.XX.CIIMNET.CRTS' disp='i-o' normal='k' abend='k' recfmt='F'
+ASSGNDD ddname='OUTPUT' filename='$SEQFILES/DCC.ADD.HDR.NEW' disp='o' normal='k' recsize='90' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(INPUT) -                                                 
+         OFILE(OUTPUT)                                                  
+!
+EXECPGM pgmname='IDCAMS' stepname='CPYHDR2'
+
+
+################################################################################
+#  *** P R O D U C T I O N                                               
+#  *** -------------------                                               
+#  *** THE ABOVE DATE WILL ALWAYS BE 00/00/00 FOR PRODUCTION.            
+#  *** (1ST 8 POSITIONS).                                                
+#  ***                                                                   
+#  *** S P E C I A L   R E Q U E S T   R U N S                           
+#  *** -------------   -------------   -------                           
+#  *** IF A SPECIFIC DAY IS REQUESTED, CHANGE THE ABOVE DATE TO THE      
+#  ***  REQUESTED DATE, IN THE FORMAT OF MM/DD/YY (1ST 8 POSITIONS).     
+#  ***                                            ==================     
+#  *** BE SURE THE ABOVE DATE IS RESET TO 00/00/00 AFTER THE "SPECIAL    
+#  ***  DATE" RUN HAS COMPLETED (1ST 8 POSITIONS).                       
+#  ***                          ==================                       
+#  ********************************************************************  
+
+################################################################################
+LABEL name=BLDCNT 
+################################################################################
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ACCTOT' filename='$SEQFILES/DC.CONTRACT.NEW' disp='o' normal='k' recsize='70' recfmt='F' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='CIDAMX1' stepname='BLDCNT'
+
+################################################################################
+
+ftp -n ntis1.cso.local < $JCLLIB/ftp-cidcimnet
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+# "exelpr.sh p81n1d.parms '-ode=Gail_Stephens' $SYSOUTDIR/$JOBNAME/BLDHDR/SYS022_$JON"
+# "exelpr.sh p81n1d.parms '-ode=Gail_Stephens' $SYSOUTDIR/$JOBNAME/BLDHDR/SYS023_$JON"
+else
+   echo "Job aborted print not released"
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+# 110303                 PEMA  REMOVE BACKUPS AND SORTS
+# 110303                 PEMA  CHANGE PGM NAME TO CIDAMX1 FROM PEMAMX2
+# 110303                 PEMA  ADD SYS019 PROCESSING TO CIIMNET AND CIDAMX1
+# 062404                 SMVA  CHG PRINT TO NEW QUEUE DIRECT TO RECORDS AREA
+################################################################################

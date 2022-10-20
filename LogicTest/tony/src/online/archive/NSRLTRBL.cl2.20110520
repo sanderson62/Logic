@@ -1,0 +1,1258 @@
+       IDENTIFICATION DIVISION.                                         
+
+       PROGRAM-ID.   NSRLTRBL.
+
+      *AUTHOR.     PABLO
+      *            COLLEYVILLE, TEXAS.                                       
+
+      *REMARKS.    EXECUTED FROM NSREQLTR
+
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      * 121802    2009122800001  PEMA  NEW PROGRAM
+      ******************************************************************
+       ENVIRONMENT DIVISION.                                            
+
+       DATA DIVISION.                                                   
+
+       working-storage section.
+       
+       77  SAVE-DATE                   PIC X(8)    VALUE SPACES.
+       77  WS-SAVE-EDIT-A-DATE         PIC X(10)   VALUE SPACES.
+       77  SAVE-BIN-DATE               PIC XX      VALUE SPACES.
+       77  S1                          PIC S999 COMP-3 VALUE +0.
+       77  E1                          PIC S999 COMP-3 VALUE +0.
+       77  A1                          PIC S9(5) COMP-3 VALUE +0.
+       77  M1                          PIC S999 COMP-3 VALUE +0.
+       77  WS-WORK-FIELD               PIC X(80)    VALUE SPACES.
+       77  WS-ARCHIVE-NO               PIC S9(8)  COMP VALUE +0.
+       77  WS-FOLLOW-UP-DT             PIC XX  VALUE LOW-VALUES.
+       77  WS-RESEND-DT                PIC XX  VALUE LOW-VALUES.
+       77  WS-AUTO-LAST-SCHED-DT       PIC XX  VALUE LOW-VALUES.
+       77  WS-LAST-ACT-DT              PIC XX  VALUE LOW-VALUES.
+       77  WS-ACTIVITY-DT              PIC XX  VALUE LOW-VALUES.
+       77  WS-FORM                     PIC XXXX  VALUE SPACES.
+       77  WS-LAST-ACT-TYPE            PIC X   VALUE ' '.
+       77  WS-FOUND-BENE-SW            PIC X   VALUE ' '.
+           88  FOUND-BENE                  VALUE 'Y'.
+       77  WS-TALLY                    PIC S999 COMP-3 VALUE +0.
+       77  WS-TALLY1                   PIC S999 COMP-3 VALUE +0.
+       77  NS-LEN                      PIC S9(5) COMP-3 VALUE +0.
+
+       01  WS-XML-WORK                 PIC X(2500)  VALUE SPACES.
+       01 response-code         pic s9(8) comp.
+       01 display-response      pic 9(8).
+       01 bl-index              pic 9(8) comp.
+       01 max-last-name         pic x(18).
+       01 first-initial         pic x.
+       01 name-in-range-flag    pic 9.
+       01 max-entries           pic s9(8) comp value 100.
+       
+       01 lower-case    pic x(26) value
+                  "abcdefghijklmnopqrstuvwxyz".
+       01 upper-case    pic x(26) value
+                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".
+
+       01  W-Z-CONTROL-DATA.
+           05  W-NUMBER-OF-COPIES  PIC  9(01).
+           05  FILLER              PIC  X(01).
+           05  W-DAYS-TO-FOLLOW-UP PIC  9(03).
+           05  FILLER              PIC  X(01).
+           05  W-DAYS-TO-RESEND-1  PIC  9(03).
+           05  FILLER              PIC  X(01).
+           05  W-FORM-TO-RESEND    PIC  X(04).
+           05  FILLER              PIC  X(01).
+           05  W-PROMPT-LETTER     PIC  X(01).
+           05  FILLER              PIC  X(01).
+           05  W-ENCLOSURE-CD      PIC  X(03).
+           05  FILLER              PIC  X(1).
+           05  W-AUTO-CLOSE-IND    PIC  X(1).
+           05  FILLER              PIC  X(1).
+           05  W-LETTER-TO-BENE    PIC  X(1).
+
+
+
+       01  MISC.
+           12  WS-RESPONSE             PIC S9(8)   COMP.
+               88  RESP-NORMAL                  VALUE +00.
+               88  RESP-NOTFND                  VALUE +13.
+               88  RESP-DUPREC                  VALUE +14.
+               88  RESP-DUPKEY                  VALUE +15.
+               88  RESP-NOTOPEN                 VALUE +19.
+               88  RESP-ENDFILE                 VALUE +20.
+
+
+       01  WS-ELENCC-KEY.
+           05  WS-ELENCC-COMPANY-CD    PIC X.
+           05  WS-ELENCC-ENC-CODE      PIC X(5).
+           05  F                       PIC X(10).
+
+       01  WS-ELMSTR-KEY.
+           05  WS-ELMSTR-COMPANY-CD    PIC X.
+           05  WS-ELMSTR-CARRIER       PIC X.
+           05  WS-ELMSTR-CLAIM-NO      PIC X(7).
+           05  WS-ELMSTR-CERT-NO       PIC X(11).
+       01  WS-ELTRLR-KEY.
+           05  WS-ELTRLR-COMPANY-CD    PIC X.
+           05  WS-ELTRLR-CARRIER       PIC X.
+           05  WS-ELTRLR-CLAIM-NO      PIC X(7).
+           05  WS-ELTRLR-CERT-NO       PIC X(11).
+           05  WS-ELTRLR-SEQ-NO        PIC S9(4) COMP VALUE +0.
+       01  WS-ELCERT-KEY.
+           05  WS-ELCERT-COMPANY-CD    PIC X.
+           05  WS-ELCERT-CARRIER       PIC X.
+           05  WS-ELCERT-GROUP         PIC X(6).
+           05  WS-ELCERT-STATE         PIC XX.
+           05  WS-ELCERT-ACCOUNT       PIC X(10).
+           05  WS-ELCERT-EFF-DT        PIC XX.
+           05  WS-ELCERT-CERT-NO       PIC X(11).
+       01  WS-ERACCT-KEY.
+           05  WS-ERACCT-COMPANY-CD    PIC X.
+           05  WS-ERACCT-CARRIER       PIC X.
+           05  WS-ERACCT-GROUP         PIC X(6).
+           05  WS-ERACCT-STATE         PIC XX.
+           05  WS-ERACCT-ACCOUNT       PIC X(10).
+           05  WS-ERACCT-EXP-DT        PIC XX.
+           05  FILLER                  PIC XXXX.
+       01  WS-ELBENE-KEY.
+           05  WS-ELBENE-COMPANY-CD    PIC X.
+           05  WS-ELBENE-REC-TYPE      PIC X.
+           05  WS-ELBENE-BENE          PIC X(10).
+       01  WS-ELLETR-KEY.
+           05  WS-ELLETR-COMPANY-CD    PIC X.
+           05  WS-ELLETR-LETTER-ID     PIC X(12).
+           05  WS-ELLETR-SEQ-NO        PIC S9(4) COMP VALUE +0.
+       01  WS-ELCNTL-KEY.
+           05  WS-ELCNTL-COMPANY-ID    PIC XXX.
+           05  WS-ELCNTL-REC-TYPE      PIC X.
+           05  WS-ELCNTL-GENL.
+               10  FILLER              PIC XX  VALUE SPACES.
+               10  WS-ELCNTL-BEN-CD    PIC XX.
+           05  WS-ELCNTL-SEQ-NO        PIC S9(4) COMP.
+
+                                       COPY ELCDATE.
+                                       COPY ELCMSTR.
+                                       COPY ELCTRLR.
+                                       COPY ELCCERT.
+                                       COPY ERCACCT.
+                                       COPY ELCBENE.
+                                       COPY ELCTEXT.
+                                       COPY ELCCNTL.
+                                       COPY NSCVARS.
+       01  FILLER                      PIC X(500)  VALUE SPACES.
+                                       COPY ELCNAPS.
+                                       COPY ELCENCC.
+
+       linkage section.
+       
+       01 dfhcommarea. 
+                                       copy ELCLTRSPI.
+
+       procedure division.
+
+           MOVE EIBDATE                TO DC-JULIAN-YYDDD
+           MOVE '5'                    TO DC-OPTION-CODE
+           PERFORM 9700-DATE-LINK      THRU 9700-EXIT
+           MOVE DC-GREG-DATE-1-EDIT    TO  SAVE-DATE
+           MOVE DC-GREG-DATE-A-EDIT    TO WS-SAVE-EDIT-A-DATE
+           MOVE DC-BIN-DATE-1          TO  SAVE-BIN-DATE
+
+      *****************************************************
+      * The full claim key has been established and passed
+      * to this program via NSREQLTR
+      *****************************************************
+
+
+           IF BL-COMP-ID = 'DCC'
+              MOVE X'05'               TO WS-ELMSTR-COMPANY-CD
+           ELSE
+              MOVE X'04'               TO WS-ELMSTR-COMPANY-CD
+           END-IF
+           MOVE BL-CARRIER             TO WS-ELMSTR-CARRIER
+           MOVE BL-CLAIM-NO            TO WS-ELMSTR-CLAIM-NO
+           MOVE BL-CERT-NO             TO WS-ELMSTR-CERT-NO
+           SET BL-FAIL TO TRUE
+
+           EXEC CICS READ                                               
+                DATASET    ('ELMSTR') 
+                INTO       (CLAIM-MASTER)                    
+                RIDFLD     (WS-ELMSTR-KEY)                                   
+                RESP       (WS-RESPONSE)
+           END-EXEC.                                                    
+
+           IF RESP-NORMAL
+              MOVE BL-LETTER-ID        TO OUT-TEMP
+                                          OUT-LETTER
+              MOVE BL-PROC-ID          TO OUT-PROCID
+              MOVE BL-COMP-ID          TO OUT-COMPID
+              MOVE BL-PRINT-NOW-SW     TO OUT-PRINT-NOW-SW
+              MOVE CL-CARRIER          TO OUT-CARR
+              MOVE CL-INSURED-LAST-NAME
+                                       TO OUT-ILNAME
+              MOVE CL-INSURED-1ST-NAME TO OUT-IFNAME
+              MOVE CL-CLAIM-NO         TO OUT-CLMNO
+              MOVE CL-CERT-NO          TO OUT-CRTNO
+              MOVE CL-CERT-ACCOUNT     TO OUT-ACTNO
+              MOVE CL-SOC-SEC-NO       TO OUT-SSN
+              MOVE CL-CLAIM-STATUS     TO OUT-CLMSTAT
+
+              MOVE WS-SAVE-EDIT-A-DATE TO DC-GREG-DATE-A-EDIT 
+              STRING DC-EDITA-CCYY  DC-EDITA-MONTH DC-EDITA-DAY
+                DELIMITED BY SIZE INTO OUT-CYCLE-DATE
+              END-STRING
+
+      *       IF CLAIM-IS-CLOSED
+      *          MOVE 'CLOSED'         TO OUT-CLMSTAT
+      *       ELSE
+      *          MOVE 'OPEN'           TO OUT-CLMSTAT
+      *       END-IF
+              MOVE CL-CLAIM-TYPE       TO OUT-CLMTYPE
+              MOVE CL-FILE-ESTABLISH-DT
+                                       TO DC-BIN-DATE-1
+              MOVE ' '                 TO DC-OPTION-CODE             
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                    DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                    INTO OUT-EST-DT
+                 END-STRING
+              ELSE
+                 MOVE SPACES           TO OUT-EST-DT
+              END-IF
+              MOVE CL-PAID-THRU-DT     TO DC-BIN-DATE-1
+              MOVE ' '                 TO DC-OPTION-CODE             
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                    DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                    INTO OUT-PD-THRU-DT
+                 END-STRING
+              ELSE
+                 MOVE SPACES           TO OUT-PD-THRU-DT
+              END-IF
+
+              MOVE CL-PAID-THRU-DT     TO DC-BIN-DATE-1
+              MOVE +0                  TO DC-ELAPSED-MONTHS
+              MOVE +30                 TO DC-ELAPSED-DAYS
+              MOVE '6'                 TO DC-OPTION-CODE
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                    DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                    INTO OUT-FORM-DUE-DT
+                 END-STRING
+              ELSE
+                 MOVE SPACES           TO OUT-FORM-DUE-DT
+              END-IF
+
+              MOVE CL-TOTAL-PAID-AMT   TO OUT-TOT-PAID
+              MOVE CL-INSURED-SEX-CD   TO OUT-SEX-CD
+              MOVE CL-CERT-STATE       TO OUT-CRT-ST
+                                          OUT-ENC-ST
+                                          OUT-ENC-ST-NAME
+
+              MOVE CL-CERT-EFF-DT      TO DC-BIN-DATE-1
+              MOVE ' '                 TO DC-OPTION-CODE             
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                    DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                    INTO OUT-EFF-DT
+                 END-STRING
+              ELSE
+                 MOVE SPACES           TO OUT-EFF-DT
+              END-IF
+              MOVE CL-INCURRED-DT      TO DC-BIN-DATE-1
+              MOVE ' '                 TO DC-OPTION-CODE             
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                    DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                    INTO OUT-INC-DT
+                 END-STRING
+              ELSE
+                 MOVE SPACES           TO OUT-INC-DT
+              END-IF
+              MOVE CL-REPORTED-DT      TO DC-BIN-DATE-1
+              MOVE ' '                 TO DC-OPTION-CODE             
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                    DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                    INTO OUT-RPT-DT
+                 END-STRING
+              ELSE
+                 MOVE SPACES           TO OUT-RPT-DT
+              END-IF
+              MOVE CL-LAST-PMT-DT      TO DC-BIN-DATE-1
+              MOVE ' '                 TO DC-OPTION-CODE             
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                    DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                    INTO OUT-LST-PMT-DT
+                 END-STRING
+              ELSE
+                 MOVE SPACES           TO OUT-LST-PMT-DT
+              END-IF
+              MOVE CL-INSURED-BIRTH-DT TO DC-BIN-DATE-1
+              MOVE ' '                 TO DC-OPTION-CODE             
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                    DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                    INTO OUT-BIRTH-DT
+                 END-STRING
+              ELSE
+                 MOVE SPACES           TO OUT-BIRTH-DT
+              END-IF
+              MOVE CL-LAST-MAINT-DT    TO DC-BIN-DATE-1
+              MOVE ' '                 TO DC-OPTION-CODE             
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                    DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                    INTO OUT-LST-MAINT-DT
+                 END-STRING
+              ELSE
+                 MOVE SPACES           TO OUT-LST-MAINT-DT
+              END-IF
+              MOVE CL-LAST-MAINT-USER  TO OUT-LST-MAINT-USER
+              MOVE CL-LAST-MAINT-TYPE  TO OUT-LST-MAINT-TYPE
+              MOVE CL-NO-OF-PMTS-MADE  TO OUT-NO-OF-PMTS
+              MOVE CL-LAST-PMT-AMT     TO OUT-LST-PD-AMT
+              MOVE CL-ACCOUNT-ADDR-CNT TO OUT-ADDR-CNT
+              MOVE CL-LAST-CLOSE-REASON TO OUT-LST-CLS-REA
+              MOVE BL-ENC-CD           TO OUT-ENC-CODE
+              PERFORM 1000-GET-FILES   THRU 1000-EXIT
+              SET BL-OK TO TRUE
+           END-IF
+
+           IF BL-OK
+              PERFORM 1500-GET-ARCH-NO THRU 1500-EXIT
+              MOVE WS-ARCHIVE-NO       TO OUT-ARCHNO
+              PERFORM 0500-SCRUB-DATA  THRU 0500-EXIT
+              MOVE NAPER-OUTPUT-DATA   TO BL-RECORD-PASSED-DATA
+      *       PERFORM 1600-ADD-CORR-TRLR
+      *                                THRU 1600-EXIT
+           END-IF
+
+           exec cics return end-exec.	
+
+       0500-SCRUB-DATA.
+
+      *   THE DECODER DOES NOT LIKE & AND I TRIED TO USE
+      *   A DIFFERENT DELIMITER IN PROGRAM NSREQLTR BUT
+      *   COULD NOT GET IT TO WORK SO I AM CONVERTING IT
+      *   TO A HEX 26 TO GET BY THE DECODER
+
+           MOVE FUNCTION LENGTH(OUT-ILNAME)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-ILNAME (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-ILNAME (1:A1 - 1)
+                                       TO WS-WORK-FIELD (1:A1 - 1)
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-ILNAME (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-ILNAME
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-ACCT-ADDR1)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-ACCT-ADDR1 (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-ACCT-ADDR1 (1:A1 - 1)
+                                       TO WS-WORK-FIELD (1:A1 - 1)
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-ACCT-ADDR1 (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-ACCT-ADDR1
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-ACCT-ADDR2)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-ACCT-ADDR2 (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-ACCT-ADDR2 (1:A1 - 1)
+                                       TO WS-WORK-FIELD (1:A1 - 1)
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-ACCT-ADDR2 (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-ACCT-ADDR2
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-ACCT-CITY)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-ACCT-CITY (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-ACCT-CITY (1:A1 - 1)
+                                       TO WS-WORK-FIELD (1:A1 - 1)
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-ACCT-CITY (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-ACCT-CITY
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-ACCT-NAME)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-ACCT-NAME (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-ACCT-NAME (1:A1 - 1)
+                                       TO WS-WORK-FIELD (1:A1 - 1)
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-ACCT-NAME (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-ACCT-NAME
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-ORIG-NAME)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-ORIG-NAME (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-ORIG-NAME (1:A1 - 1)
+                                       TO WS-WORK-FIELD (1:A1 - 1)
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-ORIG-NAME (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-ORIG-NAME
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-INS-NAME)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-INS-NAME (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-INS-NAME (1:A1 - 1)
+                                       TO WS-WORK-FIELD
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-INS-NAME (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-INS-NAME
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-INS-ADDR1)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-INS-ADDR1 (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-INS-ADDR1 (1:A1 - 1)
+                                       TO WS-WORK-FIELD
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-INS-ADDR1 (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-INS-ADDR1
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-INS-ADDR2)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-INS-ADDR2 (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-INS-ADDR2 (1:A1 - 1)
+                                       TO WS-WORK-FIELD
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-INS-ADDR2 (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-INS-ADDR2
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-BEN-NAME)   TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-BEN-NAME (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-BEN-NAME (1:A1 - 1)
+                                       TO WS-WORK-FIELD (1:A1 - 1)
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-BEN-NAME (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-BEN-NAME
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-BEN-ADDR1)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-BEN-ADDR1 (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-BEN-ADDR1 (1:A1 - 1)
+                                       TO WS-WORK-FIELD (1:A1 - 1)
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-BEN-ADDR1 (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-BEN-ADDR1
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-BEN-ADDR2)
+                                       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-BEN-ADDR2 (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-BEN-ADDR2 (1:A1 - 1)
+                                       TO WS-WORK-FIELD (1:A1 - 1)
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-BEN-ADDR2 (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD       TO OUT-BEN-ADDR2
+           END-IF
+
+           MOVE FUNCTION LENGTH(OUT-DIAG)       TO M1
+           MOVE SPACES                 TO WS-WORK-FIELD
+           PERFORM VARYING A1 FROM +1 BY +1 UNTIL 
+              A1 > M1
+              OR OUT-DIAG (A1:1) = '&'
+           END-PERFORM
+           IF A1 > M1
+              CONTINUE
+           ELSE
+              MOVE OUT-DIAG (1:A1 - 1)  TO WS-WORK-FIELD
+              MOVE '%26'               TO WS-WORK-FIELD (A1:3)
+              MOVE OUT-DIAG (A1 + 1:M1 - A1)
+                                       TO WS-WORK-FIELD (A1 + 3:M1 - A1)
+              MOVE WS-WORK-FIELD TO OUT-DIAG
+           END-IF
+
+           MOVE ZEROS TO WS-TALLY WS-TALLY1
+           INSPECT NAPER-OUTPUT-DATA TALLYING WS-TALLY
+              FOR ALL '%'
+           INSPECT NAPER-OUTPUT-DATA TALLYING WS-TALLY1
+              FOR ALL '%26'
+           IF (WS-TALLY > 0)
+              AND (WS-TALLY NOT = WS-TALLY1)
+              MOVE +1                  TO A1
+              MOVE FUNCTION LENGTH(NAPER-OUTPUT-DATA)
+                                       TO NS-LEN
+              PERFORM WS-TALLY TIMES
+                 PERFORM VARYING A1 FROM A1 BY +1 UNTIL
+                    (A1 > NS-LEN)
+                    OR (NAPER-OUTPUT-DATA (A1:1) = '%')
+                 END-PERFORM
+                 IF A1 > NS-LEN
+                    CONTINUE
+                 ELSE
+                    IF NAPER-OUTPUT-DATA (A1:3) = '%26'
+                       ADD +1 TO A1
+                    ELSE
+                       MOVE NAPER-OUTPUT-DATA (1:A1 - 1)
+                                       TO WS-XML-WORK
+                       MOVE '%25'      TO WS-XML-WORK (A1:3)
+                       MOVE NAPER-OUTPUT-DATA (A1 + 1:NS-LEN - A1)
+                                    TO WS-XML-WORK (A1 + 3:NS-LEN - A1)
+                       MOVE WS-XML-WORK TO NAPER-OUTPUT-DATA
+                       ADD +3 TO A1
+                    END-IF
+                 END-IF
+              END-PERFORM
+           END-IF
+
+           .
+       0500-EXIT.
+           EXIT.
+
+       1000-GET-FILES.
+
+           PERFORM 1100-GET-ELCERT     THRU 1100-EXIT
+           PERFORM 1200-GET-ERACCT     THRU 1200-EXIT
+
+           MOVE ' '                    TO WS-FOUND-BENE-SW
+           PERFORM 1250-GET-ELLETR     THRU 1250-EXIT
+           PERFORM 1300-GET-ELTRLRS    THRU 1300-EXIT
+           PERFORM 1700-GET-ELENCC     THRU 1700-EXIT
+
+           IF CL-CLAIM-TYPE NOT = 'L' AND 'P'
+              PERFORM 1400-GET-WAIT-PER THRU 1400-EXIT
+           END-IF
+
+           IF NOT FOUND-BENE
+              MOVE CL-COMPANY-CD       TO WS-ELBENE-COMPANY-CD
+              MOVE 'B'                 TO WS-ELBENE-REC-TYPE
+              MOVE CL-BENEFICIARY      TO WS-ELBENE-BENE
+              EXEC CICS READ                                               
+                   DATASET    ('ELBENE') 
+                   INTO       (BENEFICIARY-MASTER)              
+                   RIDFLD     (WS-ELBENE-KEY)                                   
+                   RESP       (WS-RESPONSE)
+              END-EXEC
+              IF RESP-NORMAL
+                 MOVE BE-MAIL-TO-NAME   TO OUT-BEN-NAME
+                 MOVE BE-ADDRESS-LINE-1 TO OUT-BEN-ADDR1
+                 MOVE BE-ADDRESS-LINE-2 TO OUT-BEN-ADDR2
+                 MOVE BE-CITY           TO OUT-BEN-CITY
+                 MOVE BE-STATE          TO OUT-BEN-STATE
+                 MOVE BE-ZIP-PRIME      TO OUT-BEN-ZIP
+                 IF BE-ZIP-PLUS4 NOT = SPACES AND ZEROS
+                    STRING '-' BE-ZIP-PLUS4 DELIMITED BY SIZE
+                       INTO OUT-BEN-ZIP (6:5)
+                    END-STRING
+                 END-IF
+                 MOVE BE-PHONE-NO       TO OUT-BEN-PHONE
+              END-IF
+           END-IF
+
+           .
+       1000-EXIT.
+           EXIT.
+
+       1100-GET-ELCERT.
+
+           MOVE CL-COMPANY-CD          TO WS-ELCERT-COMPANY-CD
+           MOVE CL-CERT-KEY-DATA       TO WS-ELCERT-KEY (2:21)
+           MOVE CL-CERT-NO             TO WS-ELCERT-CERT-NO
+
+           EXEC CICS READ                                               
+                DATASET    ('ELCERT') 
+                INTO       (CERTIFICATE-MASTER)              
+                RIDFLD     (WS-ELCERT-KEY)                                   
+                RESP       (WS-RESPONSE)
+           END-EXEC.                                                    
+
+           IF RESP-NORMAL
+              IF CL-CLAIM-TYPE = 'L' OR 'P'
+                 MOVE CM-LF-BENEFIT-AMT TO OUT-BENAMT
+                 MOVE CM-LF-ORIG-TERM  TO OUT-TERM
+                 MOVE CM-LF-BENEFIT-CD TO OUT-BEN-CD
+                 MOVE CM-LF-CRITICAL-PERIOD
+                                       TO OUT-CRIT-PER
+                 MOVE CM-LF-LOAN-EXPIRE-DT
+                                       TO DC-BIN-DATE-1
+                 MOVE ' '              TO DC-OPTION-CODE             
+                 PERFORM 9700-DATE-LINK
+                                       THRU 9700-EXIT
+                 IF NO-CONVERSION-ERROR
+                    STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                       DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                       INTO OUT-EXP-DT
+                    END-STRING
+                 ELSE
+                    MOVE SPACES        TO OUT-EXP-DT
+                 END-IF
+              ELSE
+                 MOVE CM-AH-BENEFIT-AMT TO OUT-BENAMT
+                 MOVE CM-AH-ORIG-TERM  TO OUT-TERM
+                 MOVE CM-AH-BENEFIT-CD TO OUT-BEN-CD
+                 MOVE CM-AH-CRITICAL-PERIOD
+                                       TO OUT-CRIT-PER
+                 MOVE CM-AH-LOAN-EXPIRE-DT
+                                       TO DC-BIN-DATE-1
+                 MOVE ' '              TO DC-OPTION-CODE             
+                 PERFORM 9700-DATE-LINK
+                                       THRU 9700-EXIT
+                 IF NO-CONVERSION-ERROR
+                    STRING DC-EDITA-CCYY '-' DC-EDITA-MONTH '-'
+                       DC-EDITA-DAY ' 00:00:00.0' DELIMITED BY SIZE
+                       INTO OUT-EXP-DT
+                    END-STRING
+                 ELSE
+                    MOVE SPACES        TO OUT-EXP-DT
+                 END-IF
+              END-IF
+              MOVE CM-ACCOUNT          TO OUT-CERTACCT
+              IF CL-INSURED-1ST-NAME = CM-INSURED-FIRST-NAME
+                  MOVE CM-JT-FIRST-NAME TO OUT-JFNAME
+                  MOVE CM-JT-LAST-NAME  TO OUT-JLNAME
+              ELSE
+                  MOVE CM-INSURED-FIRST-NAME TO OUT-JFNAME
+                  MOVE CM-INSURED-LAST-NAME TO OUT-JLNAME
+              END-IF
+
+
+              MOVE CM-LOAN-APR         TO OUT-APR
+           END-IF
+
+           .
+       1100-EXIT.
+           EXIT.
+
+       1200-GET-ERACCT.
+
+          MOVE LOW-VALUES              TO WS-ERACCT-KEY
+          MOVE WS-ELCERT-KEY (1:22)    TO WS-ERACCT-KEY (1:22)
+
+           EXEC CICS STARTBR                                            
+               DATASET   ('ERACCT')
+               RIDFLD    (WS-ERACCT-KEY)
+               GTEQ
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           IF RESP-NORMAL
+              EXEC CICS READNEXT
+                 INTO    (ACCOUNT-MASTER)
+                 DATASET ('ERACCT')
+                 RIDFLD  (WS-ERACCT-KEY)
+                 RESP    (WS-RESPONSE)
+              END-EXEC
+           END-IF
+
+           IF RESP-NORMAL
+              PERFORM WITH TEST AFTER UNTIL
+                 NOT (RESP-NORMAL)
+                 OR (CM-CONTROL-PRIMARY (1:20) NOT =
+                              AM-CONTROL-PRIMARY (1:20))
+                 IF (CM-CONTROL-PRIMARY (1:20)
+                    = AM-CONTROL-PRIMARY (1:20))
+                    IF (CL-CERT-EFF-DT >= AM-EFFECTIVE-DT)
+                       AND (CM-CERT-EFF-DT < AM-EXPIRATION-DT)
+                       MOVE AM-NAME    TO OUT-ORIG-NAME
+                    END-IF
+                    MOVE AM-NAME       TO OUT-ACCT-NAME
+                    MOVE AM-ADDRS      TO OUT-ACCT-ADDR1
+                    MOVE SPACES        TO OUT-ACCT-ADDR2
+                    MOVE AM-ADDR-CITY  TO OUT-ACCT-CITY
+                    MOVE AM-ADDR-STATE TO OUT-ACCT-STATE
+                    MOVE AM-ZIP-PRIME  TO OUT-ACCT-ZIP
+                    IF AM-ZIP-PLUS4 NOT = SPACES AND ZEROS
+                       STRING '-' AM-ZIP-PLUS4 DELIMITED BY SIZE
+                          INTO OUT-ACCT-ZIP (6:5)
+                       END-STRING
+                    END-IF
+                    MOVE AM-TEL-NO     TO OUT-ACCT-PHONE
+                    EXEC CICS READNEXT
+                       INTO    (ACCOUNT-MASTER)
+                       DATASET ('ERACCT')
+                       RIDFLD  (WS-ERACCT-KEY)
+                       RESP    (WS-RESPONSE)
+                    END-EXEC
+                 END-IF
+              END-PERFORM
+           END-IF
+
+          .
+       1200-EXIT.
+           EXIT.
+
+       1250-GET-ELLETR.
+
+           MOVE CL-COMPANY-CD          TO WS-ELLETR-COMPANY-CD
+           MOVE BL-LETTER-ID           TO WS-ELLETR-LETTER-ID
+           MOVE +0                     TO WS-ELLETR-SEQ-NO
+
+           EXEC CICS READ                                               
+                DATASET    ('ELLETR') 
+                INTO       (TEXT-FILES)
+                RIDFLD     (WS-ELLETR-KEY)
+                RESP       (WS-RESPONSE)
+                GTEQ
+           END-EXEC
+
+           IF RESP-NORMAL
+              IF (LETTER-FILE-TEXT)
+                 AND (BL-LETTER-ID = TX-LETTER-NO)
+                 AND (TX-LINE-SQUEEZE-CONTROL = 'Z')
+                 PERFORM 1280-PROCESS-Z-CONTROLS
+                                       THRU 1280-EXIT
+              END-IF
+           END-IF
+
+           .
+       1250-EXIT.
+           EXIT.
+
+
+       1280-PROCESS-Z-CONTROLS.
+
+           MOVE TX-TEXT-LINE           TO W-Z-CONTROL-DATA
+
+           IF W-FORM-TO-RESEND > SPACES
+              MOVE W-FORM-TO-RESEND    TO OUT-FORM
+           ELSE
+              MOVE SPACES              TO OUT-FORM
+           END-IF.
+           
+      *    MOVE W-ENCLOSURE-CD         TO OUT-ENC-CODE
+
+           .
+       1280-EXIT.
+           EXIT.
+
+
+       1300-GET-ELTRLRS.
+
+           MOVE CL-CONTROL-PRIMARY     TO WS-ELTRLR-KEY
+           MOVE +0                     TO WS-ELTRLR-SEQ-NO
+
+           EXEC CICS STARTBR                                            
+               DATASET   ('ELTRLR')
+               RIDFLD    (WS-ELTRLR-KEY)
+               GTEQ
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+          IF RESP-NORMAL
+             EXEC CICS READNEXT
+                INTO    (ACTIVITY-TRAILERS)
+                DATASET ('ELTRLR')
+                RIDFLD  (WS-ELTRLR-KEY)
+                RESP    (WS-RESPONSE)
+             END-EXEC
+             PERFORM 1310-GET-ELTRLRS THRU 1310-EXIT
+          END-IF
+
+           .
+       1300-EXIT.
+           EXIT.
+
+       1310-GET-ELTRLRS.
+
+           IF RESP-NORMAL
+
+           IF CL-CONTROL-PRIMARY = AT-CONTROL-PRIMARY (1:20)
+              EVALUATE TRUE
+                 WHEN AT-INSURED-ADDR-TRL
+                    MOVE AT-MAIL-TO-NAME   TO OUT-INS-NAME
+                    MOVE AT-ADDRESS-LINE-1 TO OUT-INS-ADDR1
+                    MOVE AT-ADDRESS-LINE-2 TO OUT-INS-ADDR2
+                    MOVE AT-CITY           TO OUT-INS-CITY
+                    MOVE AT-STATE          TO OUT-INS-STATE
+                    MOVE AT-ZIP-CODE       TO OUT-INS-ZIP
+                    IF AT-ZIP-PLUS4 NOT = SPACES AND ZEROS
+                       STRING '-' AT-ZIP-PLUS4 DELIMITED BY SIZE
+                          INTO OUT-INS-ZIP (6:5)
+                       END-STRING
+                    END-IF
+                    MOVE AT-PHONE-NO       TO OUT-INS-PHONE
+                 WHEN AT-BENEFICIARY-ADDR-TRL
+                    SET FOUND-BENE TO TRUE
+                    MOVE AT-MAIL-TO-NAME   TO OUT-BEN-NAME
+                    MOVE AT-ADDRESS-LINE-1 TO OUT-BEN-ADDR1
+                    MOVE AT-ADDRESS-LINE-2 TO OUT-BEN-ADDR2
+                    MOVE AT-CITY           TO OUT-BEN-CITY
+                    MOVE AT-STATE          TO OUT-BEN-STATE
+                    MOVE AT-ZIP-CODE       TO OUT-BEN-ZIP
+                    IF AT-ZIP-PLUS4 NOT = SPACES AND ZEROS
+                       STRING '-' AT-ZIP-PLUS4 DELIMITED BY SIZE
+                          INTO OUT-BEN-ZIP (6:5)
+                       END-STRING
+                    END-IF
+                    MOVE AT-PHONE-NO       TO OUT-BEN-PHONE
+                 WHEN AT-ACCOUNT-ADDR-TRL
+                    MOVE AT-MAIL-TO-NAME   TO OUT-ACCT-NAME
+                    MOVE AT-ADDRESS-LINE-1 TO OUT-ACCT-ADDR1
+                    MOVE AT-ADDRESS-LINE-2 TO OUT-ACCT-ADDR2
+                    MOVE AT-CITY           TO OUT-ACCT-CITY
+                    MOVE AT-STATE          TO OUT-ACCT-STATE
+                    MOVE AT-ZIP-CODE       TO OUT-ACCT-ZIP
+                    IF AT-ZIP-PLUS4 NOT = SPACES AND ZEROS
+                       STRING '-' AT-ZIP-PLUS4 DELIMITED BY SIZE
+                          INTO OUT-ACCT-ZIP (6:5)
+                       END-STRING
+                    END-IF
+                    MOVE AT-PHONE-NO       TO OUT-ACCT-PHONE
+                 WHEN AT-SEQUENCE-NO = +90
+                    MOVE AT-INFO-LINE-1   TO OUT-DIAG
+                 WHEN AT-SEQUENCE-NO = +91
+                    MOVE AT-INFO-LINE-1 TO OUT-LOAN-NO
+                 WHEN AT-TRAILER-TYPE = '2' AND AT-PAYMENT-TYPE = 'I'
+                    IF AT-INT-RATE NUMERIC AND
+                       AT-INT-RATE NOT EQUAL ZEROS
+                          COMPUTE OUT-LF-INT-RATE = AT-INT-RATE * 100
+                    END-IF
+
+                 WHEN AT-TRAILER-TYPE = '3'
+                    IF (SAVE-BIN-DATE >= AT-SCHEDULE-START-DT)
+                       AND (SAVE-BIN-DATE <= AT-SCHEDULE-END-DT)
+                       AND (AT-TERMINATED-DT = LOW-VALUES OR SPACES)
+                       MOVE AT-SCHEDULE-END-DT TO WS-AUTO-LAST-SCHED-DT
+                    END-IF
+                 WHEN AT-TRAILER-TYPE = '8'
+                    IF AT-RECORDED-DT > WS-LAST-ACT-DT
+                       MOVE AT-RECORDED-DT
+                                    TO WS-LAST-ACT-DT
+                       MOVE 'DENIAL'
+                                    TO WS-LAST-ACT-TYPE
+                    END-IF
+                 WHEN AT-TRAILER-TYPE = 'A'
+                    IF AT-RECORDED-DT > WS-LAST-ACT-DT
+                       MOVE AT-RECORDED-DT
+                                    TO WS-LAST-ACT-DT
+                       MOVE 'FORMS' TO WS-LAST-ACT-TYPE
+                       IF INITIAL-FORM
+                          MOVE 'INIT'
+                                    TO WS-FORM
+                       END-IF
+                       IF PROGRESS-FORM
+                          MOVE 'PROG'
+                                    TO WS-FORM
+                       END-IF
+                    END-IF
+                    IF AT-FORM-SEND-ON-DT > WS-ACTIVITY-DT
+                       MOVE AT-FORM-SEND-ON-DT
+                                    TO WS-ACTIVITY-DT
+                    END-IF
+                    IF AT-FORM-REPRINT-DT > WS-ACTIVITY-DT
+                       MOVE AT-FORM-REPRINT-DT
+                                    TO WS-ACTIVITY-DT
+                    END-IF
+                    IF AT-FORM-ANSWERED-DT > WS-ACTIVITY-DT
+                       MOVE AT-FORM-ANSWERED-DT
+                                    TO WS-ACTIVITY-DT
+                    END-IF
+              END-EVALUATE
+              EXEC CICS READNEXT
+                INTO    (ACTIVITY-TRAILERS)
+                DATASET ('ELTRLR')
+                RIDFLD  (WS-ELTRLR-KEY)
+                RESP    (WS-RESPONSE)
+              END-EXEC
+              
+              GO TO 1310-GET-ELTRLRS
+           END-IF
+           
+           END-IF
+           .
+       1310-EXIT.
+           EXIT.
+
+       1400-GET-WAIT-PER.
+
+           MOVE BL-COMP-ID             TO WS-ELCNTL-COMPANY-ID
+           MOVE CM-AH-BENEFIT-CD       TO WS-ELCNTL-BEN-CD
+           MOVE '5'                    TO WS-ELCNTL-REC-TYPE
+           MOVE +0                     TO WS-ELCNTL-SEQ-NO
+
+           EXEC CICS READ
+              INTO    (CONTROL-FILE)
+              DATASET ('ELCNTL')
+              RIDFLD  (WS-ELCNTL-KEY)
+              GTEQ
+              RESP    (WS-RESPONSE)
+           END-EXEC
+           
+           IF RESP-NORMAL
+              AND (CF-COMPANY-ID  = BL-COMP-ID)
+              AND (CF-RECORD-TYPE = '5')
+              PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+                 (S1 > +8)
+                 OR (CM-AH-BENEFIT-CD = CF-BENEFIT-CODE (S1))
+              END-PERFORM
+              IF S1 > +8
+                 MOVE '**'             TO OUT-WAIT-PER
+              ELSE
+                 MOVE CF-BENEFIT-ALPHA (S1) (1:2)
+                                       TO OUT-WAIT-PER
+              END-IF
+           ELSE
+              MOVE '**'                TO OUT-WAIT-PER
+           END-IF
+
+          .
+       1400-EXIT.
+           EXIT.
+
+       1500-GET-ARCH-NO.
+
+      *    DISPLAY ' MADE IT TO 1500 '
+           MOVE BL-COMP-ID             TO WS-ELCNTL-COMPANY-ID
+           MOVE '1'                    TO WS-ELCNTL-REC-TYPE
+           MOVE SPACES                 TO WS-ELCNTL-GENL
+           MOVE +0                     TO WS-ELCNTL-SEQ-NO
+
+           EXEC CICS READ
+              INTO    (CONTROL-FILE)
+              DATASET ('ELCNTL')
+              RIDFLD  (WS-ELCNTL-KEY)
+              UPDATE
+              RESP    (WS-RESPONSE)
+           END-EXEC
+
+           IF RESP-NORMAL
+              AND (CF-COMPANY-ID  = BL-COMP-ID)
+              AND (CF-RECORD-TYPE = '1')
+              ADD +1                   TO CF-CO-ARCHIVE-COUNTER
+              MOVE CF-CO-ARCHIVE-COUNTER TO WS-ARCHIVE-NO
+              MOVE WS-ARCHIVE-NO       TO BL-ARCHIVE-NO
+              EXEC CICS REWRITE
+                 FROM    (CONTROL-FILE)
+                 DATASET ('ELCNTL')
+              END-EXEC
+           ELSE
+              MOVE +0                  TO WS-ARCHIVE-NO
+           END-IF
+
+          .
+       1500-EXIT.
+           EXIT.
+
+       1600-ADD-CORR-TRLR.
+
+           EXEC CICS READ
+                DATASET    ('ELMSTR')
+                INTO       (CLAIM-MASTER)
+                RIDFLD     (WS-ELMSTR-KEY)
+                UPDATE
+                RESP       (WS-RESPONSE)
+           END-EXEC
+
+           IF NOT RESP-NORMAL
+              DISPLAY ' 1600 READ UPD MSTR ' WS-RESPONSE
+              GO TO 1600-EXIT
+           END-IF
+
+           SUBTRACT +1 FROM CL-TRAILER-SEQ-CNT
+
+           PERFORM 2000-BUILD-ELNAPS   THRU 2000-EXIT
+
+           IF WS-FOLLOW-UP-DT > CL-NEXT-FOLLOWUP-DT
+              MOVE WS-FOLLOW-UP-DT     TO CL-NEXT-FOLLOWUP-DT
+           END-IF
+                                                                        
+           IF WS-RESEND-DT > CL-NEXT-FOLLOWUP-DT
+              MOVE WS-RESEND-DT        TO CL-NEXT-FOLLOWUP-DT
+           END-IF
+           MOVE '2'                    TO CL-LAST-MAINT-TYPE
+
+           MOVE 'AT'                   TO ACTIVITY-TRAILERS
+           MOVE CL-CONTROL-PRIMARY     TO AT-CONTROL-PRIMARY
+           MOVE CL-TRAILER-SEQ-CNT     TO AT-SEQUENCE-NO                
+           MOVE  4                     TO AT-TRAILER-TYPE
+           MOVE SAVE-BIN-DATE          TO AT-RECORDED-DT                
+                                          CL-LAST-MAINT-DT              
+                                          AT-CORR-LAST-MAINT-DT         
+           MOVE BL-PROC-ID             TO AT-RECORDED-BY                
+                                          CL-LAST-MAINT-USER            
+                                          AT-CORR-LAST-UPDATED-BY       
+           MOVE EIBTIME                TO AT-LAST-MAINT-HHMMSS          
+                                          CL-LAST-MAINT-HHMMSS.         
+           MOVE SAVE-BIN-DATE          TO AT-LETTER-SENT-DT.            
+           MOVE WS-FOLLOW-UP-DT        TO AT-RECEIPT-FOLLOW-UP.         
+           MOVE WS-RESEND-DT           TO AT-AUTO-RE-SEND-DT.           
+           MOVE LOW-VALUES             TO AT-LETTER-ANSWERED-DT         
+                                          AT-LETTER-PURGED-DT.          
+           MOVE WS-ARCHIVE-NO          TO AT-LETTER-ARCHIVE-NO.
+           MOVE '3'                    TO AT-LETTER-ORIGIN
+                                                                        
+           MOVE BL-LETTER-ID           TO AT-STD-LETTER-FORM
+
+           MOVE SAVE-BIN-DATE          TO AT-INITIAL-PRINT-DATE         
+
+           MOVE LOW-VALUES             TO AT-RESEND-PRINT-DATE
+
+           EXEC CICS WRITE                                              
+                DATASET    ('ELTRLR')
+                FROM       (ACTIVITY-TRAILERS)                          
+                RIDFLD     (AT-CONTROL-PRIMARY)
+                RESP       (WS-RESPONSE)
+           END-EXEC
+                                                                        
+           IF NOT RESP-NORMAL
+              DISPLAY ' 1600 WRITE TRLR ' WS-RESPONSE
+              GO TO 1600-EXIT
+           END-IF
+       
+           EXEC CICS REWRITE                                            
+                DATASET    ('ELMSTR')
+                FROM       (CLAIM-MASTER)                               
+                RESP       (WS-RESPONSE)
+           END-EXEC
+       
+           IF NOT RESP-NORMAL
+              DISPLAY ' 1600 REWRITE MSTR ' WS-RESPONSE
+           END-IF
+
+           .
+       1600-EXIT.
+           EXIT.
+
+       1700-GET-ELENCC.
+
+           MOVE CL-COMPANY-CD          TO WS-ELENCC-KEY
+           MOVE BL-ENC-CD              TO WS-ELENCC-ENC-CODE
+           PERFORM VARYING E1 FROM +1 BY +1 UNTIL
+              (WS-ELENCC-ENC-CODE (E1:1) = ' ')
+              OR (E1 > +5)
+           END-PERFORM
+
+           IF E1 < +5
+              MOVE CL-CERT-STATE       TO WS-ELENCC-ENC-CODE (E1:2)
+           END-IF
+
+           EXEC CICS READ
+               DATASET   ('ELENCC')
+               INTO      (ENCLOSURE-CODES)
+               RIDFLD    (WS-ELENCC-KEY)
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           IF NOT RESP-NORMAL
+              MOVE BL-ENC-CD           TO WS-ELENCC-ENC-CODE
+              EXEC CICS READ
+                  DATASET   ('ELENCC')
+                  INTO      (ENCLOSURE-CODES)
+                  RIDFLD    (WS-ELENCC-KEY)
+                  RESP      (WS-RESPONSE)
+              END-EXEC
+           END-IF
+          
+           IF RESP-NORMAL
+              MOVE NC-OUTPUT-STACK     TO OUT-OUTSTACK
+              MOVE NC-ENCLOSURE-LINE   TO OUT-ENCLINE
+              MOVE NC-ATTACHMENTS      TO OUT-ENCATTS
+           END-IF
+
+           .
+       1700-EXIT.
+           EXIT.
+
+       2000-BUILD-ELNAPS.
+
+           PERFORM 1500-GET-ARCH-NO    THRU 1500-EXIT
+
+           MOVE 'NA'                   TO NAPERSOFT-FILE
+           MOVE CL-COMPANY-CD          TO NA-COMPANY-CD
+           MOVE BL-CARRIER             TO NA-CARRIER
+           MOVE BL-CLAIM-NO            TO NA-CLAIM-NO
+           MOVE BL-CERT-NO             TO NA-CERT-NO
+           MOVE WS-ARCHIVE-NO          TO NA-ARCHIVE-NO
+                                          BL-ARCHIVE-NO
+           MOVE BL-LETTER-ID           TO NA-LETTER-ID
+           MOVE BL-NO-OF-COPIES        TO NA-NO-OF-COPIES
+           MOVE SAVE-BIN-DATE          TO NA-CREATION-DT
+                                          NA-INITIAL-PRINT-DT
+
+           MOVE LOW-VALUES             TO NA-FOLLOW-UP-DT
+                                          NA-RESEND-DT
+                                          NA-RESEND-PRINT-DT
+                                          NA-1ST-LTR-PRINT-DT
+                                          NA-NEXT-DUE-DT   
+                                          NA-AUTOPYDT
+
+           MOVE CL-TRAILER-SEQ-CNT     TO NA-CORR-TRLR-SEQ
+
+           IF BL-FOLLOW-UP-DT NOT = SPACES AND LOW-VALUES
+              STRING BL-FOLLOW-UP-DT (7:2) BL-FOLLOW-UP-DT (1:2)
+                 BL-FOLLOW-UP-DT (4:2) DELIMITED BY SIZE
+                   INTO DC-GREG-DATE-1-YMD-R
+              END-STRING
+              MOVE '3'                 TO DC-OPTION-CODE
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 MOVE DC-BIN-DATE-1    TO NA-FOLLOW-UP-DT
+                                          WS-FOLLOW-UP-DT
+              ELSE
+                 MOVE LOW-VALUES       TO NA-FOLLOW-UP-DT
+                                          WS-FOLLOW-UP-DT
+              END-IF
+           END-IF
+
+           IF BL-RESEND-DT NOT = SPACES AND LOW-VALUES
+              STRING BL-RESEND-DT (7:2) BL-RESEND-DT (1:2)
+                 BL-RESEND-DT (4:2) DELIMITED BY SIZE
+                   INTO DC-GREG-DATE-1-YMD-R
+              END-STRING
+              MOVE '3'                 TO DC-OPTION-CODE
+              PERFORM 9700-DATE-LINK   THRU 9700-EXIT
+              IF NO-CONVERSION-ERROR
+                 MOVE DC-BIN-DATE-1    TO NA-RESEND-DT
+                                          WS-RESEND-DT
+              ELSE
+                 MOVE LOW-VALUES       TO NA-RESEND-DT
+                                          WS-RESEND-DT
+              END-IF
+           END-IF
+
+           PERFORM WITH TEST AFTER UNTIL RESP-NORMAL
+              EXEC CICS WRITE
+                 DATASET   ('ELNAPS')
+                 FROM      (NAPERSOFT-FILE)
+                 RIDFLD    (NA-CONTROL-PRIMARY)
+                 RESP      (WS-RESPONSE)
+              END-EXEC
+              IF RESP-NORMAL
+                 CONTINUE
+              ELSE
+                 IF RESP-DUPREC OR RESP-DUPKEY
+                    ADD +1 TO NA-ARCHIVE-NO
+                 ELSE
+                    DISPLAY ' BAD WRITE ELNAPS ' WS-RESPONSE
+                       ' ' NA-CONTROL-PRIMARY (2:19)
+                    SET RESP-NORMAL TO TRUE
+                 END-IF
+              END-IF
+           END-PERFORM
+
+          .
+       2000-EXIT.
+           EXIT.
+
+       9700-DATE-LINK.                                                  
+
+           EXEC CICS LINK                                               
+               PROGRAM   ('ELDATCV')
+               COMMAREA  (DATE-CONVERSION-DATA)                         
+               LENGTH    (DC-COMM-LENGTH)                               
+           END-EXEC.                                                    
+                                                                        
+                                                                        
+       9700-EXIT.                                                       
+            EXIT.

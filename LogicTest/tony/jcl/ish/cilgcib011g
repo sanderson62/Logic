@@ -1,0 +1,83 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE EQ 64 GOTO END_JOB 
+
+if ($EBMSYS != "mdoff") then
+   echo "Job aborted, not mdoff"
+   exit 1
+endif
+
+################################################################################
+LABEL name=CIB011G
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1t/exe/bat'
+ASSGNDD ddname='SYS010' filename='/data/seqfiles/CI.EX.FICH063' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERCOMP' type='VS' filename='ERCOMP' disp='i-o' 
+ASSGNDD ddname='ERCOBI' type='VS' filename='ERCOBI' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.ER.DATECARD' disp='i-o' 
+****************************** REMIT STMTS      
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.WW.OTHER.STMT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/ZI.WW.S.STMT.TEMP' disp='o' normal='k' abend='d' recsize='156' recfmt='F' 
+****************************** REFUND STMTS     
+
+EXECPGM pgmname='CIB011G' stepname='CIB011G'
+
+################################################################################
+LABEL name=SORT01
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/ZI.WW.S.STMT.TEMP' disp='i-o' normal='k' abend='k' recsize='156' recfmt='F'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/ZI.WW.S.STMT.SRTD' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 23)
+       ARRANGE=(24,133)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT04'
+
+################################################################################
+LABEL name=PERL01
+################################################################################
+#
+# This step reads the file from above and removes the duplicate cover letters
+# and address pages
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/cib011a.pl $SEQFILES/ZI.WW.S.STMT.SRTD $SEQFILES/ZI.WW.S.STMT
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL01' parm='SH'
+
+################################################################################
+LABEL name=CPYFILE1
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M'
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.WW.S.STMT' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.S.FICH063' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+EXECPGM pgmname='CIB009L' stepname='CPYFILE1' parm='ALL'
+
+################################################################################
+LABEL name=CPYFILE2
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M'
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.WW.OTHER.STMT' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.FICH063' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+EXECPGM pgmname='CIB009L' stepname='CPYFILE2' parm='ALL'
+
+
+if ($JOBSTATUS == 0) then
+    echo " No print, just testing "
+   "$HOME/exelpr.sh cim014t.parms '-ode=CI -oti=SPECIAL_HANDLING' $SEQFILES/ZI.WW.S.STMT"
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

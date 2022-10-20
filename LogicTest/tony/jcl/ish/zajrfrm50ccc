@@ -1,0 +1,131 @@
+################################################################################
+BEGINJOB mode='MVS'
+
+if ($EBMSYS != 'tony') then
+   echo "Job Aborting, not Tony"
+   exit 1
+endif
+################################################################################
+LABEL name=FNB166
+################################################################################
+#  DATE: MMDDYYYY   
+#  FROM CILGM15     
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='SYS010' dataset='ZC.XX.DET010' filename='\${SEQFILES}/ZC.XX.DET010' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZC.FN.DD.FX.DCCPRCM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/ZC.FN.DD.FX.CSIPRCM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYS013' filename='$SEQFILES/ZC.FN.DD.FX.CCCPRCM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+
+EXECPGM pgmname='FNB166' stepname='FNB166' parm='11302008'
+
+################################################################################
+LABEL name=CCC170 
+################################################################################
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='\${SEQFILES}/FNDCFRM50C' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZC.FN.DD.FX.CCCPRCM' disp='i' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='CCC170' parm='CCCPRCM' 
+
+################################################################################
+LABEL name=CPYM50C
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/addcrlf.pl /data/test/tony/seqfiles/FNDCFRM50C /data/test/tony/seqfiles/ZC.DL.FN.FX.FRM50.CCC2 133
+!
+EXECPGM pgmname='BPXBATCH' stepname='CPYM50C' parm='SH'
+
+################################################################################
+LABEL name=SPLIT1C
+################################################################################
+ASSGNDD ddname='SORTIN' filename='\${SEQFILES}/ZC.FN.DD.FX.CCCPRCM' disp='i-o' normal='k' abend='k' recfmt='F' recsize='250' 
+ASSGNDD ddname='SORTOUT' filename='\${SEQFILES}/ZC.FN.DD.FX.CCCPREM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+     INCLUDE=(19 2 EQ '40')
+     KEYS=(1 3)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SPLIT1C' 
+
+################################################################################
+LABEL name=SPLIT2C
+################################################################################
+ASSGNDD ddname='SORTIN' filename='\${SEQFILES}/ZC.FN.DD.FX.CCCPRCM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTOUT' filename='\${SEQFILES}/ZC.FN.DD.FX.CCCCOMM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+	 INCLUDE=(19 2 EQ '50')
+	 INCLUDE=(19 2 EQ '80')
+	 KEYS=(1 3)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SPLIT2C'
+
+################################################################################
+LABEL name=FNBLSCC
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZC.FN.DD.FX.CCCCOMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZC.FN.DL.FX.CCCCOMM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+
+EXECPGM pgmname='FNBLS' stepname='FNBLSCC'
+
+################################################################################
+LABEL name=FNBLSPC
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZC.FN.DD.FX.CCCPREM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZC.FN.DL.FX.CCCPREM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+
+EXECPGM pgmname='FNBLS' stepname='FNBLSPC'
+
+################################################################################
+LABEL name=COPY1C
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CCC
+#  *
+#  *  SYSUT2 is ftp'd to ntfree2
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/ZC.FN.DL.FX.CCCPREM' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/CCCDCCPREM_11-30-08.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY1C'
+
+################################################################################
+LABEL name=COPY2C
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR DCC
+#  *
+#  *  SYSUT2 is ftp'd to ntfree2
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/ZC.FN.DL.FX.CCCCOMM' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/CCCDCCCOMM_11-30-08.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY2C'
+

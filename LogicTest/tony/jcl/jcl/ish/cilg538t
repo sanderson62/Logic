@@ -1,0 +1,88 @@
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=EL538T
+################################################################################
+#  ********************************************************************  
+#  ******--                                                    --******  
+#  ***--                LIMITS EXCEEDED REPORT                    --***  
+#  ******--                                                    --******  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' filename='/data/seqfiles/CI.XX.AFEX_00' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='ELMSTR5' type='VS' filename='ELMSTR5' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='B'  
+ASSGNDD ddname='SYS020' type='DUMMY' 
+#  ****************************************************  WORK FILES      
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+ASSGNDD ddname='SORTWK06' type='TEMP' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+CID AL ZZ PO 650500000750000750650750000750000750551250001000001000
+!
+
+EXECPGM pgmname='EL538T' stepname='EL538T' 
+
+################################################################################
+LABEL name=CPY538
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL538T/SYS008_\${JON}' disp='i-o'
+#ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL538T/SYS008_956' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH538' disp='o' normal='k' abend='d' recfmt='F' recsize='149'
+
+EXECPGM pgmname='CIB009150' stepname='CPY538' parm='ALL'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the file from above and creates seperate files for each state
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/*EL538.txt*
+perl $HOME/bin/create_el538_state.pl $SEQFILES/CI.DL.CIADM.FICH538 $SEQFILES/
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=PERL2
+################################################################################
+#
+# This step reads each of the state files from perl1 and creates a pdf
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/el150mrpts2pdf $SEQFILES/*EL538.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL2' parm='SH'
+
+################################################################################
+LABEL name=PERL3
+################################################################################
+#
+# This step reads the pdf files from perl2 and sends them to print
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/print_el538_state.pl $SEQFILES/*EL538.txt.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL3' parm='SH'
+
+#################################################################################
+#
+#if ($JOBSTATUS == 0) then
+#   lprafp -sntinfoprint -pQSS_PRTQ -oform=blnk -oformdef=f1ogl -oduplex=yes -ojobn=Limits-Exceeded -ode=EL538_AZ $SEQFILES/CI.EL538.pdf
+#   lprafp -sntinfoprint -pQSS_PRTQ -oform=blnk -oformdef=f1ogl -oduplex=yes -ojobn=Limits-Exceeded -ode=EL538_CO $SEQFILES/CI.EL538.pdf
+#else
+#   echo " Job aborted, print not released "
+#endif
+
+
+ENDJOB 
+################################################################################

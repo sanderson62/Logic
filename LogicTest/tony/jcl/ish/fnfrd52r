@@ -1,0 +1,59 @@
+################################################################################
+BEGINJOB mode='MVS' 
+
+if ($EBMSYS != "mdoff") then
+   echo "Job aborted, not MDOFF"
+   exit 1
+endif
+
+################################################################################
+LABEL name=FNB165 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.DD.LG.ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.ER.DATECARD' disp='i-o'
+
+#  DOWNLOAD
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZN.DL.FX.CIDPYAJ' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='FNB165' stepname='FNB165' parm='09072010_09082010' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                     PRINT SUMMARY REPORT 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYS007' filename='$SEQFILES/ZNFRD52' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZN.DL.FX.CIDPYAJ' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='CIDPYADJ'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZNFRD52' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZN.DL.CIDPYAJ.FNFRD52' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID pyaj 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/ZN.DL.FX.CIDPYAJ' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/CIDPYAJ_09-08-10.TST' disp='o' abend='d' normal='k' recsize='250' recfmt='F'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+
+
+
+ENDJOB
+################################################################################

@@ -1,0 +1,1153 @@
+00001 ***************************************************************** 
+00002 *                                                               * 
+00003 *                            ELC50WS.                           * 
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+00005 *                            VMOD=2.061.                        * 
+00006 *                                                               * 
+00007 *   THIS IS THE WORKING STORAGE FOR EL050                       * 
+00008 *                                   EL517                       * 
+00009 ***************************************************************** 
+122002******************************************************************
+122002*                   C H A N G E   L O G
+122002*
+122002* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+122002*-----------------------------------------------------------------
+122002*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+122002* EFFECTIVE    NUMBER
+122002*-----------------------------------------------------------------
+123102* 123102                   PEMA  ADD DCC PROCESSING
+082003* 082003  CR2002100700004  PEMA  ADD ER-2702 TO SUPPORT ERROR
+082203* 082203  CR2003040800006  PEMA  ADD CERT NO ERROR 
+100703* 100703  CR2003080800002  PEMA  ADD SUPER GAP PROCESSING
+040504* 040504  CR2003080800002  PEMA  ADD DEALER INCENTIVE PROCESSING
+111504* 111504  CR2004110300005  PEMA  SPLIT SPP BANK COMMISSION
+121304* 121304  CR2004110200005  PEMA  ADD EDIT FOR NON SPP DEV PCT
+071305* 071305  CR2005011100006  PEMA  ADD MAX PREMIUM EDIT
+092205* 092205  CR2005050300006  PEMA  ADD PROCESSING FOR SPP LEASE
+042106* 042106  CR2006021300001  PEMA  ADD PROCESSING FOR GA EFF DATE
+052306* 052306  CR2006050800002  PEMA  ADD COMM TYPE 'J'
+071906* 071906  CR2006012700002  PEMA  ADD 'MI' AND 'MU' TO AH CASH 
+081606* 081606  CR2006051800002  PEMA  ADD POST CARD PROCESSING
+083106* 083106  CR2006063000001  PEMA  ADD LOAN OFFICER FIELD EDIT
+101706* 101706  CR2006080800002  PEMA  ADD VIN NUMBER
+062707* 062707  CR2006050800002  PEMA  CHANGE J TYPE TO I TYPE
+022608* 022608  CR2008022100006  PEMA  CHANGE NC TRUNC ERROR MESSAGE
+090408* 090408  CR2008040800002  PEMA  ADD JOINT BIRTH DATE PROCESSING
+102908* 102908  CR2007091400001  PEMA  ADD NEW ERROR 2882
+030309* 030309  CR2009021700001  PEMA  ADD ER-2883
+042709* 042709  CR2009031600001  AJRA  ADD ELCRTT VIN UPDATE
+011410* 011410  CR2009050700003  PEMA  ADD SPP DEALER DIRECT
+012010* 012010  CR2009061500002  AJRA  ADD FLAG FOR REFUND WITH OPEN CLAIM
+071910* 071910  CR2010042900001  PEMA  SEPARATE CITY AND STATE
+101010* 101010  CR2010012700001  PEMA  DEALER DIRECT FLAT FEE
+011211* 011211  CR2010030900001  AJRA  CANCELS WITH CLAIMS PROCESS
+020711* 020711  CR2010032500001  PEMA  ADDED NEW LOAN TERM EDIT
+020711* 020711  CR2010032900001  PEMA  ADDED NEW ATTAINED AGE EDIT
+071211* 071211  CR2009050700003  PEMA  ADD SPP DEALER DIRECT
+092311* 092311  IR2011092100001  PEMA  ID 10C MONTHLY
+110811* 110811  CR2011083000003  PEMA  GROSS EDIT FOR SPPDDF
+112911* 112911  CR2011083000003  PEMA  ADD SPPDDF TRUNCATED
+061412* 061412  CR2011022800001  AJRA  NAPERSOFT
+121712* 121712  CR2012101700002  AJRA  ADD DEFAULT AGE FLAG
+012213* 012213  CR2013011600001  PEMA  ADD ERROR 3058
+031513* 031513  CR2012100500002  PEMA  CORRECT TOL PCT PROCESS
+012010*-----------------------------------------------------------------
+00010                                                                   
+00011  01  WORK-AREAS.                                                  
+00012                                                                   
+00013 ***************************************************************** 
+00014 *        WORKING STORAGE AREA FOR CLIENT-MON                    * 
+00015 ***************************************************************** 
+00016                                                                   
+00017      12  WS-SUB                   PIC S9(4)     COMP    VALUE +0. 
+00018      12  WS-SUB1                  PIC S9(4)     COMP    VALUE +0. 
+00019      12  WS-SUB2                  PIC S9(4)     COMP    VALUE +0. 
+00020      12  WS-NAME-EDIT-WORK-AREA.                                  
+00021          16  WS-WORK-MEMB-NAME    PIC X(6)      VALUE SPACES.     
+00022          16  WS-WORK-MEMB-TABLE   REDEFINES WS-WORK-MEMB-NAME.    
+00023              20  WS-MEMB-LETTER   OCCURS 6 TIMES PIC X.           
+00024          16  WS-WORK-NAME.                                        
+00025              20  WS-WORK-LETTER-1 PIC X         VALUE SPACES.     
+00026              20  WS-WORK-LETTER-2 PIC X         VALUE SPACES.     
+00027              20  FILLER           PIC X(10)     VALUE SPACES.     
+00028          16  WS-WORK-TABLE REDEFINES WS-WORK-NAME.                
+00029              20  WS-TBL-LETTER OCCURS 12 TIMES PIC X.             
+00030                                                                   
+00031 ***************************************************************** 
+00032 *        END OF WORKING STORAGE FOR CLIENT-MON                  * 
+00033 ***************************************************************** 
+00034                                                                   
+00035      12  WS-ERRESC-KEY.                                           
+00036          16 WS-ERRESC-SEARCH-KEY.                                 
+00037              20  WS-ERRESC-COMPANY-CD PIC  X.                     
+00038              20  WS-ERRESC-CARRIER    PIC  X.                     
+00039              20  WS-ERRESC-GROUP      PIC X(6).                   
+00040              20  WS-ERRESC-STATE      PIC XX.                     
+00041              20  WS-ERRESC-ACCOUNT    PIC X(10).                  
+00042          16 WS-ERRESC-RESIDUAL-KEY.                               
+00043              20  WS-ERRESC-AGENT      PIC X(10).                  
+00044              20  WS-ERRESC-RES-STATE  PIC XX.                     
+00045              20  WS-ERRESC-EXPIRE-DT  PIC 9(8) COMP-3.            
+00046 *                                          YYYYMMDD               
+00047      12  WS-COMMISSION                PIC SV9(5) COMP-3.          
+00048      12  FILE-ID-ERRESC               PIC X(8)   VALUE 'ERRESC'.  
+00049                                                                   
+00050 *RESIDENT STATE TAX MASTER(ERRESS)                                
+00051 *                                                                 
+00052      12  WS-ERRESS-KEY.                                           
+00053          16  WS-ERRESS-COMPANY-CD      PIC  X.                    
+00054          16  WS-ERRESS-RESIDENT-STATE  PIC XX.                    
+00055          16  WS-ERRESS-COVERAGE-CAT    PIC  X.                    
+00056          16  WS-ERRESS-EXPIRE-DT       PIC 9(8) COMP-3.           
+00057 *                                          YYYYMMDD               
+00058                                                                   
+00059      12  WS-CONTRACT-DATE              PIC 9(8).                  
+00060 *                                          YYYYMMDD               
+00061      12  WS-NEXT-CONTRACT-DATE         PIC 9(8).                  
+00062      12  FILLER REDEFINES WS-NEXT-CONTRACT-DATE.                  
+00063          16 WS-YEAR-YY                 PIC   9999.                
+00064          16 FILLER                     PIC 9(4).                  
+00065 *                                          YYYYMMDD               
+00066      12  WS-SAVE-ERRESS-KEY            PIC X(9).                  
+00067      12  WS-RES-STATE-TAX              PIC SV9(5) COMP-3.         
+00068      12  WS-RES-MUNI-TAX               PIC SV9(5) COMP-3.         
+00069      12  FILE-ID-ERRESS                PIC X(8)  VALUE 'ERRESS'.  
+00070                                                                   
+00071      12  DPRB-1ST-TIME-SW              PIC X     VALUE SPACE.     
+00072          88  DPRB-1ST-TIME                      VALUE ' '.        
+00073                                                                   
+00074 ***************************************************************** 
+00075 *        END OF WORKING STORAGE FOR CLIENT-DMD                  * 
+00076 ***************************************************************** 
+00077                                                                   
+100703     12  WS-SAVE-ST-ELCNTL       PIC X(750)     VALUE LOW-VALUES.
+CIDMOD     12  WS-AGE-AT-EXPIRE        PIC 99         VALUE ZERO.       
+PEMMOD     12  WS-ST-LF-PREM-TAX       PIC S9V9(4) COMP-3 VALUE +0.
+PEMMOD     12  WS-ST-AH-PREM-TAX-I     PIC S9V9(4) COMP-3 VALUE +0.
+PEMMOD     12  WS-ST-AH-PREM-TAX-G     PIC S9V9(4) COMP-3 VALUE +0.
+012010     12  WS-ST-REFUND-CLAIM-FLAG PIC X          VALUE SPACES.
+00078      12  WS-ERROR                PIC S9(4)       VALUE +0 COMP.   
+00079      12  WS-CSL-AMT1              PIC S9(7)V99  COMP-3  VALUE +0. 
+00080      12  WS-CSL-AMT2              PIC S9(7)V99  COMP-3  VALUE +0. 
+00081      12  WS-AH-BENEFIT-CD         PIC XX        VALUE ZERO.       
+00082          88 POLICY-HAS-AH            VALUE '01' THRU '89'.        
+00083          88 NO-AH-COVERAGE           VALUE '  ' '00'.             
+00084      12  WS-LF-BENEFIT-CD         PIC XX        VALUE ZERO.       
+00085          88 POLICY-HAS-LIFE          VALUE '01' THRU '89'.        
+00086          88 NO-LIFE-COVERAGE         VALUE '  ' '00'.             
+00087      12  WS-CERT-EFF-DT           PIC XX        VALUE LOW-VALUE.  
+00088                                                                   
+00089      12  WS-AH-COMP-CD            PIC XX        VALUE ZERO.       
+00090      12  WS-LF-COMP-CD            PIC XX        VALUE ZERO.       
+00091                                                                   
+00092      12  WS-R78-METHOD            PIC X         VALUE SPACES.     
+00093      12  WS-COMP-MAX-CAP          PIC S9(3)V99  COMP-3  VALUE +0. 
+00094      12  WS-PL-TOL-LF-CLAIM       PIC S9(3)V99  COMP-3  VALUE +0. 
+00095      12  WS-PL-TOL-LF-PREM        PIC S9(3)V99  COMP-3  VALUE +0. 
+00096      12  WS-PL-TOL-LF-REFUND      PIC S9(3)V99  COMP-3  VALUE +0. 
+00097      12  WS-PL-TOL-LF-PREM-PCT    PIC S9V9(4)   COMP-3  VALUE +0. 
+00098      12  WS-PL-TOL-LF-REFUND-PCT  PIC S9V9(4)   COMP-3  VALUE +0. 
+00099      12  WS-PL-TOL-AH-CLAIM       PIC S9(3)V99  COMP-3  VALUE +0. 
+00100      12  WS-PL-TOL-AH-PREM        PIC S9(3)V99  COMP-3  VALUE +0. 
+00101      12  WS-PL-TOL-AH-REFUND      PIC S9(3)V99  COMP-3  VALUE +0. 
+00102      12  WS-PL-TOL-AH-PREM-PCT    PIC S9V9(4)   COMP-3  VALUE +0. 
+00103      12  WS-PL-TOL-AH-REFUND-PCT  PIC S9V9(4)   COMP-3  VALUE +0. 
+00104      12  WS-PL-SALES-TAX          PIC S9V9(4)   COMP-3  VALUE +0. 
+00105      12  WS-LIFE-REVISION         PIC XXX   VALUE SPACES.         
+00106      12  WS-AH-REVISION           PIC XXX   VALUE SPACES.         
+00107      12  WS-MINIMUM-REFUND        PIC S9(3)V99  COMP-3  VALUE +0. 
+00108      12  WS-TOL-LF-CLAIM          PIC S9(3)V99  COMP-3  VALUE +0. 
+00109      12  WS-TOL-LF-PREM           PIC S9(3)V99  COMP-3  VALUE +0. 
+00110      12  WS-TOL-LF-REFUND         PIC S9(3)V99  COMP-3  VALUE +0. 
+00111      12  WS-TOL-AH-CLAIM          PIC S9(3)V99  COMP-3  VALUE +0. 
+00112      12  WS-TOL-AH-PREM           PIC S9(3)V99  COMP-3  VALUE +0. 
+00113      12  WS-TOL-AH-REFUND         PIC S9(3)V99  COMP-3  VALUE +0. 
+00114      12  WS-TOL-LF-HIGH-PREM-PCT  PIC S9(7)V99  COMP-3  VALUE +0. 
+00115      12  WS-TOL-LF-LOW-PREM-PCT   PIC S9(7)V99  COMP-3  VALUE +0. 
+00116      12  WS-TOL-AH-HIGH-PREM-PCT  PIC S9(7)V99  COMP-3  VALUE +0. 
+00117      12  WS-TOL-AH-LOW-PREM-PCT   PIC S9(7)V99  COMP-3  VALUE +0. 
+00118      12  WS-TOL-LF-HIGH-PREM-AMT  PIC S9(7)V99  COMP-3  VALUE +0. 
+00119      12  WS-TOL-LF-LOW-PREM-AMT   PIC S9(7)V99  COMP-3  VALUE +0. 
+00120      12  WS-TOL-AH-HIGH-PREM-AMT  PIC S9(7)V99  COMP-3  VALUE +0. 
+00121      12  WS-TOL-AH-LOW-PREM-AMT   PIC S9(7)V99  COMP-3  VALUE +0. 
+00122      12  WS-TOL-LF-PREM-PCT       PIC S9V9(4)   COMP-3  VALUE +0. 
+00123      12  WS-TOL-LF-REFUND-PCT     PIC S9V9(4)   COMP-3  VALUE +0. 
+00124      12  WS-TOL-AH-PREM-PCT       PIC S9V9(4)   COMP-3  VALUE +0. 
+00125      12  WS-TOL-AH-REFUND-PCT     PIC S9V9(4)   COMP-3  VALUE +0. 
+00126      12  WS-PAYMENT-AMT           PIC S9(7)V99  COMP-3  VALUE +0. 
+00127      12  WS-LF-BENEFIT-AMT        PIC S9(11)V99 COMP-3  VALUE +0. 
+00128      12  WS-FREE-LOOK-PERIOD      PIC S9(03)    COMP-3  VALUE +0. 
+00129      12  WS-CSL-CALC-CD           PIC X         VALUE SPACES.     
+00130      12  WS-PREM-REJECT-SW        PIC X         VALUE SPACES.     
+00131      12  WS-REF-REJECT-SW         PIC X         VALUE SPACES.     
+00132      12  WS-IG-OVRD-AH-PL         PIC X         VALUE SPACES.     
+00133      12  WS-IG-OVRD-LF-PL         PIC X         VALUE SPACES.     
+00134      12  WS-IG-OVRD-AM            PIC X         VALUE SPACES.     
+00135      12  WS-IG-OVRD-AH-BEN        PIC X         VALUE SPACES.     
+00136      12  WS-IG-OVRD-LF-BEN        PIC X         VALUE SPACES.     
+00137      12  WS-IG-OVRD-AH            PIC X         VALUE SPACES.     
+00138      12  WS-IG-OVRD-LF            PIC X         VALUE SPACES.     
+00139      12  WS-IG-OVRD               PIC X         VALUE SPACES.     
+00140      12  WS-BIRTH-DATE-FLAG       PIC X         VALUE SPACES.     
+00141      12  WS-JOINT-AGE-FLAG        PIC X         VALUE SPACES.     
+00142      12  WS-CURRENT-MONTH-END     PIC XX        VALUE LOW-VALUE.  
+00143      12  WS-REM-TRM-CALC-OPTION   PIC X         VALUE SPACE.      
+00144      12  WS-2671-SW               PIC X         VALUE SPACE.      
+00145      12  WS-2672-SW               PIC X         VALUE SPACE.      
+00146      12  WS-OUTSIDE-AMT-LIMITS    PIC X         VALUE SPACE.      
+00147          88  OUTSIDE-AMT-LIMITS                 VALUE 'Y'.        
+00148      12  WS-FUTURE-CANCEL-DT-SW   PIC X         VALUE SPACE.      
+00149          88  CANCEL-FUTURE-DT                   VALUE 'Y'.        
+00150      12  W-BROWSE-SW              PIC X         VALUE SPACE.      
+00151                                                                   
+00152      12  WS-FILE-ADDRESSED        PIC X    VALUE SPACE.           
+00153          88  ELCNTL-FILE-ADDRESSED              VALUE '1'.        
+00154          88  ERPLAN-FILE-ADDRESSED              VALUE '2'.        
+00155          88  ERFORM-FILE-ADDRESSED              VALUE '3'.        
+00156          88  ERACCT-FILE-ADDRESSED              VALUE '4'.        
+00157                                                                   
+00158      12  WS-CREDIT-EDIT-CONTROLS.                                 
+00159          16  WS-MIN-PREMIUM       PIC S9(3)V99  COMP-3  VALUE +0. 
+00160          16  WS-MIN-AGE           PIC 99                VALUE  0. 
+00161          16  WS-DEFAULT-AGE       PIC 99                VALUE  0. 
+00162          16  WS-MIN-TERM          PIC S9(3)     COMP-3  VALUE +0. 
+00163          16  WS-MAX-TERM          PIC S9(3)     COMP-3  VALUE +0. 
+00164          16  WS-DEFAULT-SEX       PIC X         VALUE SPACE.      
+00165                                                                   
+121712     12  WS-AGE-FIELDS.
+121712         16  WS-INS-AGE-SET             PIC X VALUE 'N'.
+121712         16  WS-JNT-AGE-SET             PIC X VALUE 'N'.
+121712         16  WS-INS-AGE-DEFAULTED       PIC X VALUE 'N'.
+121712         16  WS-JNT-AGE-DEFAULTED       PIC X VALUE 'N'.
+121712
+00166      12  WS-SAVE-ALLOWABLE-BENEFIT.                               
+00167          16  WS-SAVE-BENEFIT-CODE       PIC XX.                   
+00168          16  WS-SAVE-BENEFIT-TYPE       PIC X.                    
+00169          16  WS-SAVE-BENEFIT-REVISION   PIC XXX.                  
+00170          16  WS-SAVE-BENEFIT-REM-TERM   PIC X.                    
+00171          16  WS-SAVE-BENEFIT-RETRO-Y-N  PIC X.                    
+00172          16  FILLER                      PIC XX.                  
+00173                                                                   
+00174      12  WS-DEFAULT-APR           PIC S9(3)V9(4) COMP-3 VALUE +0. 
+00175      12  WS-STATE-ABBREVIATION    PIC XX        VALUE SPACES.     
+100703     12  WS-CLP-STATE             PIC XX        VALUE SPACES.
+100703     12  WS-TOL-CLP-PCT           PIC S9V9(4)   COMP-3 VALUE +0.
+092705     12  WS-SPP-LEASE-COMM        PIC S9(5)V99  COMP-3 VALUE +0.
+100703     12  WS-BANK-FEE              PIC S999V99   COMP-3 VALUE +0.
+092205     12  WS-BANK-LFEE             PIC S999V99   COMP-3 VALUE +0.
+100703     12  WS-BANK-NOCHRGB          PIC 99        VALUE ZEROS.
+011904     12  WS-DCC-LF-RATE           PIC S99V9(5)  COMP-3 VALUE +0.
+011904     12  WS-DCC-AH-RATE           PIC S99V9(5)  COMP-3 VALUE +0.
+00176                                                                   
+00177      12  WS-LF-REM-TERM-CALC      PIC X         VALUE SPACE.      
+00178      12  WS-AM-LF-BENE-REM-TERM   PIC X         VALUE SPACE.      
+00179      12  WS-LF-BENEFIT-ALPHA      PIC X(3)      VALUE SPACES.     
+00180      12  WS-LF-REFUND-CALC        PIC X         VALUE SPACE.      
+00181      12  WS-LF-SPECIAL-CALC-CD    PIC X         VALUE SPACE.      
+00182      12  WS-LF-EARNINGS-CALC      PIC X         VALUE SPACE.      
+00183      12  WS-LF-JOINT-INDICATOR    PIC X         VALUE SPACE.      
+00184      12  WS-LF-COVERAGE-TYPE      PIC X         VALUE SPACE.      
+00185          88  WS-REDUCING              VALUE 'R'.                  
+00186          88  WS-LEVEL                 VALUE 'L' 'P'.              
+100703     12  WS-LF-BEN-CATEGORY       PIC X         VALUE SPACES.
+00187                                                                   
+00188      12  WS-AH-REM-TERM-CALC      PIC X         VALUE SPACE.      
+00189      12  WS-AM-AH-BENE-REM-TERM   PIC X         VALUE SPACE.      
+00190      12  WS-AH-BENEFIT-ALPHA      PIC X(3)      VALUE SPACES.     
+00191      12  WS-AH-REFUND-CALC        PIC X         VALUE SPACES.     
+00192      12  WS-AH-SPECIAL-CALC-CD    PIC X         VALUE SPACES.     
+00193      12  WS-AH-EARNINGS-CALC      PIC X         VALUE SPACES.     
+00194      12  WS-AH-JOINT-INDICATOR    PIC X         VALUE SPACES.     
+100703     12  WS-AH-BEN-CATEGORY       PIC X         VALUE SPACES.
+           12  WS-AH-DCC-TRUNC          PIC X         VALUE SPACES.
+00195                                                                   
+00196      12  WS-ACCT-REIN-TABLE       PIC XXX       VALUE SPACES.     
+00197      12  WS-ACCT-STATUS           PIC X         VALUE SPACES.     
+00198      12  WS-ACCT-STD-AH-TYPE      PIC XX        VALUE SPACES.     
+00199      12  WS-ACCT-LF-DEV-PCT       PIC S9V9(6)   COMP-3 VALUE ZERO.
+00200      12  WS-ACCT-LF-DEVIATION     PIC XXX       VALUE SPACES.     
+00201      12  WS-ACCT-AH-DEV-PCT       PIC S9V9(6)   COMP-3 VALUE ZERO.
+00202      12  WS-ACCT-AH-DEVIATION     PIC XXX       VALUE SPACES.     
+00203      12  WS-ACCT-CLASS-TABLE      PIC XX        VALUE SPACES.     
+00204      12  WS-ACCT-USER-FLD-5       PIC XX        VALUE SPACES.     
+00205      12  WS-ACCT-BUSINESS-TYPE    PIC XX        VALUE SPACES.     
+00206      12  WS-ACCT-SIG-SW.                                          
+00207          16  WS-ACCT-SIG-SW-A     PIC X         VALUE SPACES.     
+00208          16  WS-ACCT-SIG-SW-B     PIC X         VALUE SPACES.     
+00209      12  WS-ACCT-AH-OB-RT         PIC S99V9(5)  COMP-3 VALUE ZERO.
+00210      12  WS-ACCT-LF-OB-RT         PIC S99V9(5)  COMP-3 VALUE ZERO.
+040504     12  WS-ACCT-ADDL-CLP         PIC S9(5)V99  COMP-3 VALUE +0.
+062707     12  WS-ACCT-I-CLP            PIC S9(5)V99  COMP-3 VALUE +0.
+101010     12  WS-ADMIN-FEES            PIC S9(5)V99  COMP-3 VALUE +0.
+           12  WS-CSO-ADMIN-FEE         PIC S9(5)V99  COMP-3 VALUE +0.
+071211     12  WS-1ST-YR-ALLOW          PIC S9(5)V99  COMP-3 VALUE +0.
+           12  WS-COMM-AND-MFEE         PIC S9(5)V99  COMP-3 VALUE +0.
+00211      12  WS-INITIALS.                                             
+00212          16  WS-INIT-1            PIC X         VALUE SPACES.     
+00213          16  WS-INIT-2            PIC X         VALUE SPACES.     
+00214                                                                   
+00215      12  WS-EDIT-LOAN-OFC-SW    PIC X(01)       VALUE 'N'.        
+00216      12  WS-ERROR-LINE          PIC X(72)       VALUE SPACES.     
+00217      12  WS-CURRENT-BIN-DT      PIC XX     VALUE LOW-VALUES.      
+00218      12  WS-CANCEL-EXIT-DT      PIC XX     VALUE LOW-VALUES.      
+           12  WS-ATT-AGE             PIC S9(3)V99    COMP-3 VALUE +0.
+00219 *    12  WS-ATT-AGE             PIC 99          COMP-3 VALUE ZERO.
+00220      12  WS-WORK-AGE            PIC S999        COMP-3 VALUE ZERO.
+00221      12  WS-EDIT-AGE            PIC S999        COMP-3 VALUE ZERO.
+00222      12  WS-AH-EDIT-AGE         PIC S999        COMP-3 VALUE ZERO.
+00223      12  WS-LF-MAX-ISSUE-AGE    PIC S999        COMP-3 VALUE ZERO.
+00224      12  WS-AH-MAX-ISSUE-AGE    PIC S999        COMP-3 VALUE ZERO.
+00225      12  WS-WORK-TERM           PIC S999        COMP-3 VALUE ZERO.
+00226      12  WS-WORK-RATE           PIC S99V9(5)    COMP-3 VALUE ZERO.
+00227      12  WS-WK-RATE             PIC SV9(5)      COMP-3 VALUE ZERO.
+00228      12  WS-COMM-CK-AMT         PIC S9(7)V99    COMP-3 VALUE ZERO.
+00229      12  WS-TEX-FACT-2          PIC S9(3)       COMP-3 VALUE ZERO.
+00230      12  WS-TEX-FACT-3          PIC S9(3)       COMP-3 VALUE ZERO.
+00231      12  WS-WK-C1               PIC S9(7)       COMP-3 VALUE ZERO.
+00232      12  WS-WK-C2               PIC S9(7)       COMP-3 VALUE ZERO.
+00233      12  WS-WK-C3               PIC S9(7)V99    COMP-3 VALUE ZERO.
+00234      12  WS-WK-C4               PIC S9(7)V99    COMP-3 VALUE ZERO.
+00235      12  WS-CALC-WORK           PIC S9(8)V9(5)  COMP-3 VALUE ZERO.
+00236      12  WS-UNSIGN-WRK1         PIC 9(9)V99     COMP-3 VALUE ZERO.
+00237      12  WS-UNSIGN-WRK2         PIC 9(9)V99     COMP-3 VALUE ZERO.
+00238      12  WS-UNSIGN-WRK3         PIC 9(9)V99     COMP-3 VALUE ZERO.
+00239      12  WS-UNSIGN-WRK4         PIC 9(9)V99     COMP-3 VALUE ZERO.
+00240      12  WS-UNSIGN-WRK5         PIC 9(9)V99     COMP-3 VALUE ZERO.
+00241      12  WS-UNSIGN-WRK6         PIC 9(9)V99     COMP-3 VALUE ZERO.
+00242 ******** FLA                                                      
+00243      12  WS-SIGN-WRK1           PIC S9(7)V99    COMP-3 VALUE ZERO.
+00244      12  WS-SIGN-WRK2           PIC S9(7)V99    COMP-3 VALUE ZERO.
+00245      12  WS-SIGN-WRK4           PIC S9(7)V99    COMP-3 VALUE ZERO.
+00246      12  WS-SV-LF-CANCEL-DT     PIC XX    VALUE LOW-VALUES.       
+00247      12  WS-SV-AH-CANCEL-DT     PIC XX    VALUE LOW-VALUES.       
+00248 ********                                                          
+00249      12  WS-SAVE-PREM-CHECK     PIC S9(5)V99    COMP-3 VALUE ZERO.
+00250      12  WS-SAVE-REFUND-CHECK   PIC S9(5)V99    COMP-3 VALUE ZERO.
+00251      12  WS-SAVE-CLAIM-CHECK    PIC S9(5)V99    COMP-3 VALUE ZERO.
+00252      12  WS-WORK-MAX-BENEFIT-AMT PIC S9(5)V99   COMP-3 VALUE ZERO.
+00253      12  WS-AEC-WORK-AREA       PIC 9(5)V99     COMP-3 VALUE ZERO.
+00254      12  WS-AEC-SIGNED-AREA     PIC S9(5)V99    COMP-3 VALUE +0.  
+00255      12  WS-LOOKUP-TYPE         PIC X      VALUE SPACE.           
+00256      12  WS-EXPIRE-DT           PIC XX     VALUE LOW-VALUES.      
+00257      12  WS-TERM                PIC S9(3)       COMP-3 VALUE +0.  
+00258      12  WS-CLAIM-ATTACHED-COUNT PIC S9(4)      COMP   VALUE +0.  
+00259                                                                   
+00260      12  WS-SKIP-CODE-CHECK     PIC X    VALUE ' '.               
+00261          88  VALID-SKIP-CODE       VALUE ' ' 'A' 'X'              
+00262                                          '0' THRU '9'.            
+00263                                                                   
+00264      12  NUMBER-OF-MONTHS.                                        
+00265          16  SK-MO OCCURS 12 TIMES PIC X.                         
+00266                                                                   
+00267      12  WS-WORK-DATE.                                            
+00268          16  WS-YEAR            PIC 99    VALUE 00.               
+00269          16  WS-MONTH           PIC 99    VALUE 00.               
+00270          16  WS-DAY             PIC 99    VALUE 00.               
+00271                                                                   
+00272      12  WS-WORK-LF-CRIT-PER    PIC 9(03)   VALUE ZEROS.          
+00273      12  WS-WORK-CRIT-DEV       REDEFINES                         
+00274          WS-WORK-LF-CRIT-PER    PIC X(03).                        
+00275                                                                   
+00276      12  WS-ODD-DAYS-OVER       PIC 9(3)      VALUE ZERO.         
+           12  WS-DAYS-TO-1ST-PMT     PIC 9(3)      VALUE ZERO.         
+00277                                                                   
+00278      12  WS-WORK-DATE-FROM.                                       
+00279          16  WS-WDF-MONTH       PIC 99        VALUE ZERO.         
+00280          16  FILLER             PIC X  VALUE SPACE.               
+00281          16  WS-WDF-DAY         PIC 99        VALUE ZERO.         
+00282          16  FILLER             PIC X         VALUE SPACE.        
+00283          16  WS-WDF-YEAR        PIC 99        VALUE ZERO.         
+00284                                                                   
+00285      12  WS-WORK-DATE-THRU.                                       
+00286          16  WS-WDT-MONTH       PIC 99        VALUE ZERO.         
+00287          16  FILLER             PIC X         VALUE SPACE.        
+00288          16  WS-WDT-DAY         PIC 99        VALUE ZERO.         
+00289          16  FILLER             PIC X         VALUE SPACE.        
+00290          16  WS-WDT-YEAR        PIC 99        VALUE ZERO.         
+00291                                                                   
+00292      12  WS-LF-INPUT-CD.                                          
+00293          16  WS-LF-INPUT-CD-1   PIC X     VALUE ' '.              
+00294          16  WS-LF-INPUT-CD-2   PIC X     VALUE ' '.              
+00295                                                                   
+00296      12  WS-AH-INPUT-CD         PIC XXX       VALUE SPACES.       
+00297      12  WS-AH-INPUT-CD-R REDEFINES WS-AH-INPUT-CD.               
+00298          16  WS-AH-INPUT-CD-1   PIC X.                            
+00299          16  WS-AH-INPUT-CD-2-3 PIC XX.                           
+00300                                                                   
+00301      12  WS-SWITCHES.                                             
+00302          16  DATE-RANGE-SW            PIC X    VALUE SPACES.      
+00303          16  ACCOUNT-MAST-FOUND-SW    PIC X    VALUE SPACES.      
+00304              88  ACCOUNT-MAST-FOUND       VALUE 'Y'.              
+100703         16  BANK-ACCT-SW             PIC X    VALUE SPACES.      
+100703             88  BANK-ACCT-FOUND          VALUE 'Y'.              
+111504         16  AGTC-MASTER-SW           PIC X    VALUE SPACES.      
+111504             88  AGENT-MASTER-FOUND       VALUE 'Y'.              
+100703         16  BXRF-MASTER-SW           PIC X    VALUE SPACES.      
+100703             88  BXRF-MASTER-FOUND        VALUE 'Y'.              
+100703         16  COMP-MASTER-SW           PIC X    VALUE SPACES.      
+100703             88  COMP-MASTER-FOUND        VALUE 'Y'.              
+083106         16  LOFC-MASTER-SW           PIC X    VALUE SPACES.      
+083106             88  LOFC-MASTER-FOUND        VALUE 'Y'.              
+101010         16  PDEF-MASTER-SW           PIC X    VALUE SPACES.      
+101010             88  PDEF-MASTER-FOUND        VALUE 'Y'.              
+101010         16  STAT-MASTER-SW           PIC X    VALUE SPACES.      
+101010             88  STAT-MASTER-FOUND        VALUE 'Y'.              
+00305          16  PLAN-MASTER-SW           PIC X    VALUE SPACES.      
+00306              88  PLAN-MASTER-FOUND        VALUE 'Y'.              
+00307          16  PLAN-MASTER-LIFE-SW      PIC X    VALUE SPACES.      
+00308              88  LF-PLAN-MASTER-FOUND     VALUE 'Y'.              
+00309          16  PLAN-MASTER-AH-SW        PIC X    VALUE SPACES.      
+00310              88  AH-PLAN-MASTER-FOUND     VALUE 'Y'.              
+00311          16  FORM-MASTER-SW           PIC X(1) VALUE SPACES.      
+00312              88  FORM-MASTER-FOUND        VALUE 'Y'.              
+00313          16  FORM-MASTER-LIFE-SW      PIC X(1) VALUE SPACES.      
+00314              88  LF-FORM-MASTER-FOUND     VALUE 'Y'.              
+00315          16  FORM-MASTER-AH-SW        PIC X(1) VALUE SPACES.      
+00316              88  AH-FORM-MASTER-FOUND     VALUE 'Y'.              
+00317          16  PROCESS-FORM-EDITS-SW    PIC X(1) VALUE SPACES.      
+00318              88  PROCESS-FORM-EDITS       VALUE 'Y'.              
+00319          16  BEN-SEARCH-SW            PIC X    VALUE SPACES.      
+00320              88  NO-BENEFIT-FOUND         VALUE 'N'.              
+00321          16  ACCOUNT-LIFE-CK-SW       PIC X(3) VALUE SPACES.      
+00322              88  ACCOUNT-LIFE-CHECKED     VALUE  'YES'.           
+00323          16  ACCOUNT-AH-CK-SW         PIC X(3) VALUE SPACES.      
+00324              88  ACCOUNT-AH-CHECKED       VALUE  'YES'.           
+00325          16  AH-BENEFIT-ERROR         PIC X    VALUE SPACE.       
+00326              88  AH-BENEFIT-FOUND         VALUE ' '.              
+00327              88  NO-AH-BENEFIT-MATCH      VALUE '1'.              
+00328          16  LF-BENEFIT-ERROR         PIC X    VALUE SPACE.       
+00329              88  LF-BENEFIT-FOUND         VALUE ' '.              
+00330              88  NO-LF-BENEFIT-MATCH      VALUE '1'.              
+071910         16  STATE-RECORD-ERROR       PIC X    VALUE SPACES.
+071910             88  NO-STATE-RECORD          VALUE '1'.
+00331          16  WS-NSP-ST-CD-LF          PIC XX   VALUE SPACE.       
+00332              88  LF-REIN-NSP-NOT-USED     VALUE '  '.             
+00333          16  WS-NSP-ST-CD-AH          PIC XX   VALUE SPACE.       
+00334              88  AH-REIN-NSP-NOT-USED     VALUE '  '.             
+00335          16  CERT-STATUS-SW           PIC X    VALUE SPACE.       
+00336              88  CERT-WAS-FOUND           VALUE ' '.              
+00337              88  CERT-WAS-NOT-FOUND       VALUE '1'.              
+00338          16  WS-BROWSE-STARTED-SW     PIC X    VALUE SPACE.       
+00339              88  BROWSE-STARTED           VALUE 'Y'.              
+00340          16  WS-JOINT-AGE-SW          PIC X    VALUE SPACE.       
+00341              88  JOINT-AGE-USED-IN-EDIT   VALUE 'Y'.              
+00342          16  WS-CERT-ADDED-FOR-CLM-SW PIC X    VALUE SPACE.       
+00343              88  CERT-WAS-ADDED-FOR-CLM   VALUE 'Y'.              
+00344          16  WS-CERT-AND-CLM-ONLINE-SW PIC X    VALUE SPACE.      
+00345              88  CERT-AND-CLM-ONLINE      VALUE 'Y'.              
+00346          16  WS-AH-CANCEL-SW          PIC X    VALUE SPACE.       
+00347              88  AH-COVERAGE-CANCELLED    VALUE 'Y'.              
+00348          16  WS-LF-CANCEL-SW          PIC X    VALUE SPACE.       
+00349              88  LF-COVERAGE-CANCELLED    VALUE 'Y'.              
+00350          16  WS-APP-CERT-SW           PIC X    VALUE SPACE.       
+00351              88  APP-CERT-USED            VALUE 'Y' 'A'.          
+00352          16  WS-CTBL-READ-SW          PIC X    VALUE SPACE.       
+00353              88  CTBL-TABLE-FOUND         VALUE 'Y'.              
+00354              88  FIRST-TIME-THROUGH       VALUE '1'.              
+00355              88  CTBL-NOT-FOUND           VALUE '2'.              
+00356                                                                   
+00357          16  WS-REIN-READ-SW          PIC X    VALUE SPACE.       
+00358              88  REIN-TABLE-NOT-FOUND     VALUE 'N'.              
+00359                                                                   
+00360          16  WS-DLO-ERROR-SW          PIC X    VALUE SPACE.       
+00361              88  DLO-ERROR-FOUND          VALUE 'Y'.              
+00362                                                                   
+00363 ********FLA                                                       
+00364      12  WS-TOLERANCE-SWITCH      PIC 9           VALUE ZERO.     
+00365      12  WS-SAVE-DATA-ENTRY-SW    PIC X           VALUE SPACES.   
+00366 ********                                                          
+00367      12  RC-SW-1                  PIC X           VALUE '0'.      
+00368      12  RC-SW-2                  PIC X           VALUE '0'.      
+00369      12  CTBL-SW                  PIC X(4)        VALUE 'XXXX'.   
+00370      12  REIN-SW                  PIC X(4)        VALUE 'XXXX'.   
+00371      12  SUB                      PIC 9(4) COMP   VALUE ZEROS.    
+00372      12  SUB1                     PIC 9(4) COMP   VALUE ZEROS.    
+00373      12  SUB2                     PIC 9(4) COMP   VALUE ZEROS.    
+00374      12  SUB3                     PIC 9(4) COMP   VALUE ZEROS.    
+00375      12  SUB4                     PIC 9(4) COMP   VALUE ZEROS.    
+00376      12  SUB5                     PIC 9(4) COMP   VALUE ZEROS.    
+00377      12  SUB6                     PIC 9(4) COMP   VALUE ZEROS.    
+00378      12  IB                       PIC 9(4) COMP   VALUE ZEROS.    
+00379      12  LIT-SPACES               PIC X           VALUE SPACES.   
+00380      12  JOURNAL-LENGTH           PIC S9999 COMP  VALUE ZERO.     
+00381      12  ELMSTR-LENGTH            PIC S9999 COMP  VALUE +11.      
+00382      12  ERMAIL-FOUND             PIC X           VALUE SPACES.   
+00383      12  ERPNDM-FOUND             PIC X           VALUE SPACES.   
+011410     12  WS-LF-PMF-COMM           PIC S9V9(5) COMP-3 VALUE +0.
+011410     12  WS-AH-PMF-COMM           PIC S9V9(5) COMP-3 VALUE +0.
+           12  WS-SECPAY-SWITCH         PIC X VALUE ' '.
+               88  WS-SECURE-PAY-CARRIER   VALUE 'Y'.
+               88  WS-NO-SECURE-PAY        VALUE ' ' 'N'.
+           12  WS-SKIP-ADDR-EDIT-SW     PIC X VALUE ' '.
+               88  SKIP-ADDR-EDIT         VALUE 'Y'.
+00384                                                                   
+100703 01  WS-RECORD-LENGTH COMP       SYNCHRONIZED.
+100703     12  BXRF-MAX-REC-LENGTH     PIC S9(8)    VALUE +26178.
+100703     12  BXRF-REC-LENGTH         PIC S9(4)    VALUE +0.
+00385  01  WS-CRI-SSN-WORK-AREA.                                        
+00386      05  WS-CRI-SOC-SEC-NO.                                       
+00387          10  WS-SS-REPT-CD       PIC X(5).                        
+00388          10  WS-SS-LAST-NAME     PIC X(5).                        
+00389          10  WS-SS-INITIAL       PIC X.                           
+00390                                                                   
+00391      05  WS-CRI-REPORT-CODE.                                      
+00392          10  FILLER              PIC X(5).                        
+00393          10  WS-CRI-RPT-CD-MOVE  PIC X(5).                        
+00394                                                                   
+00395      05  WS-CRI-LAST-NAME.                                        
+00396          10  WS-CRI-NAME-MOVE    PIC X(5).                        
+00397          10  FILLER              PIC X(10).                       
+00398                                                                   
+       01  WS-NUM-TABLE                PIC X(26)  VALUE
+           '12345678012345070923456789'.
+       01  FILLER REDEFINES WS-NUM-TABLE.
+           05  WS-NUM OCCURS 26        PIC 9.
+101010 01  WS-WORK-FACT                PIC S9V9(6) COMP-3 VALUE +0.
+       01  V1                          PIC S999 COMP-3.
+       01  V2                          PIC S999 COMP-3.
+       01  V3                          PIC S999 COMP-3.
+       01  WS-WORK-VIN                 PIC X(17)  VALUE SPACES.
+       01  FILLER REDEFINES WS-WORK-VIN.
+           05  WS-WORK-VIN-N OCCURS 17        PIC 9.
+       01  WS-VIN-TOTAL                PIC S9(9)  VALUE +0.
+       01  WS-VIN-FINAL                PIC S9(7)  VALUE +0.
+       01  WS-VIN-REMAINDER            PIC S999   VALUE +0.
+       01  WS-HEX-WORK.
+           05  FILLER                  PIC X  VALUE LOW-VALUES.
+           05  WS-HEX-BYTE             PIC X.
+       01  WS-CHARCD REDEFINES WS-HEX-WORK PIC S9(4)  COMP.
+       01  WS-CHARCD-A                 PIC S9(4)   COMP VALUE +65.
+
+101010 01  WS-WORK-HIN-ROW-B.
+101010     05  WS-ROW-B-VAL OCCURS 16 PIC 9 VALUE ZERO.
+101010
+101010 01  WS-WORK-HIN-ROW-C       PIC X(16)  VALUE '9876543298765432'.
+101010 01  FILLER REDEFINES WS-WORK-HIN-ROW-C.
+101010     05  WS-ROW-C-VAL OCCURS 16  PIC 9.
+101010 01  WS-ROW-D-TABLE.
+101010     05  WS-ROW-D-VAL OCCURS 16 PIC S999 VALUE +0 COMP-3.
+101010
+101010 01  WS-HIN-TABLE-B.
+101010     05  F                       PIC XX VALUE 'A2'.
+101010     05  F                       PIC XX VALUE 'B3'.
+101010     05  F                       PIC XX VALUE 'C4'.
+101010     05  F                       PIC XX VALUE 'D5'.
+101010     05  F                       PIC XX VALUE 'E6'.
+101010     05  F                       PIC XX VALUE 'F7'.
+101010     05  F                       PIC XX VALUE 'G8'.
+101010     05  F                       PIC XX VALUE 'H9'.
+101010     05  F                       PIC XX VALUE 'I1'.
+101010     05  F                       PIC XX VALUE 'J2'.
+101010     05  F                       PIC XX VALUE 'K3'.
+101010     05  F                       PIC XX VALUE 'L4'.
+101010     05  F                       PIC XX VALUE 'M5'.
+101010     05  F                       PIC XX VALUE 'N6'.
+101010     05  F                       PIC XX VALUE 'O0'.
+101010     05  F                       PIC XX VALUE 'P7'.
+101010     05  F                       PIC XX VALUE 'Q0'.
+101010     05  F                       PIC XX VALUE 'R8'.
+101010     05  F                       PIC XX VALUE 'S9'.
+101010     05  F                       PIC XX VALUE 'T2'.
+101010     05  F                       PIC XX VALUE 'U3'.
+101010     05  F                       PIC XX VALUE 'V4'.
+101010     05  F                       PIC XX VALUE 'W5'.
+101010     05  F                       PIC XX VALUE 'X6'.
+101010     05  F                       PIC XX VALUE 'Y7'.
+101010     05  F                       PIC XX VALUE 'Z8'.
+101010 01  WS-HIN-TABLE-B-RED REDEFINES WS-HIN-TABLE-B OCCURS 26.
+101010     05  WS-VAL-IN               PIC X.
+101010     05  WS-VAL-OUT              PIC 9.
+101010 01  WS-GOOD-HIN                 PIC X  VALUE 'Y'.
+
+00399  01  WS-COMPARE-BINARY-DATES.                                     
+CIDMOD     05  WS-971231                PIC XX VALUE X'92FF'.
+00400      05  WS-931231                PIC XX VALUE X'8CFF'.           
+00401      05  WS-791231                PIC XX VALUE X'77FF'.           
+00402      05  WS-771001                PIC XX VALUE X'74A1'.           
+00403      05  WS-820301                PIC XX VALUE X'7B41'.           
+00404      05  WS-831031                PIC XX VALUE X'7DBF'.           
+00405      05  WS-831231                PIC XX VALUE X'7DFF'.           
+00406      05  WS-810831                PIC XX VALUE X'7A7F'.           
+00407      05  WS-830901                PIC XX VALUE X'7D81'.           
+00408                                                                   
+00409  01  FILE-ACCESS-IDS.                                             
+00410      12  CNTL-ID                  PIC X(8)       VALUE 'ELCNTL'.  
+00411      12  ACCT-ID                  PIC X(8)       VALUE 'ERACCT2'. 
+00412      12  PLAN-ID                  PIC X(8)       VALUE 'ERPLAN'.  
+00413      12  FORM-ID                  PIC X(8)       VALUE 'ERFORM'.  
+00414      12  CERT-ID                  PIC X(8)       VALUE 'ELCERT'.  
+00415      12  CLMS-ID                  PIC X(8)       VALUE 'ELMSTR5'. 
+00416      12  REIN-ID                  PIC X(8)       VALUE 'ERREIN'.  
+00417      12  CTBL-ID                  PIC X(8)       VALUE 'ERCTBL'.  
+00418      12  FILE-ERMAIL              PIC X(8)       VALUE 'ERMAIL'.  
+00419      12  FILE-ERPNDM              PIC X(8)       VALUE 'ERPNDM'.  
+100703     12  COMP-ID                  PIC X(8)       VALUE 'ERCOMP'.  
+083106     12  LOFC-ID                  PIC X(8)       VALUE 'ERLOFC'.  
+101010     12  PDEF-ID                  PIC X(8)       VALUE 'ERPDEF'.
+101010     12  STAT-ID                  PIC X(8)       VALUE 'ELSTAT'.
+100703     12  BXRF-ID                  PIC X(8)       VALUE 'ERBXRF'.  
+111504     12  AGTC-ID                  PIC X(8)       VALUE 'ERAGTC'.
+042709     12  CRTT-ID                  PIC X(8)       VALUE 'ELCRTT'.
+
+101010 01  DD-IU-SW                    PIC X   VALUE ' '.
+101010     88  DD-IU-PRESENT                 VALUE 'Y'.
+00420                                                                   
+00421  01  ACCESS-KEYS.                                                 
+00422      12  ELMSTR-KEY.                                              
+00423          16  MSTR-COMP-CD         PIC X       VALUE LOW-VALUES.   
+00424          16  MSTR-CERT-NO         PIC X(11)   VALUE SPACES.       
+00425      12  W-CLAIM-KEY.                                             
+00426          16  W-CL-COMP-CD         PIC X       VALUE LOW-VALUES.   
+00427          16  W-CL-CERT-NO         PIC X(11)   VALUE SPACES.       
+00428                                                                   
+00429      12  ELCNTL-KEY.                                              
+00430          16  CNTL-COMP-ID         PIC XXX     VALUE SPACES.       
+00431          16  CNTL-REC-TYPE        PIC X       VALUE SPACE.        
+00432          16  CNTL-ACCESS          PIC X(4)    VALUE SPACES.       
+00433          16  CNTL-SEQ-NO          PIC S9(4)    COMP VALUE +0.     
+00434                                                                   
+00435      12  ELCERT-KEY.                                              
+00436          16  CERT-COMP-CD         PIC X       VALUE LOW-VALUES.   
+00437          16  CERT-CARRIER         PIC X       VALUE SPACE.        
+00438          16  CERT-GROUPING        PIC X(6)    VALUE SPACES.       
+00439          16  CERT-STATE           PIC XX      VALUE SPACES.       
+00440          16  CERT-ACCOUNT         PIC X(10)   VALUE SPACES.       
+00441          16  CERT-EFF-DT          PIC XX      VALUE LOW-VALUES.   
+00442          16  CERT-CERT-NO         PIC X(11)   VALUE SPACES.       
+00443                                                                   
+00444      12  ELCERT2-KEY.                                             
+00445          16  CERT2-COMP-CD        PIC X       VALUE LOW-VALUE.    
+00446          16  CERT2-CERT-NO        PIC X(11)   VALUE SPACES.       
+00447                                                                   
+00448      12  ELCERT-LENGTH            PIC S9(4)    COMP  VALUE +450.  
+00449                                                                   
+00450      12  ELCERT-SAVE.                                             
+00451          16  FILLER                      PIC XX    VALUE SPACES.  
+00452                                                                   
+042709         16  WCS-CONTROL-PRIMARY.                                  
+042709             20  WCS-COMPANY-CD          PIC X  VALUE LOW-VALUE.  
+042709             20  WCS-CARRIER             PIC X     VALUE SPACE.   
+042709             20  WCS-GROUPING            PIC X(6)  VALUE SPACES.  
+042709             20  WCS-STATE               PIC XX    VALUE SPACES.  
+042709             20  WCS-ACCOUNT             PIC X(10) VALUE SPACES.  
+042709             20  WCS-CERT-EFF-DT         PIC XX VALUE LOW-VALUES.
+042709             20  WCS-CERT-NO.                                     
+042709                 24  WCS-CERT-PRIME      PIC X(10) VALUE SPACES.  
+042709                 24  WCS-CERT-SFX        PIC X     VALUE SPACE.   
+00463                                                                   
+00464          16  CS-CONTROL-BY-NAME.                                  
+00465              20  CS-COMPANY-CD-A1        PIC X  VALUE LOW-VALUES. 
+00466              20  CS-INSURED-LAST-NAME    PIC X(15) VALUE SPACES.  
+00467              20  CS-INSURED-INITIALS.                             
+00468                  24  CS-INSURED-INITIAL1 PIC X VALUE SPACE.       
+00469                  24  CS-INSURED-INITIAL2 PIC X VALUE SPACE.       
+00470                                                                   
+00471          16  CS-CONTROL-BY-SSN.                                   
+00472              20  CS-COMPANY-CD-A2        PIC X VALUE LOW-VALUES.  
+00473              20  CS-SOC-SEC-NO.                                   
+00474                  24  CS-SSN-STATE        PIC XX VALUE SPACES.     
+00475                  24  CS-SSN-ACCOUNT      PIC X(6) VALUE SPACES.   
+00476                  24  CS-SSN-LN3.                                  
+00477                      28 CS-INSURED-INITIALS-A2   PIC XX           
+00478                                      VALUE SPACES.                
+00479                      28 CS-PART-LAST-NAME-A2     PIC X            
+00480                                      VALUE SPACE.                 
+00481                                                                   
+00482          16  CS-CONTROL-BY-CERT-NO.                               
+00483              20  CS-COMPANY-CD-A4        PIC X  VALUE LOW-VALUES. 
+00484              20  CS-CERT-NO-A4           PIC X(11)                
+00485                                      VALUE SPACES.                
+00486                                                                   
+00487          16  CS-CONTROL-BY-MEMB.                                  
+00488              20  CS-COMPANY-CD-A5        PIC X VALUE LOW-VALUES.  
+00489              20  CS-MEMBER-NO.                                    
+00490                  24  CS-MEMB-STATE     PIC XX VALUE SPACES.       
+00491                  24  CS-MEMB-ACCOUNT   PIC X(6) VALUE SPACES.     
+00492                  24  CS-MEMB-LN4.                                 
+00493                      28 CS-INSURED-INITIALS-A5   PIC XX           
+00494                                       VALUE SPACES.               
+00495                      28 CS-PART-LAST-NAME-A5     PIC XX           
+00496                                       VALUE SPACES.               
+00497                                                                   
+00498          16  FILLER              PIC X(360) VALUE SPACES.         
+00499                                                                   
+00500      12  ERACCT-KEY.                                              
+00501          16  ACCT-COMP-CD         PIC X     VALUE LOW-VALUES.     
+00502          16  ACCT-CARRIER         PIC X     VALUE SPACES.         
+00503          16  ACCT-GROUPING        PIC X(06) VALUE SPACES.         
+00504          16  ACCT-STATE           PIC X(02) VALUE SPACES.         
+00505          16  ACCT-ACCOUNT         PIC X(10) VALUE SPACES.         
+00506          16  ACCT-EXP-DT          PIC X(02) VALUE LOW-VALUES.     
+100703
+100703     12  ERCOMP-KEY.                                              
+100703         16  COMP-COMP-CD         PIC X     VALUE LOW-VALUES.     
+100703         16  COMP-CARRIER         PIC X     VALUE SPACES.         
+100703         16  COMP-GROUPING        PIC X(06) VALUE SPACES.         
+100703         16  COMP-FIN-RESP        PIC X(10) VALUE SPACES.         
+100703         16  COMP-ACCOUNT         PIC X(10) VALUE SPACES.         
+100703         16  COMP-TYPE            PIC X     VALUE SPACES.
+100703                                                                  
+083106     12  ERLOFC-KEY.                                              
+083106         16  LOFC-COMP-CD         PIC X     VALUE LOW-VALUES.     
+083106         16  LOFC-CARRIER         PIC X     VALUE SPACES.         
+083106         16  LOFC-GROUPING        PIC X(06) VALUE SPACES.         
+083106         16  LOFC-STATE           PIC XX    VALUE SPACES.         
+083106         16  LOFC-ACCOUNT         PIC X(10) VALUE SPACES.         
+083106         16  LOFC-CODE            PIC X(5)  VALUE SPACES.
+083106                                                                  
+042709     12  WS-ELCRTT-KEY.
+042709         16  WS-ELCRTT-PRIMARY       PIC X(33).
+042709         16  WS-ELCRTT-REC-TYPE      PIC X(1).
+042709
+100703     12  ERBXRF-KEY.                                              
+100703         16  BXRF-COMP-CD         PIC X     VALUE LOW-VALUES.     
+100703         16  BXRF-CARRIER         PIC X     VALUE SPACES.         
+100703         16  BXRF-GROUPING        PIC X(06) VALUE SPACES.         
+100703         16  BXRF-BANK-NUMBER     PIC X(10) VALUE SPACES.         
+100703                                                                  
+111504     12  ERAGTC-KEY.                                              
+111504         16  AGTC-COMP-CD         PIC X     VALUE LOW-VALUES.     
+111504         16  AGTC-CARRIER         PIC X     VALUE SPACES.         
+111504         16  AGTC-GROUPING        PIC X(06) VALUE SPACES.         
+111504         16  AGTC-BANK            PIC X(10) VALUE SPACES.         
+111504         16  AGTC-EXP-DT          PIC XX    VALUE SPACES.         
+111504         16  AGTC-TYPE            PIC X     VALUE SPACES.
+111504                                                                  
+00508      12  ERPLAN-KEY.                                              
+00509          16  PLAN-COMPANY-CD      PIC X     VALUE LOW-VALUES.     
+00510          16  PLAN-CARRIER         PIC X     VALUE SPACES.         
+00511          16  PLAN-GROUPING        PIC X(6)  VALUE SPACES.         
+00512          16  PLAN-STATE           PIC X(2)  VALUE SPACES.         
+00513          16  PLAN-ACCOUNT         PIC X(10) VALUE SPACES.         
+00514          16  PLAN-BENEFIT-TYPE    PIC X     VALUE SPACE.          
+00515          16  PLAN-BENEFIT-CODE    PIC X(2)  VALUE SPACES.         
+00516          16  PLAN-REVISION-NO     PIC X(3)  VALUE SPACES.         
+00517                                                                   
+00518      12  ERFORM-KEY.                                              
+00519          16  FORM-COMPANY-CD      PIC X     VALUE LOW-VALUES.     
+00520          16  FORM-STATE           PIC X(2)  VALUE SPACES.         
+00521          16  FORM-FORM-ID         PIC X(12) VALUE SPACES.         
+00522          16  FORM-FORM-EXP-DT     PIC X(2)  VALUE SPACES.         
+00523                                                                   
+00524      12  ERREIN-KEY.                                              
+00525          16  REIN-COMP-CD         PIC X     VALUE LOW-VALUES.     
+00526          16  REIN-TYPE            PIC X     VALUE SPACES.         
+00527          16  REIN-TABLE-CO.                                       
+00528              20  REIN-CODE-1      PIC X     VALUE SPACE.          
+00529              20  REIN-CODE-2      PIC X     VALUE SPACE.          
+00530              20  REIN-CODE-3      PIC X     VALUE SPACE.          
+00531          16  FILLER               PIC X(3)  VALUE SPACES.         
+00532                                                                   
+00533      12  ERCTBL-KEY.                                              
+00534          16  CTBL-COMPANY-CD      PIC X     VALUE LOW-VALUES.     
+00535          16  CTBL-TABLE           PIC XXX   VALUE SPACES.         
+00536          16  CTBL-CNTRL-2.                                        
+00537              20  CTBL-BEN-TYPE    PIC X     VALUE SPACE.          
+00538              20  CTBL-BEN-CODE    PIC XX    VALUE SPACES.         
+061412
+061412     12  ELCRTO-KEY.                                              
+061412         16  ELCRTO-COMPANY-CD       PIC X.     
+061412         16  ELCRTO-CARRIER          PIC X.     
+061412         16  ELCRTO-GROUPING         PIC X(6).  
+061412         16  ELCRTO-STATE            PIC XX.    
+061412         16  ELCRTO-ACCOUNT          PIC X(10). 
+061412         16  ELCRTO-CERT-EFF-DT      PIC XX.    
+061412         16  ELCRTO-CERT-NO.                    
+061412             20  ELCRTO-CERT-PRIME   PIC X(10). 
+061412             20  ELCRTO-CERT-SFX     PIC X.
+061412         16  ELCRTO-RECORD-TYPE      PIC X.
+061412         16  ELCRTO-SEQ-NO           PIC 9(4)  BINARY.     
+061412
+00539                                                                   
+00540      12  WS-ACCESS.                                               
+00541          16  FILLER               PIC XX    VALUE SPACES.         
+00542          16  WS-BEN-CD            PIC XX    VALUE SPACES.         
+00543                                                                   
+00544      12  WS-CARR-ACCESS.                                          
+00545          16  FILLER               PIC X(3)  VALUE SPACES.         
+00546          16  WS-CARR              PIC X     VALUE SPACE.          
+00547 *DMD CUSTOM CODING FIELDS BELOW POPULATED BY CF-RATING-SWITCH     
+00548 *WHEN EL050 IS INVOLED BY EL631, EL6311,EL6312,EL6313,EL517       
+00549      12  WS-DMD-RATING-SW         PIC X         VALUE SPACE.      
+00550          88  WS-DMD-LF-RATING   VALUE 'Y'.                        
+00551          88  WS-DMD-AH-RATING   VALUE 'Y'.                        
+00552          88  WS-DMD-NO-RATING   VALUE 'N'.                        
+00553                                                                   
+
+082205     12  WS-LF-BEN-CD            PIC XX  VALUE SPACES.
+082205         88  WS-LF-CASH            VALUE 'MJ' 'MS'
+082205                                         'NJ' 'NL'
+092311                                         'PJ' 'PL'
+082205                                         'SJ' 'SL'.
+082205     12  WS-AH-BEN-CD            PIC XX  VALUE SPACES.
+071906         88  WS-AH-CASH            VALUE 'MJ' 'MS' 'MI' 'MU'
+082205                                         'NI' 'NJ' 'NL' 'NU'
+092311                                         'PJ' 'PL' 'PI' 'PU'
+082205                                         'SI' 'SJ' 'SL' 'SU'
+                                               'MX' 'MY' 'MZ'.
+
+101010 01  ERPDEF-KEY-SAVE             PIC X(18).
+101010 01  ERPDEF-KEY.
+101010     12  ERPDEF-COMPANY-CD       PIC X.
+101010     12  ERPDEF-STATE            PIC XX.
+101010     12  ERPDEF-PROD-CD          PIC XXX.
+101010     12  F                       PIC X(7).
+101010     12  ERPDEF-BEN-TYPE         PIC X.
+101010     12  ERPDEF-BEN-CODE         PIC XX.
+101010     12  ERPDEF-EXP-DT           PIC XX.
+101010
+101010 01  ELSTAT-KEY-SAVE             PIC X(20).
+101010 01  ELSTAT-KEY.
+101010     12  ELSTAT-COMPANY-ID       PIC XXX.
+101010     12  ELSTAT-CARRIER          PIC X.
+101010     12  ELSTAT-GROUP            PIC X(6).
+101010     12  ELSTAT-STATE            PIC XX.
+101010     12  ELSTAT-EXP-DT           PIC 9(8).
+
+020711 01  WS-ERROR-VALUES.
+020711     12  ER-1570                     PIC S9(4)   VALUE +1570.
+020711     12  ER-1571                     PIC S9(4)   VALUE +1571.
+020711     12  ER-1575                     PIC S9(4)   VALUE +1575.
+00555      12  ER-1891                     PIC S9(4)   VALUE +1891.     
+00556      12  ER-1892                     PIC S9(4)   VALUE +1892.     
+00557      12  ER-1893                     PIC S9(4)   VALUE +1893.     
+00558      12  ER-1894                     PIC S9(4)   VALUE +1894.     
+00559      12  ER-1895                     PIC S9(4)   VALUE +1895.     
+00560      12  ER-1896                     PIC S9(4)   VALUE +1896.     
+00561      12  ER-1897                     PIC S9(4)   VALUE +1897.     
+00562      12  ER-1898                     PIC S9(4)   VALUE +1898.     
+00563      12  ER-1899                     PIC S9(4)   VALUE +1899.     
+00564      12  ER-1900                     PIC S9(4)   VALUE +1900.     
+00565      12  ER-1901                     PIC S9(4)   VALUE +1901.     
+00566      12  ER-1902                     PIC S9(4)   VALUE +1902.     
+00567      12  ER-1903                     PIC S9(4)   VALUE +1903.     
+00568      12  ER-1904                     PIC S9(4)   VALUE +1904.     
+00569      12  ER-1905                     PIC S9(4)   VALUE +1905.     
+00570      12  ER-1906                     PIC S9(4)   VALUE +1906.     
+00571      12  ER-1907                     PIC S9(4)   VALUE +1907.     
+00572      12  ER-1909                     PIC S9(4)   VALUE +1909.     
+00573      12  ER-1910                     PIC S9(4)   VALUE +1910.     
+00574      12  ER-1911                     PIC S9(4)   VALUE +1911.     
+00575      12  ER-1912                     PIC S9(4)   VALUE +1912.     
+00576      12  ER-1913                     PIC S9(4)   VALUE +1913.     
+00577      12  ER-1914                     PIC S9(4)   VALUE +1914.     
+00578      12  ER-1915                     PIC S9(4)   VALUE +1915.     
+00579      12  ER-1916                     PIC S9(4)   VALUE +1916.     
+00580      12  ER-1917                     PIC S9(4)   VALUE +1917.     
+00581      12  ER-1918                     PIC S9(4)   VALUE +1918.     
+00582      12  ER-1919                     PIC S9(4)   VALUE +1919.     
+00583      12  ER-1920                     PIC S9(4)   VALUE +1920.     
+00584      12  ER-1921                     PIC S9(4)   VALUE +1921.     
+00585      12  ER-1922                     PIC S9(4)   VALUE +1922.     
+00586      12  ER-1923                     PIC S9(4)   VALUE +1923.     
+00587      12  ER-1924                     PIC S9(4)   VALUE +1924.     
+00588      12  ER-1925                     PIC S9(4)   VALUE +1925.     
+00589      12  ER-1926                     PIC S9(4)   VALUE +1926.     
+00590      12  ER-1927                     PIC S9(4)   VALUE +1927.     
+00591      12  ER-2393                     PIC S9(4)   VALUE +2393.     
+00591      12  ER-2600                     PIC S9(4)   VALUE +2600.     
+00592      12  ER-2601                     PIC S9(4)   VALUE +2601.     
+00593      12  ER-2602                     PIC S9(4)   VALUE +2602.     
+00594      12  ER-2603                     PIC S9(4)   VALUE +2603.     
+00595      12  ER-2604                     PIC S9(4)   VALUE +2604.     
+00596      12  ER-2605                     PIC S9(4)   VALUE +2605.     
+00597      12  ER-2606                     PIC S9(4)   VALUE +2606.     
+00598      12  ER-2607                     PIC S9(4)   VALUE +2607.     
+00599      12  ER-2608                     PIC S9(4)   VALUE +2608.     
+00600      12  ER-2609                     PIC S9(4)   VALUE +2609.     
+00601      12  ER-2610                     PIC S9(4)   VALUE +2610.     
+00602      12  ER-2611                     PIC S9(4)   VALUE +2611.     
+00603      12  ER-2612                     PIC S9(4)   VALUE +2612.     
+00604      12  ER-2613                     PIC S9(4)   VALUE +2613.     
+00605      12  ER-2614                     PIC S9(4)   VALUE +2614.     
+00606      12  ER-2615                     PIC S9(4)   VALUE +2615.     
+00607      12  ER-2616                     PIC S9(4)   VALUE +2616.     
+00608      12  ER-2617                     PIC S9(4)   VALUE +2617.     
+00609      12  ER-2618                     PIC S9(4)   VALUE +2618.     
+00610      12  ER-2619                     PIC S9(4)   VALUE +2619.     
+00611      12  ER-2620                     PIC S9(4)   VALUE +2620.     
+00612      12  ER-2621                     PIC S9(4)   VALUE +2621.     
+00613      12  ER-2622                     PIC S9(4)   VALUE +2622.     
+00614      12  ER-2623                     PIC S9(4)   VALUE +2623.     
+00615      12  ER-2624                     PIC S9(4)   VALUE +2624.     
+00616      12  ER-2625                     PIC S9(4)   VALUE +2625.     
+00617      12  ER-2626                     PIC S9(4)   VALUE +2626.     
+00618      12  ER-2627                     PIC S9(4)   VALUE +2627.     
+00619      12  ER-2628                     PIC S9(4)   VALUE +2628.     
+00620      12  ER-2629                     PIC S9(4)   VALUE +2629.     
+00621      12  ER-2630                     PIC S9(4)   VALUE +2630.     
+00622      12  ER-2631                     PIC S9(4)   VALUE +2631.     
+00623      12  ER-2632                     PIC S9(4)   VALUE +2632.     
+00624      12  ER-2633                     PIC S9(4)   VALUE +2633.     
+00625      12  ER-2634                     PIC S9(4)   VALUE +2634.     
+00626      12  ER-2635                     PIC S9(4)   VALUE +2635.     
+00627      12  ER-2636                     PIC S9(4)   VALUE +2636.     
+00628      12  ER-2637                     PIC S9(4)   VALUE +2637.     
+00629      12  ER-2638                     PIC S9(4)   VALUE +2638.     
+00630      12  ER-2639                     PIC S9(4)   VALUE +2639.     
+00631      12  ER-2640                     PIC S9(4)   VALUE +2640.     
+00632      12  ER-2641                     PIC S9(4)   VALUE +2641.     
+00633      12  ER-2642                     PIC S9(4)   VALUE +2642.     
+00634      12  ER-2643                     PIC S9(4)   VALUE +2643.     
+00635      12  ER-2644                     PIC S9(4)   VALUE +2644.     
+00636      12  ER-2645                     PIC S9(4)   VALUE +2645.     
+00637      12  ER-2646                     PIC S9(4)   VALUE +2646.     
+00638      12  ER-2647                     PIC S9(4)   VALUE +2647.     
+00639      12  ER-2648                     PIC S9(4)   VALUE +2648.     
+00640      12  ER-2649                     PIC S9(4)   VALUE +2649.     
+00641      12  ER-2650                     PIC S9(4)   VALUE +2650.     
+00642      12  ER-2651                     PIC S9(4)   VALUE +2651.     
+00643      12  ER-2652                     PIC S9(4)   VALUE +2652.     
+00644      12  ER-2653                     PIC S9(4)   VALUE +2653.     
+00645      12  ER-2654                     PIC S9(4)   VALUE +2654.     
+00646      12  ER-2655                     PIC S9(4)   VALUE +2655.     
+00647      12  ER-2656                     PIC S9(4)   VALUE +2656.     
+00648      12  ER-2657                     PIC S9(4)   VALUE +2657.     
+00649      12  ER-2658                     PIC S9(4)   VALUE +2658.     
+00650      12  ER-2659                     PIC S9(4)   VALUE +2659.     
+00651      12  ER-2660                     PIC S9(4)   VALUE +2660.     
+00652      12  ER-2661                     PIC S9(4)   VALUE +2661.     
+00653      12  ER-2662                     PIC S9(4)   VALUE +2662.     
+00654      12  ER-2663                     PIC S9(4)   VALUE +2663.     
+00655      12  ER-2664                     PIC S9(4)   VALUE +2664.     
+00656      12  ER-2665                     PIC S9(4)   VALUE +2665.     
+00657      12  ER-2666                     PIC S9(4)   VALUE +2666.     
+00658      12  ER-2667                     PIC S9(4)   VALUE +2667.     
+00659      12  ER-2668                     PIC S9(4)   VALUE +2668.     
+00660      12  ER-2669                     PIC S9(4)   VALUE +2669.     
+00661      12  ER-2670                     PIC S9(4)   VALUE +2670.     
+00662      12  ER-2671                     PIC S9(4)   VALUE +2671.     
+00663      12  ER-2672                     PIC S9(4)   VALUE +2672.     
+00664      12  ER-2673                     PIC S9(4)   VALUE +2673.     
+00665      12  ER-2674                     PIC S9(4)   VALUE +2674.     
+00666      12  ER-2675                     PIC S9(4)   VALUE +2675.     
+00667      12  ER-2676                     PIC S9(4)   VALUE +2676.     
+00668      12  ER-2677                     PIC S9(4)   VALUE +2677.     
+00669      12  ER-2678                     PIC S9(4)   VALUE +2678.     
+00670      12  ER-2679                     PIC S9(4)   VALUE +2679.     
+00671      12  ER-2680                     PIC S9(4)   VALUE +2680.     
+00672      12  ER-2681                     PIC S9(4)   VALUE +2681.     
+00673      12  ER-2682                     PIC S9(4)   VALUE +2682.     
+00674      12  ER-2683                     PIC S9(4)   VALUE +2683.     
+00675      12  ER-2684                     PIC S9(4)   VALUE +2684.     
+00676      12  ER-2685                     PIC S9(4)   VALUE +2685.     
+00677      12  ER-2686                     PIC S9(4)   VALUE +2686.     
+00678      12  ER-2687                     PIC S9(4)   VALUE +2687.     
+00679      12  ER-2688                     PIC S9(4)   VALUE +2688.     
+00680      12  ER-2689                     PIC S9(4)   VALUE +2689.     
+00681      12  ER-2690                     PIC S9(4)   VALUE +2690.     
+00682      12  ER-2691                     PIC S9(4)   VALUE +2691.     
+00683      12  ER-2692                     PIC S9(4)   VALUE +2692.     
+00684      12  ER-2693                     PIC S9(4)   VALUE +2693.     
+00685      12  ER-2694                     PIC S9(4)   VALUE +2694.     
+00686      12  ER-2695                     PIC S9(4)   VALUE +2695.     
+00687      12  ER-2696                     PIC S9(4)   VALUE +2696.     
+00688      12  ER-2697                     PIC S9(4)   VALUE +2697.     
+00689      12  ER-2698                     PIC S9(4)   VALUE +2698.     
+00690      12  ER-2699                     PIC S9(4)   VALUE +2699.     
+00691      12  ER-2700                     PIC S9(4)   VALUE +2700.     
+00692      12  ER-2701                     PIC S9(4)   VALUE +2701.     
+082003     12  ER-2702                     PIC S9(4)   VALUE +2702.     
+00693      12  ER-2703                     PIC S9(4)   VALUE +2703.     
+00694      12  ER-2704                     PIC S9(4)   VALUE +2704.     
+00695      12  ER-2707                     PIC S9(4)   VALUE +2707.     
+00696      12  ER-2720                     PIC S9(4)   VALUE +2720.     
+CIDMOD     12  ER-2709                     PIC S9(4)   VALUE +2709.     
+00697      12  ER-2717                     PIC S9(4)   VALUE +2717.     
+CIDMOD     12  ER-2718                     PIC S9(4)   VALUE +2718.     
+PEMMOD     12  ER-2719                     PIC S9(4)   VALUE +2719.     
+123102     12  ER-2721                     PIC S9(4)   VALUE +2721.     
+082203     12  ER-2722                     PIC S9(4)   VALUE +2722.
+00698      12  ER-2723                     PIC S9(4)   VALUE +2723.     
+00699      12  ER-2724                     PIC S9(4)   VALUE +2724.     
+00700      12  ER-2725                     PIC S9(4)   VALUE +2725.     
+00701      12  ER-2726                     PIC S9(4)   VALUE +2726.     
+00702      12  ER-2727                     PIC S9(4)   VALUE +2727.     
+00703      12  ER-2728                     PIC S9(4)   VALUE +2728.     
+00704      12  ER-2729                     PIC S9(4)   VALUE +2729.     
+00705      12  ER-2730                     PIC S9(4)   VALUE +2730.     
+00706      12  ER-2731                     PIC S9(4)   VALUE +2731.     
+00707      12  ER-2732                     PIC S9(4)   VALUE +2732.     
+00708      12  ER-2733                     PIC S9(4)   VALUE +2733.     
+00709      12  ER-2734                     PIC S9(4)   VALUE +2734.     
+00710      12  ER-2735                     PIC S9(4)   VALUE +2735.     
+00711      12  ER-2736                     PIC S9(4)   VALUE +2736.     
+00712      12  ER-2737                     PIC S9(4)   VALUE +2737.     
+00713      12  ER-2738                     PIC S9(4)   VALUE +2738.     
+00714      12  ER-2739                     PIC S9(4)   VALUE +2739.     
+00715      12  ER-2740                     PIC S9(4)   VALUE +2740.     
+00716      12  ER-2741                     PIC S9(4)   VALUE +2741.     
+00717      12  ER-2742                     PIC S9(4)   VALUE +2742.     
+00718      12  ER-2743                     PIC S9(4)   VALUE +2743.     
+00719      12  ER-2744                     PIC S9(4)   VALUE +2744.     
+00720      12  ER-2745                     PIC S9(4)   VALUE +2745.     
+00721      12  ER-2746                     PIC S9(4)   VALUE +2746.     
+00722      12  ER-2747                     PIC S9(4)   VALUE +2747.     
+00723      12  ER-2748                     PIC S9(4)   VALUE +2748.     
+00724      12  ER-2749                     PIC S9(4)   VALUE +2749.     
+00725      12  ER-2750                     PIC S9(4)   VALUE +2750.     
+00726      12  ER-2751                     PIC S9(4)   VALUE +2751.     
+00727      12  ER-2752                     PIC S9(4)   VALUE +2752.     
+00728      12  ER-2753                     PIC S9(4)   VALUE +2753.     
+00729      12  ER-2754                     PIC S9(4)   VALUE +2754.     
+00730      12  ER-2755                     PIC S9(4)   VALUE +2755.     
+00731      12  ER-2756                     PIC S9(4)   VALUE +2756.     
+00732      12  ER-2757                     PIC S9(4)   VALUE +2757.     
+00733      12  ER-2758                     PIC S9(4)   VALUE +2758.     
+00734      12  ER-2759                     PIC S9(4)   VALUE +2759.     
+00735      12  ER-2760                     PIC S9(4)   VALUE +2760.     
+00736      12  ER-2761                     PIC S9(4)   VALUE +2761.     
+00737      12  ER-2762                     PIC S9(4)   VALUE +2762.     
+00738      12  ER-2763                     PIC S9(4)   VALUE +2763.     
+00739      12  ER-2764                     PIC S9(4)   VALUE +2764.     
+00740      12  ER-2765                     PIC S9(4)   VALUE +2765.     
+00741      12  ER-2766                     PIC S9(4)   VALUE +2766.     
+00742      12  ER-2767                     PIC S9(4)   VALUE +2767.     
+00743      12  ER-2768                     PIC S9(4)   VALUE +2768.     
+00744      12  ER-2769                     PIC S9(4)   VALUE +2769.     
+00745      12  ER-2770                     PIC S9(4)   VALUE +2770.     
+00746      12  ER-2771                     PIC S9(4)   VALUE +2771.     
+00747      12  ER-2772                     PIC S9(4)   VALUE +2772.     
+00748      12  ER-2773                     PIC S9(4)   VALUE +2773.     
+00749      12  ER-2774                     PIC S9(4)   VALUE +2774.     
+00750      12  ER-2775                     PIC S9(4)   VALUE +2775.     
+00751      12  ER-2776                     PIC S9(4)   VALUE +2776.     
+00752      12  ER-2777                     PIC S9(4)   VALUE +2777.     
+00753      12  ER-2778                     PIC S9(4)   VALUE +2778.     
+00754      12  ER-2779                     PIC S9(4)   VALUE +2779.     
+00755      12  ER-2780                     PIC S9(4)   VALUE +2780.     
+00756      12  ER-2781                     PIC S9(4)   VALUE +2781.     
+00757      12  ER-2782                     PIC S9(4)   VALUE +2782.     
+00758      12  ER-2783                     PIC S9(4)   VALUE +2783.     
+121304     12  ER-2786                     PIC S9(4)   VALUE +2786.
+071305     12  ER-2787                     PIC S9(4)   VALUE +2787.
+042106     12  ER-2788                     PIC S9(4)   VALUE +2788.
+102006     12  ER-2789                     PIC S9(4)   VALUE +2789.
+022608     12  ER-2792                     PIC S9(4)   VALUE +2792.
+00759      12  ER-2793                     PIC S9(4)   VALUE +2793.     
+00759      12  ER-2794                     PIC S9(4)   VALUE +2794.     
+00759      12  ER-2795                     PIC S9(4)   VALUE +2795.     
+00759      12  ER-2796                     PIC S9(4)   VALUE +2796.     
+           12  ER-2798                     PIC S9(4)   VALUE +2798.
+00760      12  ER-2799                     PIC S9(4)   VALUE +2799.     
+100703     12  ER-2869                     PIC S9(4)   VALUE +2869.
+020305     12  ER-2879                     PIC S9(4)   VALUE +2879.
+           12  ER-2881                     PIC S9(4)   VALUE +2881.
+030309     12  ER-2883                     PIC S9(4)   VALUE +2883.
+102908     12  ER-2882                     PIC S9(4)   VALUE +2882.
+012010     12  ER-2884                     PIC S9(4)   VALUE +2884.
+012010     12  ER-2885                     PIC S9(4)   VALUE +2885.
+012010     12  ER-2886                     PIC S9(4)   VALUE +2886.
+011211     12  ER-2887                     PIC S9(4)   VALUE +2887.
+011211     12  ER-2888                     PIC S9(4)   VALUE +2888.
+011211     12  ER-2889                     PIC S9(4)   VALUE +2889.
+011211     12  ER-2890                     PIC S9(4)   VALUE +2890.
+011211     12  ER-2891                     PIC S9(4)   VALUE +2891.
+011211     12  ER-2892                     PIC S9(4)   VALUE +2892.
+071910     12  ER-2963                     PIC S9(4)   VALUE +2963.
+071910     12  ER-2964                     PIC S9(4)   VALUE +2964.
+011211     12  ER-2965                     PIC S9(4)   VALUE +2965.
+011211     12  ER-2969                     PIC S9(4)   VALUE +2969.
+083106     12  ER-3006                     PIC S9(4)   VALUE +3006.
+031513     12  ER-3049                     PIC S9(4)   VALUE +3049.
+00761      12  ER-3050                     PIC S9(4)   VALUE +3050.     
+00762      12  ER-3052                     PIC S9(4)   VALUE +3052.     
+00763      12  ER-3054                     PIC S9(4)   VALUE +3054.
+071211     12  ER-3057                     PIC S9(4)   VALUE +3057.
+012213     12  ER-3058                     PIC S9(4)   VALUE +3058.
+00764      12  ER-3780                     PIC S9(4)   VALUE +3780.     
+00765      12  ER-3781                     PIC S9(4)   VALUE +3781.     
+00766      12  ER-3782                     PIC S9(4)   VALUE +3782.     
+081606     12  ER-3789                     PIC S9(4)   VALUE +3789.
+081606     12  ER-3790                     PIC S9(4)   VALUE +3790.
+101706     12  ER-3825                     PIC S9(4)   VALUE +3825.
+101706     12  ER-3826                     PIC S9(4)   VALUE +3826.
+           12  ER-3843                     PIC S9(4)   VALUE +3843.
+00767      12  ER-7812                     PIC S9(4)   VALUE +7812.     
+00768      12  ER-7813                     PIC S9(4)   VALUE +7813.     
+00769      12  ER-7814                     PIC S9(4)   VALUE +7814.     
+00770      12  ER-7815                     PIC S9(4)   VALUE +7815.     
+00771      12  ER-7816                     PIC S9(4)   VALUE +7816.     
+00772      12  ER-7817                     PIC S9(4)   VALUE +7817.     
+00773      12  ER-7818                     PIC S9(4)   VALUE +7818.     
+00774      12  ER-7819                     PIC S9(4)   VALUE +7819.     
+00775      12  ER-7820                     PIC S9(4)   VALUE +7820.     
+00776      12  ER-7823                     PIC S9(4)   VALUE +7823.     
+00777      12  ER-7825                     PIC S9(4)   VALUE +7825.     
+00778      12  ER-8002                     PIC S9(4)   VALUE +8002.     
+00779      12  ER-8030                     PIC S9(4)   VALUE +8030.     
+00780      12  ER-8036                     PIC S9(4)   VALUE +8036.     
+00781      12  ER-8037                     PIC S9(4)   VALUE +8037.     
+00782      12  ER-8038                     PIC S9(4)   VALUE +8038.     
+00783      12  ER-8039                     PIC S9(4)   VALUE +8039.     
+00784      12  ER-8040                     PIC S9(4)   VALUE +8040.     
+00785      12  ER-8041                     PIC S9(4)   VALUE +8041.     
+00786      12  ER-8042                     PIC S9(4)   VALUE +8042.     
+00787      12  ER-8043                     PIC S9(4)   VALUE +8043.     
+00788      12  ER-8044                     PIC S9(4)   VALUE +8044.     
+00789      12  ER-8045                     PIC S9(4)   VALUE +8045.     
+00790      12  ER-8046                     PIC S9(4)   VALUE +8046.     
+00791      12  ER-8050                     PIC S9(4)   VALUE +8050.     
+00792      12  ER-8067                     PIC S9(4)   VALUE +8067.     
+00793      12  ER-8068                     PIC S9(4)   VALUE +8068.     
+00794      12  ER-8069                     PIC S9(4)   VALUE +8069.     
+00795      12  ER-8070                     PIC S9(4)   VALUE +8070.     
+00796      12  ER-8071                     PIC S9(4)   VALUE +8071.     
+00797      12  ER-8072                     PIC S9(4)   VALUE +8072.     
+00798      12  ER-8074                     PIC S9(4)   VALUE +8074.     
+00799      12  ER-8075                     PIC S9(4)   VALUE +8075.     
+00800      12  ER-8076                     PIC S9(4)   VALUE +8076.     
+00801      12  ER-8077                     PIC S9(4)   VALUE +8077.     
+00802      12  ER-8078                     PIC S9(4)   VALUE +8078.     
+00803      12  ER-8079                     PIC S9(4)   VALUE +8079.     
+00804      12  ER-8080                     PIC S9(4)   VALUE +8080.     
+00805      12  ER-8081                     PIC S9(4)   VALUE +8081.     
+00806      12  ER-8082                     PIC S9(4)   VALUE +8082.     
+00807      12  ER-8083                     PIC S9(4)   VALUE +8083.     
+00808      12  ER-8084                     PIC S9(4)   VALUE +8084.     
+00809      12  ER-8085                     PIC S9(4)   VALUE +8085.     
+00810      12  ER-8086                     PIC S9(4)   VALUE +8086.     
+00811      12  ER-8087                     PIC S9(4)   VALUE +8087.     
+00812      12  ER-8088                     PIC S9(4)   VALUE +8088.     
+00813      12  ER-8089                     PIC S9(4)   VALUE +8089.     
+00814      12  ER-8090                     PIC S9(4)   VALUE +8090.     
+00815      12  ER-8091                     PIC S9(4)   VALUE +8091.     
+00816      12  ER-8092                     PIC S9(4)   VALUE +8092.     
+00817      12  ER-8093                     PIC S9(4)   VALUE +8093.     
+00818      12  ER-8094                     PIC S9(4)   VALUE +8094.     
+00819      12  ER-8095                     PIC S9(4)   VALUE +8095.     
+00820      12  ER-8096                     PIC S9(4)   VALUE +8096.     
+00821      12  ER-8097                     PIC S9(4)   VALUE +8097.     
+00822      12  ER-8098                     PIC S9(4)   VALUE +8098.     
+00823      12  ER-8099                     PIC S9(4)   VALUE +8099.     
+00824      12  ER-8109                     PIC S9(4)   VALUE +8109.     
+00825      12  ER-8110                     PIC S9(4)   VALUE +8110.     
+00826      12  ER-8111                     PIC S9(4)   VALUE +8111.     
+00827      12  ER-8112                     PIC S9(4)   VALUE +8112.     
+00828      12  ER-8113                     PIC S9(4)   VALUE +8113.     
+00829      12  ER-8114                     PIC S9(4)   VALUE +8114.     
+00830      12  ER-8116                     PIC S9(4)   VALUE +8116.     
+00831      12  ER-8148                     PIC S9(4)   VALUE +8148.     
+00831      12  ER-8152                     PIC S9(4)   VALUE +8152.
+00832      12  ER-8300                     PIC S9(4)   VALUE +8300.     
+00833      12  ER-8301                     PIC S9(4)   VALUE +8301.     
+00834      12  ER-8302                     PIC S9(4)   VALUE +8302.     
+00835      12  ER-8303                     PIC S9(4)   VALUE +8303.     
+00836      12  ER-8304                     PIC S9(4)   VALUE +8304.     
+00837      12  ER-8310                     PIC S9(4)   VALUE +8310.     
+00838      12  ER-8311                     PIC S9(4)   VALUE +8311.     
+00839      12  ER-8312                     PIC S9(4)   VALUE +8312.     
+00840      12  ER-8313                     PIC S9(4)   VALUE +8313.     
+00841      12  ER-8314                     PIC S9(4)   VALUE +8314.     
+00842      12  ER-8315                     PIC S9(4)   VALUE +8315.     
+00843      12  ER-8316                     PIC S9(4)   VALUE +8316.     
+00844      12  ER-8317                     PIC S9(4)   VALUE +8317.     
+00845      12  ER-9236                     PIC S9(4)   VALUE +9236.     
+090408     12  ER-9501                     PIC S9(4)   VALUE +9501.
+090408     12  ER-9503                     PIC S9(4)   VALUE +9503.
+00846      12  ER-9263                     PIC S9(4)   VALUE +9263.     
+00846      12  ER-9999                     PIC S9(4)   VALUE +9999.     
+00847 ******************************************************************
+00848 ***************   END OF ELC50WS     **************************** 
+00849 ******************************************************************
+00850      EJECT                                                        

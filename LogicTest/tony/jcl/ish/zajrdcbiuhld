@@ -1,0 +1,65 @@
+BEGINJOB mode='MVS' jobclass='M' 
+
+if ($EBMSYS != "tony") then
+   echo "Job Aborted, Not Tony"
+   exit 1
+endif
+
+#*******************************************************************************
+#   Get the batch number from  //Ntis2/userapps/prod/batch/biu
+#*******************************************************************************
+ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajrbiubatch
+
+################################################################################
+unikixbld -t s -d ERPNDB -s /data/test/tony/seqfiles/erpndb.bkp
+
+################################################################################
+LABEL name=DCBIUHLD
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/BIUBatchNumber.txt' disp='i'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.DD.CIADM.FICHBIUHLD' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='DCBIUHLD' stepname='DCBIUHLD'
+
+
+################################################################################
+LABEL name=EL517 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                     
+#  *  DOES A BATCH EDIT ON THE PENDING FILE AFTER THE LOAD               
+#  *                                                                     
+#  ********************************************************************* 
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELERRS' dataset='CI.DD.LG.ELERRS' type='VS' filename='ELERRS' disp='i-o' 
+ASSGNDD ddname='ERREIN' dataset='CI.DD.LG.ERREIN' type='VS' filename='ERREIN' disp='i-o' 
+ASSGNDD ddname='ERPNDB' dataset='CI.DD.LG.ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='ERPLAN' dataset='CI.DD.LG.ERPLAN' type='VS' filename='ERPLAN' disp='i-o' 
+#  ***//ERFORM   DD DSN=CI.DD.LG.ERFORM,DISP=SHR                         
+ASSGNDD ddname='ERFORM' type='DUMMY' 
+ASSGNDD ddname='ELCERT' dataset='CI.DD.LG.ELCERT' type='VS' filename='ELCERT' disp='i-o' 
+ASSGNDD ddname='ERPNDB1' dataset='CI.DD.LG.ERPNDB2' type='VS' filename='ERPNDB2' disp='i-o' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ERRATE' dataset='CI.DD.LG.ERRATE' type='VS' filename='ERRATE' disp='i-o' 
+ASSGNDD ddname='ERCTBL' dataset='CI.DD.LG.ERCTBL' type='VS' filename='ERCTBL' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='ERPNDM' dataset='CI.DD.LG.ERPNDM' type='VS' filename='ERPNDM' disp='i-o' 
+ASSGNDD ddname='ERMAIL' dataset='CI.DD.LG.ERMAIL' type='VS' filename='ERMAIL' disp='i-o' 
+ASSGNDD ddname='ELCRTT' dataset='CI.DD.LG.ELCRTT' type='VS' filename='ELCRTT' disp='i-o'
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='SYS019' filename='/data/test/tony/seqfiles/DC.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='EL517' stepname='EL517' 
+
+####################################################################################
+if ($JOBSTATUS == 0) then
+   "smtp -f slunikix -t ajra -s 'BIU - REMOVE HOLD RESULTS' -mf $SEQFILES/ZI.DD.CIADM.FICHBIUHLD"
+else
+   echo "job aborted print not released "
+endif
+
+ENDJOB 

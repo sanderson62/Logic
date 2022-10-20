@@ -1,0 +1,80 @@
+################################################################################
+#
+#  Job:  ahfrm56
+#
+################################################################################
+BEGINJOB mode='MVS' 
+
+################################################################################
+LABEL name=FNB168AHL
+################################################################################
+#  DATE: MMDDYYYY      
+ASSGNDD ddname='SYS010' dataset='AH.XX.EPEC' gdg='0' filename='$SEQFILES/AH.XX.EPEC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i-o' 
+#  ** DOWNLOAD LIFE **    
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.FX.AHLRSRV' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+
+EXECPGM pgmname='FNB168AHL' stepname='FNB168AHL' parm='@MEMMDDYYYY'
+
+################################################################################
+LABEL name=FNB170
+################################################################################
+#  *                                                                     
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='$SEQFILES/AHFRM56' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.DL.FX.AHLRSRV' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170LR' stepname='FNB170'
+
+################################################################################
+LABEL name=CPYM56
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AHFRM56' disp='i'
+ASSGNDD  ddname='SYS011' filename='$SEQFILES/AH.DL.FX.FRM56' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPYM56' parm='ALL'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/AHFRM56' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY1   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR AHL 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/AH.DL.FX.AHLRSRV' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/AHLRSRV_@MEMM-DD-YY.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+EXECPGM pgmname='IDCAMS' stepname='COPY1'   
+
+################################################################################
+LABEL name=FTPM56
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntfree2 < $JCLLIB/ftp-ahfrm56
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTPM56' parm='SH'
+
+################################################################################
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 042012                 AJRA   NEW JOB FOR AHL

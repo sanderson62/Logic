@@ -1,0 +1,199 @@
+/**********************************************************************/
+/*                                                                    */
+/* Copyright (c) 2007 by Clerity Solutions, Inc.                      */
+/* All rights reserved.                                               */
+/*                                                                    */
+/**********************************************************************/
+
+
+#include <stdio.h>
+#include <stdarg.h>
+#include <errno.h>
+#include <string.h>
+
+void kx_sql_errmsg_rtn();
+
+extern void kxsysinfo();
+extern void kxsetmsg();
+
+EXEC SQL INCLUDE sqlca; 
+
+EXEC SQL BEGIN DECLARE SECTION;
+   char dbmsname[9];
+   char username[9];
+EXEC SQL END DECLARE SECTION;                        
+
+#include "kxinfo.h"
+
+struct lsyspar kix_sys_info;
+struct lextpar kix_tct_info;
+struct lmsgstr kix_msg_info;
+
+/************************************************************
+KXDB2LGN()
+*************************************************************/
+int KXDB2LGN() 
+  {
+	strcpy(kix_msg_info.cur_func,"KXDB2LGN");
+
+	EXEC SQL WHENEVER SQLERROR GOTO sql_abort;
+	/*
+	*---------------------------------------------------------------*
+	* This call update the  sit information
+	* user can use this information to set the userid .
+	* In this example, databasename is used for the connection
+	*---------------------------------------------------------------*
+	*/
+
+	kxsysinfo(&kix_sys_info);
+	strncpy(dbmsname,kix_sys_info.cur_dbname,8);
+
+        /* if you do not want to use the SHARE MODE, then comment the 
+        *  original EXEC SQL CONNECT and uncomment the line
+        *  EXEC SQL CONNECT TO :dbmsname  */
+	EXEC SQL CONNECT TO :dbmsname IN SHARE MODE;
+        /* EXEC SQL CONNECT TO :dbmsname;   */
+	return(0); /* Good return code */
+
+sql_abort:
+	kx_sql_errmsg_rtn();
+	return(-1); /* This is a fatal and need to abort */
+
+  } /* End of KXDB2LGN function */
+
+/************************************************************
+KXDB2LGF()
+*************************************************************/
+int KXDB2LGF() 
+  {
+	strcpy(kix_msg_info.cur_func,"KXDB2LGF");
+
+	EXEC SQL WHENEVER SQLERROR GOTO sql_error;
+	EXEC SQL CONNECT RESET;
+	return(0); /* Good return code */
+
+sql_error:
+	kx_sql_errmsg_rtn();
+	return(1); /* This is a fatal and need to abort */
+
+  } /* End of KXDB2LGF function */
+
+
+/************************************************************
+KXDB2BTRN()
+*************************************************************/
+int KXDB2BTRN() 
+  {
+	strcpy(kix_msg_info.cur_func,"KXDB2BTRN");
+
+	EXEC SQL WHENEVER SQLERROR GOTO sql_abort;
+	/*
+	*---------------------------------------------------------------*
+	* This call update the  tct information
+	* user can use this information to inquire the current user info.
+	*---------------------------------------------------------------*
+	*/
+
+        /*
+	kxtctinfo(&kix_tct_info);
+	*/
+	return(0); /* Good return code */
+
+sql_abort:
+	kx_sql_errmsg_rtn();
+	return(-1); /* This is a fatal and need to abort */
+
+  } /* End of KXDB2BTRN function */
+
+
+/************************************************************
+KXDB2ETRN()
+*************************************************************/
+int KXDB2ETRN() 
+  {
+	strcpy(kix_msg_info.cur_func,"KXDB2ETRN");
+
+	EXEC SQL WHENEVER SQLERROR GOTO sql_error;
+	EXEC SQL COMMIT WORK;
+	return(0); /* Good return code */
+
+sql_error:
+	kx_sql_errmsg_rtn();
+	return(1); /* This is a fatal and need to abort */
+
+  } /* End of KXDB2ETRN function */
+
+
+/************************************************************
+KXDB2SAVE()
+*************************************************************/
+int KXDB2SAVE() 
+  {
+	strcpy(kix_msg_info.cur_func,"KXDB2SAVE");
+
+	EXEC SQL WHENEVER SQLERROR GOTO sql_error;
+	EXEC SQL COMMIT WORK;
+	return(0); /* Good return code */
+
+sql_error:
+	kx_sql_errmsg_rtn();
+	return(1); /* This is a fatal and need to abort */
+
+  } /* End of KXDB2SAVE function */
+
+
+/************************************************************
+KXDB2UNDO()
+*************************************************************/
+int KXDB2UNDO() 
+  {
+	strcpy(kix_msg_info.cur_func,"KXDB2UNDO");
+
+	EXEC SQL WHENEVER SQLERROR GOTO sql_error;
+	EXEC SQL ROLLBACK WORK;
+	return(0); /* Good return code */
+
+sql_error:
+	kx_sql_errmsg_rtn();
+	return(1); /* This is a fatal and need to abort */
+
+  } /* End of KXDB2UNDO function */
+
+/************************************************************
+KXDB2DOXA()
+*************************************************************/
+int KXDB2DOXA() 
+  {
+	strcpy(kix_msg_info.cur_func,"KXDB2DOXA");
+	/*
+	*---------------------------------------------------------------*
+	* This exit can be used to do some post xa_open() processing.
+	* As an example uncomment the following lines to set the 
+	* schema name to the userID specified in the SIT
+	*---------------------------------------------------------------*
+	*/
+        /*
+	EXEC SQL WHENEVER SQLERROR GOTO sql_error;
+	kxsysinfo(&kix_sys_info);
+	strncpy(username,kix_sys_info.cur_usrname,8);
+	EXEC SQL SET CURRENT PACKAGESET :username;
+        */
+	return(0); /* Good return code */
+
+sql_error:
+	kx_sql_errmsg_rtn();
+	return(1); /* This is a fatal and need to abort */
+
+  } /* End of KXDB2DOXA function */
+/*
+*---------------------------------------------------------------
+* kx_sql_errmsg_rtn to process error messages
+*---------------------------------------------------------------
+*/
+void kx_sql_errmsg_rtn()
+{
+	sprintf(kix_msg_info.cur_errno,"1098\n"); /* Set errno to 1098 */
+	sprintf(kix_msg_info.cur_msg,
+	       "Database Error. Sqlcode = %d\n",sqlca.sqlcode);
+        kxsetmsg(&kix_msg_info);
+}

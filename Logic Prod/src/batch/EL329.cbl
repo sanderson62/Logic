@@ -1,0 +1,350 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. EL329.
+       AUTHOR.     SUZAN VUKOV.
+       DATE-COMPILED.
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      *                          SMVA  NEW PROGRAM           
+      ******************************************************************
+010716* 010716  CR2015082500001  PEMA  VPP CHANGES
+      ******************************************************************
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT DFTACT-IN        ASSIGN TO DFTACT
+                                   ORGANIZATION IS LINE SEQUENTIAL.
+
+           SELECT ELRCON           ASSIGN TO ELRCON
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS RANDOM    
+                                   RECORD KEY IS ELRCON-KEY
+                                   FILE STATUS IS WS-ELRCON-FILE-STATUS.
+
+           SELECT DISK-DATE        ASSIGN TO SYS019.
+
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  DFTACT-IN
+           RECORDING MODE F
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+
+       01  DFTACT-RECORD                          PIC X(108).
+
+
+       FD  ELRCON.
+       01  ELRCON-RECORD.
+           05  FILLER                            PIC X(02).
+           05  ELRCON-KEY                        PIC X(19).
+           05  FILLER                            PIC X(175).
+
+
+
+       FD  DISK-DATE
+       COPY ELCDTEFD.
+
+
+       WORKING-STORAGE SECTION.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  FILLER  PIC X(32) VALUE '   EL329 WORKING STORAGE        '.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+
+       01  WS-MISC.
+           05  WS-EOF-SW                        PIC X(01)  VALUE SPACE.
+               88  END-OF-DFTACT                           VALUE 'Y'.
+           05  WS-DFTACT-RECS-IN                PIC 9(09)  VALUE ZEROS.
+           05  WS-ELRCON-WRITES                 PIC 9(09)  VALUE ZEROS.
+           05  WS-ANB-GL-ACCOUNT                PIC X(10)  
+                                                    VALUE '2724500200'.
+           05  WS-FNB-GL-ACCOUNT                PIC X(10) 
+                                                    VALUE '8888888888'.
+           05  WS-ELRCON-FILE-STATUS            PIC X(02)  VALUE ZEROS.
+
+       01  WS-ELCDTERX-FIELDS.
+           05  PGM-SUB                   COMP   PIC S9(04) VALUE +329.
+
+       01  WS-ELCABEND-FIELDS.
+00361      05  WS-ABEND-MESSAGE                 PIC X(80)  VALUE SPACES.   
+00362      05  WS-ABEND-FILE-STATUS             PIC X(02)  VALUE ZEROS.    
+00360      05  WS-RETURN-CODE            COMP   PIC S9(04) VALUE +0.       
+00363      05  WS-ZERO                   COMP-3 PIC S9(01) VALUE +0.       
+00364                                                                   
+       01  WS-DRAFT-ACTIVITY-RECORD.
+           03  DAR-RECORD-KEY.
+               05  DAR-EXPANDED-DRAFT-NO. 
+                   07  DAR-DRAFT-ACCOUNT. 
+                       10  FILLER                    PIC X(01).
+                       10  DAR-EXPDFT-CARRIER        PIC X(01).
+                   07  DAR-DRAFT-NUMBER.
+                       10  FILLER                    PIC X(01).
+                       10  DAR-LOGIC-DRAFT-NUM.
+                           15  DAR-LOGIC-DFT-CARRIER PIC X(01).
+                           15  FILLER                PIC X(06).
+               05  DAR-DRAFT-STATUS             PIC X(01).
+           03  DAR-POLICY-NUMBER                PIC X(10).
+           03  DAR-CLAIM-NUMBER                 PIC X(10).
+           03  DAR-AMOUNT-PAID                  PIC 9(07)V99.
+           03  DAR-AUDITOR                      PIC X(03).
+           03  DAR-PART-FINAL                   PIC X(01).
+           03  DAR-FROM-DATE                    PIC X(08).
+           03  DAR-TO-DATE                      PIC X(08).
+           03  CHAR-ZEROS-5                     PIC 9(03).
+           03  CHAR-ZEROS-6                     PIC 9(09).
+           03  CHAR-ZEROS-7                     PIC 9(09).
+           03  CHAR-ZEROS-8                     PIC 9(09).
+           03  CHAR-ZEROS-9                     PIC 9(09).
+           03  CHAR-ZEROS-10                    PIC 9(09).
+DANA       03  DAR-NOTE-CODE                    PIC 9(02).
+DANA       03  FILLER                           PIC X(256).
+           03  DAR-PAYEE-ADDRESS.
+               04  DAR-PAYEE                    PIC X(30).
+               04  DAR-PAYEE-ADDR1              PIC X(30).
+               04  DAR-PAYEE-ADDR2              PIC X(30).
+               04  DAR-PAYEE-CITY               PIC X(20).
+               04  DAR-PAYEE-STATE              PIC XX.
+           03  DAR-PAYEE-ZIP                    PIC 9(9).
+           03  DAR-ENTERED-DATE                 PIC X(8).
+           03  DAR-PRINT-FLAG                   PIC X.
+           03  DAR-PROOF                        PIC X(8).
+           03  DAR-SSN-TIN.
+               05  DAR-TA-NO                    PIC 9(09).
+               05  DAR-TAX-TYPE                 PIC X(01).
+           03  DAR-EOB-AUDITOR                  PIC X(04).
+           03  DAR-RETURN-DFT                   PIC X(01).
+           03  DRAFT-CLAIM-WORK-RECORD.
+               05  DCW-RECORD-KEY.
+                   07  DCW-CLAIM-NUMBER         PIC X(10).
+               05  DCW-CLAIMANT                 PIC X(20).
+               05  DCW-CLAIMANT-DOB             PIC X(8).
+               05  DCW-CLAIM-STATUS             PIC X.
+               05  DCW-ENTRY-DATE               PIC X(8).
+               05  DCW-REVISION-DATE            PIC X(8).
+               05  DCW-CLAIMANT-STATE-OF-RES    PIC XX.
+               05  DCW-DATE-INCURRED            PIC X(6).
+               05  DCW-FIRST-NOTICE             PIC X(8).
+               05  DCW-DIAGNOSIS                PIC X(50).
+               05  DCW-AMOUNT-PAID              PIC S9(7)V99.
+               05  DCW-LAST-PAID                PIC X(8).
+               05  FILLER                       PIC X(52).
+               05  DCW-CLAIM-TYPE               PIC X.
+               05  FILLER                       PIC X.
+               05  DCW-ACTION-TIME              PIC X(6).
+CS1019         05  DCW-EXC-STATE                PIC X(2).
+CS1019         05  DCW-EXC-BEN-TYPE             PIC X(2).
+               05  FILLER                       PIC X(4).
+           03  DRAFT-POLICY-WORK-RECORD.
+               05  DPW-RECORD-KEY.
+                   07  DPW-CLAIM-NUMBER         PIC X(10).
+                   07  DPW-POLICY-NUMBER        PIC X(10).
+               05  DPW-CLAIMANT                 PIC X(20).
+               05  DPW-CLAIMANT-DOB             PIC X(8).
+               05  DPW-POLICY-STATUS            PIC X.
+               05  DPW-PO-ADDRESS.
+                   06  DPW-POLICY-OWNER         PIC X(30).
+                   06  DPW-PO-ADDR1             PIC X(30).
+                   06  DPW-PO-ADDR2             PIC X(30).
+                   06  DPW-PO-CITY              PIC X(20).
+                   06  DPW-PO-STATE             PIC XX.
+               05  DPW-PO-ZIP                   PIC 9(9).
+               05  DPW-PLAN-NUMBER              PIC X(6).
+               05  DPW-POLICY-TYPE              PIC XX.
+               05  DPW-ISSUE-DATE               PIC X(8).
+               05  DPW-INDEMNITY                PIC S9(7)V99.
+               05  CHAR-ZEROS-15                PIC 9(7).
+               05  FILLER                       PIC X(20).
+               05  DPW-PAID-TO                  PIC X(8).
+               05  FILLER                       PIC X.
+               05  DPW-COLL-AGT-NO              PIC 9(7).
+               05  DPW-COLL-AGT-STATE           PIC XX.
+               05  FILLER                       PIC XX.
+               05  DPW-COLL-AGT-CODE            PIC X(10).
+               05  FILLER                       PIC X(102).
+               05  CHAR-ZEROS-17                PIC 9(9).
+               05  FILLER                       PIC X(50).
+               05  DPW-AMOUNT-PAID              PIC S9(7)V99.
+               05  DPW-LAST-PAID                PIC X(8).
+               05  FILLER                       PIC X.
+               05  DPW-PROOF-DATE               PIC X(8).
+               05  FILLER                       PIC X(3).
+               05  DPW-POLICY-ACTION            PIC X.
+               05  DPW-ACTION-TIME              PIC X(6).
+               05  DPW-REVISION-DATE            PIC X(8).
+               05  DPW-HOME-OFFICE-CATEGORY     PIC XXX.
+               05  DPW-ANNUAL-STATE-CATEGORY    PIC XXX.
+               05  DPW-CLAIM-TYPE               PIC X.
+               05  DPW-OPER-COMPANY             PIC XX.
+               05  DPW-BENEFIT-DURATION         PIC 9(3).
+
+
+       COPY ELCRCON.
+
+      *************************************************************
+      *  DATE-CONVERSION-DATA USED BY ELDATCX
+      *************************************************************
+       COPY ELCDATE.
+
+
+      *************************************************************
+      *  DATE-CARD LAYOUT USED BY ELCDTERX 
+      *************************************************************
+       COPY ELCDTECX.
+
+
+      *************************************************************
+      *  OTHER FIELDS USED BY ELCDTERX 
+      *************************************************************
+       COPY ELCDTEVR. 
+
+           EJECT
+       PROCEDURE DIVISION.
+      *************************************************************
+      **** DISK-DATE ROUTINE THAT PROVIDES COMPANY INFORMATION.
+           COPY ELCDTERX.
+      *************************************************************
+
+       0000-MAIN.
+ 
+           PERFORM 0400-OPEN-FILES       THRU 0400-EXIT
+           PERFORM 0100-PROCESS-DFTACT   THRU 0100-EXIT UNTIL
+                 END-OF-DFTACT
+
+           PERFORM 0500-CLOSE-FILES      THRU 0500-EXIT
+
+           DISPLAY ' DRAFT ACTIVITY RECORDS READ '  WS-DFTACT-RECS-IN
+           DISPLAY ' ELRCON RECORDS WRITTEN '  WS-ELRCON-WRITES  
+           GOBACK
+
+           .
+
+       0100-PROCESS-DFTACT.
+
+           READ DFTACT-IN INTO WS-DRAFT-ACTIVITY-RECORD
+               AT END SET END-OF-DFTACT TO TRUE
+               GO TO 0100-EXIT
+           END-READ
+
+           ADD +1                         TO WS-DFTACT-RECS-IN
+           
+           IF DAR-DRAFT-STATUS NOT = 'S'
+               CONTINUE
+           ELSE
+               GO TO 0100-EXIT
+           END-IF 
+
+           INITIALIZE CHECK-RECONCILIATION            
+
+           MOVE 'RC'                      TO RC-RECORD-ID
+           MOVE DTE-CLASIC-COMPANY-CD     TO RC-COMPANY-CD
+
+010716     IF DTE-CLIENT = 'DCC' or 'VPP'
+      *        MOVE DAR-LOGIC-DRAFT-NUM   TO RC-CHECK-NO
+      *        MOVE WS-ANB-GL-ACCOUNT     TO RC-GL-ACCOUNT-NO
+      *    ELSE
+      *        IF DTE-CLIENT = 'CID'
+                   MOVE DAR-EXPDFT-CARRIER  TO DAR-LOGIC-DFT-CARRIER
+                   MOVE DAR-LOGIC-DRAFT-NUM TO RC-CHECK-NO
+                   MOVE WS-FNB-GL-ACCOUNT   TO RC-GL-ACCOUNT-NO
+      *        END-IF
+           END-IF
+               
+           MOVE 'C'                       TO RC-CHECK-ORIGIN
+
+           MOVE DAR-ENTERED-DATE          TO DC-GREG-DATE-CYMD   
+           MOVE 'L'                       TO DC-OPTION-CODE
+           PERFORM 8500-DATE-CONVERSION   THRU 8500-EXIT 
+           IF NO-CONVERSION-ERROR
+               MOVE DAR-ENTERED-DATE      TO RC-ISSUE-DATE
+           ELSE
+               DISPLAY 'INVALID CHECK ISSUE DATE ' DAR-ENTERED-DATE
+               PERFORM ABEND-PGM          THRU APS-EXIT
+           END-IF
+
+           MOVE DAR-AMOUNT-PAID           TO RC-CHECK-AMOUNT
+           MOVE DAR-LOGIC-DFT-CARRIER     TO RC-CARRIER
+           MOVE DAR-CLAIM-NUMBER          TO RC-CLAIM-NO
+           MOVE DCW-CLAIM-TYPE            TO RC-COVERAGE-TYPE
+           MOVE DPW-PLAN-NUMBER(2:2)      TO RC-BENEFIT-CODE
+           MOVE DAR-SSN-TIN               TO RC-BENEFICIARY
+           MOVE DAR-PART-FINAL            TO RC-PAYMENT-TYPE
+           MOVE 'O'                       TO RC-STATUS 
+           MOVE DAR-ENTERED-DATE          TO RC-STATUS-DATE
+
+           MOVE CHECK-RECONCILIATION      TO ELRCON-RECORD
+           PERFORM 0300-WRITE-ELRCON      THRU 0300-EXIT
+
+           .
+
+       0100-EXIT.
+           EXIT.
+
+
+       0300-WRITE-ELRCON.
+
+           WRITE ELRCON-RECORD       
+
+           EVALUATE TRUE
+           WHEN WS-ELRCON-FILE-STATUS = '00'
+               ADD +1                     TO WS-ELRCON-WRITES  
+           WHEN WS-ELRCON-FILE-STATUS = '22'
+               DISPLAY 'Duplicate key for draft# ' RC-CHECK-NO
+           WHEN OTHER
+               DISPLAY ' Vsam write error ' WS-ELRCON-FILE-STATUS
+           END-EVALUATE
+
+           .
+
+       0300-EXIT.
+           EXIT.
+
+       0400-OPEN-FILES.
+
+           OPEN INPUT DFTACT-IN
+                I-O   ELRCON  
+
+           IF WS-ELRCON-FILE-STATUS = '00'
+               CONTINUE
+           ELSE
+               DISPLAY 'ELRCON open error ' WS-ELRCON-FILE-STATUS
+           END-IF
+
+           .
+
+       0400-EXIT.
+           EXIT.
+
+       0500-CLOSE-FILES.
+
+           CLOSE DFTACT-IN
+                 ELRCON  
+
+           .
+
+       0500-EXIT.
+           EXIT.
+
+
+       8500-DATE-CONVERSION.
+
+           CALL 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+
+       8500-EXIT.
+           EXIT.
+
+       ABEND-PGM.                                                       
+           DISPLAY '******************************'                     
+           DISPLAY '***** ABEND PGM **************'                     
+           DISPLAY '******************************'                     
+
+           COPY ELCABEND.                       

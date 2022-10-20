@@ -1,0 +1,67 @@
+################################################################################
+BEGINJOB mode='MVS' verbose
+
+if ($EBMSYS != "mdoff") then
+   echo "Job aborted, not MDOFF"
+   exit 1
+endif
+
+################################################################################
+LABEL name=EL539 
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+#  ******************************************************************    
+#  ***                                                                   
+#  ***                   MONTHLY FILE VERIFICATION                       
+#  ***            SEE RESTART INSTRUCTIONS BEFORE RESTARTING             
+#  ***                                                                   
+#  ******************************************************************    
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' filename='/data/seqfiles/CI.XX.EXTR521_00' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERPNDB2' dataset='CI.DD.LG.ERPNDB2' type='VS' filename='ERPNDB2' disp='i-o' 
+ASSGNDD ddname='ERLOFC' dataset='CI.DD.LG.ERLOFC' type='VS' filename='ERLOFC' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+!
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='ELREPT' type='DUMMY'
+#  **************************************************** I/O FILES        
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL539T' stepname='EL539' 
+
+################################################################################
+LABEL name=CPY539
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL539/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.FICH539' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY539' parm='ALL' 
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/ZI.DL.CIADM.FICH539 $SEQFILES/EL539.TST.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "uuencode $SEQFILES/EL539.TST.pdf EL539.TST.pdf|mailx -s 'TEST EL539 Report ' -r 'slunikix@cso.com' pema@cso.com"
+	echo " Test job, no print "
+else
+	echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+
+################################################################################

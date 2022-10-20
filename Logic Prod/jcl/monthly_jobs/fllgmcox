@@ -1,0 +1,94 @@
+################################################################################
+#                                                                              #
+#     JOB: fllgmcox              Created  07/06/2021                           #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+#setenv JOBDATE `date +"%Y%m"`
+#echo $JOBDATE
+
+################################################################################
+LABEL name=CIDCOX2 
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='ERCOMP' type='VS' filename='ERCOMP' disp='i-o' 
+ASSGNDD ddname='SYS010' dataset='FL.XX.PEND.STMT.KEYS' gdg='0' filename='$SEQFILES/FL.XX.PEND.STMT.KEYS' disp='i-o'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/FL.DD.ER.DATECARD' disp='i-o'
+ASSGNDD ddname='COMPOT1' filename='$SEQFILES/@CCYYYYMM_FNL_JV_EXTRACT1.TXT' disp='o' normal='k' abend='d' recsize='265' recfmt='F' 
+ASSGNDD ddname='COMPOT2' filename='$SEQFILES/FNL_JV_EXTRACT2.TXT' disp='o' normal='k' abend='d' recsize='268' recfmt='F' 
+ASSGNDD ddname='COMPOT3' filename='$SEQFILES/FNL_JV_EXTRACT3.TXT' disp='o' normal='k' abend='d' recsize='281' recfmt='F' 
+ASSGNDD ddname='COMPOT4' filename='$SEQFILES/@CCYYYYMM_FNL_JV_EXTRACT4.TXT' disp='o' normal='k' abend='d' recsize='263' recfmt='F' 
+
+EXECPGM pgmname='CIDCOX2' stepname='CIDCOX2' 
+
+################################################################################
+LABEL name=SORT01
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/FNL_JV_EXTRACT2.TXT' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/FNL_JV_EXTRACT2.SRTD' disp='o' normal='k' abend='d' recfmt='F' recsize='268'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 4)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT01'
+
+################################################################################
+LABEL name=PERL01
+################################################################################
+#
+# This step reads the file from above and creates multiple extract files based
+# on how many unique CSR's there are.  The csr is in positions 1 thru 4
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/create_csr_jvextr.pl $SEQFILES/FNL_JV_EXTRACT2.SRTD FNL_JV_EXTRACT2 @CCYYYYMM $SEQFILES/
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL01' parm='SH'
+
+################################################################################
+LABEL name=SORT02
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/FNL_JV_EXTRACT3.TXT' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/FNL_JV_EXTRACT3.SRTD' disp='o' normal='k' abend='d' recfmt='F' recsize='281'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 4)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT02'
+
+################################################################################
+LABEL name=PERL02
+################################################################################
+#
+# This step reads the file from above and creates multiple extract files based
+# on how many unique CSR's there are.  The csr is in positions 1 thru 4
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/create_csr_jvextr_3.pl $SEQFILES/FNL_JV_EXTRACT3.SRTD FNL_JV_EXTRACT3 @CCYYYYMM $SEQFILES/
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL02' parm='SH'
+
+if ($JOBSTATUS == 0) then
+   ftp -n ntcso1 < $JCLLIB/ftp-fnlcox2
+   "smtp -f slunikix -t gmcox -s 'FNL JV File available' -mf /apps/prod/cid1p/emails/putfnljv.txt"
+else
+   echo " Job aborted, ftp and email not performed "
+endif
+
+ENDJOB
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOB

@@ -1,0 +1,62 @@
+cd /apps/prod/cid1p/jcl
+
+setenv cdte `date +%m%d`
+
+echo "cidmtha is about to start"
+unikixjob cidmtha -ca
+if ($status != 0) then
+    echo "cidmtha aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDMTHA'"
+    exit 1
+endif
+echo "cidmtha terminated successfully"
+
+echo "cidmthb is about to start"
+unikixjob cidmthb -w -ca
+if ($status != 0) then
+    echo "cidmthb aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDMTHB'"
+    exit 1
+endif
+echo "cidmthb terminated successfully"
+
+"smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE SUCCESS - CIDMTHB' -ml 'CIDMTHB COMPLETE'"
+
+ftp -n ntis2 < $JCLLIB/ftp-rdsfiles
+
+rm /apps/prod/cid1p/jcl/ish/date_hash
+
+#########################  B E G I N  S T E P  07   #########################
+"smtp -f slunikix -t CPSPrintList -s 'Todays print list' -mf /apps/prod/cid1p/emails/printemail.txt"
+cp /apps/prod/cid1p/reprints/dailycycle /apps/prod/cid1p/reprints/dailycycle.$cdte
+
+echo "@ccyyyymmdd" > /data/seqfiles/Logic.daily.postcycle.done
+ftp -n ntcso1 < $JCLLIB/ftp-postcycle
+#########################    E N D    S T E P  07   #########################
+
+#########################  B E G I N  S T E P  08   #########################
+if (`date +%F` == 2016-12-29 || "@ccdow" == "Fri") then
+   echo "@ccyyyymmdd" > /data/seqfiles/dailyslunikix.txt
+   ftp -n ntcso1 < $JCLLIB/ftp-cpsfrimedone
+endif
+#########################    E N D    S T E P  08   #########################
+
+#########################  B E G I N  S T E P  09   #########################
+echo "sqlbermebl is about to start"
+unikixjob sqlbermebl -w -ca
+if ($status != 0) then
+    echo "sqlbermebl aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In SQLBERMEBL'"
+    exit 1
+endif
+echo "sqlbermebl terminated successfully"
+
+
+"smtp -f slunikix -t cycle -s 'Logic Month-End Day 1 Complete' -ml 'Logic Day 1 completee'"
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOBS
+# 052914  2014042300003  TANA   CHANGE SMTP TO USE DIST GROUP

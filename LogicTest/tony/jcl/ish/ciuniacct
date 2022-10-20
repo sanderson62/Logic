@@ -1,0 +1,57 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+#
+################################################################################
+
+if ($EBMSYS != "cid1t") then
+   echo "Job Aborted, Not CID1T"
+   exit 1
+endif
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+tr -d '\012' < $SEQFILES/uniacctsr1 > $SEQFILES/uniwrk1
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=SORT02
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/uniwrk1' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/uniwrk2' disp='o' normal='k' abend='d' recfmt='F' recsize='627'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 10 CHAR) (268 1 CHAR)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT02'
+
+################################################################################
+LABEL name=UNIACCT
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.ER.DATECARD' disp='i-o' 
+#ASSGNDD ddname='SYS007' filename='$SEQFILES/uni_acct.prn' disp='i-o' 
+#ASSGNDD ddname='SYS014' filename='$SEQFILES/uni_grp_ext_b.prn' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/uniwrk2' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/uni_new_acct' disp='o' normal='k' abend='d' recsize='2000' recfmt='F' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/uni_new_acct_note' disp='o' normal='k' abend='d' recsize='120' recfmt='F' 
+ASSGNDD ddname='SYS013' filename='$SEQFILES/uni_new_comp' disp='o' normal='k' abend='d' recsize='700' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='UNIACCT' stepname='UNIACCT' 
+
+ENDJOB 
+################################################################################

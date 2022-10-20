@@ -1,0 +1,92 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: fnfrd50               Translated  : Tue May 22 09:51:06 2001        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=DELETE 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID CLAIMS 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  DELETE FN.DL.FX.CIDCLMS
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='DELETE' 
+
+################################################################################
+LABEL name=FNB164 
+################################################################################
+#  DATE MMDDYYYY 
+#  FROM CILGEXTR
+ASSGNDD ddname='SYS010' dataset='CI.WW.LG.DFTACT' filename='\${SEQFILES}/CI.WW.LG.DFTACT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+
+#  DOWNLOAD
+ASSGNDD ddname='SYS011' dataset='FN.DL.FX.CIDCLMS' filename='\${SEQFILES}/FN.DL.FX.CIDCLMS' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='FNB164' stepname='FNB164' parm='11212007' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                     PRINT SUMMARY REPORT 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYS007' dataset='FN.DD.PRINT.DATA' member='FNFRD50' filename='\${SEQFILES}/FNFRD50' disp='i-o' 
+ASSGNDD ddname='SYS010' dataset='FN.DL.FX.CIDCLMS' filename='\${SEQFILES}/FN.DL.FX.CIDCLMS' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='CIDCLAIMS' 
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='FN.DD.PRINT.DATA' member='FNFRD50' filename='\${SEQFILES}/FNFRD50' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/FN.DL.CIDCLMS.FNFRD50' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID CLAIMS 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' dataset='FN.DL.FX.CIDCLMS' filename='\${SEQFILES}/FN.DL.FX.CIDCLMS' disp='i' normal='k' abend='k'
+#ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/inputfileq/CIDCLMS_08-22-02.DAT' disp='o' abend='d' normal='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/CIDCLMS_11-21-07.DAT' disp='o' abend='d' normal='k' recsize='250' recfmt='F'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+
+################################################################################
+
+##ftp -n ntfree2 < /apps/prod/cid1p/jcl/ish/ftp-fnfrd50
+
+################################################################################
+
+##ftp -n ntfree2 < /apps/prod/cid1p/jcl/ish/ftp-fnfrd50-print
+
+################################################################################
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#111902                 PEMA    ADD SYS019 TO FNB164
+#011604                 SMVA    ADD CLIENT ID/FILE ID PARM TO FNB170
+#082307  2007082100002  AJRA    Change Print to FTP of File

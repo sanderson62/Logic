@@ -1,0 +1,202 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+################################################################################
+LABEL name=EL300
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLOG' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='J' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' dataset='CI.DD.LG.ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' dataset='CI.DD.LG.ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' dataset='CI.DD.LG.ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD.BALLARD' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCCID1
+CLAS073104                          1
+!
+
+EXECPGM pgmname='EL300' stepname='EL300'
+
+################################################################################
+LABEL name=SORT1 
+################################################################################
+ASSGNDD ddname='SORTIN' filename='\${SEQFILES}/pem_final_fix.txt' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='\${SEQFILES}/BALLARD.EXT.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='67' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 2) (13 19)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT1'
+
+#unikixbld -i -dCFCNTL
+
+################################################################################
+##  The following backs up ELCNTL  to cfcntl.txt (flat file) then copies it to
+##  CFCNTL  The following will run even if you restart after this
+
+#unikixbld -t s -d ELCNTL -s cfcntl.txt
+
+#unikixbld -t v -d CFCNTL -s cfcntl.txt
+
+################################################################################
+LABEL name=PEMBALRF1
+################################################################################
+
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD.BALLARD' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/BALLARD.EXT.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/si.tot.cert.srt.noact.jul03' disp='i-o' 
+#ASSGNDD ddname='ELCERT' type='VS' filename='ELCERT' disp='i-o' normal='k' 
+ASSGNDD ddname='ELCERT' filename='/data/test/seqfiles/ELCERT.DAT' disp='i-o'
+ASSGNDD ddname='SYS012' filename='\${SEQFILES}/BALLARD.DATA' disp='o' normal='k' abend='d' recsize='99' recfmt='F' 
+ASSGNDD ddname='SYS013' filename='\${SEQFILES}/BALLARD.EL511.EXTRACT' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='PEMBALRF1' stepname='PEMBALRF1' 
+
+################################################################################
+LABEL name=CPY511
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/${JOBNAME}/PEMBALRF1/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.CIADM.FICH511.BALLARD' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY511' parm='ALL' 
+
+################################################################################
+LABEL name=SORT2
+################################################################################
+ASSGNDD ddname='SORTIN' filename='\${SEQFILES}/BALLARD.DATA' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='\${SEQFILES}/BALLARD.DATA.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='99' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 19) (12 6) (1 11) (79 2)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT2'
+
+################################################################################
+LABEL name=PEMBALRF2
+################################################################################
+
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD.BALLARD' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/BALLARD.DATA.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/BALLARD.DATA.WBHDR' disp='o' normal='k' abend='d' recsize='99' recfmt='F' 
+
+EXECPGM pgmname='PEMBALRF2' stepname='PEMBALRF2'
+
+################################################################################
+LABEL name=SORT3
+################################################################################
+ASSGNDD ddname='SORTIN' filename='\${SEQFILES}/BALLARD.DATA.WBHDR' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='\${SEQFILES}/BALLARD.DATA.WBHDR.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='99' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 19) (12 6) (1 11) (79 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT3'
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/BALLARD.DATA.WBHDR.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/BALLARD.EL512.DATA' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD.BALLARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+#ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ERACCT2' filename='/data/test/seqfiles/ERACCT.DAT'
+#ASSGNDD ddname='ELCNTL' dataset='CI.CFED.ELCNTL' type='VS' filename='CFCNTL' disp='i-o' normal='k' 
+ASSGNDD ddname='ELCNTL' filename='/data/test/seqfiles/ELCNTL.DAT'
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512MF' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/${JOBNAME}/EL512/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.DL.CIADM.FICH512.BALLARD' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL' 
+################################################################################
+LABEL name=EL513 
+################################################################################
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS009' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/BALLARD.EL512.DATA' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD.BALLARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERPNDB' filename='/data/test/seqfiles/ERPNDB.DAT' disp='i-o' 
+ASSGNDD ddname='ELCNTL' filename='/data/test/seqfiles/ELCNTL.DAT' disp='i-o' 
+ASSGNDD ddname='ERACCT2' filename='/data/test/seqfiles/ERACCT.DAT' disp='i-o' 
+ASSGNDD ddname='ERPNDM' filename='/data/test/seqfiles/ERPNDM.DAT' disp='i-o' 
+ASSGNDD ddname='SYS024' type='DUMMY' 
+ASSGNDD ddname='SYS025' type='DUMMY' 
+ASSGNDD ddname='SYS026' type='DUMMY' 
+ASSGNDD ddname='SYS027' type='DUMMY' 
+ASSGNDD ddname='SYS011' type='DUMMY' 
+ASSGNDD ddname='SYS006' type='DUMMY' 
+
+EXECPGM pgmname='EL513MF' stepname='EL513' 
+
+################################################################################
+LABEL name=CPY513
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/$JOBNAME/EL513/SYS008_${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.DL.CIADM.FICH513.BALLARD' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY513' parm='ALL' 
+
+################################################################################
+LABEL name=EL517 
+################################################################################
+ASSGNDD ddname='ELCNTL' filename='/data/test/seqfiles/ELCNTL.DAT' disp='i-o' 
+ASSGNDD ddname='ELERRS' filename='/data/test/seqfiles/ELERRS.DAT' disp='i-o' 
+ASSGNDD ddname='ERREIN' filename='/data/test/seqfiles/ERREIN.DAT' disp='i-o' 
+ASSGNDD ddname='ERPNDB' filename='/data/test/seqfiles/ERPNDB.DAT' disp='i-o' 
+ASSGNDD ddname='ERPLAN' filename='/data/test/seqfiles/ERPLAN.DAT' disp='i-o' 
+#  ***//ERFORM   DD DSN=CI.DD.LG.ERFORM,DISP=SHR                         
+ASSGNDD ddname='ERFORM' type='DUMMY' 
+ASSGNDD ddname='ELCERT' filename='/data/test/seqfiles/ELCERT.DAT' disp='i-o' 
+ASSGNDD ddname='ERACCT2' filename='/data/test/seqfiles/ERACCT.DAT' disp='i-o' 
+ASSGNDD ddname='ERRATE' filename='/data/test/seqfiles/ERRATE.DAT' disp='i-o' 
+ASSGNDD ddname='ERCTBL' filename='/data/test/seqfiles/ERCTBL.DAT' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='ERPNDM' filename='/data/test/seqfiles/ERPNDM.DAT' disp='i-o' 
+ASSGNDD ddname='ERMAIL' filename='/data/test/seqfiles/ERMAIL.DAT' disp='i-o' 
+ASSGNDD ddname='ERCOMP' filename='/data/test/seqfiles/ERCOMP.DAT' disp='i-o' 
+ASSGNDD ddname='ERBXRF' type='DUMMY' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD.BALLARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='EL517MF' stepname='EL517' 
+
+ENDJOB 
+################################################################################

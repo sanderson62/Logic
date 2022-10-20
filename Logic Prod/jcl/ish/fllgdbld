@@ -1,0 +1,93 @@
+################################################################################
+#     JOB: fllgdbld              Created     : 06/17/2021                      #
+#   This job is run each night to update the vsam files used in the daily jobs #
+#    that the users submit into the autosub folder                             #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+################################################################################
+LABEL name=EL300 
+################################################################################
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' dataset='CI.DD.LG.ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMO' dataset='CI.DD.LG.ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+ASSGNDD ddname='ELPGMS' dataset='CI.DD.LG.ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/FL.DD.ER.DATECARD.DBLD' disp='o' normal='k' abend='k' recfmt='F' recsize='100' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCFNL1
+CLAS103122
+!
+
+EXECPGM pgmname='EL300' stepname='EL300' 
+
+
+################################################################################
+LABEL name=GETCIDJV
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/vouchers/fnljvtmpin $SEQFILES/vouchers/fnljvin
+touch $SEQFILES/vouchers/fnljvtmpin $SEQFILES/vouchers/fnljvin
+cat $SEQFILES/vouchers/*_FNL_JV_EXTRACT*.Logic > $SEQFILES/vouchers/fnljvtmpin
+
+if [ -s $SEQFILES/vouchers/fnljvtmpin ] ; then
+   echo "we got a file " ;
+else
+   echo "No file today "
+   exit 1
+fi
+
+tr -d '\015' < $SEQFILES/vouchers/fnljvtmpin > $SEQFILES/vouchers/fnljvin
+cp $SEQFILES/vouchers/fnljvin $SEQFILES/vouchers/fnljvin.20221019
+rm -f $SEQFILES/vouchers/*_FNL_JV_EXTRACT*.Logic
+!
+EXECPGM pgmname='BPXBATCH' stepname='GETGAJV' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+
+################################################################################
+LABEL name=BKPCOMP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERCOMP -s $SEQFILES/fllgdbld.ercomp.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPCOMP' parm='SH'
+
+################################################################################
+LABEL name=BKPPYAJ
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERPYAJ -s $SEQFILES/fllgdbld.erpyaj.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPPYAJ' parm='SH'
+
+################################################################################
+LABEL name=CIDPYB2
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/vouchers/fnljvin' disp='i-o'
+ASSGNDD ddname='ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+ASSGNDD ddname='ERCOMP' type='VS' filename='ERCOMP' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/FL.DD.ER.DATECARD' disp='i-o' 
+
+EXECPGM pgmname='CIDPYB2' stepname='CIDPYB2'
+
+if ($JOBSTATUS == 0) then
+        echo " Nothing to print "
+else
+        echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 061721                 PEMA   NEW JOB

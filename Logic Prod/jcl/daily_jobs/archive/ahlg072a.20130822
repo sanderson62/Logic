@@ -1,0 +1,44 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+ONRETCODE GT 8 GOTO END_JOB 
+
+################################################################################
+LABEL name=ECS072A
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' filename='/apps/prod/cid1p/sys/RATES' disp='i'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133'
+ASSGNDD ddname='SYS020' filename='$SEQFILES/AH.EX.FICH072A' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+
+EXECPGM pgmname='ECS072A' stepname='ECS072A'
+
+################################################################################
+LABEL name=CPY072
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.EX.FICH072A' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.CIADM.FICH072A' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY072' parm='ALL'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/rpt2pdf $SEQFILES/AH.DL.CIADM.FICH072A $SEQFILES/AHL.RATE.FILE.AUDIT.RPT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+   "mutt -s 'AHL RATE FILE AUDIT RPT ' -a $SEQFILES/AHL.RATE.FILE.AUDIT.RPT.pdf dsysrateaudit@cso.com -e 'my_hdr FROM:pema@cso.com' < /dev/null"
+else
+        echo "job aborted, print not released"
+endif
+
+ENDJOB 
+################################################################################

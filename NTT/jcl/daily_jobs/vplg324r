@@ -1,0 +1,52 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+ONRETCODE GT 11 GOTO END_JOB 
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job aborted, not mdoff"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=EL324R
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.WW.CLMDLY.EXTR' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.EL517.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A'  
+
+EXECPGM pgmname='EL324R' stepname='EL324R' 
+
+################################################################################
+LABEL name=CPY324R
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL324R/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH324R' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY324R' parm='ALL'
+   
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the files from above and creates pdf files
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/VP.DL.CIADM.FICH324R $SEQFILES/EL324R.VPP.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+	  echo " Nothing to print at this time "
+    "mutt -s 'VPP EL324R Report' -a $SEQFILES/EL324R.VPP.pdf -- dsyslg324r@cso.com < /dev/null"
+else
+	echo " Job aborted, print not released "
+endif
+
+################################################################################
+
+ENDJOB 
+################################################################################

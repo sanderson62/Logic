@@ -1,0 +1,56 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+
+if ($EBMSYS != "cid1t") then
+   echo "Job Aborted, Not CID1T"
+   exit 1
+endif
+
+setenv dtetme `date +%m%d%H%M%S`
+
+################################################################################
+LABEL name=PERL1 
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/clmint_conv.pl $SEQFILES/test_file.csv $SEQFILES/CI.WW.CLMINT.WORK
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=EL341CI
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.WW.CLMINT.WORK' disp='i' normal='k' abend='k' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/CI.EX.FICH341CI' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='B' 
+
+EXECPGM pgmname='EL341CI' stepname='EL341CI' 
+
+################################################################################
+LABEL name=CPY341
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.EX.FICH341CI' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH341CI' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY341' parm='ALL' 
+
+################################################################################
+
+################################################################################
+LABEL name=ENDSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+smtp -f slunikix -t pema -s '$JOBNAME is complete' -mf $SEQFILES/CI.DL.CIADM.FICH341CI
+!
+EXECPGM pgmname='BPXBATCH' stepname='ENDSTEP' parm='SH'
+
+ENDJOB 
+
+################################################################################
+

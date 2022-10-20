@@ -1,0 +1,81 @@
+BEGINJOB mode='MVS' 
+
+if ($EBMSYS != "cid1t") then
+   echo "Job Aborting, Not CID1T"
+   exit 1
+endif
+
+################################################################################
+LABEL name=ECS0561
+################################################################################
+ASSGNDD ddname='ERDUEP' type='VS' filename='ERDUEP' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS012' filename='\${SEQFILES}/FN.DD.FX.DCCDUEPC' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYS020' filename='\${SEQFILES}/DC.EX.FICH0561' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS0561' stepname='ECS0561' 
+
+################################################################################
+LABEL name=CPYFILE
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/$JOBNAME/ECS0561/SYS008_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/DC.DL.CIADM.FICH0561.AF' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPYFILE' parm='ALL'
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='\${SEQFILES}/DCLG056' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/FN.DD.FX.DCCDUEPC' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SYSABOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='JOBCLASS' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='DCC'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/DCLG056' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR DCC DUE PREM AND COMM
+#  *------------------------------------------------------------------- 
+#  * 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/FN.DD.FX.DCCDUEPC' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/LPACDUEPC_12-31-05.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+################################################################################
+#ftp -n ntfree2 < /apps/prod/cid1p/jcl/ish/ftp-dclg056
+
+#if ($JOBSTATUS == 0) then
+#   "exelpr.sh l133std.parms '-ode=CO -ocopies=2' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+#else
+#   echo " Job aborted, print not released "
+#endif
+
+
+ENDJOB 

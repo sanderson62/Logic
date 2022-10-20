@@ -1,0 +1,221 @@
+       IDENTIFICATION DIVISION.                                         
+
+       PROGRAM-ID.   NSADDLTR.
+
+      *AUTHOR.     PABLO
+      *            COLLEYVILLE, TEXAS.                                       
+
+      *REMARKS.    EXECUTED FROM INDEXT.HTML
+
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      * 121802    2009122800001  PEMA  NEW PROGRAM
+      ******************************************************************
+       ENVIRONMENT DIVISION.                                            
+
+       DATA DIVISION.                                                   
+       working-storage section.
+
+      ************************************************
+      * commarea passed to the business logic
+      ************************************************
+      	  
+       01 srch-commarea.
+                                       copy ELCLTRSPI.
+
+       01  INPUT-FROM-FORM.
+           05  IFF-CARRIER             PIC X.
+           05  IFF-CLAIM-NO            PIC X(7).
+           05  IFF-CERT-NO             PIC X(11).
+           05  IFF-LETTER-ID           PIC XXXX.
+           05  IFF-FOLLOW-UP-DT        PIC X(10).
+           05  IFF-RESEND-DT           PIC X(10).
+           05  IFF-NO-OF-COPIES        PIC 99.
+           05  IFF-PROC-ID             PIC XXXX.
+           05  IFF-COMP-ID             PIC XXX.
+           05  IFF-PRINT-NOW-SW        PIC X.
+           05  IFF-ENC-CD              PIC XXX.
+           05  IFF-ARCHIVE-NO          PIC 9(8).
+           05  IFF-REGARDING           PIC X(70).
+
+      ************************************
+      * fields used to read web data
+      ************************************
+      
+       01  w-form-name       pic x(80).
+       01  w-form-value      pic x(160).
+       01  w-form-name-len   pic s9(8) comp.
+       01  w-form-value-len  pic s9(8) comp.
+       01  w-resp            pic s9(8) comp.
+       01  w-doctoken        pic x(16).
+
+      ******************************************
+      * symbol list text for SRCHHDR template
+      ******************************************
+
+
+       01  WS-ELMSTR-KEY.
+           05  WS-ELMSTR-COMPANY-CD    PIC X.
+           05  WS-ELMSTR-CARRIER       PIC X.
+           05  WS-ELMSTR-CLAIM-NO      PIC X(7).
+           05  WS-ELMSTR-CERT-NO       PIC X(11).
+
+                                       COPY ELCMSTR.
+
+       01 output-msg.
+          05 filler              pic x(4) value "MSG=".
+          05 out-msg-text        pic x(50).
+
+       01  MISC.
+           12  WS-RESPONSE             PIC S9(8)   COMP.
+               88  RESP-NORMAL                  VALUE +00.
+               88  RESP-NOTFND                  VALUE +13.
+               88  RESP-DUPREC                  VALUE +14.
+               88  RESP-DUPKEY                  VALUE +15.
+               88  RESP-NOTOPEN                 VALUE +19.
+               88  RESP-ENDFILE                 VALUE +20.
+
+      *****************************************
+      * symbol list for the SRCHROW template
+      *****************************************
+      
+                                       COPY NSCVARS.
+
+       procedure division.
+
+      *********************
+      * Receive web input
+      *********************
+      
+           exec cics web 
+              startbr formfield resp(w-resp) 
+            end-exec.
+      	         
+            perform read-form thru read-form-exit
+               until w-resp not = dfhresp(normal).
+      	             
+            exec cics web
+              endbr formfield
+            end-exec.
+		
+           MOVE INPUT-FROM-FORM        TO BL-INPUT
+
+PEMTST*    DISPLAY ' I F F ' INPUT-FROM-FORM
+      *****************************************
+      * Invoke the SEARCH business logic
+      *****************************************
+
+           exec cics link
+              program('NSALTRBL')
+              commarea(srch-commarea)
+           end-exec.
+
+           IF BL-OK
+              MOVE BL-RECORD-PASSED-DATA
+                                       TO NAPER-OUTPUT-DATA
+           END-IF
+
+
+      ***********************************************************
+      * Build output document.  There are three templates used
+      * for this document.  SRCHHDR and SRCHFTR are the header
+      * and footer, respectively.  SRCHROW is used for the
+      * actual data.  For each array entry in the business
+      * logic output, set the symbol list from the array
+      * entry and insert into the document using the SRCHROW
+      * template.
+      ***********************************************************
+
+      *    move bl-output-message to out-msg-text.
+	   
+      *    exec cics document create
+      *       doctoken(w-doctoken)
+      *       template('PEMHDR')
+      *       symbollist(output-msg)
+      *       listlength(length of output-msg)
+      *    end-exec.
+      *
+      *    exec cics document set
+      *       doctoken(w-doctoken)
+      *       symbollist(NAPER-OUTPUT-DATA)
+      *       length(length of NAPER-OUTPUT-DATA)
+      *    end-exec
+      *
+      *    exec cics document insert
+      *       doctoken(w-doctoken)
+      *       template('PEMBOD')
+      *    end-exec
+      *
+      *    exec cics document set
+      *       doctoken(w-doctoken)
+      *       symbollist(WS-TEST-TESTER)
+      *       length(length of WS-TEST-TESTER)
+      *    end-exec
+      *
+      *    exec cics document insert
+      *       doctoken(w-doctoken)
+      *       template('PEMFTR')
+      *    end-exec
+      *
+      *
+      ****************************************
+      * Send the document and return.
+      ****************************************
+      *   
+      *    exec cics web send
+      *       doctoken(w-doctoken)
+      *    end-exec.		
+
+           exec cics
+              return
+           end-exec.
+	   
+	   
+      ******************************************************
+      * Read all fields of the incoming form, moving
+      * each to the corresponding field of the commarea 
+      * (business logic input fields).  For a search,
+      * both form fields, last_name and first_initial,
+      * may be null.  In that case, set the business
+      * logic input fields to spaces.
+      ******************************************************
+	   	
+       read-form.
+           move spaces to w-form-name.
+           move length of w-form-name to w-form-name-len.
+	         move spaces to w-form-value.
+           move length of w-form-value to w-form-value-len.
+           exec cics web readnext 
+                         formfield(w-form-name)
+                         namelength(w-form-name-len)
+                         value(w-form-value)
+                         valuelength(w-form-value-len)
+                         resp(w-resp)
+           end-exec.
+
+           evaluate w-resp
+              when dfhresp(normal)
+                 evaluate w-form-name(1:w-form-name-len)
+                    when 'clmkey'
+                       if w-form-value-len not = 0
+                          move w-form-value(1:w-form-value-len)
+                                 to INPUT-FROM-FORM
+                       else
+                          move spaces to INPUT-FROM-FORM
+                       end-if
+                 end-evaluate
+              when other
+                 continue
+           end-evaluate.
+
+
+
+       read-form-exit.		
+					
+				        

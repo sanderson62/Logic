@@ -1,0 +1,117 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE EQ 64 GOTO END_JOB 
+
+unikixbld -i -dERPNDE
+unikixbld -i -dERPNDE2
+
+################################################################################
+LABEL name=EL349 
+################################################################################
+#  ********************************************************************  
+#  **                                                                    
+#  **                       LOAD ERPNDE FILE                             
+#  **    -- NOTE --  ONE DUMMY RECORD IS ALL THAT IS LOADED              
+#  **                                                                    
+#  ********************************************************************  
+#  *************************************************    INPUT FILES      
+ASSGNDD ddname='ERPNDE' dataset='CI.TT.LG.ERPNDE' type='VS' filename='ERPNDE' disp='i-o' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+ERPNDE  LOAD                                                            
+!
+
+EXECPGM pgmname='EL349' stepname='EL349' 
+
+################################################################################
+LABEL name=EL560 
+################################################################################
+#  ********************************************************************  
+#  *                                                                     
+#  * INPUT IS 'CI.XX.EXTR521' FROM CI MONTH-END CILGM15             
+#  *                                                                     
+#  ********************************************************************  
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS010' dataset='CI.XX.EXTR521' gdg='0' filename='\${SEQFILES}/CI.XX.EXTR521' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERPNDE' dataset='CI.TT.LG.ERPNDE' type='VS' filename='ERPNDE' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+EXECPGM pgmname='EL560' stepname='EL560' 
+
+unikixbld -i -dELCNTLT
+unikixbld -i -dERCOMPT
+
+################################################################################
+LABEL name=BKPCNTL 
+################################################################################
+#  ********************************************************************  
+#  ***                                                                   
+#  **  creates backup of prod elcntl FILE                                     
+#  ***                                                                   
+#  ********************************************************************  
+ASSGNDD ddname='SYSUT1' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYSUT2' filename='/tmp/elcntl.bkp' type='FS' disp='o' normal='k' abend='d' recsize='750' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO INFILE(SYSUT1) OUTFILE(SYSUT2)                                  
+  SET MAXCC=0                                   
+!
+
+EXECPGM pgmname='IDCAMS' stepname='BKPCNTL' 
+
+################################################################################
+LABEL name=LOADCNTL 
+################################################################################
+#  ********************************************************************  
+#  ***                                                                   
+#  **  LOADS THE DUMMY "ELCNTL" FILE                                     
+#  ***                                                                   
+#  ********************************************************************  
+ASSGNDD ddname='SYSUT1' filename='/tmp/elcntl.bkp' disp='i' 
+ASSGNDD ddname='SYSUT2' dataset='CI.TT.LG.ELCNTL' type='VS' filename='ELCNTLT' disp='i-o' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO INFILE(SYSUT1) OUTFILE(SYSUT2)                                  
+  SET MAXCC=0                                   
+!
+
+EXECPGM pgmname='IDCAMS' stepname='LOADCNTL' 
+
+################################################################################
+LABEL name=EL349 
+################################################################################
+#  ********************************************************************  
+#  ***                                                                   
+#  **  LOADS ONE DUMMY RECORD INTO "ERCOMP" TO INITIALIZE THE FILE.      
+#  ***                                                                   
+#  ********************************************************************  
+ASSGNDD ddname='ERCOMP' dataset='CI.TT.LG.ERCOMP' type='VS' filename='ERCOMPT' disp='i-o' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+ERCOMP  LOAD                                                            
+!
+
+EXECPGM pgmname='EL349' stepname='EL349' 
+
+################################################################################
+LABEL name=EL509 
+################################################################################
+#  ********************************************************************* 
+#  **--                                                                  
+#  **--       BATCH TO ONLINE COMPENSATION LOAD                          
+#  **--   SEE RESTART INSTRUCTIONS BEFORE RESTARTING                     
+#  **--                                                                  
+#  ********************************************************************* 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.ME.COMM_00' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERCOMP' dataset='CI.TT.LG.ERCOMP' type='VS' filename='ERCOMPT' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.TT.LG.ELCNTL' type='VS' filename='ELCNTLT' disp='i-o' 
+ASSGNDD ddname='ELREPT' dataset='CI.DD.LG.ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+ASSGNDD ddname='SYS013' type='DUMMY'
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='EL509' stepname='EL509' 
+
+ENDJOB 
+################################################################################

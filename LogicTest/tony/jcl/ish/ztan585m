@@ -1,0 +1,41 @@
+################################################################################
+BEGINJOB mode='MVS'
+
+if ($EBMSYS != 'tony') then
+   echo "Job aborting, not tony"
+   exit 1
+endif
+
+################################################################################
+LABEL name=EL585M 
+################################################################################
+#
+# Creates a MTD Claims Activity Summary for Actuary
+#
+################################################################################
+ASSGNDD ddname='SYS019' dataset='ZI.DD.ER.DATECARD' filename='\${SEQFILES}/ZI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELMSTR' dataset='CI.DD.LG.ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='ELTRLR' dataset='CI.DD.LG.ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT'
+
+EXECPGM pgmname='EL585M' stepname='EL585M' parm='2018032920180331'
+
+################################################################################
+LABEL name=CPY585M
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL585M/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.DL.CIADM.FICH585M' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPY585M' parm='ALL' 
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/ZI.DL.CIADM.FICH585M $SEQFILES/CI.EL585M.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+ENDJOB 
+################################################################################

@@ -1,0 +1,52 @@
+################################################################################
+#                       
+#     JOB: cpsbaldcc2
+#       This job checks the totals from job cidclgm15, step ECS010
+#       against the tolerance amounts provided by CPS accounting for DCC.
+#                      
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+# 
+# PERL1 Checks ECS010 Life Claims, A&H Claims, and Total Number of Certificate
+#     Master Input Records Against Tolerance Amounts Provided By CPS
+#     For DCC
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+perl $HOME/bin/cpschkbal1.pl $SEQFILES/dccmechkpts.txt $SEQFILES/cidclgm15.ECS010.ME.BAL.AMTS $SEQFILES/dccmechkpts.@YYYYMMDD.txt $SEQFILES/cpschkbal1.@YYYYMMDD.msgs
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=FTPPUT1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+ftp -n ntcso1 < $JCLLIB/ftp-cpsbaldcc2
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTPPUT1' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "cat $PROJECT_ROOT/emails/cpsbaldcc2.txt | mutt -s 'Results of DCC Auto Balancing'  bal331@cso.com"
+else
+    "cat $SEQFILES/dccmechkpts.txt $SEQFILES/cidclgm15.ECS010.ME.BAL.AMTS > $SEQFILES/dc.ecs010.out.bal.txt"
+    "mutt -s ' DCC ECS010 IS OUT OF BALANCE' -i $SEQFILES/dc.ecs010.out.bal.txt -e 'my_hdr FROM:pema@cso.com' lgoncall@cso.com < /dev/null"
+    echo " Job aborted, print not released "
+    echo " Balancing may be outside of tolerance"
+    echo " Results file is dccmechkpts.@YYYYMMDD.txt"
+endif
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 061704   2004050700001 SMVA   NEW MONTHLY JOB FOR AUTOMATION OF BALANCING
+# 080210   2010010400006 PEMA   REMOVE COMMAND FROM PARM
+# 052914   2014042300003 TANA   CHANGE SMTP TO USE DIST GROUP

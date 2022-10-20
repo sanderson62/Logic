@@ -1,0 +1,1521 @@
+00001 ******************************************************************04/20/98
+00002 *                                                                *ELCRTMPD
+00002 *                                                                *ELCRTMPD
+00003 *                            ELCRTMPD                            *   LV005
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL**4
+00005 *                            VMOD=2.012.                         *   CL**4
+00006 *                                                                *ELCRTMPD
+00007 ******************************************************************ELCRTMPD
+00008                                                                   ELCRTMPD
+00009      MOVE SPACE                  TO EFFECTIVE-EOM                 ELCRTMPD
+00010                                     VALUATION-EOM                 ELCRTMPD
+00011                                     PAYMENT-EOM                   ELCRTMPD
+00012                                     EXPIRATION-EOM                ELCRTMPD
+00013                                     TOP-EOM                       ELCRTMPD
+00014                                     BOTTOM-EOM.                   ELCRTMPD
+00015                                                                   ELCRTMPD
+00016      MOVE ZERO                   TO CP-RETURN-CODE                ELCRTMPD
+00017                                     CP-RETURN-CODE-2              ELCRTMPD
+00018                                     CP-REMAINING-TERM-1           ELCRTMPD
+00019                                     CP-REMAINING-TERM-2           ELCRTMPD
+00020                                     CP-REMAINING-TERM-3           ELCRTMPD
+00021                                     CP-ODD-DAYS.                  ELCRTMPD
+00022                                                                   ELCRTMPD
+00023 ******************************************************************ELCRTMPD
+00024 *   IF THE ORIGINAL TERM IS NOT VALID, THEN EXIT FROM THE        *ELCRTMPD
+00025 *  ROUTINE INDICATING THAT THERE WAS AN ERROR DETECTED WITH      *ELCRTMPD
+00026 *  THE TERM.                                                     *ELCRTMPD
+00027 ******************************************************************ELCRTMPD
+00028                                                                   ELCRTMPD
+00029      IF CP-ORIGINAL-TERM NOT NUMERIC                              ELCRTMPD
+00030          MOVE ZERO               TO CP-ORIGINAL-TERM.             ELCRTMPD
+00031                                                                   ELCRTMPD
+00032      IF CP-ORIGINAL-TERM = ZERO                                   ELCRTMPD
+00033          MOVE '4'                TO CP-RETURN-CODE                ELCRTMPD
+00034          GO TO 9999-RT-REMAINING-TERM-XIT.                        ELCRTMPD
+00035                                                                   ELCRTMPD
+00036      EJECT                                                        ELCRTMPD
+00037                                                                   ELCRTMPD
+00038      IF CP-FIRST-PAY-DATE = SPACES  OR  LOW-VALUES                ELCRTMPD
+00039          NEXT SENTENCE                                            ELCRTMPD
+00040      ELSE                                                         ELCRTMPD
+00041          IF CP-FIRST-PAY-DATE NOT GREATER THAN CP-CERT-EFF-DT     ELCRTMPD
+00042              MOVE LOW-VALUES     TO CP-FIRST-PAY-DATE.            ELCRTMPD
+00043                                                                   ELCRTMPD
+00044 ******************************************************************ELCRTMPD
+00045 *   IF THE FIRST PAYMENT DATE IS NOT A VALID DATE, THEN          *ELCRTMPD
+00046 *  CALCULATE A DEFAULT PAYMENT DATE I.E. ONE MONTH AFTER         *ELCRTMPD
+00047 *  THE EFFECTIVE, AND CONTINUE PROCESSING.                       *ELCRTMPD
+00048 ******************************************************************ELCRTMPD
+00049                                                                   ELCRTMPD
+00050      IF CP-FIRST-PAY-DATE = SPACES  OR  LOW-VALUES                ELCRTMPD
+00051          MOVE CP-CERT-EFF-DT     TO DC-BIN-DATE-1                 ELCRTMPD
+00052          MOVE +1                 TO DC-ELAPSED-MONTHS             ELCRTMPD
+00053          MOVE ZEROS              TO DC-ELAPSED-DAYS               ELCRTMPD
+00054          MOVE '6'                TO DC-OPTION-CODE                ELCRTMPD
+00055          PERFORM 8000-DATE-CONVERT THRU 8000-EXIT                 ELCRTMPD
+00056          IF NO-CONVERSION-ERROR                                   ELCRTMPD
+00057              MOVE DC-BIN-DATE-2  TO CP-FIRST-PAY-DATE             ELCRTMPD
+00058          ELSE                                                     ELCRTMPD
+00059              MOVE '2'            TO CP-RETURN-CODE                ELCRTMPD
+00060              GO TO 9999-RT-REMAINING-TERM-XIT.                    ELCRTMPD
+00061                                                                   ELCRTMPD
+00062      MOVE CP-ORIGINAL-TERM       TO CP-REMAINING-TERM-1           ELCRTMPD
+00063                                     CP-REMAINING-TERM-2           ELCRTMPD
+00064                                     CP-REMAINING-TERM-3.          ELCRTMPD
+00065                                                                   ELCRTMPD
+00066      EJECT                                                        ELCRTMPD
+00067 ******************************************************************ELCRTMPD
+00068 *   IF THE CERT EFFECTIVE DATE EQUAL TO THE CANCEL DATE,         *ELCRTMPD
+00069 *  EXIT FROM THE ROUTINE WITH THE ORIGINAL TERM EQUAL TO THE     *ELCRTMPD
+00070 *  REMAINING TERM - NO PREMIUM EARNED.                           *ELCRTMPD
+00071 ******************************************************************ELCRTMPD
+00072                                                                   ELCRTMPD
+00073      IF CP-CERT-EFF-DT NOT LESS THAN CP-VALUATION-DT              ELCRTMPD
+00074          GO TO 9999-RT-REMAINING-TERM-XIT.                        ELCRTMPD
+00075                                                                   ELCRTMPD
+00076      IF VALID-REM-TRM-CALC-OPTION                                 ELCRTMPD
+00077          NEXT SENTENCE                                            ELCRTMPD
+00078      ELSE                                                         ELCRTMPD
+00079          GO TO 1000-CONTROL-CALCULATION.                          ELCRTMPD
+00080                                                                   ELCRTMPD
+00081 ******************************************************************ELCRTMPD
+00082 *  IF THE POLICY IS CANCELED DURING A "FREE-LOOK" PERIOD,        *ELCRTMPD
+00083 *  EXIT FROM THE ROUTINE WITH THE ORGINAL TERM EQUAL TO THE      *ELCRTMPD
+00084 *  REMAINING TERM - NO PREMIUM EARNED.                           *ELCRTMPD
+00085 *  (ELASPED DAYS FROM EFFECTIVE DATE TO CANCEL DATE IS COMPARED  *ELCRTMPD
+00086 *  TO FREE LOOK DAYS)                                            *ELCRTMPD
+00087 ******************************************************************ELCRTMPD
+00088                                                                   ELCRTMPD
+00089      IF CP-FREE-LOOK NOT NUMERIC                                  ELCRTMPD
+00090           MOVE ZERO               TO CP-FREE-LOOK.                ELCRTMPD
+00091                                                                   ELCRTMPD
+00092      IF CP-FREE-LOOK NOT = ZERO                                   ELCRTMPD
+00093           MOVE CP-CERT-EFF-DT     TO DC-BIN-DATE-1                ELCRTMPD
+00094           MOVE CP-VALUATION-DT    TO DC-BIN-DATE-2                ELCRTMPD
+00095           MOVE '1'                TO DC-OPTION-CODE               ELCRTMPD
+00096           PERFORM 8000-DATE-CONVERT THRU 8000-EXIT                ELCRTMPD
+00097           IF DATE-CONVERSION-ERROR                                ELCRTMPD
+00098             MOVE '2'                TO CP-RETURN-CODE             ELCRTMPD
+00099             GO TO 9999-RT-REMAINING-TERM-XIT                      ELCRTMPD
+00100           ELSE                                                    ELCRTMPD
+00101              IF DC-ELAPSED-DAYS NOT GREATER THAN CP-FREE-LOOK     ELCRTMPD
+00102                 GO TO 9999-RT-REMAINING-TERM-XIT.                 ELCRTMPD
+00103                                                                   ELCRTMPD
+00104 ******************************************************************ELCRTMPD
+00105 *   INITIALIZE DATE FIELDS USED LATER TO CALCULATE ELAPSED TIME  *ELCRTMPD
+00106 ******************************************************************ELCRTMPD
+00107                                                                   ELCRTMPD
+00108      MOVE CP-CERT-EFF-DT         TO DC-BIN-DATE-1.                ELCRTMPD
+00109      MOVE ' '                    TO DC-OPTION-CODE.               ELCRTMPD
+00110      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT                     ELCRTMPD
+00111      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+00112          MOVE '2'                TO CP-RETURN-CODE                ELCRTMPD
+00113          GO TO 9999-RT-REMAINING-TERM-XIT.                        ELCRTMPD
+00114                                                                   ELCRTMPD
+00115      MOVE DC-GREG-DATE-CYMD      TO WS-SAVE-EFFECTIVE-DATE.          CL**2
+00116      IF SAVE-EFF-DAYS EQUAL DC-DAYS-IN-MONTH                      ELCRTMPD
+00117          MOVE 'Y'                TO EFFECTIVE-EOM.                ELCRTMPD
+00118                                                                   ELCRTMPD
+00119      MOVE CP-VALUATION-DT        TO DC-BIN-DATE-1.                ELCRTMPD
+00120      MOVE ' '                    TO DC-OPTION-CODE.               ELCRTMPD
+00121      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT                     ELCRTMPD
+00122      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+00123          MOVE '2'                TO CP-RETURN-CODE                ELCRTMPD
+00124          GO TO 9999-RT-REMAINING-TERM-XIT.                        ELCRTMPD
+00125                                                                   ELCRTMPD
+00126      MOVE DC-GREG-DATE-CYMD      TO WS-SAVE-VALUATION-DATE.          CL**2
+00127      IF SAVE-VAL-DAYS EQUAL DC-DAYS-IN-MONTH                      ELCRTMPD
+00128          MOVE 'Y'                TO VALUATION-EOM.                ELCRTMPD
+00129                                                                   ELCRTMPD
+00130                                                                   ELCRTMPD
+00131      MOVE CP-FIRST-PAY-DATE      TO DC-BIN-DATE-1.                ELCRTMPD
+00132      MOVE ' '                    TO DC-OPTION-CODE.               ELCRTMPD
+00133      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT                     ELCRTMPD
+00134      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+00135          MOVE '2'                TO CP-RETURN-CODE                ELCRTMPD
+00136          GO TO 9999-RT-REMAINING-TERM-XIT.                        ELCRTMPD
+00137                                                                   ELCRTMPD
+00138      MOVE DC-GREG-DATE-CYMD      TO WS-SAVE-PAYMENT-DATE.            CL**2
+00139      IF SAVE-PAY-DAYS EQUAL DC-DAYS-IN-MONTH                      ELCRTMPD
+00140          MOVE 'Y'                TO PAYMENT-EOM.                  ELCRTMPD
+00141                                                                   ELCRTMPD
+00142                                                                   ELCRTMPD
+00143  EJECT                                                            ELCRTMPD
+00144 ****************************************************************  ELCRTMPD
+00145 *   THREE OPTIONS:                                             *  ELCRTMPD
+00146 *     1) CALCULATE TIME ELAPSED FROM PAYMENT DATE              *  ELCRTMPD
+00147 *       TO CANCEL DATE CONSIDERING EXTENSION DAYS              *  ELCRTMPD
+00148 *                                                              *  ELCRTMPD
+00149 *     2) CALCULATE TIME ELAPSED FROM EFFECTIVE DATE            *  ELCRTMPD
+00150 *       TO CANCEL DATE NOT CONSIDERING EXTENSION DAYS          *  ELCRTMPD
+00151 *                                                              *  ELCRTMPD
+00152 *     3) IF COMPANY ID IS 'NCL' AND ELASPED TIME METHOD IS     *  ELCRTMPD
+00153 *       '3' OR '4', CALCULATE REMAINING TIME AS                *  ELCRTMPD
+00154 *      (EXPIRATION DATE - CANCEL DATE = REMAINING TIME)        *  ELCRTMPD
+00155 *                                                              *  ELCRTMPD
+00156 *   IF THE CANCEL DATE IS LESS THAN THE 1ST PAYMENT DATE,      *  ELCRTMPD
+00157 *   OPTION 2 WILL BE USED (DOES NOT APPLY IF OPTION 3 IS TRUE) *  ELCRTMPD
+00158 ****************************************************************  ELCRTMPD
+00159                                                                   ELCRTMPD
+00160  001-CONTROL-OPTIONS.                                             ELCRTMPD
+00161                                                                   ELCRTMPD
+           IF (CP-CONSIDER-EXTENSION)
+                       AND
+              ((CP-COMPANY-ID = 'NCL')
+                OR (CP-USE-EXP-AND-1ST-PMT))
+              GO TO 600-PROCESS-FOR-NCL
+           END-IF
+
+00162 *    IF CP-CONSIDER-EXTENSION AND                                 ELCRTMPD
+00163 *       CP-COMPANY-ID = 'NCL'                                     ELCRTMPD
+00164 *        GO TO 600-PROCESS-FOR-NCL.                               ELCRTMPD
+00165                                                                   ELCRTMPD
+00166      IF CP-VALUATION-DT LESS THAN CP-FIRST-PAY-DATE               ELCRTMPD
+00167          GO TO 100-CANCELLED-BEFORE-PAYMENT.                      ELCRTMPD
+00168                                                                   ELCRTMPD
+00169      IF CP-CONSIDER-EXTENSION                                     ELCRTMPD
+00170          GO TO 200-PROCESS-WITH-1ST-PMT-DATE                      ELCRTMPD
+00171      ELSE                                                         ELCRTMPD
+00172          GO TO 300-PROCESS-WITH-CERT-EFF-DATE.                    ELCRTMPD
+00173                                                                   ELCRTMPD
+00174  EJECT                                                            ELCRTMPD
+00175                                                                      CL**5
+00176 ****************************************************************  ELCRTMPD
+00177 *                                                              *  ELCRTMPD
+00178 *   PROCESSING WHEN VALUATION DATE LESS THAN 1ST PAYMENT DATE  *  ELCRTMPD
+00179 *   OR WHEN REMAINING TERM OPTION '1' OR '2' IS CHOSEN.        *  ELCRTMPD
+00180 *                                                              *  ELCRTMPD
+00181 ****************************************************************  ELCRTMPD
+00182                                                                   ELCRTMPD
+00183 ****************************************************************  ELCRTMPD
+00184 *                                                              *  ELCRTMPD
+00185 *   CALCULATE THE TIME ELAPSED BETWEEN THE CANCEL DATE AND     *  ELCRTMPD
+00186 *   THE CERT EFFECTIVE DATE.                                   *  ELCRTMPD
+00187 *                                                              *  ELCRTMPD
+00188 ****************************************************************  ELCRTMPD
+00189  100-CANCELLED-BEFORE-PAYMENT.                                    ELCRTMPD
+00190                                                                   ELCRTMPD
+00191      MOVE WS-SAVE-EFFECTIVE-DATE TO WS-BOTTOM-NUMBER.             ELCRTMPD
+00192                                                                   ELCRTMPD
+00193      MOVE WS-SAVE-VALUATION-DATE TO WS-TOP-NUMBER.                ELCRTMPD
+00194      MOVE CP-VALUATION-DT        TO WS-SAVE-BINARY-DATE.          ELCRTMPD
+00195      IF VALUATION-DATE-EOM AND EFFECTIVE-DATE-EOM                 ELCRTMPD
+00196          MOVE ZEROS              TO WS-TOP-DA                     ELCRTMPD
+00197                                     WS-BOTTOM-DA.                 ELCRTMPD
+00198                                                                   ELCRTMPD
+00199      PERFORM 500-SIMPLE-ARITHMETIC THRU 500-EXIT.                 ELCRTMPD
+00200                                                                   ELCRTMPD
+00201      IF CP-EARN-AFTER-15TH                                        ELCRTMPD
+00202         GO TO 110-METHOD-1.                                       ELCRTMPD
+00203      IF CP-EARN-ON-HALF-MONTH                                     ELCRTMPD
+00204         GO TO 120-METHOD-2.                                       ELCRTMPD
+00205      IF CP-EARN-ON-1ST-DAY                                        ELCRTMPD
+00206         GO TO 130-METHOD-3.                                       ELCRTMPD
+00207      IF CP-EARN-ON-FULL-MONTH                                     ELCRTMPD
+00208         GO TO 140-METHOD-4.                                       ELCRTMPD
+00209      IF CP-EARN-WITH-NO-DAYS                                      ELCRTMPD
+00210         GO TO 150-METHOD-5.                                       ELCRTMPD
+00211      IF CP-EARN-AFTER-14TH                                        ELCRTMPD
+00212         GO TO 160-METHOD-6.                                       ELCRTMPD
+00213      IF CP-EARN-AFTER-16TH                                        ELCRTMPD
+00214         GO TO 170-METHOD-7.                                       ELCRTMPD
+00215                                                                   ELCRTMPD
+00216 ****************************************************************  ELCRTMPD
+00217 *                                                              *  ELCRTMPD
+00218 *   IF NONE OF THE ABOVE OPTIONS HAVE BEEN SPECIFIED, THEN     *  ELCRTMPD
+00219 *   INDICATE THERE WAS AN ERROR IN THE OPTION SELECTION AND    *  ELCRTMPD
+00220 *   EXIT FROM THE ROUTINE.                                     *  ELCRTMPD
+00221 *                                                              *  ELCRTMPD
+00222 ****************************************************************  ELCRTMPD
+00223      MOVE '3' TO CP-RETURN-CODE                                   ELCRTMPD
+00224      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00225                                                                   ELCRTMPD
+00226  EJECT                                                            ELCRTMPD
+00227 ****************************************************************  ELCRTMPD
+00228 *                                                              *  ELCRTMPD
+00229 *                       NUMBER OF DAYS                         *  ELCRTMPD
+00230 *         POLICY MUST BE INFORCE FOR 15 DAYS TO EARN A MONTH   *  ELCRTMPD
+00231 *                                                              *  ELCRTMPD
+00232 ****************************************************************  ELCRTMPD
+00233                                                                   ELCRTMPD
+00234  110-METHOD-1.                                                    ELCRTMPD
+00235                                                                   ELCRTMPD
+00236                                                                   ELCRTMPD
+00237      IF WS-RESULT-DA     GREATER THAN +15  OR                     ELCRTMPD
+00238         TERM-IN-MONTHS    GREATER THAN +0                         ELCRTMPD
+00239          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00240                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+00241                                                                   ELCRTMPD
+00242      GO TO 199-END-CERT-DATE-PROCESSING.                          ELCRTMPD
+00243                                                                   ELCRTMPD
+00244 ****************************************************************  ELCRTMPD
+00245 *                                                              *  ELCRTMPD
+00246 *                       HALF MONTH ADJUSTMENT                  *  ELCRTMPD
+00247 *            PREMIUM EARNS ON 1/2 MONTH MORE ASSUMPTION        *  ELCRTMPD
+00248 *                                                              *  ELCRTMPD
+00249 ****************************************************************  ELCRTMPD
+00250                                                                   ELCRTMPD
+00251  120-METHOD-2.                                                    ELCRTMPD
+00252                                                                   ELCRTMPD
+00253      IF TERM-IN-MONTHS    GREATER THAN +0                         ELCRTMPD
+00254          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00255                        CP-REMAINING-TERM-1 - (+1.5)               ELCRTMPD
+00256      ELSE                                                         ELCRTMPD
+00257          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00258                        CP-REMAINING-TERM-1 - (+.5).               ELCRTMPD
+00259                                                                   ELCRTMPD
+00260      IF CP-REMAINING-TERM-1 NEGATIVE                              ELCRTMPD
+00261          MOVE ZEROS                 TO CP-REMAINING-TERM-1.       ELCRTMPD
+00262                                                                   ELCRTMPD
+00263                                                                   ELCRTMPD
+00264      GO TO 199-END-CERT-DATE-PROCESSING.                          ELCRTMPD
+00265                                                                   ELCRTMPD
+00266                                                                   ELCRTMPD
+00267  EJECT                                                            ELCRTMPD
+00268 ****************************************************************  ELCRTMPD
+00269 *                                                              *  ELCRTMPD
+00270 *                       FIRST DAY METHOD                       *  ELCRTMPD
+00271 *                  PREMIUM EARNS ON FIRST DAY                  *  ELCRTMPD
+00272 *                                                              *  ELCRTMPD
+00273 ****************************************************************  ELCRTMPD
+00274                                                                   ELCRTMPD
+00275  130-METHOD-3.                                                    ELCRTMPD
+00276                                                                   ELCRTMPD
+00277      IF WS-RESULT-DA     GREATER THAN +0  OR                      ELCRTMPD
+00278         TERM-IN-MONTHS    GREATER THAN +0                         ELCRTMPD
+00279          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00280                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+00281                                                                   ELCRTMPD
+00282      GO TO 199-END-CERT-DATE-PROCESSING.                          ELCRTMPD
+00283                                                                   ELCRTMPD
+00284 ****************************************************************  ELCRTMPD
+00285 *                                                              *  ELCRTMPD
+00286 *                       FULL MONTH METHOD                      *  ELCRTMPD
+00287 *          PREMIUM EARNS ON FULL MONTH - SAME AS BENEFIT       *  ELCRTMPD
+00288 *                                                              *  ELCRTMPD
+00289 ****************************************************************  ELCRTMPD
+00290                                                                   ELCRTMPD
+00291  140-METHOD-4.                                                    ELCRTMPD
+00292                                                                   ELCRTMPD
+00293                                                                   ELCRTMPD
+00294 *    WILL NOT REDUCE REMAINING TERM ON 'FULL' MONTH UNTIL         ELCRTMPD
+00295 *        PAST THE FIRST PAYMENT DATE.                             ELCRTMPD
+00296                                                                   ELCRTMPD
+00297      GO TO 199-END-CERT-DATE-PROCESSING.                          ELCRTMPD
+00298                                                                   ELCRTMPD
+00299                                                                   ELCRTMPD
+00300  EJECT                                                            ELCRTMPD
+00301 ****************************************************************  ELCRTMPD
+00302 *                                                              *  ELCRTMPD
+00303 *                       FULL MONTH - NO DAYS                   *  ELCRTMPD
+00304 *          PREMIUM EARNS A FULL MONTH STARTING THE FIRST MONTH *  ELCRTMPD
+00305 *       (THIS METHOD WILL EARN WITHOUT A FLUCTUATION IN SHORT  *  ELCRTMPD
+00306 *        MONTHS )                                              *  ELCRTMPD
+00307 ****************************************************************  ELCRTMPD
+00308                                                                   ELCRTMPD
+00309  150-METHOD-5.                                                    ELCRTMPD
+00310                                                                   ELCRTMPD
+00311                                                                   ELCRTMPD
+00312      COMPUTE CP-REMAINING-TERM-1 =                                ELCRTMPD
+00313                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+00314                                                                   ELCRTMPD
+00315      GO TO 199-END-CERT-DATE-PROCESSING.                          ELCRTMPD
+00316                                                                   ELCRTMPD
+00317  EJECT                                                            ELCRTMPD
+00318 ****************************************************************  ELCRTMPD
+00319 *                                                              *  ELCRTMPD
+00320 *                       NUMBER OF DAYS                         *  ELCRTMPD
+00321 *         POLICY MUST BE INFORCE FOR 14 DAYS TO EARN A MONTH   *  ELCRTMPD
+00322 *                                                              *  ELCRTMPD
+00323 ****************************************************************  ELCRTMPD
+00324                                                                   ELCRTMPD
+00325  160-METHOD-6.                                                    ELCRTMPD
+00326                                                                   ELCRTMPD
+00327                                                                   ELCRTMPD
+00328      IF WS-RESULT-DA     GREATER THAN +14  OR                     ELCRTMPD
+00329         TERM-IN-MONTHS    GREATER THAN +0                         ELCRTMPD
+00330          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00331                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+00332                                                                   ELCRTMPD
+00333      GO TO 199-END-CERT-DATE-PROCESSING.                          ELCRTMPD
+00334                                                                   ELCRTMPD
+00335 ****************************************************************  ELCRTMPD
+00336 *                                                              *  ELCRTMPD
+00337 *                       NUMBER OF DAYS                         *  ELCRTMPD
+00338 *         POLICY MUST BE INFORCE FOR 16 DAYS TO EARN A MONTH   *  ELCRTMPD
+00339 *                                                              *  ELCRTMPD
+00340 ****************************************************************  ELCRTMPD
+00341                                                                   ELCRTMPD
+00342  170-METHOD-7.                                                    ELCRTMPD
+00343                                                                   ELCRTMPD
+00344                                                                   ELCRTMPD
+00345      IF WS-RESULT-DA     GREATER THAN +16  OR                     ELCRTMPD
+00346         TERM-IN-MONTHS    GREATER THAN +0                         ELCRTMPD
+00347          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00348                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+00349                                                                   ELCRTMPD
+00350      GO TO 199-END-CERT-DATE-PROCESSING.                          ELCRTMPD
+00351                                                                   ELCRTMPD
+00352                                                                   ELCRTMPD
+00353  EJECT                                                            ELCRTMPD
+00354  199-END-CERT-DATE-PROCESSING.                                    ELCRTMPD
+00355                                                                   ELCRTMPD
+00356      IF CP-REMAINING-TERM-1 NEGATIVE                              ELCRTMPD
+00357         MOVE ZERO                TO CP-REMAINING-TERM-1           ELCRTMPD
+00358                                     CP-REMAINING-TERM-2           ELCRTMPD
+00359                                     CP-REMAINING-TERM-3           ELCRTMPD
+00360         GO TO 9999-RT-REMAINING-TERM-XIT.                         ELCRTMPD
+00361                                                                   ELCRTMPD
+00362      MOVE WS-RESULT-DA           TO CP-ODD-DAYS.                  ELCRTMPD
+00363                                                                   ELCRTMPD
+00364      IF CP-EARN-AS-REG-BALLOON                                    ELCRTMPD
+00365         IF CP-BALLOON-LAST-PMT                                    ELCRTMPD
+00366            ADD +1 TO CP-REMAINING-TERM-3.                         ELCRTMPD
+00367                                                                   ELCRTMPD
+00368      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00369                                                                   ELCRTMPD
+00370  EJECT                                                            ELCRTMPD
+00371                                                                      CL**5
+00372 ****************************************************************  ELCRTMPD
+00373 *                                                              *  ELCRTMPD
+00374 *  PROCESSING FOR VALUATION DATE ON OR AFTER 1ST PAYMENT DATE  *  ELCRTMPD
+00375 *  AND CONSIDERING EXTENSION DAYS.                             *  ELCRTMPD
+00376 *                                                              *  ELCRTMPD
+00377 ****************************************************************  ELCRTMPD
+00378                                                                   ELCRTMPD
+00379  200-PROCESS-WITH-1ST-PMT-DATE.                                   ELCRTMPD
+00380                                                                   ELCRTMPD
+00381 ****************************************************************  ELCRTMPD
+00382 *                                                              *  ELCRTMPD
+00383 *  COMPUTE AN EXPIRATION DATE USING THE 1ST PAYMENT DATE  AND  *  ELCRTMPD
+00384 *  THE (REMAINING TERM - 1). IF THE VALUATION DATE IS GREATER  *  ELCRTMPD
+00385 *  THAN THIS ESTIMATED DATE, THEN THE TERM IS CONSIDERED TO    *  ELCRTMPD
+00386 *  BE FULLY EXPIRED.                                           *  ELCRTMPD
+00387 *                                                              *  ELCRTMPD
+00388 ****************************************************************  ELCRTMPD
+00389                                                                   ELCRTMPD
+00390      MOVE CP-FIRST-PAY-DATE      TO DC-BIN-DATE-1.                ELCRTMPD
+00391                                                                   ELCRTMPD
+00392      COMPUTE DC-ELAPSED-MONTHS EQUAL                              ELCRTMPD
+00393          (CP-ORIGINAL-TERM - +1).                                 ELCRTMPD
+00394                                                                   ELCRTMPD
+00395      MOVE ZEROS                  TO DC-ELAPSED-DAYS.              ELCRTMPD
+00396      MOVE '6'                    TO DC-OPTION-CODE.               ELCRTMPD
+00397      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT.                    ELCRTMPD
+00398                                                                   ELCRTMPD
+00399      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+00400         MOVE '2' TO CP-RETURN-CODE                                ELCRTMPD
+00401         GO TO 9999-RT-REMAINING-TERM-XIT                          ELCRTMPD
+00402      ELSE                                                         ELCRTMPD
+00403         IF DC-BIN-DATE-2 NOT GREATER CP-VALUATION-DT              ELCRTMPD
+00404             MOVE ZEROS TO CP-REMAINING-TERM-1                     ELCRTMPD
+00405                           CP-REMAINING-TERM-2                     ELCRTMPD
+00406                           CP-REMAINING-TERM-3                     ELCRTMPD
+00407             GO TO 9999-RT-REMAINING-TERM-XIT.                     ELCRTMPD
+00408                                                                   ELCRTMPD
+00409                                                                   ELCRTMPD
+00410  EJECT                                                            ELCRTMPD
+00411 ****************************************************************  ELCRTMPD
+00412 *  REMAINING-TERM-2 REFLECTS THE NUMBER OF PAYMENTS THAT A     *  ELCRTMPD
+00413 *  INSURED HAS LEFT TO PAY. REQUARDLESS OF THE AMOUNT OF TIME  *  ELCRTMPD
+00414 *  THAT HAS ELAPSED FROM THE EFFECTIVE DATE TO THE FIRST       *  ELCRTMPD
+00415 *  PAYMENT DATE, ONLY ONE MONTH IS EARNED.  THE NUMBER OF      *  ELCRTMPD
+00416 *  PAYMENTS IS THEN EVALUATED FROM THE FIRST PAYMENT DATE TO   *  ELCRTMPD
+00417 *  THE VALUATION DATE.                                         *  ELCRTMPD
+00418 *                                                              *  ELCRTMPD
+00419 *  IF THE VALUATION DATE IS GREATER THAN THE 1ST PAYMENT       *  ELCRTMPD
+00420 *  DATE, ONE MONTH HAS BEEN EARNED FOR REMAINING TERM-2.       *  ELCRTMPD
+00421 *                                                              *  ELCRTMPD
+00422 *   NOTE : THE MAXIMUM MONTHS EARNED FORM THE EFFECTIVE DATE   *  ELCRTMPD
+00423 *     TO THE PAYMENT DATE IS 1.                                *  ELCRTMPD
+00424 *                                                              *  ELCRTMPD
+00425 ****************************************************************  ELCRTMPD
+00426                                                                   ELCRTMPD
+00427      IF CP-VALUATION-DT NOT LESS THAN CP-FIRST-PAY-DATE           ELCRTMPD
+00428          MOVE 1                  TO MONTHS-EARNED-2               ELCRTMPD
+00429      ELSE                                                         ELCRTMPD
+00430          MOVE 0                  TO MONTHS-EARNED-2.              ELCRTMPD
+00431                                                                   ELCRTMPD
+00432      MOVE WS-SAVE-VALUATION-DATE TO WS-TOP-NUMBER.                ELCRTMPD
+00433      MOVE CP-VALUATION-DT        TO WS-SAVE-BINARY-DATE.          ELCRTMPD
+00434                                                                   ELCRTMPD
+00435      MOVE WS-SAVE-PAYMENT-DATE   TO WS-BOTTOM-NUMBER.             ELCRTMPD
+00436                                                                   ELCRTMPD
+00437      PERFORM 500-SIMPLE-ARITHMETIC THRU 500-EXIT.                 ELCRTMPD
+00438                                                                   ELCRTMPD
+00439      COMPUTE CP-REMAINING-TERM-2 = CP-ORIGINAL-TERM -             ELCRTMPD
+00440                           (TERM-IN-MONTHS  + MONTHS-EARNED-2).    ELCRTMPD
+00441                                                                   ELCRTMPD
+00442      IF CP-REMAINING-TERM-2 NEGATIVE                              ELCRTMPD
+00443         MOVE 0                   TO CP-REMAINING-TERM-1           ELCRTMPD
+00444                                     CP-REMAINING-TERM-2           ELCRTMPD
+00445                                     CP-REMAINING-TERM-3           ELCRTMPD
+00446                                     CP-ODD-DAYS                   ELCRTMPD
+00447         GO TO 9999-RT-REMAINING-TERM-XIT.                         ELCRTMPD
+00448                                                                   ELCRTMPD
+00449      MOVE CP-REMAINING-TERM-2    TO CP-REMAINING-TERM-3.          ELCRTMPD
+00450                                                                   ELCRTMPD
+00451      IF CP-EARN-AS-REG-BALLOON                                    ELCRTMPD
+00452         IF CP-BALLOON-LAST-PMT                                    ELCRTMPD
+00453            ADD +1 TO CP-REMAINING-TERM-3.                         ELCRTMPD
+00454                                                                   ELCRTMPD
+00455      IF CP-EARN-ON-FULL-MONTH                                     ELCRTMPD
+00456         MOVE CP-REMAINING-TERM-2    TO CP-REMAINING-TERM-1        ELCRTMPD
+00457         MOVE 0                      TO CP-ODD-DAYS                ELCRTMPD
+00458         GO TO 9999-RT-REMAINING-TERM-XIT.                         ELCRTMPD
+00459                                                                   ELCRTMPD
+00460                                                                   ELCRTMPD
+00461  EJECT                                                            ELCRTMPD
+00462 ****************************************************************  ELCRTMPD
+00463 *  REMAINING-TERM-1 IS USED FOR REFUNDS ETC.  THE TERM IS      *  ELCRTMPD
+00464 *  CALCULATED FROM THE FIRST PAYMENT DATE TO THE VALUATION     *  ELCRTMPD
+00465 *  DATE EARNING NO MORE THAN ONE MONTH FROM EFFECTIVE DATE TO  *  ELCRTMPD
+00466 *  1ST PAYMENT DATE.                                           *  ELCRTMPD
+00467 *                                                              *  ELCRTMPD
+00468 *  THE TIME ELAPSED FROM THE EFFECTIVE DATE AND THE FIRST      *  ELCRTMPD
+00469 *  PAYMENT DATE MUST BE 1 MONTH BEFORE IT IS CONSIDERED        *  ELCRTMPD
+00470 *  EARNED.                                                     *  ELCRTMPD
+00471 *                                                              *  ELCRTMPD
+00472 *   NOTE : THE MAXIMUM MONTHS EARNED FORM THE EFFECTIVE DATE   *  ELCRTMPD
+00473 *     TO THE PAYMENT DATE IS 1.                                *  ELCRTMPD
+00474 *                                                              *  ELCRTMPD
+00475 ****************************************************************  ELCRTMPD
+00476                                                                   ELCRTMPD
+00477      MOVE WS-SAVE-PAYMENT-DATE   TO WS-TOP-NUMBER.                ELCRTMPD
+00478      MOVE CP-FIRST-PAY-DATE      TO WS-SAVE-BINARY-DATE.          ELCRTMPD
+00479                                                                   ELCRTMPD
+00480      MOVE WS-SAVE-EFFECTIVE-DATE TO WS-BOTTOM-NUMBER.             ELCRTMPD
+00481                                                                   ELCRTMPD
+00482      IF PAYMENT-DATE-EOM AND EFFECTIVE-DATE-EOM                   ELCRTMPD
+00483          MOVE ZEROS              TO WS-TOP-DA                     ELCRTMPD
+00484                                     WS-BOTTOM-DA.                 ELCRTMPD
+00485                                                                   ELCRTMPD
+00486      PERFORM 500-SIMPLE-ARITHMETIC THRU 500-EXIT.                 ELCRTMPD
+00487                                                                   ELCRTMPD
+00488      MOVE ZERO                   TO MONTHS-EARNED-1.              ELCRTMPD
+00489                                                                   ELCRTMPD
+00490      IF TERM-IN-MONTHS  GREATER THAN +0                           ELCRTMPD
+00491          MOVE 1                    TO MONTHS-EARNED-1             ELCRTMPD
+00492          MOVE WS-SAVE-PAYMENT-DATE TO WS-BOTTOM-NUMBER            ELCRTMPD
+00493          GO TO 205-1ST-PAY-TO-VALUATION-DATE                      ELCRTMPD
+00494      ELSE                                                         ELCRTMPD
+00495          MOVE WS-SAVE-EFFECTIVE-DATE TO WS-BOTTOM-NUMBER          ELCRTMPD
+00496          GO TO 205-1ST-PAY-TO-VALUATION-DATE.                     ELCRTMPD
+00497                                                                   ELCRTMPD
+00498  EJECT                                                            ELCRTMPD
+00499 ****************************************************************  ELCRTMPD
+00500 *                                                              *  ELCRTMPD
+00501 *  COMPUTE THE ELAPSED TIME BETWEEN THE 1ST PAYMENT DATE       *  ELCRTMPD
+00502 *  AND THE VALUATION/CANCEL DATE.                              *  ELCRTMPD
+00503 *   THE REMAINING TERM THEN BECOMES :                          *  ELCRTMPD
+00504 *                                                              *  ELCRTMPD
+00505 *  ORIGINAL TERM - (CALCULATED ELAPSED MONTHS + MONTHS EARNED) *  ELCRTMPD
+00506 *                                                              *  ELCRTMPD
+00507 ****************************************************************  ELCRTMPD
+00508                                                                   ELCRTMPD
+00509  205-1ST-PAY-TO-VALUATION-DATE.                                   ELCRTMPD
+00510                                                                   ELCRTMPD
+00511      MOVE WS-SAVE-VALUATION-DATE TO WS-TOP-NUMBER.                ELCRTMPD
+00512      MOVE CP-VALUATION-DT        TO WS-SAVE-BINARY-DATE.          ELCRTMPD
+00513                                                                   ELCRTMPD
+00514      PERFORM 500-SIMPLE-ARITHMETIC THRU 500-EXIT.                 ELCRTMPD
+00515                                                                   ELCRTMPD
+00516      MOVE WS-RESULT-DA           TO CP-ODD-DAYS.                  ELCRTMPD
+00517                                                                   ELCRTMPD
+00518      COMPUTE CP-REMAINING-TERM-1 = CP-ORIGINAL-TERM -             ELCRTMPD
+00519                           (TERM-IN-MONTHS  + MONTHS-EARNED-1).    ELCRTMPD
+00520                                                                   ELCRTMPD
+00521  EJECT                                                            ELCRTMPD
+00522 ****************************************************************  ELCRTMPD
+00523 * IF THIS TERM IS NEGATIVE, THE TERM IS CONSIDERED TO BE       *  ELCRTMPD
+00524 *  EXPIRED AND ALL PREMIUM IS EARNED.                          *  ELCRTMPD
+00525 ****************************************************************  ELCRTMPD
+00526      IF CP-REMAINING-TERM-1 NEGATIVE                              ELCRTMPD
+00527         MOVE ZERO                TO CP-REMAINING-TERM-1           ELCRTMPD
+00528                                     CP-ODD-DAYS                   ELCRTMPD
+00529         GO TO 9999-RT-REMAINING-TERM-XIT.                         ELCRTMPD
+00530                                                                   ELCRTMPD
+00531      IF CP-EARN-AFTER-15TH                                        ELCRTMPD
+00532         GO TO 410-METHOD-1.                                       ELCRTMPD
+00533      IF CP-EARN-ON-HALF-MONTH                                     ELCRTMPD
+00534         GO TO 420-METHOD-2.                                       ELCRTMPD
+00535      IF CP-EARN-ON-1ST-DAY                                        ELCRTMPD
+00536         GO TO 430-METHOD-3.                                       ELCRTMPD
+00537      IF CP-EARN-ON-FULL-MONTH                                     ELCRTMPD
+00538         GO TO 440-METHOD-4.                                       ELCRTMPD
+00539      IF CP-EARN-WITH-NO-DAYS                                      ELCRTMPD
+00540         GO TO 450-METHOD-5.                                       ELCRTMPD
+00541      IF CP-EARN-AFTER-14TH                                        ELCRTMPD
+00542         GO TO 460-METHOD-6.                                       ELCRTMPD
+00543      IF CP-EARN-AFTER-16TH                                        ELCRTMPD
+00544         GO TO 470-METHOD-7.                                       ELCRTMPD
+00545                                                                   ELCRTMPD
+00546                                                                   ELCRTMPD
+00547 ****************************************************************  ELCRTMPD
+00548 *                                                              *  ELCRTMPD
+00549 *   IF NONE OF THE ABOVE OPTIONS HAVE BEEN SPECIFIED, THEN     *  ELCRTMPD
+00550 *   INDICATE THERE WAS AN ERROR IN THE OPTION SELECTION AND    *  ELCRTMPD
+00551 *   EXIT FROM THE ROUTINE.                                     *  ELCRTMPD
+00552 *                                                              *  ELCRTMPD
+00553 ****************************************************************  ELCRTMPD
+00554                                                                   ELCRTMPD
+00555      MOVE '3' TO CP-RETURN-CODE                                   ELCRTMPD
+00556      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00557                                                                   ELCRTMPD
+00558  EJECT                                                            ELCRTMPD
+00559 ****************************************************************  ELCRTMPD
+00560 *                                                              *  ELCRTMPD
+00561 *  PROCESSING FOR VALUATION DATE AFTER THE CERT-EFFECTIVE DATE *  ELCRTMPD
+00562 *  NOT CONSIDERING EXTENSION DAYS.                             *  ELCRTMPD
+00563 *                                                              *  ELCRTMPD
+00564 ****************************************************************  ELCRTMPD
+00565                                                                   ELCRTMPD
+00566  300-PROCESS-WITH-CERT-EFF-DATE.                                  ELCRTMPD
+00567                                                                   ELCRTMPD
+00568 ****************************************************************  ELCRTMPD
+00569 *                                                              *  ELCRTMPD
+00570 *  COMPUTE AN EXPIRATION DATE USING THE CERTIFICATE EFFECTIVE  *  ELCRTMPD
+00571 *  DATE AND ORIGINAL TERM. IF THE CANCEL DATE IS GREATER THAN  *  ELCRTMPD
+00572 *  THIS ESTIMATED DATE, THEN THE TERM IS CONSIDERED TO BE FULLY*  ELCRTMPD
+00573 *  EXHAUSTED.                                                  *  ELCRTMPD
+00574 *                                                              *  ELCRTMPD
+00575 ****************************************************************  ELCRTMPD
+00576                                                                   ELCRTMPD
+00577      MOVE CP-CERT-EFF-DT         TO DC-BIN-DATE-1.                ELCRTMPD
+00578      MOVE CP-ORIGINAL-TERM       TO DC-ELAPSED-MONTHS.            ELCRTMPD
+00579      MOVE ZEROS                  TO DC-ELAPSED-DAYS.              ELCRTMPD
+00580      MOVE '6'                    TO DC-OPTION-CODE.               ELCRTMPD
+00581      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT.                    ELCRTMPD
+00582                                                                   ELCRTMPD
+00583      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+00584         MOVE '2' TO CP-RETURN-CODE                                ELCRTMPD
+00585         GO TO 9999-RT-REMAINING-TERM-XIT                          ELCRTMPD
+00586      ELSE                                                         ELCRTMPD
+00587         IF DC-BIN-DATE-2 LESS THAN CP-VALUATION-DT                ELCRTMPD
+00588             MOVE ZEROS TO CP-REMAINING-TERM-1                     ELCRTMPD
+00589                           CP-REMAINING-TERM-2                     ELCRTMPD
+00590                           CP-REMAINING-TERM-3                     ELCRTMPD
+00591             GO TO 9999-RT-REMAINING-TERM-XIT.                     ELCRTMPD
+00592  EJECT                                                            ELCRTMPD
+00593 ****************************************************************  ELCRTMPD
+00594 *                                                              *  ELCRTMPD
+00595 *  COMPUTE THE ELAPSED TIME BETWEEN THE EFFECTIVE DATE         *  ELCRTMPD
+00596 *  AND THE CANCEL DATE.                                        *  ELCRTMPD
+00597 *                                                              *  ELCRTMPD
+00598 ****************************************************************  ELCRTMPD
+00599                                                                   ELCRTMPD
+00600  305-EFF-TO-VALUATION-DATE.                                       ELCRTMPD
+00601                                                                   ELCRTMPD
+00602      MOVE WS-SAVE-VALUATION-DATE TO WS-TOP-NUMBER.                ELCRTMPD
+00603      MOVE CP-VALUATION-DT        TO WS-SAVE-BINARY-DATE.          ELCRTMPD
+00604                                                                   ELCRTMPD
+00605      MOVE WS-SAVE-EFFECTIVE-DATE TO WS-BOTTOM-NUMBER.             ELCRTMPD
+00606                                                                   ELCRTMPD
+00607      IF VALUATION-DATE-EOM AND EFFECTIVE-DATE-EOM                 ELCRTMPD
+00608          MOVE ZEROS              TO WS-TOP-DA                     ELCRTMPD
+00609                                     WS-BOTTOM-DA.                 ELCRTMPD
+00610                                                                   ELCRTMPD
+00611      PERFORM 500-SIMPLE-ARITHMETIC THRU 500-EXIT.                 ELCRTMPD
+00612                                                                   ELCRTMPD
+00613      COMPUTE CP-REMAINING-TERM-1 = CP-ORIGINAL-TERM -             ELCRTMPD
+00614                             TERM-IN-MONTHS.                       ELCRTMPD
+00615                                                                   ELCRTMPD
+00616      MOVE WS-RESULT-DA           TO CP-ODD-DAYS.                  ELCRTMPD
+00617                                                                   ELCRTMPD
+00618  EJECT                                                            ELCRTMPD
+00619 ****************************************************************  ELCRTMPD
+00620 * IF THIS TERM IS NEGATIVE, THE TERM IS CONSIDERED TO BE       *  ELCRTMPD
+00621 *  EXPIRED AND ALL PREMIUM IS EARNED.                          *  ELCRTMPD
+00622 ****************************************************************  ELCRTMPD
+00623      IF CP-REMAINING-TERM-1 NEGATIVE                              ELCRTMPD
+00624         MOVE ZERO                TO CP-REMAINING-TERM-1           ELCRTMPD
+00625                                     CP-REMAINING-TERM-2           ELCRTMPD
+00626                                     CP-REMAINING-TERM-3           ELCRTMPD
+00627                                     CP-ODD-DAYS                   ELCRTMPD
+00628         GO TO 9999-RT-REMAINING-TERM-XIT.                         ELCRTMPD
+00629                                                                   ELCRTMPD
+00630      MOVE CP-REMAINING-TERM-1    TO CP-REMAINING-TERM-2           ELCRTMPD
+00631                                     CP-REMAINING-TERM-3.          ELCRTMPD
+00632                                                                   ELCRTMPD
+00633      IF CP-EARN-AS-REG-BALLOON                                    ELCRTMPD
+00634         IF CP-BALLOON-LAST-PMT                                    ELCRTMPD
+00635            ADD +1 TO CP-REMAINING-TERM-3.                         ELCRTMPD
+00636                                                                   ELCRTMPD
+00637      IF CP-EARN-AFTER-15TH                                        ELCRTMPD
+00638         GO TO 410-METHOD-1.                                       ELCRTMPD
+00639      IF CP-EARN-ON-HALF-MONTH                                     ELCRTMPD
+00640         GO TO 420-METHOD-2.                                       ELCRTMPD
+00641      IF CP-EARN-ON-1ST-DAY                                        ELCRTMPD
+00642         GO TO 430-METHOD-3.                                       ELCRTMPD
+00643      IF CP-EARN-ON-FULL-MONTH                                     ELCRTMPD
+00644         GO TO 440-METHOD-4.                                       ELCRTMPD
+00645      IF CP-EARN-WITH-NO-DAYS                                      ELCRTMPD
+00646         GO TO 450-METHOD-5.                                       ELCRTMPD
+00647      IF CP-EARN-AFTER-14TH                                        ELCRTMPD
+00648         GO TO 460-METHOD-6.                                       ELCRTMPD
+00649      IF CP-EARN-AFTER-16TH                                        ELCRTMPD
+00650         GO TO 470-METHOD-7.                                       ELCRTMPD
+00651                                                                   ELCRTMPD
+00652                                                                   ELCRTMPD
+00653 ****************************************************************  ELCRTMPD
+00654 *                                                              *  ELCRTMPD
+00655 *   IF NONE OF THE ABOVE OPTIONS HAVE BEEN SPECIFIED, THEN     *  ELCRTMPD
+00656 *   INDICATE THERE WAS AN ERROR IN THE OPTION SELECTION AND    *  ELCRTMPD
+00657 *   EXIT FROM THE ROUTINE.                                     *  ELCRTMPD
+00658 *                                                              *  ELCRTMPD
+00659 ****************************************************************  ELCRTMPD
+00660                                                                   ELCRTMPD
+00661      MOVE '3' TO CP-RETURN-CODE                                   ELCRTMPD
+00662      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00663                                                                   ELCRTMPD
+00664  EJECT                                                            ELCRTMPD
+00665 ****************************************************************  ELCRTMPD
+00666 *                                                              *  ELCRTMPD
+00667 *                       NUMBER OF DAYS                         *  ELCRTMPD
+00668 *         POLICY MUST BE INFORCE FOR 15 DAYS TO EARN A MONTH   *  ELCRTMPD
+00669 *                                                              *  ELCRTMPD
+00670 ****************************************************************  ELCRTMPD
+00671                                                                   ELCRTMPD
+00672  410-METHOD-1.                                                    ELCRTMPD
+00673                                                                   ELCRTMPD
+00674                                                                   ELCRTMPD
+00675      IF WS-RESULT-DA     GREATER THAN +15                         ELCRTMPD
+00676          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00677                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+00678                                                                   ELCRTMPD
+00679      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00680                                                                   ELCRTMPD
+00681                                                                   ELCRTMPD
+00682 ****************************************************************  ELCRTMPD
+00683 *                                                              *  ELCRTMPD
+00684 *                       HALF MONTH ADJUSTMENT                  *  ELCRTMPD
+00685 *            PREMIUM EARNS ON 1/2 MONTH MORE ASSUMPTION        *  ELCRTMPD
+00686 *                                                              *  ELCRTMPD
+00687 ****************************************************************  ELCRTMPD
+00688                                                                   ELCRTMPD
+00689  420-METHOD-2.                                                    ELCRTMPD
+00690                                                                   ELCRTMPD
+00691      IF CP-REMAINING-TERM-1 NOT = ZERO                            ELCRTMPD
+00692          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00693                              CP-REMAINING-TERM-1 - (+.5).         ELCRTMPD
+00694                                                                   ELCRTMPD
+00695      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00696                                                                   ELCRTMPD
+00697 *     NO ADJUSTMENT TO CP-REMAINING-TERM-3 FOR DAYS - TYPE 2.     ELCRTMPD
+00698                                                                   ELCRTMPD
+00699                                                                   ELCRTMPD
+00700  EJECT                                                            ELCRTMPD
+00701 ****************************************************************  ELCRTMPD
+00702 *                                                              *  ELCRTMPD
+00703 *                       FIRST DAY METHOD                       *  ELCRTMPD
+00704 *                  PREMIUM EARNS ON FIRST DAY                  *  ELCRTMPD
+00705 *                                                              *  ELCRTMPD
+00706 ****************************************************************  ELCRTMPD
+00707                                                                   ELCRTMPD
+00708  430-METHOD-3.                                                    ELCRTMPD
+00709                                                                   ELCRTMPD
+00710      IF WS-RESULT-DA     GREATER THAN +0                          ELCRTMPD
+00711          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00712                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+00713                                                                   ELCRTMPD
+00714      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00715                                                                   ELCRTMPD
+00716                                                                   ELCRTMPD
+00717 ****************************************************************  ELCRTMPD
+00718 *                                                              *  ELCRTMPD
+00719 *                       FULL MONTH METHOD                      *  ELCRTMPD
+00720 *          PREMIUM EARNS ON FULL MONTH - SAME AS BENEFIT       *  ELCRTMPD
+00721 *                                                              *  ELCRTMPD
+00722 ****************************************************************  ELCRTMPD
+00723                                                                   ELCRTMPD
+00724  440-METHOD-4.                                                    ELCRTMPD
+00725                                                                   ELCRTMPD
+00726 *  NO ADJUSTMENT FOR CP-REMAINING-TERM-1 - TYPE 4.                ELCRTMPD
+00727                                                                   ELCRTMPD
+00728                                                                   ELCRTMPD
+00729      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00730                                                                   ELCRTMPD
+00731                                                                   ELCRTMPD
+00732  EJECT                                                            ELCRTMPD
+00733 ****************************************************************  ELCRTMPD
+00734 *                                                              *  ELCRTMPD
+00735 *                       FULL MONTH - NO DAYS                   *  ELCRTMPD
+00736 *          PREMIUM EARNS A FULL MONTH STARTING THE FIRST MONTH *  ELCRTMPD
+00737 *       (THIS METHOD WILL EARN WITHOUT A FLUCTUATION IN SHORT  *  ELCRTMPD
+00738 *        MONTHS )                                              *  ELCRTMPD
+00739 ****************************************************************  ELCRTMPD
+00740                                                                   ELCRTMPD
+00741  450-METHOD-5.                                                    ELCRTMPD
+00742                                                                   ELCRTMPD
+00743                                                                   ELCRTMPD
+00744      IF CP-REMAINING-TERM-1 NOT = ZERO                            ELCRTMPD
+00745          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00746                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+00747                                                                   ELCRTMPD
+00748      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00749                                                                   ELCRTMPD
+00750 ****************************************************************  ELCRTMPD
+00751 *                                                              *  ELCRTMPD
+00752 *                       NUMBER OF DAYS                         *  ELCRTMPD
+00753 *         POLICY MUST BE INFORCE FOR 14 DAYS TO EARN A MONTH   *  ELCRTMPD
+00754 *                                                              *  ELCRTMPD
+00755 ****************************************************************  ELCRTMPD
+00756                                                                   ELCRTMPD
+00757  460-METHOD-6.                                                    ELCRTMPD
+00758                                                                   ELCRTMPD
+00759                                                                   ELCRTMPD
+00760      IF WS-RESULT-DA     GREATER THAN +14                         ELCRTMPD
+00761          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00762                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+00763                                                                   ELCRTMPD
+00764      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00765                                                                   ELCRTMPD
+00766 ****************************************************************  ELCRTMPD
+00767 *                                                              *  ELCRTMPD
+00768 *                       NUMBER OF DAYS                         *  ELCRTMPD
+00769 *     POLICY MUST BE INFORCE FOR 16 DAYS TO EARN A MONTH       *  ELCRTMPD
+00770 *                                                              *  ELCRTMPD
+00771 ****************************************************************  ELCRTMPD
+00772                                                                   ELCRTMPD
+00773  470-METHOD-7.                                                    ELCRTMPD
+00774                                                                   ELCRTMPD
+00775                                                                   ELCRTMPD
+00776      IF WS-RESULT-DA     GREATER THAN +16                         ELCRTMPD
+00777          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00778                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+00779                                                                   ELCRTMPD
+00780      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00781                                                                   ELCRTMPD
+00782 ****************************************************************  ELCRTMPD
+00783 *                                                              *  ELCRTMPD
+00784 *                                                              *  ELCRTMPD
+00785 *                                                              *  ELCRTMPD
+00786 *                                                              *  ELCRTMPD
+00787 *                                                              *  ELCRTMPD
+00788 ****************************************************************  ELCRTMPD
+00789                                                                   ELCRTMPD
+00790  500-SIMPLE-ARITHMETIC.                                           ELCRTMPD
+00791                                                                   ELCRTMPD
+00792  500-BORROW-IF-LESS.                                              ELCRTMPD
+00793      IF WS-TOP-DA NOT LESS THAN WS-BOTTOM-DA                      ELCRTMPD
+00794         GO TO 500-CHECK-MONTH.                                    ELCRTMPD
+00795                                                                   ELCRTMPD
+00796 * BORROW BASED ON 30 DAY MONTH                                    ELCRTMPD
+00797                                                                   ELCRTMPD
+00798      IF CP-30-DAY-MONTH                                           ELCRTMPD
+00799          COMPUTE WS-TOP-DA = WS-TOP-DA + 30                       ELCRTMPD
+00800      ELSE                                                         ELCRTMPD
+00801          MOVE WS-SAVE-BINARY-DATE    TO DC-BIN-DATE-1             ELCRTMPD
+00802          MOVE -1                     TO DC-ELAPSED-MONTHS         ELCRTMPD
+00803          MOVE '1'                    TO DC-END-OF-MONTH           ELCRTMPD
+00804          MOVE ZERO                   TO DC-ELAPSED-DAYS           ELCRTMPD
+00805          MOVE '6'                    TO DC-OPTION-CODE            ELCRTMPD
+00806          PERFORM 8000-DATE-CONVERT THRU 8000-EXIT                 ELCRTMPD
+00807          IF DATE-CONVERSION-ERROR                                 ELCRTMPD
+00808              MOVE '2'                TO CP-RETURN-CODE            ELCRTMPD
+00809              GO TO 500-EXIT                                       ELCRTMPD
+00810          ELSE                                                     ELCRTMPD
+00811              COMPUTE WS-TOP-DA = WS-TOP-DA + DC-DAYS-IN-MONTH.    ELCRTMPD
+00812                                                                   ELCRTMPD
+00813      COMPUTE WS-TOP-MO = WS-TOP-MO - 1.                           ELCRTMPD
+00814                                                                   ELCRTMPD
+00815      IF WS-TOP-MO EQUAL 0                                         ELCRTMPD
+00816         COMPUTE WS-TOP-CCYR = WS-TOP-CCYR - 1                        CL**2
+00817         MOVE 12             TO WS-TOP-MO.                         ELCRTMPD
+00818                                                                   ELCRTMPD
+00819  500-CHECK-MONTH.                                                 ELCRTMPD
+00820      IF WS-TOP-MO NOT LESS THAN WS-BOTTOM-MO                      ELCRTMPD
+00821         GO TO 500-SUBTRACT.                                       ELCRTMPD
+00822                                                                   ELCRTMPD
+00823      COMPUTE WS-TOP-CCYR = WS-TOP-CCYR - 1.                          CL**2
+00824                                                                      CL**2
+00825      COMPUTE WS-TOP-MO = WS-TOP-MO + 12.                          ELCRTMPD
+00826                                                                   ELCRTMPD
+00827  500-SUBTRACT.                                                    ELCRTMPD
+00828                                                                   ELCRTMPD
+00829      COMPUTE WS-RESULT-CCYR = WS-TOP-CCYR - WS-BOTTOM-CCYR.          CL**2
+00830                                                                   ELCRTMPD
+00831      COMPUTE WS-RESULT-MO = WS-TOP-MO - WS-BOTTOM-MO.             ELCRTMPD
+00832      IF WS-RESULT-CCYR GREATER THAN ZERO                             CL**3
+00833         COMPUTE TERM-IN-MONTHS = WS-RESULT-MO +                   ELCRTMPD
+00834                       (WS-RESULT-CCYR * 12)                          CL**3
+00835      ELSE                                                         ELCRTMPD
+00836         MOVE WS-RESULT-MO          TO TERM-IN-MONTHS.             ELCRTMPD
+00837                                                                   ELCRTMPD
+00838      COMPUTE WS-RESULT-DA = WS-TOP-DA - WS-BOTTOM-DA.             ELCRTMPD
+00839                                                                   ELCRTMPD
+00840 *    IF CP-30-DAY-MONTH                                           ELCRTMPD
+00841 *       AND WS-RESULT-DA EQUAL 30                                 ELCRTMPD
+00842 *         COMPUTE WS-RESULT-MO = WS-RESULT-MO + 1                 ELCRTMPD
+00843 *         MOVE 0                   TO WS-RESULT-DA.               ELCRTMPD
+00844                                                                   ELCRTMPD
+00845                                                                   ELCRTMPD
+00846  500-EXIT.                                                        ELCRTMPD
+00847      EXIT.                                                        ELCRTMPD
+00848      EJECT                                                        ELCRTMPD
+00849 ****************************************************************  ELCRTMPD
+00850  600-PROCESS-FOR-NCL.                                             ELCRTMPD
+00851 ****************************************************************  ELCRTMPD
+00852 *                                                              *  ELCRTMPD
+00853 *  COMPUTE AN EXPIRATION DATE USING THE 1ST PAYMENT DATE  AND  *  ELCRTMPD
+00854 *  THE (REMAINING TERM - 1). IF THE VALUATION DATE IS GREATER  *  ELCRTMPD
+00855 *  THAN THIS ESTIMATED DATE, THEN THE TERM IS CONSIDERED TO    *  ELCRTMPD
+00856 *  BE FULLY EXPIRED.                                           *  ELCRTMPD
+00857 *                                                              *  ELCRTMPD
+00858 ****************************************************************  ELCRTMPD
+00859                                                                   ELCRTMPD
+00860      MOVE CP-FIRST-PAY-DATE      TO DC-BIN-DATE-1.                ELCRTMPD
+00861                                                                   ELCRTMPD
+00862      COMPUTE DC-ELAPSED-MONTHS EQUAL                              ELCRTMPD
+00863          (CP-ORIGINAL-TERM - +1).                                 ELCRTMPD
+00864                                                                   ELCRTMPD
+00865      MOVE ZEROS                  TO DC-ELAPSED-DAYS.              ELCRTMPD
+00866      MOVE '6'                    TO DC-OPTION-CODE.               ELCRTMPD
+00867      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT.                    ELCRTMPD
+00868                                                                   ELCRTMPD
+00869      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+00870         MOVE '2' TO CP-RETURN-CODE                                ELCRTMPD
+00871         GO TO 9999-RT-REMAINING-TERM-XIT                          ELCRTMPD
+00872      ELSE                                                         ELCRTMPD
+00873         IF DC-BIN-DATE-2 NOT GREATER CP-VALUATION-DT              ELCRTMPD
+00874             MOVE ZEROS TO CP-REMAINING-TERM-1                     ELCRTMPD
+00875                           CP-REMAINING-TERM-2                     ELCRTMPD
+00876                           CP-REMAINING-TERM-3                     ELCRTMPD
+00877             GO TO 9999-RT-REMAINING-TERM-XIT.                     ELCRTMPD
+00878                                                                   ELCRTMPD
+00879      MOVE DC-BIN-DATE-2          TO WS-SAVE-BINARY-DATE.          ELCRTMPD
+00880      MOVE DC-BIN-DATE-2          TO DC-BIN-DATE-1.                ELCRTMPD
+00881      MOVE ' '                    TO DC-OPTION-CODE.               ELCRTMPD
+00882      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT                     ELCRTMPD
+00883      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+00884          MOVE '2'                TO CP-RETURN-CODE                ELCRTMPD
+00885          GO TO 9999-RT-REMAINING-TERM-XIT.                        ELCRTMPD
+00886                                                                   ELCRTMPD
+00887      MOVE DC-GREG-DATE-CYMD      TO WS-SAVE-EXPIRATION-DATE.         CL**2
+00888      IF SAVE-EXP-DAYS EQUAL DC-DAYS-IN-MONTH                      ELCRTMPD
+00889          MOVE 'Y'                TO EXPIRATION-EOM.               ELCRTMPD
+00890 ****************************************************************  ELCRTMPD
+00891 *                                                              *  ELCRTMPD
+00892 *  COMPUTE THE ELAPSED TIME BETWEEN THE CANCEL DATE AND        *  ELCRTMPD
+00893 *  EXPIRATION (MATURITY DATE). THIS WILL BE THE REMAINING      *  ELCRTMPD
+00894 *  TERM.                                                       *  ELCRTMPD
+00895 ****************************************************************  ELCRTMPD
+00896                                                                   ELCRTMPD
+00897      MOVE WS-SAVE-EXPIRATION-DATE TO WS-TOP-NUMBER.               ELCRTMPD
+00898      MOVE DC-BIN-DATE-2          TO WS-SAVE-BINARY-DATE.          ELCRTMPD
+00899                                                                   ELCRTMPD
+00900      MOVE WS-SAVE-VALUATION-DATE TO WS-BOTTOM-NUMBER.             ELCRTMPD
+00901                                                                   ELCRTMPD
+00902      IF VALUATION-DATE-EOM AND EXPIRATION-DATE-EOM                ELCRTMPD
+00903          MOVE ZEROS              TO WS-TOP-DA                     ELCRTMPD
+00904                                     WS-BOTTOM-DA.                 ELCRTMPD
+00905                                                                   ELCRTMPD
+00906      PERFORM 500-SIMPLE-ARITHMETIC THRU 500-EXIT.                 ELCRTMPD
+00907                                                                   ELCRTMPD
+00908      MOVE TERM-IN-MONTHS         TO CP-REMAINING-TERM-1           ELCRTMPD
+00909                                                                   ELCRTMPD
+00910      MOVE WS-RESULT-DA           TO CP-ODD-DAYS.                  ELCRTMPD
+00911                                                                   ELCRTMPD
+00912  EJECT                                                            ELCRTMPD
+00913 ****************************************************************  ELCRTMPD
+00914 * IF THIS TERM IS NEGATIVE, THE TERM IS CONSIDERED TO BE       *  ELCRTMPD
+00915 *  EXPIRED AND ALL PREMIUM IS EARNED.                          *  ELCRTMPD
+00916 ****************************************************************  ELCRTMPD
+00917      IF CP-REMAINING-TERM-1 NEGATIVE                              ELCRTMPD
+00918         MOVE ZERO                TO CP-REMAINING-TERM-1           ELCRTMPD
+00919                                     CP-REMAINING-TERM-2           ELCRTMPD
+00920                                     CP-REMAINING-TERM-3           ELCRTMPD
+00921                                     CP-ODD-DAYS                   ELCRTMPD
+00922         GO TO 9999-RT-REMAINING-TERM-XIT.                         ELCRTMPD
+00923                                                                   ELCRTMPD
+00924      MOVE CP-REMAINING-TERM-1    TO CP-REMAINING-TERM-2           ELCRTMPD
+00925                                     CP-REMAINING-TERM-3.          ELCRTMPD
+00926                                                                   ELCRTMPD
+00927      IF CP-ODD-DAYS GREATER THAN ZERO                             ELCRTMPD
+00928         ADD +1                   TO CP-REMAINING-TERM-2           ELCRTMPD
+00929         ADD +1                   TO CP-REMAINING-TERM-3.          ELCRTMPD
+00930                                                                   ELCRTMPD
+00931      IF CP-EARN-AS-REG-BALLOON                                    ELCRTMPD
+00932         IF CP-BALLOON-LAST-PMT                                    ELCRTMPD
+00933            ADD +1 TO CP-REMAINING-TERM-3.                         ELCRTMPD
+00934                                                                   ELCRTMPD
+00935      IF CP-EARN-AFTER-15TH                                        ELCRTMPD
+00936         GO TO 610-METHOD-1.                                       ELCRTMPD
+00937      IF CP-EARN-ON-HALF-MONTH                                     ELCRTMPD
+00938         GO TO 620-METHOD-2.                                       ELCRTMPD
+00939      IF CP-EARN-ON-1ST-DAY                                        ELCRTMPD
+00940         GO TO 630-METHOD-3.                                       ELCRTMPD
+00941      IF CP-EARN-ON-FULL-MONTH                                     ELCRTMPD
+00942         GO TO 640-METHOD-4.                                       ELCRTMPD
+00943      IF CP-EARN-WITH-NO-DAYS                                      ELCRTMPD
+00944         GO TO 650-METHOD-5.                                       ELCRTMPD
+00945      IF CP-EARN-AFTER-14TH                                        ELCRTMPD
+00946         GO TO 660-METHOD-6.                                       ELCRTMPD
+00947      IF CP-EARN-AFTER-16TH                                        ELCRTMPD
+00948         GO TO 670-METHOD-7.                                       ELCRTMPD
+00949 ****************************************************************  ELCRTMPD
+00950 *                                                              *  ELCRTMPD
+00951 *   IF NONE OF THE ABOVE OPTIONS HAVE BEEN SPECIFIED, THEN     *  ELCRTMPD
+00952 *   INDICATE THERE WAS AN ERROR IN THE OPTION SELECTION AND    *  ELCRTMPD
+00953 *   EXIT FROM THE ROUTINE.                                     *  ELCRTMPD
+00954 *                                                              *  ELCRTMPD
+00955 ****************************************************************  ELCRTMPD
+00956                                                                   ELCRTMPD
+00957                                                                   ELCRTMPD
+00958      MOVE '3' TO CP-RETURN-CODE                                   ELCRTMPD
+00959      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+00960                                                                   ELCRTMPD
+00961  EJECT                                                            ELCRTMPD
+00962                                                                   ELCRTMPD
+00963 ****************************************************************  ELCRTMPD
+00964 *                                                              *  ELCRTMPD
+00965 *                       NUMBER OF DAYS                         *  ELCRTMPD
+00966 *         POLICY MUST BE INFORCE FOR 15 DAYS TO EARN A MONTH   *  ELCRTMPD
+00967 *                                                              *  ELCRTMPD
+00968 ****************************************************************  ELCRTMPD
+00969                                                                   ELCRTMPD
+00970  610-METHOD-1.                                                    ELCRTMPD
+00971                                                                   ELCRTMPD
+00972      IF WS-RESULT-DA     GREATER THAN +14                         ELCRTMPD
+00973          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+00974                              CP-REMAINING-TERM-1 + (+1).          ELCRTMPD
+00975                                                                   ELCRTMPD
+00976      GO TO 680-END-NCL-PROCESSING.                                ELCRTMPD
+00977                                                                   ELCRTMPD
+00978                                                                   ELCRTMPD
+00979 ****************************************************************  ELCRTMPD
+00980 *                                                              *  ELCRTMPD
+00981 *                       HALF MONTH ADJUSTMENT                  *  ELCRTMPD
+00982 *            PREMIUM EARNS ON 1/2 MONTH MORE ASSUMPTION        *  ELCRTMPD
+00983 *                                                              *  ELCRTMPD
+00984 ****************************************************************  ELCRTMPD
+00985                                                                   ELCRTMPD
+00986  620-METHOD-2.                                                    ELCRTMPD
+00987                                                                   ELCRTMPD
+00988      COMPUTE CP-REMAINING-TERM-1 =                                ELCRTMPD
+00989                              CP-REMAINING-TERM-1 + (+.5).         ELCRTMPD
+00990                                                                   ELCRTMPD
+00991      GO TO 680-END-NCL-PROCESSING.                                ELCRTMPD
+00992                                                                   ELCRTMPD
+00993                                                                   ELCRTMPD
+00994  EJECT                                                            ELCRTMPD
+00995 ****************************************************************  ELCRTMPD
+00996 *                                                              *  ELCRTMPD
+00997 *                       FIRST DAY METHOD                       *  ELCRTMPD
+00998 *                  PREMIUM EARNS ON FIRST DAY                  *  ELCRTMPD
+00999 *                                                              *  ELCRTMPD
+01000 ****************************************************************  ELCRTMPD
+01001                                                                   ELCRTMPD
+01002  630-METHOD-3.                                                    ELCRTMPD
+01003                                                                   ELCRTMPD
+01004 *  NO ADJUSTMENT FOR CP-REMAINING-TERM-1 - TYPE 3 FOR NCL.        ELCRTMPD
+01005                                                                   ELCRTMPD
+01006      GO TO 680-END-NCL-PROCESSING.                                ELCRTMPD
+01007                                                                   ELCRTMPD
+01008                                                                   ELCRTMPD
+01009 ****************************************************************  ELCRTMPD
+01010 *                                                              *  ELCRTMPD
+01011 *                       FULL MONTH METHOD                      *  ELCRTMPD
+01012 *          PREMIUM EARNS ON FULL MONTH - SAME AS BENEFIT       *  ELCRTMPD
+01013 *                                                              *  ELCRTMPD
+01014 ****************************************************************  ELCRTMPD
+01015                                                                   ELCRTMPD
+01016  640-METHOD-4.                                                    ELCRTMPD
+01017                                                                   ELCRTMPD
+01018      MOVE CP-REMAINING-TERM-2       TO CP-REMAINING-TERM-1.       ELCRTMPD
+01019      MOVE 0                         TO CP-ODD-DAYS.               ELCRTMPD
+01020                                                                   ELCRTMPD
+01021      GO TO 680-END-NCL-PROCESSING.                                ELCRTMPD
+01022                                                                   ELCRTMPD
+01023                                                                   ELCRTMPD
+01024  EJECT                                                            ELCRTMPD
+01025 ****************************************************************  ELCRTMPD
+01026 *                                                              *  ELCRTMPD
+01027 *                       FULL MONTH - NO DAYS                   *  ELCRTMPD
+01028 *          PREMIUM EARNS A FULL MONTH STARTING THE FIRST MONTH *  ELCRTMPD
+01029 *       (THIS METHOD WILL EARN WITHOUT A FLUCTUATION IN SHORT  *  ELCRTMPD
+01030 *        MONTHS )                                              *  ELCRTMPD
+01031 ****************************************************************  ELCRTMPD
+01032                                                                   ELCRTMPD
+01033  650-METHOD-5.                                                    ELCRTMPD
+01034                                                                   ELCRTMPD
+01035                                                                   ELCRTMPD
+01036 *  NO ADJUSTMENT FOR CP-REMAINING-TERM-1 - TYPE 5 FOR NCL.        ELCRTMPD
+01037                                                                   ELCRTMPD
+01038      GO TO 680-END-NCL-PROCESSING.                                ELCRTMPD
+01039                                                                   ELCRTMPD
+01040                                                                   ELCRTMPD
+01041 ****************************************************************  ELCRTMPD
+01042 *                                                              *  ELCRTMPD
+01043 *                       NUMBER OF DAYS                         *  ELCRTMPD
+01044 *         POLICY MUST BE INFORCE FOR 14 DAYS TO EARN A MONTH   *  ELCRTMPD
+01045 *                                                              *  ELCRTMPD
+01046 ****************************************************************  ELCRTMPD
+01047                                                                   ELCRTMPD
+01048  660-METHOD-6.                                                    ELCRTMPD
+01049                                                                   ELCRTMPD
+01050                                                                   ELCRTMPD
+01051      IF WS-RESULT-DA     GREATER THAN +13                         ELCRTMPD
+01052          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01053                              CP-REMAINING-TERM-1 + (+1).          ELCRTMPD
+01054                                                                   ELCRTMPD
+01055      GO TO 680-END-NCL-PROCESSING.                                ELCRTMPD
+01056                                                                   ELCRTMPD
+01057                                                                   ELCRTMPD
+01058 ****************************************************************  ELCRTMPD
+01059 *                                                              *  ELCRTMPD
+01060 *                       NUMBER OF DAYS                         *  ELCRTMPD
+01061 *     POLICY MUST BE INFORCE FOR 16 DAYS TO EARN A MONTH       *  ELCRTMPD
+01062 *                                                              *  ELCRTMPD
+01063 ****************************************************************  ELCRTMPD
+01064                                                                   ELCRTMPD
+01065  670-METHOD-7.                                                    ELCRTMPD
+01066                                                                   ELCRTMPD
+01067      IF WS-RESULT-DA     GREATER THAN +15                         ELCRTMPD
+01068          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01069                              CP-REMAINING-TERM-1 + (+1).          ELCRTMPD
+01070                                                                   ELCRTMPD
+01071      GO TO 680-END-NCL-PROCESSING.                                ELCRTMPD
+01072                                                                   ELCRTMPD
+01073                                                                   ELCRTMPD
+01074  680-END-NCL-PROCESSING.                                          ELCRTMPD
+01075                                                                   ELCRTMPD
+01076      IF CP-REMAINING-TERM-1 > CP-ORIGINAL-TERM                    ELCRTMPD
+01077         MOVE CP-ORIGINAL-TERM    TO CP-REMAINING-TERM-1           ELCRTMPD
+01078                                     CP-REMAINING-TERM-2           ELCRTMPD
+01079                                     CP-REMAINING-TERM-3           ELCRTMPD
+01080         MOVE ZEROS               TO CP-ODD-DAYS.                  ELCRTMPD
+01081                                                                   ELCRTMPD
+01082      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01083                                                                   ELCRTMPD
+01084  EJECT                                                            ELCRTMPD
+01085                                                                   ELCRTMPD
+01086  1000-CONTROL-CALCULATION.                                        ELCRTMPD
+01087                                                                   ELCRTMPD
+01088      IF CP-VALUATION-DT NOT LESS THAN CP-FIRST-PAY-DATE           ELCRTMPD
+01089          GO TO 2000-PROCESS-WITH-1ST-PMT-DATE.                    ELCRTMPD
+01090                                                                   ELCRTMPD
+01091                                                                      CL**5
+01092 ****************************************************************  ELCRTMPD
+01093 *                                                              *  ELCRTMPD
+01094 *  ORIGINAL                                                    *  ELCRTMPD
+01095 *   PROCESSING WHEN VALUATION DATE LESS THAN 1ST PAYMENT DATE  *  ELCRTMPD
+01096 *                                                              *  ELCRTMPD
+01097 ****************************************************************  ELCRTMPD
+01098                                                                   ELCRTMPD
+01099                                                                   ELCRTMPD
+01100  1000-PROCESS-WITH-CERT-EFF-DT.                                   ELCRTMPD
+01101                                                                   ELCRTMPD
+01102      MOVE CP-CERT-EFF-DT         TO DC-BIN-DATE-1.                ELCRTMPD
+01103      MOVE CP-VALUATION-DT        TO DC-BIN-DATE-2.                ELCRTMPD
+01104      MOVE '1'                    TO DC-OPTION-CODE.               ELCRTMPD
+01105      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT                     ELCRTMPD
+01106      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+01107          MOVE '2'                TO CP-RETURN-CODE                ELCRTMPD
+01108          GO TO 9999-RT-REMAINING-TERM-XIT.                        ELCRTMPD
+01109                                                                   ELCRTMPD
+01110      IF CP-EARN-AFTER-15TH                                        ELCRTMPD
+01111         GO TO 1110-METHOD-1.                                      ELCRTMPD
+01112      IF CP-EARN-ON-HALF-MONTH                                     ELCRTMPD
+01113         GO TO 1200-METHOD-2.                                      ELCRTMPD
+01114      IF CP-EARN-ON-1ST-DAY                                        ELCRTMPD
+01115         GO TO 1300-METHOD-3.                                      ELCRTMPD
+01116      IF CP-EARN-ON-FULL-MONTH                                     ELCRTMPD
+01117         GO TO 1400-METHOD-4.                                      ELCRTMPD
+01118      IF CP-EARN-WITH-NO-DAYS                                      ELCRTMPD
+01119         GO TO 1500-METHOD-5.                                      ELCRTMPD
+01120                                                                   ELCRTMPD
+01121      IF CP-EARN-AFTER-14TH                                        ELCRTMPD
+01122         GO TO 1600-METHOD-6.                                      ELCRTMPD
+01123      IF CP-EARN-AFTER-16TH                                        ELCRTMPD
+01124         GO TO 1700-METHOD-7.                                      ELCRTMPD
+01125                                                                   ELCRTMPD
+01126      MOVE '3' TO CP-RETURN-CODE                                   ELCRTMPD
+01127      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01128                                                                   ELCRTMPD
+01129  1110-METHOD-1.                                                   ELCRTMPD
+01130                                                                   ELCRTMPD
+01131 ****************************************************************  ELCRTMPD
+01132 *                                                              *  ELCRTMPD
+01133 *  ORIGINAL                                                    *  ELCRTMPD
+01134 *                       NUMBER OF DAYS                         *  ELCRTMPD
+01135 *         POLICY MUST BE INFORCE FOR 15 DAYS TO EARN A MONTH   *  ELCRTMPD
+01136 *                                                              *  ELCRTMPD
+01137 ****************************************************************  ELCRTMPD
+01138                                                                   ELCRTMPD
+01139                                                                   ELCRTMPD
+01140      IF DC-ODD-DAYS-OVER GREATER THAN +15  OR                     ELCRTMPD
+01141         DC-ELAPSED-MONTHS GREATER THAN +0                         ELCRTMPD
+01142          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01143                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+01144                                                                   ELCRTMPD
+01145                                                                   ELCRTMPD
+01146      GO TO 1999-END-CERT-DATE-PROCESSING.                         ELCRTMPD
+01147                                                                   ELCRTMPD
+01148  1200-METHOD-2.                                                   ELCRTMPD
+01149                                                                   ELCRTMPD
+01150 ****************************************************************  ELCRTMPD
+01151 *                                                              *  ELCRTMPD
+01152 *  ORIGINAL                                                    *  ELCRTMPD
+01153 *                       HALF MONTH ADJUSTMENT                  *  ELCRTMPD
+01154 *            PREMIUM EARNS ON 1/2 MONTH MORE ASSUMPTION        *  ELCRTMPD
+01155 *                                                              *  ELCRTMPD
+01156 ****************************************************************  ELCRTMPD
+01157                                                                   ELCRTMPD
+01158      IF DC-ELAPSED-MONTHS GREATER THAN +0                         ELCRTMPD
+01159          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01160                        CP-REMAINING-TERM-1 - (+1.5)               ELCRTMPD
+01161      ELSE                                                         ELCRTMPD
+01162          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01163                        CP-REMAINING-TERM-1 - (+.5).               ELCRTMPD
+01164                                                                   ELCRTMPD
+01165      IF CP-REMAINING-TERM-1 NEGATIVE                              ELCRTMPD
+01166          MOVE ZEROS                 TO CP-REMAINING-TERM-1.       ELCRTMPD
+01167                                                                   ELCRTMPD
+01168                                                                   ELCRTMPD
+01169      GO TO 1999-END-CERT-DATE-PROCESSING.                         ELCRTMPD
+01170                                                                   ELCRTMPD
+01171                                                                   ELCRTMPD
+01172  1300-METHOD-3.                                                   ELCRTMPD
+01173                                                                   ELCRTMPD
+01174 ****************************************************************  ELCRTMPD
+01175 *                                                              *  ELCRTMPD
+01176 *  ORIGINAL                                                    *  ELCRTMPD
+01177 *                       FIRST DAY METHOD                       *  ELCRTMPD
+01178 *                  PREMIUM EARNS ON FIRST DAY                  *  ELCRTMPD
+01179 *                                                              *  ELCRTMPD
+01180 ****************************************************************  ELCRTMPD
+01181                                                                   ELCRTMPD
+01182      IF DC-ODD-DAYS-OVER GREATER THAN +0  OR                      ELCRTMPD
+01183         DC-ELAPSED-MONTHS GREATER THAN +0                         ELCRTMPD
+01184          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01185                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+01186                                                                   ELCRTMPD
+01187      GO TO 1999-END-CERT-DATE-PROCESSING.                         ELCRTMPD
+01188                                                                   ELCRTMPD
+01189  1400-METHOD-4.                                                   ELCRTMPD
+01190                                                                   ELCRTMPD
+01191 ****************************************************************  ELCRTMPD
+01192 *                                                              *  ELCRTMPD
+01193 *  ORIGINAL                                                    *  ELCRTMPD
+01194 *                       FULL MONTH METHOD                      *  ELCRTMPD
+01195 *          PREMIUM EARNS ON FULL MONTH - SAME AS BENEFIT       *  ELCRTMPD
+01196 *                                                              *  ELCRTMPD
+01197 ****************************************************************  ELCRTMPD
+01198                                                                   ELCRTMPD
+01199                                                                   ELCRTMPD
+01200 *    WILL NOT REDUCE REMAINING TERM ON 'FULL' MONTH UNTIL         ELCRTMPD
+01201 *        PAST THE FIRST PAYMENT DATE.                             ELCRTMPD
+01202                                                                   ELCRTMPD
+01203      GO TO 1999-END-CERT-DATE-PROCESSING.                         ELCRTMPD
+01204                                                                   ELCRTMPD
+01205                                                                   ELCRTMPD
+01206  1500-METHOD-5.                                                   ELCRTMPD
+01207                                                                   ELCRTMPD
+01208 ****************************************************************  ELCRTMPD
+01209 *                                                              *  ELCRTMPD
+01210 *  ORIGINAL                                                    *  ELCRTMPD
+01211 *                       FULL MONTH - NO DAYS                   *  ELCRTMPD
+01212 *          PREMIUM EARNS A FULL MONTH STARTING THE FIRST MONTH *  ELCRTMPD
+01213 *       (THIS METHOD WILL EARN WITHOUT A FLUCTUATION IN SHORT  *  ELCRTMPD
+01214 *        MONTHS )                                              *  ELCRTMPD
+01215 ****************************************************************  ELCRTMPD
+01216                                                                   ELCRTMPD
+01217                                                                   ELCRTMPD
+01218      COMPUTE CP-REMAINING-TERM-1 =                                ELCRTMPD
+01219                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+01220                                                                   ELCRTMPD
+01221      GO TO 1999-END-CERT-DATE-PROCESSING.                         ELCRTMPD
+01222                                                                   ELCRTMPD
+01223  1600-METHOD-6.                                                   ELCRTMPD
+01224                                                                   ELCRTMPD
+01225 ****************************************************************  ELCRTMPD
+01226 *                                                              *  ELCRTMPD
+01227 *  ORIGINAL                                                    *  ELCRTMPD
+01228 *                       NUMBER OF DAYS                         *  ELCRTMPD
+01229 *         POLICY MUST BE INFORCE FOR 14 DAYS TO EARN A MONTH   *  ELCRTMPD
+01230 *                                                              *  ELCRTMPD
+01231 ****************************************************************  ELCRTMPD
+01232                                                                   ELCRTMPD
+01233                                                                   ELCRTMPD
+01234      IF DC-ODD-DAYS-OVER GREATER THAN +14  OR                     ELCRTMPD
+01235         DC-ELAPSED-MONTHS GREATER THAN +0                         ELCRTMPD
+01236          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01237                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+01238                                                                   ELCRTMPD
+01239                                                                   ELCRTMPD
+01240      GO TO 1999-END-CERT-DATE-PROCESSING.                         ELCRTMPD
+01241                                                                   ELCRTMPD
+01242  1700-METHOD-7.                                                   ELCRTMPD
+01243                                                                   ELCRTMPD
+01244 ****************************************************************  ELCRTMPD
+01245 *                                                              *  ELCRTMPD
+01246 *  ORIGINAL                                                    *  ELCRTMPD
+01247 *                       NUMBER OF DAYS                         *  ELCRTMPD
+01248 *         POLICY MUST BE INFORCE FOR 16 DAYS TO EARN A MONTH   *  ELCRTMPD
+01249 *                                                              *  ELCRTMPD
+01250 ****************************************************************  ELCRTMPD
+01251                                                                   ELCRTMPD
+01252                                                                   ELCRTMPD
+01253      IF DC-ODD-DAYS-OVER GREATER THAN +16  OR                     ELCRTMPD
+01254         DC-ELAPSED-MONTHS GREATER THAN +0                         ELCRTMPD
+01255          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01256                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+01257                                                                   ELCRTMPD
+01258                                                                   ELCRTMPD
+01259      GO TO 1999-END-CERT-DATE-PROCESSING.                         ELCRTMPD
+01260                                                                   ELCRTMPD
+01261                                                                   ELCRTMPD
+01262                                                                   ELCRTMPD
+01263  1999-END-CERT-DATE-PROCESSING.                                   ELCRTMPD
+01264                                                                   ELCRTMPD
+01265      IF CP-REMAINING-TERM-1 NEGATIVE                              ELCRTMPD
+01266         MOVE ZERO                TO CP-REMAINING-TERM-1           ELCRTMPD
+01267                                     CP-REMAINING-TERM-2           ELCRTMPD
+01268                                     CP-REMAINING-TERM-3           ELCRTMPD
+01269         GO TO 9999-RT-REMAINING-TERM-XIT.                         ELCRTMPD
+01270                                                                   ELCRTMPD
+01271      MOVE DC-ODD-DAYS-OVER       TO CP-ODD-DAYS.                  ELCRTMPD
+01272                                                                   ELCRTMPD
+01273      IF CP-EARN-AS-REG-BALLOON                                    ELCRTMPD
+01274         IF CP-BALLOON-LAST-PMT                                    ELCRTMPD
+01275            ADD +1 TO CP-REMAINING-TERM-3.                         ELCRTMPD
+01276                                                                   ELCRTMPD
+01277      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01278                                                                   ELCRTMPD
+01279                                                                      CL**5
+01280 ****************************************************************  ELCRTMPD
+01281 *                                                              *  ELCRTMPD
+01282 *  ORIGINAL                                                    *  ELCRTMPD
+01283 *  PROCESSING FOR VALUATION DATE ON OR AFTER 1ST PAYMENT DATE  *  ELCRTMPD
+01284 *                                                              *  ELCRTMPD
+01285 ****************************************************************  ELCRTMPD
+01286                                                                   ELCRTMPD
+01287                                                                   ELCRTMPD
+01288  2000-PROCESS-WITH-1ST-PMT-DATE.                                  ELCRTMPD
+01289                                                                   ELCRTMPD
+01290      MOVE CP-FIRST-PAY-DATE      TO DC-BIN-DATE-1                 ELCRTMPD
+01291      COMPUTE DC-ELAPSED-MONTHS EQUAL                              ELCRTMPD
+01292          (CP-ORIGINAL-TERM - +1)                                  ELCRTMPD
+01293      MOVE ZEROS                  TO DC-ELAPSED-DAYS               ELCRTMPD
+01294      MOVE '6'                    TO DC-OPTION-CODE                ELCRTMPD
+01295      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT                     ELCRTMPD
+01296                                                                   ELCRTMPD
+01297      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+01298         MOVE '2' TO CP-RETURN-CODE                                ELCRTMPD
+01299         GO TO 9999-RT-REMAINING-TERM-XIT                          ELCRTMPD
+01300      ELSE                                                         ELCRTMPD
+01301      IF DC-BIN-DATE-2 LESS THAN CP-VALUATION-DT                   ELCRTMPD
+01302         MOVE ZEROS TO CP-REMAINING-TERM-1                         ELCRTMPD
+01303                       CP-REMAINING-TERM-2                         ELCRTMPD
+01304                       CP-REMAINING-TERM-3                         ELCRTMPD
+01305         GO TO 9999-RT-REMAINING-TERM-XIT.                         ELCRTMPD
+01306                                                                   ELCRTMPD
+01307      MOVE CP-CERT-EFF-DT         TO DC-BIN-DATE-1.                ELCRTMPD
+01308      MOVE CP-FIRST-PAY-DATE      TO DC-BIN-DATE-2.                ELCRTMPD
+01309      MOVE '1'                    TO DC-OPTION-CODE.               ELCRTMPD
+01310      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT.                    ELCRTMPD
+01311      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+01312          MOVE '2' TO CP-RETURN-CODE                               ELCRTMPD
+01313          GO TO 9999-RT-REMAINING-TERM-XIT.                        ELCRTMPD
+01314                                                                   ELCRTMPD
+01315      MOVE ZERO                   TO MONTHS-EARNED.                ELCRTMPD
+01316                                                                   ELCRTMPD
+01317      IF DC-ELAPSED-MONTHS GREATER THAN +0  OR                     ELCRTMPD
+01318         CP-EARN-WITH-NO-DAYS OR                                   ELCRTMPD
+01319         CP-EARN-ON-FULL-MONTH                                     ELCRTMPD
+01320          MOVE 1                  TO MONTHS-EARNED                 ELCRTMPD
+01321          GO TO 2050-1ST-PAY-TO-VALUATION-DATE.                    ELCRTMPD
+01322                                                                   ELCRTMPD
+01323      IF CP-EARN-ON-1ST-DAY                                        ELCRTMPD
+01324          IF DC-ODD-DAYS-OVER GREATER THAN +0                      ELCRTMPD
+01325              MOVE 1              TO MONTHS-EARNED                 ELCRTMPD
+01326              GO TO 2050-1ST-PAY-TO-VALUATION-DATE.                ELCRTMPD
+01327                                                                   ELCRTMPD
+01328      IF CP-EARN-AFTER-15TH                                        ELCRTMPD
+01329          IF DC-ODD-DAYS-OVER GREATER THAN +15                     ELCRTMPD
+01330              MOVE 1              TO MONTHS-EARNED                 ELCRTMPD
+01331              GO TO 2050-1ST-PAY-TO-VALUATION-DATE.                ELCRTMPD
+01332                                                                   ELCRTMPD
+01333      IF CP-EARN-AFTER-14TH                                        ELCRTMPD
+01334          IF DC-ODD-DAYS-OVER GREATER THAN +14                     ELCRTMPD
+01335              MOVE 1              TO MONTHS-EARNED                 ELCRTMPD
+01336              GO TO 2050-1ST-PAY-TO-VALUATION-DATE.                ELCRTMPD
+01337                                                                   ELCRTMPD
+01338      IF CP-EARN-AFTER-16TH                                        ELCRTMPD
+01339          IF DC-ODD-DAYS-OVER GREATER THAN +16                     ELCRTMPD
+01340              MOVE 1              TO MONTHS-EARNED.                ELCRTMPD
+01341                                                                   ELCRTMPD
+01342  2050-1ST-PAY-TO-VALUATION-DATE.                                  ELCRTMPD
+01343                                                                   ELCRTMPD
+01344      MOVE CP-FIRST-PAY-DATE      TO DC-BIN-DATE-1.                ELCRTMPD
+01345      MOVE CP-VALUATION-DT        TO DC-BIN-DATE-2.                ELCRTMPD
+01346      MOVE '1'                    TO DC-OPTION-CODE.               ELCRTMPD
+01347      PERFORM 8000-DATE-CONVERT THRU 8000-EXIT.                    ELCRTMPD
+01348      IF DATE-CONVERSION-ERROR                                     ELCRTMPD
+01349          MOVE '2' TO CP-RETURN-CODE                               ELCRTMPD
+01350          GO TO 9999-RT-REMAINING-TERM-XIT.                        ELCRTMPD
+01351                                                                   ELCRTMPD
+01352      COMPUTE CP-REMAINING-TERM-1 = CP-ORIGINAL-TERM -             ELCRTMPD
+01353                               (DC-ELAPSED-MONTHS + MONTHS-EARNED).ELCRTMPD
+01354                                                                   ELCRTMPD
+01355      MOVE DC-ODD-DAYS-OVER       TO CP-ODD-DAYS.                  ELCRTMPD
+01356                                                                   ELCRTMPD
+01357      IF CP-REMAINING-TERM-1 NEGATIVE                              ELCRTMPD
+01358         MOVE ZERO                TO CP-REMAINING-TERM-1           ELCRTMPD
+01359                                     CP-REMAINING-TERM-2           ELCRTMPD
+01360                                     CP-REMAINING-TERM-3           ELCRTMPD
+01361                                     CP-ODD-DAYS                   ELCRTMPD
+01362         GO TO 9999-RT-REMAINING-TERM-XIT.                         ELCRTMPD
+01363                                                                   ELCRTMPD
+01364      MOVE CP-REMAINING-TERM-1    TO CP-REMAINING-TERM-2           ELCRTMPD
+01365                                     CP-REMAINING-TERM-3.          ELCRTMPD
+01366                                                                   ELCRTMPD
+01367      IF CP-EARN-AS-REG-BALLOON                                    ELCRTMPD
+01368         IF CP-BALLOON-LAST-PMT                                    ELCRTMPD
+01369            ADD +1 TO CP-REMAINING-TERM-3.                         ELCRTMPD
+01370                                                                   ELCRTMPD
+01371      IF CP-EARN-AFTER-15TH                                        ELCRTMPD
+01372         GO TO 2100-METHOD-1.                                      ELCRTMPD
+01373      IF CP-EARN-ON-HALF-MONTH                                     ELCRTMPD
+01374         GO TO 2200-METHOD-2.                                      ELCRTMPD
+01375      IF CP-EARN-ON-1ST-DAY                                        ELCRTMPD
+01376         GO TO 2300-METHOD-3.                                      ELCRTMPD
+01377      IF CP-EARN-ON-FULL-MONTH                                     ELCRTMPD
+01378         GO TO 2400-METHOD-4.                                      ELCRTMPD
+01379      IF CP-EARN-WITH-NO-DAYS                                      ELCRTMPD
+01380         GO TO 2500-METHOD-5.                                      ELCRTMPD
+01381                                                                   ELCRTMPD
+01382      IF CP-EARN-AFTER-14TH                                        ELCRTMPD
+01383         GO TO 2600-METHOD-6.                                      ELCRTMPD
+01384      IF CP-EARN-AFTER-16TH                                        ELCRTMPD
+01385         GO TO 2700-METHOD-7.                                      ELCRTMPD
+01386                                                                   ELCRTMPD
+01387      MOVE '3' TO CP-RETURN-CODE                                   ELCRTMPD
+01388      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01389                                                                   ELCRTMPD
+01390  2100-METHOD-1.                                                   ELCRTMPD
+01391                                                                   ELCRTMPD
+01392 ****************************************************************  ELCRTMPD
+01393 *  ORIGINAL                                                    *  ELCRTMPD
+01394 *                                                              *  ELCRTMPD
+01395 *                       NUMBER OF DAYS                         *  ELCRTMPD
+01396 *         POLICY MUST BE INFORCE FOR 15 DAYS TO EARN A MONTH   *  ELCRTMPD
+01397 *                                                              *  ELCRTMPD
+01398 ****************************************************************  ELCRTMPD
+01399                                                                   ELCRTMPD
+01400                                                                   ELCRTMPD
+01401      IF DC-ODD-DAYS-OVER GREATER THAN +15                         ELCRTMPD
+01402          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01403                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+01404                                                                   ELCRTMPD
+01405      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01406                                                                   ELCRTMPD
+01407                                                                   ELCRTMPD
+01408  2200-METHOD-2.                                                   ELCRTMPD
+01409                                                                   ELCRTMPD
+01410 ****************************************************************  ELCRTMPD
+01411 *                                                              *  ELCRTMPD
+01412 *  ORIGINAL                                                    *  ELCRTMPD
+01413 *                       HALF MONTH ADJUSTMENT                  *  ELCRTMPD
+01414 *            PREMIUM EARNS ON 1/2 MONTH MORE ASSUMPTION        *  ELCRTMPD
+01415 *                                                              *  ELCRTMPD
+01416 ****************************************************************  ELCRTMPD
+01417                                                                   ELCRTMPD
+01418      IF CP-REMAINING-TERM-1 NOT = ZERO                            ELCRTMPD
+01419          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01420                              CP-REMAINING-TERM-1 - (+.5).         ELCRTMPD
+01421                                                                   ELCRTMPD
+01422      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01423                                                                   ELCRTMPD
+01424 *     NO ADJUSTMENT TO CP-REMAINING-TERM-3 FOR DAYS - TYPE 2.     ELCRTMPD
+01425                                                                   ELCRTMPD
+01426                                                                   ELCRTMPD
+01427  2300-METHOD-3.                                                   ELCRTMPD
+01428                                                                   ELCRTMPD
+01429 ****************************************************************  ELCRTMPD
+01430 *                                                              *  ELCRTMPD
+01431 *  ORIGINAL                                                    *  ELCRTMPD
+01432 *                       FIRST DAY METHOD                       *  ELCRTMPD
+01433 *                  PREMIUM EARNS ON FIRST DAY                  *  ELCRTMPD
+01434 *                                                              *  ELCRTMPD
+01435 ****************************************************************  ELCRTMPD
+01436                                                                   ELCRTMPD
+01437      IF DC-ODD-DAYS-OVER GREATER THAN +0                          ELCRTMPD
+01438          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01439                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+01440                                                                   ELCRTMPD
+01441      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01442                                                                   ELCRTMPD
+01443                                                                   ELCRTMPD
+01444  2400-METHOD-4.                                                   ELCRTMPD
+01445                                                                   ELCRTMPD
+01446 ****************************************************************  ELCRTMPD
+01447 *                                                              *  ELCRTMPD
+01448 *  ORIGINAL                                                    *  ELCRTMPD
+01449 *                       FULL MONTH METHOD                      *  ELCRTMPD
+01450 *          PREMIUM EARNS ON FULL MONTH - SAME AS BENEFIT       *  ELCRTMPD
+01451 *                                                              *  ELCRTMPD
+01452 ****************************************************************  ELCRTMPD
+01453                                                                   ELCRTMPD
+01454 *  NO ADJUSTMENT FOR CP-REMAINING-TERM-1 - TYPE 4.                ELCRTMPD
+01455                                                                   ELCRTMPD
+01456                                                                   ELCRTMPD
+01457      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01458                                                                   ELCRTMPD
+01459                                                                   ELCRTMPD
+01460  2500-METHOD-5.                                                   ELCRTMPD
+01461                                                                   ELCRTMPD
+01462 ****************************************************************  ELCRTMPD
+01463 *                                                              *  ELCRTMPD
+01464 *  ORIGINAL                                                    *  ELCRTMPD
+01465 *                       FULL MONTH - NO DAYS                   *  ELCRTMPD
+01466 *          PREMIUM EARNS A FULL MONTH STARTING THE FIRST MONTH *  ELCRTMPD
+01467 *       (THIS METHOD WILL EARN WITHOUT A FLUCTUATION IN SHORT  *  ELCRTMPD
+01468 *        MONTHS )                                              *  ELCRTMPD
+01469 ****************************************************************  ELCRTMPD
+01470                                                                   ELCRTMPD
+01471                                                                   ELCRTMPD
+01472      IF CP-REMAINING-TERM-1 NOT = ZERO                            ELCRTMPD
+01473          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01474                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+01475                                                                   ELCRTMPD
+01476      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01477                                                                   ELCRTMPD
+01478  2600-METHOD-6.                                                   ELCRTMPD
+01479                                                                   ELCRTMPD
+01480 ****************************************************************  ELCRTMPD
+01481 *  ORIGINAL                                                    *  ELCRTMPD
+01482 *                                                              *  ELCRTMPD
+01483 *                       NUMBER OF DAYS                         *  ELCRTMPD
+01484 *         POLICY MUST BE INFORCE FOR 14 DAYS TO EARN A MONTH   *  ELCRTMPD
+01485 *                                                              *  ELCRTMPD
+01486 ****************************************************************  ELCRTMPD
+01487                                                                   ELCRTMPD
+01488                                                                   ELCRTMPD
+01489      IF DC-ODD-DAYS-OVER GREATER THAN +14                         ELCRTMPD
+01490          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01491                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+01492                                                                   ELCRTMPD
+01493      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01494                                                                   ELCRTMPD
+01495  2700-METHOD-7.                                                   ELCRTMPD
+01496                                                                   ELCRTMPD
+01497 ****************************************************************  ELCRTMPD
+01498 *  ORIGINAL                                                    *  ELCRTMPD
+01499 *                                                              *  ELCRTMPD
+01500 *                       NUMBER OF DAYS                         *  ELCRTMPD
+01501 *         POLICY MUST BE INFORCE FOR 16 DAYS TO EARN A MONTH   *  ELCRTMPD
+01502 *                                                              *  ELCRTMPD
+01503 ****************************************************************  ELCRTMPD
+01504                                                                   ELCRTMPD
+01505                                                                   ELCRTMPD
+01506      IF DC-ODD-DAYS-OVER GREATER THAN +16                         ELCRTMPD
+01507          COMPUTE CP-REMAINING-TERM-1 =                            ELCRTMPD
+01508                              CP-REMAINING-TERM-1 - (+1).          ELCRTMPD
+01509                                                                   ELCRTMPD
+01510      GO TO 9999-RT-REMAINING-TERM-XIT.                            ELCRTMPD
+01511                                                                   ELCRTMPD
+01512                                                                   ELCRTMPD
+01513 ******************************************************************ELCRTMPD

@@ -1,0 +1,566 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CIB001
+       AUTHOR.     PABLO.
+       DATE-COMPILED.
+
+      *REMARKS.
+      *        This program sorts the report output of report el562
+      *        into car, grp, fin resp and account sequence. next
+      *        sort the account summary in the same sequence. next,
+      *        the program merges them together appending the account
+      *        summary report to the billing statements. during the
+      *        process, we eliminate the page number on the 3rd
+      *        heading line.
+      *        
+      
+100808******************************************************************
+100808*                   C H A N G E   L O G
+100808*
+100808* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+100808*-----------------------------------------------------------------
+100808*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+100808* EFFECTIVE    NUMBER
+100808*-----------------------------------------------------------------
+100808* 100808  CR2007100800003  PEMA  NEW PROGRAM
+101613* 101613  CR2013090300001  AJRA  ADD BLANK ACCT SUMMARY
+100808******************************************************************
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+                                                                        
+
+           SELECT BILLING-STATEMENTS   ASSIGN TO SYS010.
+
+           SELECT SRTD-BILL-STMTS      ASSIGN TO SYS016.
+
+           SELECT DISK-DATE            ASSIGN TO SYS019.
+
+           SELECT ACCOUNT-SUMMARY      ASSIGN TO SYS011.
+
+           SELECT SRTD-ACCT-SUMM       ASSIGN TO SYS017.
+
+           SELECT STMTS-OUT            ASSIGN TO SYS012.
+
+           SELECT SORT-FILE            ASSIGN TO SORTWK1.
+
+           SELECT SORT-FILE2           ASSIGN TO SORTWK2.
+
+       DATA DIVISION.                                                   
+
+       FILE SECTION.                                                    
+                                                                        
+       FD  BILLING-STATEMENTS                                           
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  STMT-RECORD                 PIC X(133).
+
+       FD  DISK-DATE                                                    
+                                       COPY ELCDTEFD.
+                                                                        
+       FD  ACCOUNT-SUMMARY
+           LABEL RECORDS ARE STANDARD
+           RECORDING MODE IS F
+           BLOCK CONTAINS 0 RECORDS.
+       01  ACCT-SUMM-REC               PIC X(133).
+
+       FD  STMTS-OUT  
+           LABEL RECORDS ARE STANDARD
+           RECORDING MODE IS F
+           BLOCK CONTAINS 0 RECORDS.
+       01  STMTS-OUT-REC               PIC X(133).
+                                                                        
+       FD  SRTD-BILL-STMTS
+           LABEL RECORDS ARE STANDARD
+           RECORDING MODE IS F
+           BLOCK CONTAINS 0 RECORDS.
+
+       01  SRTD-BILL-REC.
+           05  SBR-KEY                 PIC X(38).
+           05  SBR-RECORD              PIC X(133).
+
+       FD  SRTD-ACCT-SUMM
+           LABEL RECORDS ARE STANDARD
+           RECORDING MODE IS F
+           BLOCK CONTAINS 0 RECORDS.
+
+       01  SRTD-ACCT-REC.
+           05  SAR-KEY                 PIC X(38).
+           05  SAR-RECORD              PIC X(133).
+
+       SD  SORT-FILE.
+
+       01  SORTWORK.                       
+           05  SR-SORT-KEY.
+               10  SR-CARRIER          PIC X.
+               10  SR-GROUPING         PIC X(6).
+               10  SR-RESP-NO          PIC X(10).
+               10  SR-ACCT-NO          PIC X(10).
+               10  SR-SEQ-NO           PIC 9(11).
+           05  SR-REPORT               PIC X(133).
+
+       SD  SORT-FILE2.
+
+       01  SORTWORK2.                      
+           05  SR2-SORT-KEY.
+               10  SR2-CARRIER          PIC X.
+               10  SR2-GROUPING         PIC X(6).
+               10  SR2-RESP-NO          PIC X(10).
+               10  SR2-ACCT-NO          PIC X(10).
+               10  SR2-SEQ-NO           PIC 9(11).
+           05  SR2-REPORT               PIC X(133).
+
+       WORKING-STORAGE SECTION.                                         
+       copy "ctypes.cpy".
+
+       77  WS-HEADING-SW               PIC X   VALUE SPACES.
+           88  WS-HEADING                  VALUE 'Y'.
+       77  WS-NEW-ACCT-SW              PIC X   VALUE SPACES.
+           88  WS-NEW-ACCT                 VALUE 'Y'.
+       77  WS-EOF-SW                   PIC X   VALUE SPACES.
+           88  END-OF-INPUT                VALUE 'Y'.
+       77  WS-STMT-SW                  PIC X   VALUE SPACES.
+           88  END-OF-STMTS                VALUE 'Y'.
+       77  WS-SUMM-SW                  PIC X   VALUE SPACES.
+           88  END-OF-SUMM                 VALUE 'Y'.
+       77  s1-IN-CNT                   PIC 9(7)  VALUE ZEROS.
+       77  s1-rel-cnt                  pic 9(7)  value zeros.
+       77  s1-ret-cnt                  pic 9(7)  value zeros.
+       77  s2-IN-CNT                   PIC 9(7)  VALUE ZEROS.
+       77  s2-rel-cnt                  pic 9(7)  value zeros.
+       77  s2-ret-cnt                  pic 9(7)  value zeros.
+       77  stmts-OUT-CNT               PIC 9(7)  VALUE ZEROS.
+       77  A1                          PIC S999  VALUE +0 COMP-3.
+       77  WS-PREV-STMT-KEY            PIC X(27) VALUE SPACES.
+       77  WS-PREV-SUMM-KEY            PIC X(27) VALUE SPACES.
+       01  WS-MISC.
+           05  WS-HOLD-HEAD  OCCURS 4  PIC X(133).
+
+       01  ws-stmt-key.
+           05  ws-sk-carrier           pic x.
+           05  ws-sk-grouping          pic x(6).
+           05  ws-sk-resp-no           pic x(10).
+           05  ws-sk-acct-no           pic x(10).
+           05  ws-sk-seq-no            pic 9(11)  value zeros.
+       01  FILLER.
+           05  WS-RETURN-CODE          PIC S9(4)  COMP  VALUE ZEROS.    
+           05  WS-ZERO                 PIC S9     VALUE +0  COMP-3.
+           05  WS-ABEND-MESSAGE        PIC X(80)  VALUE SPACES.         
+           05  WS-ABEND-FILE-STATUS    PIC XX     VALUE ZEROS.          
+           05  PGM-SUB             PIC S999   COMP-3  VALUE +061.   
+           05  WS-HDG  OCCURS 4 TIMES PIC X(133).                       
+101613     05  WRK-RUN-DATE.
+101613         10  WRK-RUN-MM          PIC X(2).
+101613         10  FILLER              PIC X  VALUE '/'.
+101613         10  WRK-RUN-DD          PIC X(2).
+101613         10  FILLER              PIC X  VALUE '/'.
+101613         10  WRK-RUN-YYYY        PIC X(4).
+
+                                       COPY ELCDATE.
+                                       COPY ELCDTECX.
+                                       COPY ELCDTEVR.
+101613                                 COPY ECSDMSUM.
+
+       PROCEDURE DIVISION.
+
+                                       COPY ELCDTERX.
+
+           PERFORM 0010-OPEN-FILES     THRU 0010-EXIT
+
+           SORT SORT-FILE ASCENDING  SR-SORT-KEY
+              INPUT PROCEDURE
+                 0100-SORT-BILL-STMTS  THRU 0100-EXIT
+              GIVING SRTD-BILL-STMTS
+
+           IF SORT-RETURN NOT = ZEROS
+              DISPLAY ' SORT 01 ABENDED '
+              MOVE '0101'              TO WS-RETURN-CODE
+              GO TO ABEND-PGM
+           END-IF
+
+           CLOSE BILLING-STATEMENTS
+           display ' end of sort one ' s1-in-cnt ' ' s1-rel-cnt                                                             
+
+           MOVE ' '                    TO WS-EOF-SW
+           MOVE ZEROS                  TO WS-SK-SEQ-NO
+
+           SORT SORT-FILE2 ASCENDING  SR2-SORT-KEY
+              INPUT PROCEDURE
+                 0200-SORT-ACCT-SUMM   THRU 0200-EXIT
+              GIVING SRTD-ACCT-SUMM 
+                                                             
+           IF SORT-RETURN NOT = ZEROS
+              DISPLAY ' SORT 02 ABENDED '
+              MOVE '0101'              TO WS-RETURN-CODE
+              GO TO ABEND-PGM
+           END-IF
+
+           CLOSE account-summary
+           display ' end of sort two ' s2-in-cnt ' ' s2-rel-cnt                                                             
+
+           perform 0310-open-files     thru 0310-exit
+           perform 0320-init           thru 0320-exit
+           perform 0350-process-matches thru 0350-exit until
+              end-of-stmts and end-of-summ
+           perform 0400-close-files    thru 0400-exit
+
+           display ' stmts in          ' s1-in-cnt
+           display ' stmts released    ' s1-rel-cnt
+           display ' stmts returned    ' s1-ret-cnt
+           display ' summ  in          ' s2-in-cnt
+           display ' summ  released    ' s2-rel-cnt
+           display ' summ  returned    ' s2-ret-cnt
+           display ' statments out     ' stmts-OUT-CNT
+
+           goback
+
+           .
+       0010-OPEN-FILES.
+
+           OPEN INPUT BILLING-STATEMENTS account-summary
+
+           .
+       0010-EXIT.
+           EXIT.
+
+       0100-SORT-BILL-STMTS.
+
+           PERFORM 0140-READ-INPUT     THRU 0140-EXIT
+           PERFORM 0105-PROCESS-STMTS  THRU 0105-EXIT UNTIL
+              END-OF-INPUT
+
+           .
+       0100-EXIT.
+           EXIT.
+
+       0105-PROCESS-STMTS.
+
+           IF STMT-RECORD (1:1) = '1'
+              PERFORM 0110-PROCESS-HEAD THRU 0110-EXIT
+           end-if
+
+           add 1                       to ws-sk-seq-no
+           move ws-stmt-key            to sr-sort-key
+           move stmt-record            to sr-report
+           perform 0120-release        thru 0120-exit
+
+           PERFORM 0140-READ-INPUT     THRU 0140-EXIT
+
+           .
+       0105-EXIT.
+           EXIT.
+
+       0110-PROCESS-HEAD.
+
+           perform varying a1 from +1 by +1 until a1 > +4
+              move stmt-record         to ws-hdg (a1)
+              PERFORM 0140-READ-INPUT  THRU 0140-EXIT
+           end-perform
+
+           move ws-hdg (4) (16:1)      to ws-sk-carrier
+           move ws-hdg (4)  (17:6)     to ws-sk-grouping
+           move ws-hdg (4)  (24:10)    to ws-sk-resp-no
+           move ws-hdg (4)  (90:10)    to ws-sk-acct-no
+           if ws-sk-acct-no = spaces
+              move ws-sk-resp-no       to ws-sk-acct-no
+           end-if
+           if ws-stmt-key (1:17) = spaces
+              display ' found overall recap '
+              move '99999999999999999999999999900000000000'
+                                       to ws-stmt-key
+           end-if
+           perform varying a1 from +1 by +1 until a1 > +4
+              add 1                    to ws-sk-seq-no
+              move ws-stmt-key         to sr-sort-key
+              move ws-hdg (a1)         to sr-report
+              perform 0120-release     thru 0120-exit
+           end-perform
+
+           .
+       0110-EXIT.
+           EXIT.
+
+       0120-release.
+
+           release sortwork
+           add 1                       to s1-rel-cnt
+
+           .
+       0120-exit.
+           exit.
+
+       0140-READ-INPUT.
+
+           READ BILLING-STATEMENTS AT END
+              SET END-OF-INPUT         TO TRUE
+           END-READ
+
+           IF NOT END-OF-INPUT
+              ADD 1                    TO s1-IN-CNT
+           END-IF
+
+           .
+       0140-EXIT.
+           EXIT.
+
+       0200-SORT-ACCT-SUMM.
+
+           PERFORM 0240-READ-INPUT     THRU 0240-EXIT
+           PERFORM 0205-PROCESS-SUMM   THRU 0205-EXIT UNTIL
+              END-OF-INPUT
+
+           .
+       0200-EXIT.
+           EXIT.
+
+       0205-PROCESS-SUMM.
+
+           IF ACCT-SUMM-REC (1:1) = '1'
+              PERFORM 0210-PROCESS-HEAD THRU 0210-EXIT
+           end-if
+
+           add 1                       to ws-sk-seq-no
+           move ws-stmt-key            to sr2-sort-key
+           move acct-summ-rec          to sr2-report
+           perform 0220-release        thru 0220-exit
+
+           PERFORM 0240-READ-INPUT     THRU 0240-EXIT
+
+           .
+       0205-EXIT.
+           EXIT.
+
+       0220-release.
+
+           release sortwork2
+           add 1                       to s2-rel-cnt
+
+           .
+       0220-exit.
+           exit.
+
+       0210-PROCESS-HEAD.
+
+           perform varying a1 from +1 by +1 until a1 > +4
+              move acct-summ-rec          to ws-hdg (a1)
+              PERFORM 0240-READ-INPUT     THRU 0240-EXIT
+           end-perform
+
+           move spaces                 to ws-hdg (3) (121:12)
+           move ws-hdg (4) (16:1)      to ws-sk-carrier
+           move ws-hdg (4)  (17:6)     to ws-sk-grouping
+           move ws-hdg (4)  (24:10)    to ws-sk-resp-no
+           move ws-hdg (4)  (90:10)    to ws-sk-acct-no
+
+           if ws-sk-acct-no = spaces
+              move ws-sk-resp-no       to ws-sk-acct-no
+           end-if
+
+           perform varying a1 from +1 by +1 until a1 > +4
+              add 1                    to ws-sk-seq-no
+              move ws-stmt-key         to sr2-sort-key
+              move ws-hdg (a1)         to sr2-report
+              perform 0220-release     thru 0220-exit
+           end-perform
+
+           .
+       0210-EXIT.
+           EXIT.
+
+       0240-READ-INPUT.
+
+           READ ACCOUNT-SUMMARY AT END
+              SET END-OF-INPUT         TO TRUE
+           END-READ
+
+           IF NOT END-OF-INPUT
+              ADD 1                    TO s2-IN-CNT
+           END-IF
+
+           .
+       0240-EXIT.
+           EXIT.
+
+       0310-OPEN-FILES.
+
+           OPEN INPUT SRTD-BILL-STMTS SRTD-ACCT-SUMM
+               output STMTS-OUT
+
+           .
+       0310-EXIT.
+           EXIT.
+
+       0320-INIT.
+
+           PERFORM 0360-READ-STMTS     THRU 0360-EXIT
+           move sbr-key (1:27)         to ws-prev-stmt-key
+           PERFORM 0365-READ-SUMM      THRU 0365-EXIT
+           move sar-key (1:27)         to ws-prev-summ-key
+101613
+101613     MOVE RUN-MO       TO WRK-RUN-MM.
+101613     MOVE RUN-DA       TO WRK-RUN-DD.
+101613     MOVE RUN-CCYY     TO WRK-RUN-YYYY.
+101613     MOVE WRK-RUN-DATE TO DUM-SUM-LN2-RUN-DT
+101613                          DUM-SUM-LN3-DT.
+
+           .                                                            
+       0320-EXIT.                                                       
+           EXIT.                                                        
+
+       0350-PROCESS-MATCHES.
+
+           if sbr-key (1:27) = sar-key (1:27)
+              perform 0370-process-eq  thru 0370-exit
+              move sbr-key (1:27)      to ws-prev-stmt-key
+           else
+              if sbr-key (1:27) > sar-key (1:27)
+                 perform 0375-process-gt thru 0375-exit
+                 move sar-key (1:27)   to ws-prev-summ-key
+              else
+                 perform 0380-process-lt thru 0380-exit
+                 move sbr-key (1:27)   to ws-prev-stmt-key
+              end-if
+           end-if
+
+           .
+       0350-EXIT.
+           EXIT.
+
+       0360-READ-STMTS.
+
+           READ SRTD-BILL-STMTS AT END
+              SET END-OF-STMTS         TO TRUE
+              move high-values         to sbr-key
+           END-READ
+
+           IF NOT END-OF-STMTS
+              ADD 1                    TO s1-RET-CNT
+           END-IF
+
+           .
+       0360-EXIT.
+           EXIT.
+
+       0365-READ-SUMM.
+
+           READ SRTD-ACCT-SUMM AT END
+              SET END-OF-SUMM          TO TRUE
+              move high-values         to sar-key
+           END-READ
+
+           IF NOT END-OF-SUMM 
+              ADD 1                    TO s2-RET-CNT
+           END-IF
+
+           .
+       0365-EXIT.
+           EXIT.
+
+       0370-process-eq.
+
+           perform until (sbr-key (1:27) > ws-prev-stmt-key)
+              or (end-of-stmts)
+              WRITE STMTS-OUT-REC      FROM SBR-RECORD
+              add 1 to stmts-OUT-CNT
+              PERFORM 0360-READ-STMTS  THRU 0360-EXIT
+           END-PERFORM
+
+           .
+       0370-exit.
+           exit.
+
+       0375-process-gt.
+
+           perform until (sar-key (1:27) > ws-prev-summ-key)
+              or (end-of-summ)
+              WRITE STMTS-OUT-REC      FROM SaR-RECORD
+              add 1 to stmts-OUT-CNT
+              PERFORM 0365-READ-summ   THRU 0365-EXIT
+           END-PERFORM
+
+           .
+       0375-exit.
+           exit.
+
+       0380-process-lt.
+
+           perform until (sbr-key (1:27) > ws-prev-stmt-key)
+              or (end-of-stmts)
+              WRITE STMTS-OUT-REC      FROM SBR-RECORD
+              add 1 to stmts-OUT-CNT
+              PERFORM 0360-READ-STMTS  THRU 0360-EXIT
+           END-PERFORM
+101613
+101613    IF WS-PREV-STMT-KEY = '999999999999999999999999999'
+101613        GO TO 0380-EXIT
+101613    END-IF
+101613
+101613*** NEED TO WRITE A DUMMY ACCOUNT SUMMARY PAGE
+101613
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE1
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE2
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE3
+101613    MOVE WS-PREV-STMT-KEY (1:7) TO DUM-SUM-LN4-CAR-GRP
+101613    MOVE WS-PREV-STMT-KEY (8:10) TO DUM-SUM-LN4-RESP
+101613    MOVE WS-PREV-STMT-KEY (18:10) TO DUM-SUM-LN4-ACCT
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE4
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE5
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE6
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE7
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE8
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE9
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-DASH
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE10-C
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-DASH
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE11
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE12-C
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE13-C
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE14
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE15
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-NO-TRAN-LINE
+101613    MOVE '-' TO DUM-SUM-BLANK-CC
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-BLANK-LINE
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-DASH
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE10-R
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-DASH
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE11
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE12-R
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE13-R
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE14
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-LINE15
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-NONE-LINE
+101613    MOVE ' ' TO DUM-SUM-BLANK-CC
+101613    PERFORM 24 TIMES
+101613        WRITE STMTS-OUT-REC FROM DUM-SUM-BLANK-LINE
+101613    END-PERFORM
+101613    WRITE STMTS-OUT-REC FROM DUM-SUM-FOOTER.
+
+      *    display ' should not have gotten to 0380 '
+      *    display ' stmt keys ' sbr-key ' ' ws-prev-stmt-key
+      *    display ' summ keys ' sar-key ' ' ws-prev-summ-key
+
+      *    goback.
+
+           .
+       0380-exit.
+           exit.
+
+       0400-CLOSE-FILES.
+
+           CLOSE  SRTD-BILL-STMTS SRTD-ACCT-SUMM STMTS-OUT 
+
+           .
+       0400-EXIT.
+           EXIT.
+
+       8500-DATE-CONVERT.
+
+           CALL 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+       8500-EXIT.
+           EXIT.
+
+       ABEND-PGM.
+                           COPY ELCABEND.
+                                                                        

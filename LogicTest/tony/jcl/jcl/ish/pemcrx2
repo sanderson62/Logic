@@ -1,0 +1,31 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+################################################################################
+LABEL name=PEMCRX2
+################################################################################
+
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.XX.CERT_00' disp='i-o' 
+#ASSGNDD ddname='SYS010' filename='$SEQFILES/DC.XX.CERT_00' disp='i-o' 
+ASSGNDD ddname='ERMAIL' type='VS' filename='ERMAIL'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.CERT.EXTRACT.WATCHDOG' disp='o' normal='k' abend='d' recsize='200' recfmt='F' 
+
+EXECPGM pgmname='PEMCRX2' stepname='PEMCRX2' parm='20110115'
+
+################################################################################
+LABEL name=FTPDOG
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < $JCLLIB/ftp-watchdog
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTPDOG' parm='SH'
+
+if ($JOBSTATUS == 0) then
+   "smtp -f slunikix -t pema,dwda -s 'WatchDog Extract Complete'"
+else
+  echo " Job aborted, print not released"
+endif
+
+ENDJOB 

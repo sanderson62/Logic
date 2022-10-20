@@ -1,0 +1,85 @@
+################################################################################
+#                                                                              #
+#                                                                              #
+#     JOB: flfrd50               Created     : 06/17/2021                      #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=DELETE 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR FNL CLAIMS 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  DELETE FN.DL.FX.FNLCLMS
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='DELETE' 
+
+################################################################################
+LABEL name=FNB164 
+################################################################################
+#  DATE MMDDYYYY 
+#  FROM CILGEXTR
+ASSGNDD ddname='SYS010' dataset='FL.WW.LG.DFTACT' filename='\${SEQFILES}/FL.WW.LG.DFTACT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/FL.DD.ER.DATECARD' disp='i-o' 
+
+#  DOWNLOAD
+ASSGNDD ddname='SYS011' dataset='FN.DL.FX.FNLCLMS' filename='\${SEQFILES}/FN.DL.FX.FNLCLMS' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='FNB164' stepname='FNB164' parm='10192022' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                     PRINT SUMMARY REPORT 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYS007' dataset='FN.DD.PRINT.DATA' member='FLFRD50' filename='\${SEQFILES}/FLFRD50' disp='i-o' 
+ASSGNDD ddname='SYS010' dataset='FN.DL.FX.FNLCLMS' filename='\${SEQFILES}/FN.DL.FX.FNLCLMS' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='FNLCLAIMS' 
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='FN.DD.PRINT.DATA' member='FLFRD50' filename='\${SEQFILES}/FLFRD50' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/FN.DL.FNLCLMS.FLFRD50' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID CLAIMS 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' dataset='FN.DL.FX.FNLCLMS' filename='\${SEQFILES}/FN.DL.FX.FNLCLMS' disp='i-o' normal='k' abend='k'
+#ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/inputfileq/FNLCLMS_08-22-02.DAT' disp='o' abend='d' normal='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/FNLCLMS_10-19-22.DAT' disp='o' abend='d' normal='k' recsize='250' recfmt='F'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+
+################################################################################
+
+ftp -n sdv-free02.cso.local < $JCLLIB/ftp-flfrd50
+
+################################################################################
+
+################################################################################
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################

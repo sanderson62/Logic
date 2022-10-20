@@ -1,0 +1,40 @@
+BEGINJOB mode='MVS' jobclass='Y'
+
+if ($EBMSYS != "cid1t") then
+   echo "Job aborting, not CID1T "
+   exit 1
+endif
+
+################################################################################
+LABEL name=DELFILES
+################################################################################
+#
+# This step deletes the indexed files in cid1t
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d ERARCH
+unikixbld -i -d ERARCT
+!
+EXECPGM pgmname='BPXBATCH' stepname='DELFILES' parm='SH'
+
+################################################################################
+LABEL name=BLDFILES
+################################################################################
+#
+# This step builds the indexed files from production backups
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t v -d ERARCH -s /data/seqfiles/CI.XX.LG.ERARCH.BKP_04
+unikixbld -t v -d ERARCT -s /data/seqfiles/CI.XX.LG.ERARCT.BKP_04
+!
+EXECPGM pgmname='BPXBATCH' stepname='BLDFILES' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+else
+   "smtp -f slunikix -t pema -s 'cid1t load aborted' -ml 'cid1t load aborted'"
+endif
+
+
+ENDJOB 

@@ -1,0 +1,444 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    CIDPYB2.
+       AUTHOR.        PABLO.
+       DATE-COMPILED.
+      *REMARKS.
+      
+      *   THIS PROGRAM READS AN EXTRACT FILE FROM A .NET APPLICATION
+      *   THAT GENERATES RECORDS APPROVED BY CPS THAT THE FREEDOM
+      *   SYSTEM WILL EVENTUALLY CUT CHECKS FROM.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT EXTR-IN      ASSIGN TO SYS010
+              ORGANIZATION IS LINE SEQUENTIAL.
+
+           SELECT ERPYAJ       ASSIGN TO ERPYAJ
+                               ACCESS IS DYNAMIC
+                               ORGANIZATION IS INDEXED
+                               FILE STATUS IS ERPYAJ-FILE-STATUS
+                               RECORD KEY IS PY-CONTROL-PRIMARY.
+
+           SELECT ERCOMP       ASSIGN TO ERCOMP
+                               ACCESS IS DYNAMIC
+                               ORGANIZATION IS INDEXED
+                               FILE STATUS IS ERCOMP-FILE-STATUS
+                               RECORD KEY IS CO-CONTROL-PRIMARY.
+
+           SELECT DISK-DATE    ASSIGN TO SYS019.
+                                                                        
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  EXTR-IN
+           RECORDING MODE F
+           BLOCK CONTAINS 0 RECORDS.
+
+       01  EXTR-IN-REC                 PIC X(265).
+
+       FD  ERPYAJ.
+                                       COPY ERCPYAJ.
+       FD  ERCOMP.
+                                       COPY ERCCOMP.
+       FD  DISK-DATE                                                    
+                                       COPY ELCDTEFD.
+
+       WORKING-STORAGE SECTION.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  FILLER  PIC X(32) VALUE '     CIDPYB2 WORKING STORAGE    '.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  WS-WORK-SEQ                 PIC S9(7) COMP-3 VALUE +0.
+       77  ERPYAJ-FILE-STATUS          PIC XX   VALUE '00'.
+       77  ERCOMP-FILE-STATUS          PIC XX   VALUE '00'.
+       77  WS-CURRENT-BIN-DATE         PIC XX   VALUE LOW-VALUES.
+       77  WS-NEXT-CYCLE-BIN-DATE      PIC XX   VALUE LOW-VALUES.
+       77  WS-SELECT-BIN-DATE          PIC XX   VALUE LOW-VALUES.
+       77  WS-HYPHEN-CNTR              PIC S999 COMP-3 VALUE +0.
+       77  I1                          PIC S999 COMP-3 VALUE +0.
+       77  O1                          PIC S999 COMP-3 VALUE +0.
+
+       01  WS-COMMENT-2.
+           05  WS-STMT-TYPE            PIC X(8)  VALUE SPACES.
+           05  FILLER                  PIC X(16) VALUE
+                                           'AUTO BALANCED - '.
+           05  WS-COMMENT-DATE         PIC X(10).
+
+       01  WS-MISC.
+           05  WS-CHECK-AMT            PIC X(09).
+           05  WS-CHECK-AMT-N REDEFINES WS-CHECK-AMT
+                                       PIC 9(07)V99.
+           05  WS-EOF-SW               PIC X      VALUE SPACES.
+               88  END-OF-INPUT                   VALUE 'Y'.
+           05  WS-EXTR-IN              PIC 9(7)   VALUE ZEROS.
+           05  WS-ERPYAJ-OUT           PIC 9(7)   VALUE ZEROS.
+
+       01  WS-ABEND-AREA.
+           05  WS-ABEND-FILE-STATUS    PIC X(02).
+           05  WS-ABEND-MESSAGE        PIC X(80) VALUE SPACES.
+           05  WS-RETURN-CODE          PIC S9(04)  COMP VALUE +0.
+           05  WS-ZERO                 PIC S9(01) VALUE +0 COMP-3.
+
+       01  WORK-ABEND-CODE.
+           12  WAC-1                   PIC X.
+           12  WAC-2                   PIC X.
+           12  WAC-3-4.
+               16  WAC-3               PIC X.
+               16  WAC-4               PIC X.
+
+
+       01  EXTRACT-RECORD.
+           12  EX-ACCT-NAME            PIC X(30).
+           12  EX-TAB1                 PIC X.
+           12  EX-MAIL-NAME            PIC X(30).
+           12  EX-TAB2                 PIC X.
+           12  EX-ADDR-1               PIC X(30).
+           12  EX-TAB3                 PIC X.
+           12  EX-ADDR-2               PIC X(30).
+           12  EX-TAB4                 PIC X.
+           12  EX-ADDR-3               PIC X(29).
+           12  EX-TAB5                 PIC X.
+           12  EX-ZIP                  PIC 9(9).
+           12  EX-TAB6                 PIC X.
+           12  EX-INV-DATE             PIC X(10).
+           12  EX-TAB7                 PIC X.
+      *    12  EX-CHECK-AMT            PIC Z,ZZZ,ZZZ.99.
+           12  EX-CHECK-AMT            PIC X(12).
+           12  EX-TAB8                 PIC X.
+           12  EX-GL-NUM               PIC X(10).
+           12  EX-TAB9                 PIC X.
+           12  EX-DIV                  PIC XXX.
+           12  EX-TAB10                PIC X.
+           12  EX-CENTER               PIC X(5).
+           12  EX-TAB11                PIC X.
+           12  EX-LOB                  PIC X(7).
+           12  EX-TAB12                PIC X.
+           12  EX-STATE                PIC XX.
+           12  EX-TAB13                PIC X.
+           12  EX-CARRIER              PIC X.
+           12  EX-TAB14                PIC X.
+           12  EX-GROUPING             PIC X(6).
+           12  EX-TAB15                PIC X.
+           12  EX-RESP-NO              PIC X(10).
+           12  EX-TAB16                PIC X.
+           12  EX-ACCOUNT              PIC X(10).
+           12  EX-TAB17                PIC X.
+           12  EX-SPEC-INST            PIC X(10).
+           12  EX-TAB18                PIC X.
+           12  EX-ACTION-FLAG          PIC X.
+           12  EX-TAB19                PIC X.
+           12  EX-EOR                  PIC X.
+
+
+       01  ABEND-FIELDS.
+           12  PGM-SUB                 PIC S999 COMP  VALUE +158.
+           12  FIRST-TIME-SW           PIC X  VALUE 'Y'.
+               88  FIRST-TIME                 VALUE 'Y'.
+
+                                       COPY ELCFUNDT.
+                                       COPY ELCDATE.
+                                       COPY ELCDTECX.
+                                       COPY ELCDTEVR.
+
+       PROCEDURE DIVISION.
+                                       COPY ELCDTERX.
+
+       0000-BEGIN.
+
+           PERFORM 0020-OPEN-FILES     THRU 0020-EXIT
+           PERFORM 0040-INIT           THRU 0040-EXIT
+
+           PERFORM 0050-PROCESS-FILE   THRU 0050-EXIT UNTIL
+                (END-OF-INPUT)
+PEMTST*         OR (WS-EXTR-IN > 1000)
+
+           PERFORM 0030-CLOSE-FILES    THRU 0030-EXIT
+
+           DISPLAY ' RECORDS IN    ' WS-EXTR-IN
+           DISPLAY ' RECORDS  OUT  ' WS-ERPYAJ-OUT
+           GOBACK
+
+           .
+       0002-EXIT.
+           EXIT.
+
+       0020-OPEN-FILES.
+
+           OPEN INPUT EXTR-IN
+               I-O    ERPYAJ ERCOMP
+               
+           IF ERPYAJ-FILE-STATUS  = '00'  OR  '97'                     
+              CONTINUE
+           ELSE                                                       
+              DISPLAY ' BAD OPEN FOR ERPYAJ ' ERPYAJ-FILE-STATUS       
+              PERFORM ABEND-PGM
+           END-IF
+
+           IF ERCOMP-FILE-STATUS  = '00'  OR  '97'                     
+              CONTINUE
+           ELSE                                                       
+              DISPLAY ' BAD OPEN FOR ERCOMP ' ERCOMP-FILE-STATUS       
+              PERFORM ABEND-PGM
+           END-IF
+
+           .
+       0020-EXIT.
+           EXIT.
+
+       0030-CLOSE-FILES.
+
+           CLOSE EXTR-IN ERPYAJ ERCOMP
+
+           IF ERPYAJ-FILE-STATUS  = '00'
+              CONTINUE
+           ELSE                                                       
+              DISPLAY ' BAD CLOSE FOR ERPYAJ ' ERPYAJ-FILE-STATUS       
+              PERFORM ABEND-PGM
+           END-IF
+
+           IF ERCOMP-FILE-STATUS  = '00'
+              CONTINUE
+           ELSE                                                       
+              DISPLAY ' BAD CLOSE FOR ERCOMP ' ERCOMP-FILE-STATUS       
+              PERFORM ABEND-PGM
+           END-IF
+
+           .
+       0030-EXIT.
+           EXIT.
+
+       0040-INIT.
+
+           MOVE FUNCTION CURRENT-DATE  TO FUNCTION-DATE
+           DISPLAY ' FUNCTION DATE CYMD ' WS-FN-DATE
+           MOVE WS-FN-DATE             TO DC-GREG-DATE-CYMD
+           MOVE 'L'                    TO DC-OPTION-CODE
+           MOVE +0                     TO DC-ELAPSED-MONTHS
+                                          DC-ELAPSED-DAYS
+           PERFORM 8510-DATE-CONVERSION
+                                       THRU 8590-EXIT
+           IF NO-CONVERSION-ERROR
+              MOVE DC-BIN-DATE-1       TO WS-CURRENT-BIN-DATE
+              DISPLAY ' DAY OF WEEK = ' DC-DAY-OF-WEEK
+              MOVE +1                  TO DC-ELAPSED-DAYS
+              IF DC-DAY-OF-WEEK = 6
+                 ADD +2                TO DC-ELAPSED-DAYS
+              ELSE
+                 IF DC-DAY-OF-WEEK = 7
+                    ADD +1             TO DC-ELAPSED-DAYS
+                 END-IF
+              END-IF
+              DISPLAY ' ELAPSED DAYS ' DC-ELAPSED-DAYS
+              MOVE WS-CURRENT-BIN-DATE TO DC-BIN-DATE-1
+              MOVE '6'                 TO DC-OPTION-CODE
+              PERFORM 8510-DATE-CONVERSION
+                                       THRU 8590-EXIT
+              IF NO-CONVERSION-ERROR
+                 MOVE DC-BIN-DATE-2    TO WS-NEXT-CYCLE-BIN-DATE
+              ELSE
+                 DISPLAY ' PROBLEMS CONVERTING NEXT DATE '
+                 PERFORM ABEND-PGM
+              END-IF
+           ELSE
+              DISPLAY ' PROBLEMS CONVERTING CURRENT DATE '
+              PERFORM ABEND-PGM
+           END-IF
+
+           STRING RUN-MO '/' RUN-DA '/' RUN-CCYY 
+              DELIMITED BY SIZE INTO WS-COMMENT-DATE
+           END-STRING
+
+           MOVE CLASIC-CREDIT-EOM-DT   TO WS-SELECT-BIN-DATE
+           PERFORM 0110-READ-INPUT     THRU 0110-EXIT
+
+           .
+       0040-EXIT.
+           EXIT.
+
+       0050-PROCESS-FILE.
+
+           EVALUATE EX-ACTION-FLAG
+              WHEN ' '
+                 DISPLAY ' BYPASSING RECORD ' EX-CARRIER ' '
+                    EX-GROUPING ' ' EX-RESP-NO ' ' EX-ACCOUNT
+              WHEN 'T'
+                 PERFORM 0060-CREATE-PAYMENT-ADJ-REC
+                                       THRU 0060-EXIT
+                 PERFORM 0070-CREATE-BALANCED-NOTE
+                                       THRU 0070-EXIT
+              WHEN 'D'
+                 PERFORM 0070-CREATE-BALANCED-NOTE
+                                       THRU 0070-EXIT
+              WHEN OTHER
+                 DISPLAY ' INVALID ACTION FLAG ' EX-CARRIER ' '
+                    EX-GROUPING ' ' EX-RESP-NO ' ' EX-ACCOUNT
+           END-EVALUATE
+
+           PERFORM 0110-READ-INPUT     THRU 0110-EXIT
+
+           .
+       0050-EXIT.
+           EXIT.
+
+       0060-CREATE-PAYMENT-ADJ-REC.
+
+           ADD +1                      TO WS-WORK-SEQ
+           MOVE SPACES                 TO PENDING-PAY-ADJ
+           MOVE 'PY'                   TO PY-RECORD-ID
+           MOVE DTE-CLASIC-COMPANY-CD  TO PY-COMPANY-CD
+           MOVE EX-CARRIER             TO PY-CARRIER
+           MOVE EX-GROUPING            TO PY-GROUPING
+           MOVE EX-RESP-NO             TO PY-FIN-RESP
+
+           IF EX-ACCOUNT = SPACES
+              MOVE LOW-VALUES          TO PY-ACCOUNT
+           ELSE
+              MOVE EX-ACCOUNT          TO PY-ACCOUNT
+           END-IF
+
+           MOVE 'C'                    TO PY-RECORD-TYPE
+           MOVE +0                     TO WS-HYPHEN-CNTR
+           INSPECT EX-CHECK-AMT
+              REPLACING ALL ' ' BY ZEROS
+
+           INSPECT EX-CHECK-AMT TALLYING WS-HYPHEN-CNTR
+              FOR ALL '-'
+           IF WS-HYPHEN-CNTR > +0
+              INSPECT EX-CHECK-AMT
+                 REPLACING ALL '-' BY ZEROS
+           END-IF
+
+           MOVE +9                     TO O1
+           PERFORM VARYING I1 FROM +12 BY -1 UNTIL
+              (O1 < +1)
+              IF EX-CHECK-AMT (I1:1) NUMERIC
+                 MOVE EX-CHECK-AMT (I1:1)
+                                       TO WS-CHECK-AMT (O1:1)
+                 SUBTRACT +1           FROM O1
+              END-IF
+           END-PERFORM
+      *    MOVE EX-CHECK-AMT (1:1)     TO WS-CHECK-AMT (1:1)
+      *    MOVE EX-CHECK-AMT (3:3)     TO WS-CHECK-AMT (2:3)
+      *    MOVE EX-CHECK-AMT (7:3)     TO WS-CHECK-AMT (5:3)
+      *    MOVE EX-CHECK-AMT (11:2)    TO WS-CHECK-AMT (8:2)
+           DISPLAY ' IN AMT ' EX-CHECK-AMT ' OUT AMT ' WS-CHECK-AMT
+
+           MOVE WS-CHECK-AMT-N         TO PY-ENTRY-AMT
+           IF WS-HYPHEN-CNTR > +0
+              COMPUTE PY-ENTRY-AMT = PY-ENTRY-AMT * -1
+           END-IF
+
+           MOVE WS-NEXT-CYCLE-BIN-DATE TO PY-LAST-MAINT-DT
+                                          PY-INPUT-DT
+                                          
+           MOVE 'AUTO'                 TO PY-LAST-MAINT-BY
+           MOVE +180000                TO PY-LAST-MAINT-HHMMSS
+           MOVE LOW-VALUES             TO PY-CREDIT-ACCEPT-DT
+                                          PY-BILLED-DATE
+                                          PY-AR-DATE
+                                          PY-REPORTED-DT
+                                          PY-CHECK-WRITTEN-DT
+           MOVE ZEROS                  TO PY-CHECK-QUE-CONTROL
+                                          PY-CHECK-QUE-SEQUENCE
+           MOVE '1825011300'           TO PY-GL-ACCOUNT
+           MOVE 'MONTHLY CK'           TO PY-GL-COMMENT
+           MOVE WS-SELECT-BIN-DATE     TO PY-CREDIT-SELECT-DT
+           MOVE WS-WORK-SEQ            TO PY-FILE-SEQ-NO
+           IF WS-HYPHEN-CNTR > +0
+              SUBTRACT +1              FROM WS-WORK-SEQ
+           ELSE
+              PERFORM 0080-WRITE-ERPYAJ-OUT
+                                       THRU 0080-EXIT
+           END-IF
+
+           .
+       0060-EXIT.
+           EXIT.
+
+       0070-CREATE-BALANCED-NOTE.
+
+           MOVE DTE-CLASIC-COMPANY-CD  TO CO-COMPANY-CD
+           MOVE EX-CARRIER             TO CO-CARRIER
+           MOVE EX-GROUPING            TO CO-GROUPING
+           MOVE EX-RESP-NO             TO CO-RESP-NO
+           IF EX-ACCOUNT = SPACES
+              MOVE LOW-VALUES          TO CO-ACCOUNT
+           ELSE
+              MOVE EX-ACCOUNT          TO CO-ACCOUNT
+           END-IF
+
+           IF CO-ACCOUNT = LOW-VALUES
+              MOVE 'G'                 TO CO-TYPE
+           ELSE
+              MOVE 'A'                 TO CO-TYPE
+           END-IF
+           READ ERCOMP
+           IF ERCOMP-FILE-STATUS = '00'
+              MOVE 'J VOUCH'           TO WS-STMT-TYPE
+              MOVE WS-COMMENT-2        TO CO-GA-COMMENT-2
+              DISPLAY ' ABOUT TO UPDATE COMMENT 2 - T       '
+                       CO-CONTROL-PRIMARY (2:27)
+              REWRITE COMPENSATION-MASTER
+              IF ERCOMP-FILE-STATUS = '00'
+                 CONTINUE
+              ELSE
+                 DISPLAY ' ERROR - ERCOMP - REWRITE '
+                    ERCOMP-FILE-STATUS ' ' CO-CONTROL-PRIMARY (2:27)
+              END-IF
+           ELSE
+              DISPLAY ' ERROR - ERCOMP - READ '
+                 ERCOMP-FILE-STATUS ' ' CO-CONTROL-PRIMARY (2:27)
+           END-IF
+
+           .
+       0070-EXIT.
+           EXIT.
+
+       0080-WRITE-ERPYAJ-OUT.
+
+           WRITE PENDING-PAY-ADJ
+
+           IF ERPYAJ-FILE-STATUS  = '00'
+              ADD 1                    TO WS-ERPYAJ-OUT
+           ELSE
+              IF ERPYAJ-FILE-STATUS = '22'
+                 ADD +1 TO WS-WORK-SEQ
+                 MOVE WS-WORK-SEQ TO PY-FILE-SEQ-NO
+                 GO TO 0080-WRITE-ERPYAJ-OUT
+              ELSE
+                 DISPLAY ' BAD WRITE FOR ERPYAJ ' ERPYAJ-FILE-STATUS
+                 PERFORM ABEND-PGM
+              END-IF
+           END-IF
+
+           .
+       0080-EXIT.
+           EXIT.
+
+       0110-READ-INPUT.
+
+           READ EXTR-IN INTO EXTRACT-RECORD AT END
+              SET END-OF-INPUT         TO TRUE
+           END-READ
+
+           IF NOT END-OF-INPUT
+              ADD +1                   TO WS-EXTR-IN
+           END-IF
+
+           .
+       0110-EXIT.
+           EXIT.
+
+       8510-DATE-CONVERSION.
+
+           CALL 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+       8590-EXIT.
+           EXIT.
+
+       ABEND-PGM.
+                                       COPY ELCABEND.
+

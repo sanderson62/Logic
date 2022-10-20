@@ -1,0 +1,97 @@
+BEGINJOB MODE='MVS'
+ONRETCODE GT 7 GOTO END_JOB 
+
+################################################################################
+LABEL NAME=EL351P 
+################################################################################
+
+ONRETCODE MAXRC GT '11' BYPASS SCOPE='STEP'  
+
+ASSGNDD DDNAME='ELCERT' FILENAME='/data/test/seqfiles/ELCERT.DAT' DISP='I-O' 
+ASSGNDD DDNAME='ELMSTR' FILENAME='/data/test/seqfiles/ELMSTR.DAT' DISP='I-O' 
+ASSGNDD DDNAME='ELARCH' FILENAME='/data/test/seqfiles/ELARCH.DAT' DISP='I-O' 
+ASSGNDD DDNAME='ELTRLR' FILENAME='/data/test/seqfiles/ELTRLR.DAT' DISP='I-O' 
+ASSGNDD DDNAME='ERACCT' FILENAME='/data/test/seqfiles/ERACCT.DAT' DISP='I-O' 
+ASSGNDD DDNAME='ELLETR' FILENAME='/data/test/seqfiles/ELLETR.DAT' DISP='I-O' 
+ASSGNDD DDNAME='ELBENE' FILENAME='/data/test/seqfiles/ELBENE.DAT' DISP='I-O' 
+ASSGNDD DDNAME='ERCOMP' FILENAME='/data/test/seqfiles/ERCOMP.DAT' DISP='I-O' 
+ASSGNDD DDNAME='ELCNTL' FILENAME='/data/test/seqfiles/ELCNTL.DAT' DISP='I-O' 
+ASSGNDD DDNAME='SYS019' FILENAME='$SEQFILES/CI.DD.ER.DATECARD' DISP='I-O' 
+ASSGNDD DDNAME='SYS011' FILENAME='/data/test/seqfiles/CLM_PRIV.EXT' RECFMT='F' RECSIZE='216' DISP='O' NORMAL='K' ABEND='D' 
+ASSGNDD DDNAME='SYS008' TYPE='SYSOUT' CLASS='Y' 
+
+EXECPGM PGMNAME='EL351P' STEPNAME='EL351' 
+
+################################################################################
+LABEL name=SORT01
+################################################################################
+ASSGNDD ddname='SORTIN' filename='/data/test/seqfiles/CLM_PRIV.EXT' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTOUT' filename='/data/test/seqfiles/CLM_PRIV.WRK01' disp='o' normal='k' abend='d' recfmt='F' recsize='216'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 1 CHAR) (3 7 CHAR) (23 8 CHAR RV)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT01'
+
+################################################################################
+LABEL name=PERL01
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/addcrlf.pl /data/test/seqfiles/CLM_PRIV.WRK01 /data/test/seqfiles/CLM_PRIV.WRK02 216 
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL01' parm='SH'
+
+################################################################################
+LABEL name=PERL02
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/drop_dups.pl /data/test/seqfiles/CLM_PRIV.WRK02 /data/test/seqfiles/CLM_PRIV.WRK03 2 7
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL02' parm='SH'
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+tr -d '\012' < /data/test/seqfiles/CLM_PRIV.WRK03 > /data/test/seqfiles/CLM_PRIV.WRK04
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=SORT02
+################################################################################
+ASSGNDD ddname='SORTIN' filename='/data/test/seqfiles/CLM_PRIV.WRK04' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTOUT' filename='/data/test/seqfiles/CLM_PRIV.WRK05' disp='o' normal='k' abend='d' recfmt='F' recsize='216'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 1 CHAR) (32 30 CHAR) (23 8 CHAR RV)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT02'
+
+################################################################################
+LABEL name=PERL03
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/addcrlf.pl /data/test/seqfiles/CLM_PRIV.WRK05 /data/test/seqfiles/CLM_PRIV.WRK06 216 
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL03' parm='SH'
+
+################################################################################
+LABEL name=PERL04
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/drop_dups.pl /data/test/seqfiles/CLM_PRIV.WRK06 /data/test/seqfiles/CLM_PRIV.WRK07 31 30
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL04' parm='SH'
+
+ENDJOB 

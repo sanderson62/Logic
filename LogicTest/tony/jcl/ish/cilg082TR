@@ -1,0 +1,53 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 8 GOTO END_JOB 
+
+if ($EBMSYS != "tony") then
+   echo "Job aborting, not Tony"
+   exit 1
+endif
+
+
+################################################################################
+LABEL name=ECS082 
+################################################################################
+#  ******************************************************************    
+#  **                   GAAP REPORTING                                   
+#  ******************************************************************    
+#  **                                                                    
+#  **            UNEARNED PREMIUM AND COMMISSION EXTRACT                 
+#  **          SEE RESTART INSTRUCTIONS BEFORE RESTARTING                
+#  **                                                                    
+#  ******************************************************************    
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+#  ************************************************      INPUT FILES     
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.XX.GAAP_00' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='ERRTBLT' dataset='CI.WW.LG.ERREIN' type='VS' filename='ERRTBLT' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+#  *************************************************    OUTPUT FILES     
+ASSGNDD ddname='SYS020' dataset='ZI.DD.FICH082' filename='\${SEQFILES}/ZI.DD.FICH082' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS022' filename='${SEQFILES}/ZI.EX.RPT082.FILE' disp='o' normal='k' abend='d' recsize='250' recfmt='F' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+
+EXECPGM pgmname='ECS082TR' stepname='ECS082' 
+
+################################################################################
+LABEL name=CPY082R
+################################################################################
+ASSGNDD ddname='SYS010' dataset='ZI.DD.FICH082' filename='\${SEQFILES}/ZI.DD.FICH082' disp='i'
+ASSGNDD ddname='SYS011' dataset='ZI.DL.CIADM.FICH082R' filename='\${SEQFILES}/ZI.DL.CIADM.FICH082R' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY082R' parm='ECS082R' 
+
+if ($JOBSTATUS == 0) then
+    echo " Test job dont want print "
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

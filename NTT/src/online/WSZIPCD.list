@@ -1,0 +1,710 @@
+*>Copyright (c) 2016-2021 NTT DATA, Inc. All rights reserved.
+*>compiler version:  6.0.28692
+*>source file name:  WSZIPCD.cbl
+*>date generated  :  Mon Oct 03 10:49:36 CDT 2022
+*>compiler options:  -cv -apost -dcmi -dz -ld -sp=/apps/test/mdoff/copy:/apps/prod/cid1p/copy:/apps/test/mdoff/maps:/apps/prod/cid1p/maps:/apps/mtp/mtp/copy -dv=0 -od=/apps/test/mdoff/exe/onl -cirp2 -pt2 -cax -sl2 -rw=FILE-ID
+*>source encoding :  ISO-8859-1
+*>target encoding :  ISO-8859-1
+*>((program: WSZIPCD.cl2))                                         
+*>$SET SQL(dbman=ODBC, TARGETDB=MSSQLSERVER, NOAUTOCOMMIT)         
+identification division.                                         
+program-id. WSZIPCD.                                             
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 101017  CR2016091600001  PEMA  New program to verify zipcode.   
+*> 021521  CR2020121600001  PEMA  Switch to different table        
+*> 110921  CR2021051200001  PEMA  Onbase Workflow project          
+*> 010722 CR2019012500003   PEMA  Convert to SQLSERVER 2016        
+*>*****************************************************************
+environment division.                                            
+INPUT-OUTPUT SECTION.                                            
+FILE-CONTROL.                                                    
+                                                                 
+data division.                                                   
+FILE SECTION.                                                    
+                                                                 
+working-storage section.                                         
+01  DFH-START PIC X(04).                                         
+77  s1 pic s999 comp-3 value +0.                                 
+77  BYTE-OFFSET PIC S9(8) COMP VALUE +0.                         
+77  ws-eof-sw                   pic x  value spaces.             
+    88  end-of-input                  value 'Y'.                 
+77  ws-error-sw                 pic x  value spaces.             
+    88  error-found               value 'Y'.                     
+77  ws-string-len               pic s999 comp-3 value zeros.     
+                                                                 
+01  P pointer.                                                   
+01  KIXSYS                      pic X(7)  VALUE Z"KIXSYS".       
+01  var-ptr pointer.                                             
+01  env-var-len                 pic 9(4)  binary.                
+01  rc                          pic 9(9)  binary.                
+                                                                 
+01  WS-KIXSYS.                                                   
+    05  WS-KIX-FIL1             PIC X(10).                       
+    05  WS-KIX-APPS             PIC X(10).                       
+    05  WS-KIX-ENV              PIC X(10).                       
+    05  WS-KIX-MYENV            PIC X(10).                       
+    05  WS-KIX-SYS              PIC X(10).                       
+                                                                 
+01  ws-xml-stuff.                                                
+    05  ws-fld-1                pic x(20) value spaces.          
+    05  ws-fld-2                pic x(20) value spaces.          
+    05  ws-fld-3                pic x(50) value spaces.          
+    05  ws-error-cd redefines                                    
+        ws-fld-3                pic 9.                           
+    05  ws-len-of-5 redefines                                    
+        ws-fld-3                pic 9(5).                        
+    05  ws-model-year redefines                                  
+        ws-fld-3                pic 9999.                        
+    05  ws-base-price redefines                                  
+        ws-fld-3                pic 9(11).                       
+    05  ws-fld-4                pic x(20) value spaces.          
+    05  ws-fld-5                pic x(20) value spaces.          
+                                                                 
+*>EXEC SQL                                                         
+*>   INCLUDE SQLDA                                                 
+*>END-EXEC                                                         
+                                                                 
+*>EXEC SQL                                                         
+*>   INCLUDE SQLCA                                                 
+*>END-EXEC                                                         
+*>>>((file: SQLCA))                                                
+*>***************************************************************<*
+*> Copyright (c) 2016-2021 NTT DATA, Inc. All rights reserved.  *<*
+*> Users of NTT DATA Enterprise COBOL may freely                *<*
+*> redistribute this copybook.                                  *<*
+*>***************************************************************<*
+                                                                 
+01  SQLCA GLOBAL.                                                
+    05  SQLCAID                PIC X(8).                         
+    05  SQLCABC                PIC S9(9) COMP-5.                 
+    05  SQLCODE                PIC S9(9) COMP-5.                 
+    05  SQLERRM.                                                 
+        49  SQLERRML           PIC S9(4) COMP-5.                 
+        49  SQLERRMC           PIC X(254).                       
+    05  SQLERRP                PIC X(8).                         
+    05  SQLERRD OCCURS 6 TIMES PIC S9(9) COMP-5.                 
+    05  SQLWARN.                                                 
+        10 SQLWARN0            PIC X(1).                         
+        10 SQLWARN1            PIC X(1).                         
+        10 SQLWARN2            PIC X(1).                         
+        10 SQLWARN3            PIC X(1).                         
+        10 SQLWARN4            PIC X(1).                         
+        10 SQLWARN5            PIC X(1).                         
+        10 SQLWARN6            PIC X(1).                         
+        10 SQLWARN7            PIC X(1).                         
+    05  SQLSTATE               PIC X(5).                         
+    05  SQLEXT                 PIC S9(5) COMP-3 VALUE 1.         
+*><<((file: SQLCA))                                                
+                                                                 
+EXEC SQL                                                         
+   BEGIN DECLARE SECTION                                         
+END-EXEC                                                         
+                                                                 
+01  sqlcmd                      pic x(1024).                     
+01  svr                         pic x(32).                       
+01  usr                         pic x(32).                       
+01  pass                        pic x(32).                       
+01  usr-pass                    pic x(64).                       
+01  ws-disp-code                pic s9(11).                      
+                                                                 
+*>**-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_***
+*>**                                                            ***
+*>**  These indicators are used to determine if a variable      ***
+*>**  is passed nulls from sql. The indicator will be -1        ***
+*>**  if the value on sql is nulls and +0 if the value is       ***
+*>**  something other than nulls. Here is an example on how     ***
+*>**  to use the indicator variables.                           ***
+*>**                                                            ***
+*>**     EXEC SQL                                               ***
+*>**        fetch checkapp into                                 ***
+*>**           :db-app-status :nu-app-status,                   ***
+*>**           :db-app-by     :nu-app-by,                       ***
+*>**           :db-app-date   :nu-app-date,                     ***
+*>**           :db-app-batch  :nu-app-batch                     ***
+*>**     END-EXEC                                               ***
+*>**                                                            ***
+*>**_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-***
+                                                                 
+01  indicator-vaiables-for-nulls.                                
+    05  nu-state                pic s9(4) comp value +0.         
+    05  nu-city                 pic s9(4) comp value +0.         
+    05  nu-county               pic s9(4) comp value +0.         
+                                                                 
+01  zip-codes.                                                   
+    05  zc-zipcode              pic x(5).                        
+    05  zc-state                pic xx.                          
+    05  zc-city                 pic x(30).                       
+    05  zc-county               pic x(40).                       
+                                                                 
+EXEC SQL                                                         
+   END DECLARE SECTION                                           
+END-EXEC                                                         
+                                                                 
+01  ws-misc.                                                     
+    12  ws-file-in              pic x(26) value spaces.          
+    12  ws-connect-sw               pic x  value ' '.            
+        88  connected-to-db             value 'Y'.               
+    12  ws-file-in-status       pic xx  value spaces.            
+    12  ws-curl-return-cd       pic s9(8) comp-5 value +0.       
+    12  ws-curl-string.                                          
+        16  f                   pic x(16) value                  
+         'curl -o /tmp/zip'.                                     
+        16  filename-zip        pic x(5)  value spaces.          
+        16  f                   pic xxxx value '.txt'.           
+        16  f                   pic x(15) value                  
+         ' --data "USZip='.                                      
+        16  curl-zip            pic x(5) value zeros.            
+        16  f                   pic x(48) value                  
+         '" http://webservicex.net/uszip.asmx/GetInfoByZIP'.     
+        16  f                   pic x value low-values.          
+                                                                 
+01  WS-RESPONSE                 PIC S9(8) COMP VALUE +0.         
+    88  RESP-NORMAL                    VALUE +0.                 
+    88  resp-file-notfnd               value +12.                
+    88  RESP-NOTFND                    VALUE +13.                
+    88  resp-duprec                    value +14.                
+    88  resp-dupkey                    value +15.                
+    88  resp-invreq                    value +16.                
+    88  RESP-NOTOPEN                   VALUE +19.                
+    88  RESP-ENDFILE                   VALUE +20.                
+    88  resp-lengtherr                 value +22.                
+                                                                 
+01  f.                                                           
+    05  ws-outputzip            pic x(5).                        
+    05  ws-city                 pic x(50).                       
+    05  ws-state                pic xx.                          
+                                                                 
+01  WS-PASS-AREa.                                                
+    03  PA-ZIP                  PIC X(5).                        
+    03  PA-ErrorCode            PIC X(10).                       
+    03  PA-city                 PIC x(50).                       
+    03  PA-state                PIC XX.                          
+                                                                 
+01  sqlconnect-parms.                                            
+    05  p-sql-server            PIC X(30).                       
+    05  p-sql-database          PIC X(30).                       
+    05  p-connect-return-code   pic s9(5) comp-5.                
+    05  p-sql-return-message    pic x(256).                      
+                                                                 
+*>***************************************************************  
+*>                                                                 
+*> Copyright (c) 2016-2020 NTT DATA, Inc.                          
+*> All rights reserved.                                            
+*>                                                                 
+*>***************************************************************  
+01  DFHEIV.                                                      
+  02  DFHEIV0               PIC X(35).                           
+  02  DFHEIV1               PIC X(08).                           
+  02  DFHEIV2               PIC X(08).                           
+  02  DFHEIV3               PIC X(08).                           
+  02  DFHEIV4               PIC X(06).                           
+  02  DFHEIV5               PIC X(04).                           
+  02  DFHEIV6               PIC X(04).                           
+  02  DFHEIV7               PIC X(02).                           
+  02  DFHEIV8               PIC X(02).                           
+  02  DFHEIV9               PIC X(01).                           
+  02  DFHEIV10              PIC S9(7) COMP-3.                    
+  02  DFHEIV11              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV12              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV13              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV14              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV15              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV16              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV17              PIC X(04).                           
+  02  DFHEIV18              PIC X(04).                           
+  02  DFHEIV19              PIC X(04).                           
+  02  DFHEIV20              USAGE IS POINTER.                    
+  02  DFHEIV21              USAGE IS POINTER.                    
+  02  DFHEIV22              USAGE IS POINTER.                    
+  02  DFHEIV23              USAGE IS POINTER.                    
+  02  DFHEIV24              USAGE IS POINTER.                    
+  02  DFHEIV25              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV26              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV27              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV28              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV29              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV30              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV31              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV32              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV33              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV34              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV35              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV97              PIC S9(7) COMP-3 VALUE ZERO.         
+  02  DFHEIV98              PIC S9(4) COMP SYNC VALUE ZERO.      
+  02  FILLER                PIC X(02).                           
+  02  DFHEIV99              PIC X(08) VALUE SPACE.               
+  02  DFHEIVL0              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL1              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL2              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL3              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL4              PIC X(255) VALUE SPACE.              
+  02  DFHEIVL5              PIC X(255) VALUE SPACE.              
+LINKAGE  SECTION.                                                
+*>**************************************************************** 
+*>                                                               * 
+*> Copyright (c) 2016-2020 NTT DATA, Inc.                        * 
+*> All rights reserved.                                          * 
+*>                                                               * 
+*>**************************************************************** 
+01  dfheiblk.                                                    
+    02  eibtime          pic s9(7) comp-3.                       
+    02  eibdate          pic s9(7) comp-3.                       
+    02  eibtrnid         pic x(4).                               
+    02  eibtaskn         pic s9(7) comp-3.                       
+    02  eibtrmid         pic x(4).                               
+    02  dfheigdi         pic s9(4) comp.                         
+    02  eibcposn         pic s9(4) comp.                         
+    02  eibcalen         pic s9(4) comp.                         
+    02  eibaid           pic x(1).                               
+    02  eibfiller1       pic x(1).                               
+    02  eibfn            pic x(2).                               
+    02  eibfiller2       pic x(2).                               
+    02  eibrcode         pic x(6).                               
+    02  eibfiller3       pic x(2).                               
+    02  eibds            pic x(8).                               
+    02  eibreqid         pic x(8).                               
+    02  eibrsrce         pic x(8).                               
+    02  eibsync          pic x(1).                               
+    02  eibfree          pic x(1).                               
+    02  eibrecv          pic x(1).                               
+    02  eibsend          pic x(1).                               
+    02  eibatt           pic x(1).                               
+    02  eibeoc           pic x(1).                               
+    02  eibfmh           pic x(1).                               
+    02  eibcompl         pic x(1).                               
+    02  eibsig           pic x(1).                               
+    02  eibconf          pic x(1).                               
+    02  eiberr           pic x(1).                               
+    02  eibrldbk         pic x(1).                               
+    02  eiberrcd         pic x(4).                               
+    02  eibsynrb         pic x(1).                               
+    02  eibnodat         pic x(1).                               
+    02  eibfiller5       pic x(2).                               
+    02  eibresp          pic s9(8) comp.                         
+    02  eibresp2         pic s9(8) comp.                         
+    02  dfheigdj         pic s9(4) comp.                         
+    02  dfheigdk         pic s9(4) comp.                         
+                                                                 
+01  DFHCOMMAREA                 PIC X(587).                      
+                                                                 
+01  var  pic x(30).                                              
+                                                                 
+PROCEDURE DIVISION USING DFHEIBLK DFHCOMMAREA.                   
+0000-DFHEXIT SECTION.                                            
+    MOVE FUNCTION WHEN-COMPILED TO DFHEIVL0(1:21).               
+    MOVE '9#                    %   ' TO DFHEIV0.                
+    MOVE 'WSZIPCD' TO DFHEIV1.                                   
+    CALL 'kxdfhei1' USING DFHEIV0 DFH-START DFHEIV DFHEIV1       
+         DFHEIVL0.                                               
+VCOBOL-DUMMY-PROCEDURE.                                          
+                                                                 
+    display ' entering program WSZIPCD'                          
+                                                                 
+    move dfhcommarea            to ws-pass-AREA                  
+                                                                 
+    set P to address of KIXSYS                                   
+    CALL "getenv" using by value P returning var-ptr             
+    if var-ptr = null then                                       
+       display ' kixsys not set '                                
+    else                                                         
+       set address of var to var-ptr                             
+       move 0 to env-var-len                                     
+       inspect var tallying env-var-len                          
+         for characters before X'00'                             
+       unstring var (1:env-var-len) delimited by '/'             
+          into WS-KIX-FIL1 WS-KIX-APPS WS-KIX-ENV WS-KIX-MYENV   
+             WS-KIX-SYS                                          
+       end-unstring                                              
+    end-if                                                       
+                                                                 
+    perform 0010-init           thru 0010-exit                   
+    perform 0020-connect        thru 0020-exit                   
+    perform 0030-get-zipcd-data thru 0030-exit                   
+    perform 0050-bld-pass-area  thru 0050-exit                   
+    perform 0060-disconnect     thru 0060-exit                   
+                                                                 
+    .                                                            
+0000-return.                                                     
+                                                                 
+    move ws-pass-area           to dfhcommarea                   
+                                                                 
+                                                                 
+*> exec cics return                                                
+*>    end-exec                                                     
+*>    MOVE '.(                    ''   #00000325' TO DFHEIV0       
+    MOVE X'2E2820202020202020202020' &                           
+         X'202020202020202020202720' &                           
+         X'2020233030303030333235' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+                                                                 
+                                                                 
+*> GOBACK                                                          
+                                                                 
+    MOVE '9%                    "   ' TO DFHEIV0                 
+    MOVE 'WSZIPCD' TO DFHEIV1                                    
+    CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1                        
+    GOBACK                                                       
+                                                                 
+    .                                                            
+0010-init.                                                       
+                                                                 
+    move pa-zip                 to zc-zipcode                    
+    move pa-city                to zc-city                       
+    move pa-state               to zc-state                      
+                                                                 
+    .                                                            
+0010-exit.                                                       
+    exit.                                                        
+                                                                 
+0020-connect.                                                    
+                                                                 
+*>***  The below code is for when the db has been                  
+*>***  converted to sql server 2016                                
+    evaluate ws-kix-myenv                                        
+       when 'cid1p'                                              
+          move '//sdv-db01.cso.local:1433;'                      
+                                to p-sql-server                  
+       when 'mdoff'                                              
+          move '//hov-tstdb01.cso.local:55330;'                  
+                                to p-sql-server                  
+       when other                                                
+          move '//hov-tstdb01.cso.local:1433;'                   
+                                to p-sql-server                  
+    end-evaluate                                                 
+                                                                 
+                                                                 
+    move 'repository'           to p-sql-database                
+                                                                 
+    CALL 'SQLCONNECT' USING sqlconnect-parms                     
+    display ' ret code ' p-connect-return-code                   
+    move p-connect-return-code  to sqlcode                       
+    move p-sql-return-message   to sqlerrmc                      
+                                                                 
+                                                                 
+*>                                                                 
+*>     EXEC SQL                                                    
+*>*       CONNECT TO :svr USER :usr-pass                           
+*>        CONNECT TO :svr                                          
+*>          USER     :usr                                          
+*>          USING    :pass                                         
+*>     END-EXEC                                                    
+                                                                 
+    if sqlcode not = 0                                           
+       display "Error: cannot connect "                          
+       display sqlcode                                           
+       display sqlerrmc                                          
+    end-if                                                       
+                                                                 
+    set connected-to-db to true                                  
+                                                                 
+    .                                                            
+0020-exit.                                                       
+    exit.                                                        
+                                                                 
+0030-get-zipcd-data.                                             
+                                                                 
+    EXEC SQL                                                     
+       SELECT                                                    
+          County                                                 
+       INTO                                                      
+          :zc-County                                             
+       FROM                                                      
+          ZipCodes                                               
+       WHERE                                                     
+          ZipCode = :zc-zipcode                                  
+          and State = :zc-state                                  
+          and City = :zc-city                                    
+    END-EXEC                                                     
+                                                                 
+    if sqlcode not = 0                                           
+       move 'NOTFOUND'          to pa-errorcode                  
+       display "Error: cannot read row "                         
+       display ' sql return code ' sqlcode                       
+       display ' sql err mess    ' sqlerrmc                      
+       display ' zip code        ' zc-zipcode                    
+       go to 0030-exit                                           
+    end-if                                                       
+                                                                 
+    .                                                            
+0030-exit.                                                       
+    exit.                                                        
+                                                                 
+0050-bld-pass-area.                                              
+                                                                 
+    move function upper-case(zc-city)                            
+                                to pa-city                       
+    move zc-state               to pa-state                      
+                                                                 
+    .                                                            
+0050-exit.                                                       
+    exit.                                                        
+                                                                 
+0060-disconnect.                                                 
+                                                                 
+    EXEC SQL                                                     
+       DISCONNECT                                                
+    END-EXEC                                                     
+                                                                 
+    if sqlcode not = 0                                           
+       display "Error: cannot disconnect zipcodes "              
+       display ' sql return code ' sqlcode                       
+       display ' sql err mess    ' sqlerrmc                      
+    end-if                                                       
+                                                                 
+    .                                                            
+0060-exit.                                                       
+    exit.                                                        
+                                                                 
+0125-calc-field-len.                                             
+                                                                 
+    move 0                      to ws-string-len                 
+    inspect ws-fld-3 tallying ws-string-len for all ' '          
+*>    display ' string len b4 ' ws-string-len                      
+    compute ws-string-len = 50 - ws-string-len                   
+*>    display ' string len af ' ws-string-len                      
+                                                                 
+    .                                                            
+0125-exit.                                                       
+    exit.                                                        
+                                                                 
+9999-DFHBACK SECTION.                                            
+    MOVE '9%                    "   ' TO DFHEIV0                 
+    MOVE 'WSZIPCD' TO DFHEIV1                                    
+    CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1                        
+    GOBACK.                                                      
+9999-DFHEXIT.                                                    
+    IF DFHEIGDJ EQUAL 0001                                       
+        NEXT SENTENCE.                                           
+    MOVE '9%                    "   ' TO DFHEIV0                 
+    MOVE 'WSZIPCD' TO DFHEIV1                                    
+    CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1                        
+    GOBACK.                                                      
+*> ------------------------------------------------------------------------------------------------------------------
+*> The source line number references in the following sections are either of
+*> the form <line-number> or <file-number>:<line-number>. The first form is
+*> used as an abbreviation for 0:<line-number>.
+*> The following is a key allowing the determination of the file name from
+*> the <file-number>.
+*>  
+*>          0: WSZIPCD.cl2
+*>          1: SQLCA
+*>  
+*> ------------------------------------------------------------------------------------------------------------------
+*> DATA MAP KEY
+*>               Sec(Section) Fil = File Section                Type Flags: column O    ---> O = Occurs Item
+*>                            Wor = Working-Storage Section                 column R    ---> R = Redefines
+*>                            Loc = Local-Storage Section                   column X/G  ---> X = External
+*>                            Rep = Report Section                                           G = Global
+*>                            Lin = Linkage Section                         
+*> ------------------------------------------------------------------------------------------------------------------
+*> Data map for Program-Id: WSZIPCD
+*> ------------------------------------------------------------------------------------------------------------------
+*>     Line    Name                                                  Size Offset      Sec Flags Data Type
+*>                                                                                        O R X
+*>                                                                                            G
+*> ------------------------------------------------------------------------------------------------------------------
+*>       24 01 DFH-START                                                4             Wor       Display
+*>       25 77 S1                                                       2             Wor       Packed Decimal
+*>       26 77 BYTE-OFFSET                                              4             Wor       Binary
+*>       27 77 WS-EOF-SW                                                1             Wor       Display
+*>       28   88 END-OF-INPUT                                                                   
+*>       29 77 WS-ERROR-SW                                              1             Wor       Display
+*>       30   88 ERROR-FOUND                                                                    
+*>       31 77 WS-STRING-LEN                                            2             Wor       Packed Decimal
+*>       33 01 P                                                        4             Wor       Pointer
+*>       34 01 KIXSYS                                                   7             Wor       Display
+*>       35 01 VAR-PTR                                                  4             Wor       Pointer
+*>       36 01 ENV-VAR-LEN                                              2             Wor       Binary
+*>       37 01 RC                                                       4             Wor       Binary
+*>       39 01 WS-KIXSYS                                               50             Wor       Group
+*>       40   05 WS-KIX-FIL1                                           10 (000000000)           Display
+*>       41   05 WS-KIX-APPS                                           10 (000000010)           Display
+*>       42   05 WS-KIX-ENV                                            10 (000000020)           Display
+*>       43   05 WS-KIX-MYENV                                          10 (000000030)           Display
+*>       44   05 WS-KIX-SYS                                            10 (000000040)           Display
+*>       46 01 WS-XML-STUFF                                           130             Wor       Group
+*>       47   05 WS-FLD-1                                              20 (000000000)           Display
+*>       48   05 WS-FLD-2                                              20 (000000020)           Display
+*>       49   05 WS-FLD-3                                              50 (000000040)           Display
+*>       50   05 WS-ERROR-CD                                            1 (000000040)       R   Display Numeric
+*>       52   05 WS-LEN-OF-5                                            5 (000000040)       R   Display Numeric
+*>       54   05 WS-MODEL-YEAR                                          4 (000000040)       R   Display Numeric
+*>       56   05 WS-BASE-PRICE                                         11 (000000040)       R   Display Numeric
+*>       58   05 WS-FLD-4                                              20 (000000090)           Display
+*>       59   05 WS-FLD-5                                              20 (000000110)           Display
+*>      1:7 01 SQLCA                                                  320             Wor     G Group
+*>      1:8   05 SQLCAID                                                8 (000000000)         G Display
+*>      1:9   05 SQLCABC                                                4 (000000008)         G Native Binary
+*>     1:10   05 SQLCODE                                                4 (000000012)         G Native Binary
+*>     1:11   05 SQLERRM                                              256 (000000016)         G Group
+*>     1:12     49 SQLERRML                                             2 (000000016)         G Native Binary
+*>     1:13     49 SQLERRMC                                           254 (000000018)         G Display
+*>     1:14   05 SQLERRP                                                8 (000000272)         G Display
+*>     1:15   05 SQLERRD                                                4 (000000280)     O   G Native Binary
+*>     1:16   05 SQLWARN                                                8 (000000304)         G Group
+*>     1:17     10 SQLWARN0                                             1 (000000304)         G Display
+*>     1:18     10 SQLWARN1                                             1 (000000305)         G Display
+*>     1:19     10 SQLWARN2                                             1 (000000306)         G Display
+*>     1:20     10 SQLWARN3                                             1 (000000307)         G Display
+*>     1:21     10 SQLWARN4                                             1 (000000308)         G Display
+*>     1:22     10 SQLWARN5                                             1 (000000309)         G Display
+*>     1:23     10 SQLWARN6                                             1 (000000310)         G Display
+*>     1:24     10 SQLWARN7                                             1 (000000311)         G Display
+*>     1:25   05 SQLSTATE                                               5 (000000312)         G Display
+*>     1:26   05 SQLEXT                                                 3 (000000317)         G Packed Decimal
+*>       73 01 SQLCMD                                                1024             Wor       Display
+*>       74 01 SVR                                                     32             Wor       Display
+*>       75 01 USR                                                     32             Wor       Display
+*>       76 01 PASS                                                    32             Wor       Display
+*>       77 01 USR-PASS                                                64             Wor       Display
+*>       78 01 WS-DISP-CODE                                            11             Wor       Display Numeric
+*>       98 01 INDICATOR-VAIABLES-FOR-NULLS                             6             Wor       Group
+*>       99   05 NU-STATE                                               2 (000000000)           Binary
+*>      100   05 NU-CITY                                                2 (000000002)           Binary
+*>      101   05 NU-COUNTY                                              2 (000000004)           Binary
+*>      103 01 ZIP-CODES                                               77             Wor       Group
+*>      104   05 ZC-ZIPCODE                                             5 (000000000)           Display
+*>      105   05 ZC-STATE                                               2 (000000005)           Display
+*>      106   05 ZC-CITY                                               30 (000000007)           Display
+*>      107   05 ZC-COUNTY                                             40 (000000037)           Display
+*>      113 01 WS-MISC                                                127             Wor       Group
+*>      114   12 WS-FILE-IN                                            26 (000000000)           Display
+*>      115   12 WS-CONNECT-SW                                          1 (000000026)           Display
+*>      116     88 CONNECTED-TO-DB                                                              
+*>      117   12 WS-FILE-IN-STATUS                                      2 (000000027)           Display
+*>      118   12 WS-CURL-RETURN-CD                                      4 (000000029)           Native Binary
+*>      119   12 WS-CURL-STRING                                        94 (000000033)           Group
+*>      120     16 F                                                   16 (000000033)           Display
+*>      122     16 FILENAME-ZIP                                         5 (000000049)           Display
+*>      123     16 F                                                    4 (000000054)           Display
+*>      124     16 F                                                   15 (000000058)           Display
+*>      126     16 CURL-ZIP                                             5 (000000073)           Display
+*>      127     16 F                                                   48 (000000078)           Display
+*>      129     16 F                                                    1 (000000126)           Display
+*>      131 01 WS-RESPONSE                                              4             Wor       Binary
+*>      132   88 RESP-NORMAL                                                                    
+*>      133   88 RESP-FILE-NOTFND                                                               
+*>      134   88 RESP-NOTFND                                                                    
+*>      135   88 RESP-DUPREC                                                                    
+*>      136   88 RESP-DUPKEY                                                                    
+*>      137   88 RESP-INVREQ                                                                    
+*>      138   88 RESP-NOTOPEN                                                                   
+*>      139   88 RESP-ENDFILE                                                                   
+*>      140   88 RESP-LENGTHERR                                                                 
+*>      142 01 F                                                       57             Wor       Group
+*>      143   05 WS-OUTPUTZIP                                           5 (000000000)           Display
+*>      144   05 WS-CITY                                               50 (000000005)           Display
+*>      145   05 WS-STATE                                               2 (000000055)           Display
+*>      147 01 WS-PASS-AREA                                            67             Wor       Group
+*>      148   03 PA-ZIP                                                 5 (000000000)           Display
+*>      149   03 PA-ERRORCODE                                          10 (000000005)           Display
+*>      150   03 PA-CITY                                               50 (000000015)           Display
+*>      151   03 PA-STATE                                               2 (000000065)           Display
+*>      153 01 SQLCONNECT-PARMS                                       320             Wor       Group
+*>      154   05 P-SQL-SERVER                                          30 (000000000)           Display
+*>      155   05 P-SQL-DATABASE                                        30 (000000030)           Display
+*>      156   05 P-CONNECT-RETURN-CODE                                  4 (000000060)           Native Binary
+*>      157   05 P-SQL-RETURN-MESSAGE                                 256 (000000064)           Display
+*>      158 01 DFHEIV                                                 882             Wor       Group
+*>      158   02 DFHEIV0                                               35 (000000000)           Display
+*>      158   02 DFHEIV1                                                8 (000000035)           Display
+*>      158   02 DFHEIV2                                                8 (000000043)           Display
+*>      158   02 DFHEIV3                                                8 (000000051)           Display
+*>      158   02 DFHEIV4                                                6 (000000059)           Display
+*>      158   02 DFHEIV5                                                4 (000000065)           Display
+*>      158   02 DFHEIV6                                                4 (000000069)           Display
+*>      158   02 DFHEIV7                                                2 (000000073)           Display
+*>      158   02 DFHEIV8                                                2 (000000075)           Display
+*>      158   02 DFHEIV9                                                1 (000000077)           Display
+*>      158   02 DFHEIV10                                               4 (000000078)           Packed Decimal
+*>      158   02 DFHEIV11                                               2 (000000082)           Binary
+*>      158   02 DFHEIV12                                               2 (000000084)           Binary
+*>      158   02 DFHEIV13                                               2 (000000086)           Binary
+*>      158   02 DFHEIV14                                               2 (000000088)           Binary
+*>      158   02 DFHEIV15                                               2 (000000090)           Binary
+*>      158   02 DFHEIV16                                               4 (000000092)           Binary
+*>      158   02 DFHEIV17                                               4 (000000096)           Display
+*>      158   02 DFHEIV18                                               4 (000000100)           Display
+*>      158   02 DFHEIV19                                               4 (000000104)           Display
+*>      158   02 DFHEIV20                                               4 (000000108)           Pointer
+*>      158   02 DFHEIV21                                               4 (000000112)           Pointer
+*>      158   02 DFHEIV22                                               4 (000000116)           Pointer
+*>      158   02 DFHEIV23                                               4 (000000120)           Pointer
+*>      158   02 DFHEIV24                                               4 (000000124)           Pointer
+*>      158   02 DFHEIV25                                               4 (000000128)           Binary
+*>      158   02 DFHEIV26                                               4 (000000132)           Binary
+*>      158   02 DFHEIV27                                               4 (000000136)           Binary
+*>      158   02 DFHEIV28                                               4 (000000140)           Binary
+*>      158   02 DFHEIV29                                               4 (000000144)           Binary
+*>      158   02 DFHEIV30                                               4 (000000148)           Binary
+*>      158   02 DFHEIV31                                               4 (000000152)           Binary
+*>      158   02 DFHEIV32                                               2 (000000156)           Binary
+*>      158   02 DFHEIV33                                               2 (000000158)           Binary
+*>      158   02 DFHEIV34                                               2 (000000160)           Binary
+*>      158   02 DFHEIV35                                               2 (000000162)           Binary
+*>      158   02 DFHEIV97                                               4 (000000164)           Packed Decimal
+*>      158   02 DFHEIV98                                               2 (000000168)           Binary
+*>      158   02 FILLER                                                 2 (000000170)           Display
+*>      158   02 DFHEIV99                                               8 (000000172)           Display
+*>      158   02 DFHEIVL0                                              48 (000000180)           Display
+*>      158   02 DFHEIVL1                                              48 (000000228)           Display
+*>      158   02 DFHEIVL2                                              48 (000000276)           Display
+*>      158   02 DFHEIVL3                                              48 (000000324)           Display
+*>      158   02 DFHEIVL4                                             255 (000000372)           Display
+*>      158   02 DFHEIVL5                                             255 (000000627)           Display
+*>      158 01 DFHEIBLK                                                96             Lin       Group
+*>      158   02 EIBTIME                                                4 (000000000)           Packed Decimal
+*>      158   02 EIBDATE                                                4 (000000004)           Packed Decimal
+*>      158   02 EIBTRNID                                               4 (000000008)           Display
+*>      158   02 EIBTASKN                                               4 (000000012)           Packed Decimal
+*>      158   02 EIBTRMID                                               4 (000000016)           Display
+*>      158   02 DFHEIGDI                                               2 (000000020)           Binary
+*>      158   02 EIBCPOSN                                               2 (000000022)           Binary
+*>      158   02 EIBCALEN                                               2 (000000024)           Binary
+*>      158   02 EIBAID                                                 1 (000000026)           Display
+*>      158   02 EIBFILLER1                                             1 (000000027)           Display
+*>      158   02 EIBFN                                                  2 (000000028)           Display
+*>      158   02 EIBFILLER2                                             2 (000000030)           Display
+*>      158   02 EIBRCODE                                               6 (000000032)           Display
+*>      158   02 EIBFILLER3                                             2 (000000038)           Display
+*>      158   02 EIBDS                                                  8 (000000040)           Display
+*>      158   02 EIBREQID                                               8 (000000048)           Display
+*>      158   02 EIBRSRCE                                               8 (000000056)           Display
+*>      158   02 EIBSYNC                                                1 (000000064)           Display
+*>      158   02 EIBFREE                                                1 (000000065)           Display
+*>      158   02 EIBRECV                                                1 (000000066)           Display
+*>      158   02 EIBSEND                                                1 (000000067)           Display
+*>      158   02 EIBATT                                                 1 (000000068)           Display
+*>      158   02 EIBEOC                                                 1 (000000069)           Display
+*>      158   02 EIBFMH                                                 1 (000000070)           Display
+*>      158   02 EIBCOMPL                                               1 (000000071)           Display
+*>      158   02 EIBSIG                                                 1 (000000072)           Display
+*>      158   02 EIBCONF                                                1 (000000073)           Display
+*>      158   02 EIBERR                                                 1 (000000074)           Display
+*>      158   02 EIBRLDBK                                               1 (000000075)           Display
+*>      158   02 EIBERRCD                                               4 (000000076)           Display
+*>      158   02 EIBSYNRB                                               1 (000000080)           Display
+*>      158   02 EIBNODAT                                               1 (000000081)           Display
+*>      158   02 EIBFILLER5                                             2 (000000082)           Display
+*>      158   02 EIBRESP                                                4 (000000084)           Binary
+*>      158   02 EIBRESP2                                               4 (000000088)           Binary
+*>      158   02 DFHEIGDJ                                               2 (000000092)           Binary
+*>      158   02 DFHEIGDK                                               2 (000000094)           Binary
+*>      161 01 DFHCOMMAREA                                            587             Lin       Display
+*>      163 01 VAR                                                     30             Lin       Display
+*> ------------------------------------------------------------------------------------------------------------------
+*> --I: #14 Compiling WSZIPCD.cbl

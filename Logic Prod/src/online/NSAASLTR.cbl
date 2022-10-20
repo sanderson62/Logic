@@ -1,0 +1,371 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.   NSAASLTR.
+      *AUTHOR.     PABLO
+      *            COLLEYVILLE, TEXAS.
+      *REMARKS.    EXECUTED FROM addasarch.html
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      * 071111    2011022800001  PEMA  NEW PROGRAM
+041320* 041320  CR2020030500002  PEMA  Distinguish between iss and canc
+061421* 061421  CR2017031500001  PEMA  Update to CCM8
+      ******************************************************************
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       working-storage section.
+       01  DFH-START PIC X(04).
+      ************************************************
+      * commarea passed to the business logic
+      ************************************************
+       77  bl-input-length             pic 9(04) BINARY.
+       01 srch-commarea.
+      *                                copy ELCADLTRSPI.
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      * 060611    2011022800001  PEMA  NEW COPYBOOK
+101812* 101812    2012101700002  AJRA  ADD ENDT ARCHIVE NO, SCREENID
+110612* 110612    2012101700002  AJRA  EXPAND PASSED DATA
+      ******************************************************************
+      ****************************************
+      *  commarea for NaperSoft On Demand Admin services letters
+      *  (business logic input & output)
+      ****************************************
+           03  BL-INPUT.
+               05  BL-DATA-SRCE        PIC X.
+               05  BL-LETTER-ID        PIC XXXX.
+               05  BL-CARRIER          PIC X.
+               05  BL-GROUP            PIC X(6).
+               05  BL-STATE            PIC XX.
+               05  BL-ACCOUNT          PIC X(10).
+               05  BL-EFF-DT           PIC X(10).
+               05  BL-CERT-NO          PIC X(11).
+               05  BL-BATCH-NO         PIC X(6).
+               05  BL-BATCH-SEQ        PIC 9(8).
+               05  BL-RESP-NO          PIC X(10).
+               05  BL-NO-OF-COPIES     PIC 99.
+               05  BL-PROC-ID          PIC XXXX.
+               05  BL-COMP-ID          PIC XXX.
+               05  BL-PRINT-NOW-SW     PIC X.
+               05  BL-ENC-CD           PIC XXX.
+               05  BL-RESEND-DT        PIC X(10).
+               05  BL-FOLLOW-UP-DT     PIC X(10).
+               05  BL-ARCHIVE-NO       PIC 9(8).
+               05  BL-FUNC             PIC X(8).
+110612         05  BL-COMMENTS         PIC X(100).
+               05  FILLER REDEFINES BL-COMMENTS.
+                   10  BL-REASON-CODE OCCURS 12 PIC X(4).
+                   10  BL-LETTER-TO-ACCT PIC X.
+                   10  BL-LETTER-TO-BENE PIC X.
+                   10  BL-WRITE-ERARCH   PIC X.
+                       88  ERARCH-QWS      VALUE 'Q'.
+                       88  ERARCH-BATCH    VALUE 'B'.
+                       88  ERARCH-TEMP     VALUE 'T'.
+                   10  BL-PROCESS-TYPE PIC X(07).
+                   10  BL-CERT-FORM-ID PIC X(05).
+101812             10  BL-ENDT-ARCH-NO PIC 9(08) BINARY.
+101812             10  BL-SOURCE-SCREEN PIC X(8).
+110612             10  FILLER          PIC X(25).
+           03  BL-OUTPUT.
+               05  BL-STATUS                   PIC X.
+                   88  BL-OK                      VALUE "P".
+                   88  BL-FAIL                  VALUE "F".
+               05  BL-MESSAGE          PIC X(50).
+110612     03  BL-RECORD-PASSED-DATA   PIC X(6200).
+110612     03  FILLER                  PIC X(31).
+       01  INPUT-FROM-FORM.
+           05  IFF-COMP-ID           PIC XXX.
+           05  IFF-PRINT-NOW-SW      PIC X.
+           05  IFF-ARCHIVE-NO        PIC 9(08).
+           05  IFF-FUNC              PIC X(06).
+041320     05  iff-batch-no          pic x(06).
+041320     05  iff-batch-seq-no      pic 9(08).
+           05  IFF-PROCESS-TYPE      PIC X(07).
+      ************************************
+      * fields used to read web data
+      ************************************
+       01  w-form-name       pic x(80).
+       01  w-form-value      pic x(160).
+       01  w-form-name-len   pic s9(8) comp.
+       01  w-form-value-len  pic s9(8) comp.
+       01  w-resp            pic s9(8) comp.
+       01  w-doctoken        pic x(16).
+       01 output-msg.
+          05 filler              pic x(4) value "MSG=".
+          05 out-msg-text        pic x(50).
+       01  MISC.
+           12  WS-RESPONSE             PIC S9(8)   COMP.
+               88  RESP-NORMAL                  VALUE +00.
+               88  RESP-NOTFND                  VALUE +13.
+               88  RESP-DUPREC                  VALUE +14.
+               88  RESP-DUPKEY                  VALUE +15.
+               88  RESP-NOTOPEN                 VALUE +19.
+               88  RESP-ENDFILE                 VALUE +20.
+      ****************************************************************
+      *                                                               
+      * Copyright (c) 2007-2013 Dell Inc.                             
+      * All rights reserved.                                          
+      *                                                               
+      ****************************************************************
+       01  DFHEIV.                                                    
+         02  DFHEIV0               PIC X(35).                         
+         02  DFHEIV1               PIC X(08).                         
+         02  DFHEIV2               PIC X(08).                         
+         02  DFHEIV3               PIC X(08).                         
+         02  DFHEIV4               PIC X(06).                         
+         02  DFHEIV5               PIC X(04).                         
+         02  DFHEIV6               PIC X(04).                         
+         02  DFHEIV7               PIC X(02).                         
+         02  DFHEIV8               PIC X(02).                         
+         02  DFHEIV9               PIC X(01).                         
+         02  DFHEIV10              PIC S9(7) COMP-3.                  
+         02  DFHEIV11              PIC S9(4) COMP SYNC.               
+         02  DFHEIV12              PIC S9(4) COMP SYNC.               
+         02  DFHEIV13              PIC S9(4) COMP SYNC.               
+         02  DFHEIV14              PIC S9(4) COMP SYNC.               
+         02  DFHEIV15              PIC S9(4) COMP SYNC.               
+         02  DFHEIV16              PIC S9(9) COMP SYNC.               
+         02  DFHEIV17              PIC X(04).                         
+         02  DFHEIV18              PIC X(04).                         
+         02  DFHEIV19              PIC X(04).                         
+         02  DFHEIV20              USAGE IS POINTER.                  
+         02  DFHEIV21              USAGE IS POINTER.                  
+         02  DFHEIV22              USAGE IS POINTER.                  
+         02  DFHEIV23              USAGE IS POINTER.                  
+         02  DFHEIV24              USAGE IS POINTER.                  
+         02  DFHEIV25              PIC S9(9) COMP SYNC.               
+         02  DFHEIV26              PIC S9(9) COMP SYNC.               
+         02  DFHEIV27              PIC S9(9) COMP SYNC.               
+         02  DFHEIV28              PIC S9(9) COMP SYNC.               
+         02  DFHEIV29              PIC S9(9) COMP SYNC.               
+         02  DFHEIV30              PIC S9(9) COMP SYNC.               
+         02  DFHEIV31              PIC S9(9) COMP SYNC.               
+         02  DFHEIV32              PIC S9(4) COMP SYNC.               
+         02  DFHEIV33              PIC S9(4) COMP SYNC.               
+         02  DFHEIV34              PIC S9(4) COMP SYNC.               
+         02  DFHEIV35              PIC S9(4) COMP SYNC.               
+         02  DFHEIV97              PIC S9(7) COMP-3 VALUE ZERO.       
+         02  DFHEIV98              PIC S9(4) COMP SYNC VALUE ZERO.    
+         02  FILLER                PIC X(02).                         
+         02  DFHEIV99              PIC X(08) VALUE SPACE.             
+         02  DFHEIVL0              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL1              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL2              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL3              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL4              PIC X(255) VALUE SPACE.            
+         02  DFHEIVL5              PIC X(255) VALUE SPACE.            
+       LINKAGE  SECTION.
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2007-2013 Dell Inc.                             *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       01  dfheiblk.
+           02  eibtime          pic s9(7) comp-3.
+           02  eibdate          pic s9(7) comp-3.
+           02  eibtrnid         pic x(4).
+           02  eibtaskn         pic s9(7) comp-3.
+           02  eibtrmid         pic x(4).
+           02  dfheigdi         pic s9(4) comp.
+           02  eibcposn         pic s9(4) comp.
+           02  eibcalen         pic s9(4) comp.
+           02  eibaid           pic x(1).
+           02  eibfiller1       pic x(1).
+           02  eibfn            pic x(2).
+           02  eibfiller2       pic x(2).
+           02  eibrcode         pic x(6).
+           02  eibfiller3       pic x(2).
+           02  eibds            pic x(8).
+           02  eibreqid         pic x(8).
+           02  eibrsrce         pic x(8).
+           02  eibsync          pic x(1).
+           02  eibfree          pic x(1).
+           02  eibrecv          pic x(1).
+           02  eibsend          pic x(1).
+           02  eibatt           pic x(1).
+           02  eibeoc           pic x(1).
+           02  eibfmh           pic x(1).
+           02  eibcompl         pic x(1).
+           02  eibsig           pic x(1).
+           02  eibconf          pic x(1).
+           02  eiberr           pic x(1).
+           02  eibrldbk         pic x(1).
+           02  eiberrcd         pic x(4).
+           02  eibsynrb         pic x(1).
+           02  eibnodat         pic x(1).
+           02  eibfiller5       pic x(2).
+           02  eibresp          pic s9(8) comp.
+           02  eibresp2         pic s9(8) comp.
+           02  dfheigdj         pic s9(4) comp.
+           02  dfheigdk         pic s9(4) comp.
+       01  DFHCOMMAREA       PIC X(01).
+       PROCEDURE DIVISION USING DFHEIBLK DFHCOMMAREA.
+       0000-DFHEXIT SECTION.
+           MOVE '9#                    $   ' TO DFHEIV0.
+           MOVE 'NSAASLTR' TO DFHEIV1.
+           CALL 'kxdfhei1' USING DFHEIV0 DFH-START DFHEIV DFHEIV1.
+      *********************
+      * Receive web input
+      *********************
+           
+      * exec cics web
+      *       startbr formfield resp(w-resp)
+      *     end-exec.
+      *    MOVE 'X(f                   &  N#00000217' TO DFHEIV0
+           MOVE X'582866202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+           MOVE X'204E233030303030323137' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           MOVE EIBRESP  TO w-resp
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+            perform read-form thru read-form-exit
+               until w-resp not = 0 .
+      *   dfhresp(normal)
+            
+      * exec cics web
+      *       endbr formfield
+      *     end-exec.
+      *    MOVE 'X,f                   #   #00000222' TO DFHEIV0
+           MOVE X'582C66202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202320' TO DFHEIV0(13:12)
+           MOVE X'2020233030303030323232' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+           move spaces                 to bl-input
+           MOVE IFF-COMP-ID            TO BL-COMP-ID
+           MOVE IFF-PRINT-NOW-SW       TO BL-PRINT-NOW-SW
+           MOVE IFF-ARCHIVE-NO         TO BL-ARCHIVE-NO
+           MOVE IFF-FUNC               TO BL-FUNC
+041320     move iff-batch-no           to bl-batch-no
+041320     move iff-batch-seq-no       to bl-batch-seq
+091820     MOVE IFF-PROCESS-TYPE       TO BL-PROCESS-TYPE
+PEMTST*    DISPLAY ' I F F ' INPUT-FROM-FORM
+      *****************************************
+      * Invoke the SEARCH business logic
+      *****************************************
+      *    DISPLAY ' BL INPUT        ' BL-INPUT
+           display ' about to link to nsaasbl '
+           move function length(bl-input) to bl-input-length
+           display ' bl input length ' bl-input-length
+           
+      * exec cics link
+      *       program  ('NSAASBL')
+      *       commarea (bl-input)
+      *       length   (bl-input-length)
+      *    end-exec.
+           MOVE 'NSAASBL' TO DFHEIV1
+      *    MOVE '."C                   (   #00000241' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303030323431' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 bl-input, 
+                 bl-input-length, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+           display ' returning from nsaasbl and about to cics return '
+           
+      * exec cics
+      *       return
+      *    end-exec.
+      *    MOVE '.(                    ''   #00000247' TO DFHEIV0
+           MOVE X'2E2820202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202720' TO DFHEIV0(13:12)
+           MOVE X'2020233030303030323437' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+      ******************************************************
+      * Read all fields of the incoming form, moving
+      * each to the corresponding field of the commarea
+      * (business logic input fields).  For a search,
+      * both form fields, last_name and first_initial,
+      * may be null.  In that case, set the business
+      * logic input fields to spaces.
+      ******************************************************
+       read-form.
+           move spaces to w-form-name.
+           move length of w-form-name to w-form-name-len.
+                 move spaces to w-form-value.
+           move length of w-form-value to w-form-value-len.
+           
+      * exec cics web readnext
+      *                  formfield(w-form-name)
+      *                  namelength(w-form-name-len)
+      *                  value(w-form-value)
+      *                  valuelength(w-form-value-len)
+      *                  resp(w-resp)
+      *    end-exec.
+      *    MOVE 'X*FLVL                &  N#00000263' TO DFHEIV0
+           MOVE X'582A464C564C202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+           MOVE X'204E233030303030323633' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 w-form-name, 
+                 w-form-name-len, 
+                 w-form-value, 
+                 w-form-value-len, 
+                 DFHEIV99
+           MOVE EIBRESP  TO w-resp
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+           evaluate w-resp
+              when 0 
+      *   dfhresp(normal)
+                 evaluate w-form-name(1:w-form-name-len)
+                    when 'archkey'
+                       if w-form-value-len not = 0
+                          move w-form-value(1:w-form-value-len)
+                                 to INPUT-FROM-FORM
+                       else
+                          move spaces to INPUT-FROM-FORM
+                       end-if
+                 end-evaluate
+              when other
+                 continue
+           end-evaluate.
+       read-form-exit.
+
+       9999-DFHBACK SECTION.
+           MOVE '9%                    "   ' TO DFHEIV0
+           MOVE 'NSAASLTR' TO DFHEIV1
+           CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+           GOBACK.
+       9999-DFHEXIT.
+           IF DFHEIGDJ EQUAL 0001
+               NEXT SENTENCE.
+           MOVE '9%                    "   ' TO DFHEIV0
+           MOVE 'NSAASLTR' TO DFHEIV1
+           CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+           GOBACK.

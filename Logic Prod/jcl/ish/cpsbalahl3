@@ -1,0 +1,49 @@
+################################################################################
+#                       
+#     JOB: cpsbalahl3
+#       This job checks the totals from job ahlgm17, step ECS080
+#       against the tolerance amounts provided by CPS accounting.
+#                      
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+# 
+# PERL1 Checks ECS080 Gross Reserve Against Tolerance Amounts Provided By CPS
+#
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+perl $HOME/bin/cpschkbal1.pl $SEQFILES/ahlmechkpts.txt $SEQFILES/ahlgm17.ECS080.ME.BAL.AMTS $SEQFILES/ahlmechkpts.20220930.txt $SEQFILES/ahlcpschkbal1.20220930.msgs
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=FTPPUT1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+ftp -n ntcso1 < $JCLLIB/ftp-cpsbalahl3
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTPPUT1' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "smtp -f slunikix -t bal331 -s 'Results of AHL CPS Balancing' -mf /apps/prod/cid1p/emails/cpsbalahl3.txt"
+else
+    "cat $SEQFILES/ahlmechkpts.txt $SEQFILES/ahlgm17.ECS080.ME.BAL.AMTS > $SEQFILES/ah.ecs080.out.bal.txt"
+    "mutt -s ' AHL ECS080 IS OUT OF BALANCE' -i $SEQFILES/ah.ecs080.out.bal.txt -e 'my_hdr FROM:pema@cso.com' lgoncall@cso.com < /dev/null"
+    echo " Balancing may be outside of tolerance"
+    echo " Results file is ahlmechkpts.20220930.txt"
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOB
+# 052914  2014042300003  TANA   CHANGE SMTP TO USE DIST GROUP

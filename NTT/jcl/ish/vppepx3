@@ -1,0 +1,60 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+################################################################################
+LABEL name=CIDEPX3
+################################################################################
+
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTV' disp='i-o' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/VP.XX.EPEC_00' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD.EPX1' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.EPEC.EXTRACT3.TMP' disp='o' normal='k' abend='d' recsize='698' recfmt='F' 
+
+EXECPGM pgmname='CIDEPX3' stepname='CIDEPX3' 
+
+################################################################################
+LABEL name=SORT1
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/VP.EPEC.EXTRACT3.TMP' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/ext3_vpp_epec_tmp' disp='o' normal='k' abend='k' recfmt='F' recsize='698'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+ASSGNDD ddname='SORTWK06' type='TEMP' 
+ASSGNDD ddname='SORTWK07' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 1)(3 6) (10 2) (13 10) (24 10) (35 10) (46 10)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT1' 
+
+################################################################################
+LABEL name=ADDCRLF
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/addcrlf.pl $SEQFILES/ext3_vpp_epec_tmp $SEQFILES/ext3_vpp_epec_srtd 698
+!
+EXECPGM pgmname='BPXBATCH' stepname='ADDCRLF' parm='SH'
+
+if ($JOBSTATUS == 0) then
+   ftp -n ntis1.cso.local < $JCLLIB/ftp-vppepx3
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 071807  2007021400002  PEMA   NEW JOB

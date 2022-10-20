@@ -1,0 +1,538 @@
+* Micro Focus Server Express         V5.1 revision 000 08-Dec-17 08:45 Page   1
+* WSZIPCD.cbl
+* Options: int("WSZIPCD.int") anim csi verbose NOBOUND LINKCHECK
+*          PARAMCOUNTCHECK directives(cobopt.bth) endp list("WSZIPCD.lst")
+     1$SET SQL(dbman=ODBC, TARGETDB=MSSQLSERVER, NOAUTOCOMMIT)
+* Setting: NOACCEPTREFRESH NOADV ALIGN"8" ALPHASTART"1" NOALTER NOAMODE ANIM
+*          NOANIMPREP ANS85 APOST NOAREACHECK ARITHMETIC"OSVS" ASSIGN
+*          "EXTERNAL" NOASSIGN-PRINTER NOAUTOLOCK NOBELL NOBOUND NOBRIEF
+*          NOBS2000 BWZSTAR NOBYTEMODEMOVE CALLFH"EXTFH" NOCALLMCS
+*          NOCALLRECOVERY CALLSORT"EXTSM" CANCEL CANCELLBR NOCHANGEMESSAGE
+*          CHARSET"ASCII" CHECKDIV"ANSI" NOCHECKREFMOD NOCICS CICS-CPY
+*          NOCICSOPTIMIZE NOCMPR2 NOCOBFSTATCONV NOCOBIDY NOCOBOL370 COBOLDIR
+*          NOCOMP COMP-5"2" COMP-6"2" NOCOMS85 CONFIRM NOCONVERTRET CONVSPACE
+*          COPYEXT",cbl,cpy" NOCOPYLBR COPYLIST COPYLISTCOMMENT"1" CSI
+*          CURRENCY-SIGN"36" CURRENT-DATE"MMDDYY" NODATA DATACOMPRESS"0"
+*          NODATA-CONTEXT DATE DBCHECK DBCS"2" NODBCSSOSI DBSPACE DE-EDIT"2"
+*          DEFAULTBYTE"0" NODEFAULTCALLS DETECTLOCK NODG DIALECT"MF"
+*          NODIRECTIVES-IN-COMMENTS NODOSVS NODPCINSUBSCRIPT DYNAM
+*          NOEARLY-RELEASE ECHO NOECHOALL NOEDITOR ENSUITE"0" NOENTCOBOL
+*          ERRFORMAT"1" ERRLIST"EMBED" NOERRQ FASTSORT NOFCD3 NOFCDREG
+*          NOFDCLEAR NOFILESHARE FILETYPE"0" NOFLAG NOFLAGAS NOFLAGCD
+*          NOFLAGEUC NOFLAGMIG NOFLAGQ FLAGSINEDIT NOFLAGSTD NOFOLDCALLNAME
+*          NOFOLDCOPYNAME FORM"60" NOFP-ROUNDING NOHOSTARITHMETIC
+*          NOHOSTCONTZERO NOHOST-NUMCOMPARE NOHOST-NUMMOVE NOHOSTFD NOHOSTRW
+*          NOIBM-MS IBMCOMP IDXFORMAT"0" NOILGEN IMPLICITSCOPE NOINDD
+*          INFORETURN"0" NOINITCALL INITPTR INT"WSZIPCD.int" INTDATE"ANSI"
+*          INTLEVEL"2" IOCONV NOISO2002 NOIXNLSKEY NOIXNUMKEY KEEP-INT
+*          KEYCHECK KEYCOMPRESS"0" LIBRARIAN"2" NOLINE-COUNT LIST"WSZIPCD.lst"
+*          LISTPATH"" LISTWIDTH"80" LITVAL-SIZE"4" LOCKTYPE"0" NOMAPNAME
+*          NOMAXERROR METHODDEFAULT"REFERENCE" MF"15" MFCOMMENT NOMOVELENCHECK
+*          NOMS NOMVS NATIVE"ASCII" NONATIVEFLOATINGPOINT NONCHAR
+*          NONEWBASENAME NONLS NSYMBOL"DBCS" NOODOOSVS NOODOSLIDE
+*          NOOLDBLANKLINE NOOLDCOPY NOOLDINDEX NOOLDNEXTSENTENCE NOOLDREADINTO
+*          NOOLDSTRMIX OOCTRL"-C-E-G-P+Q+R-S+W" OPTIONAL-FILE NOOS390 OSEXT""
+*          NOOSVS NOOUTDD NOP64 NOPANVALET PERFORM-TYPE"OSVS" NOPREPLIST
+*          NOPREPROCESS NOPRINT-EXT NOPROFILE NOPROGID-COMMENT
+*          NOPROGID-INT-NAME NOPROTECT-LINKAGE PROTOTYPE"RELAXED" QUAL
+*          QUALPROC NOQUERY NOQUOTE NORAWLIST NORDW RECMODE"F" NOREENTRANT
+*          NOREF NOREFNO REMAINDER"1" REPORT-LINE"256" RESEQ NORETRYLOCK
+*          REWRITE-LS NORM RTNCODE-SIZE"4" NORWHARDPAGE NOSAA SEG NOSEQCHK
+*          SEQUENTIAL"RECORD" NOSERIAL SETTING"LINE" NOSHAREOUTDD NOSHOW-DIR
+*          SIGN"ASCII" NOSIGNDISCARD NOSIGNFIXUP SORTTYPE"DFSORT" SOURCEFORMAT
+*          "FIXED" SOURCETABSTOP"8" NOSPZERO NOSSRANGE STDERR STICKY-LINKAGE
+*          "2" NOSTICKY-PERFORM SUPFF SWITCHTYPE"1" SYMBSTART"1" SYSPUNCH"132"
+*          TERMPAGE TIME NOTRACE NOTRUNC NOTRUNCCALLNAME NOTRUNCCOPY TRUNCINC
+*          "10" UNICODE"NATIVE" VERBOSE VSC2"4" WARNING"1" NOWB NOWB2 NOWB3
+*          WEBSERVER"CGI" NOWRITELOCK NOWRITETHRU NOXOPEN NOXREF
+*          NOZEROLENGTHFALSE NOZEROSEQ NOZWB
+     2 identification division.
+     3 program-id. WSZIPCD.
+     4******************************************************************
+     5*                   C H A N G E   L O G
+     6*
+     7* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+     8*-----------------------------------------------------------------
+     9*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+    10* EFFECTIVE    NUMBER
+    11*-----------------------------------------------------------------
+    12* 101017  CR2016091600001  PEMA  New program to verify zipcode.
+    13******************************************************************
+* Micro Focus Server Express         V5.1 revision 000 08-Dec-17 08:45 Page   2
+* WSZIPCD.cbl
+    14 environment division.
+    15 INPUT-OUTPUT SECTION.
+    16 FILE-CONTROL.
+    17 data division.
+    18 FILE SECTION.
+    19 working-storage section.
+    20 01  DFH-START PIC X(04).
+    21 77  s1 pic s999 comp-3 value +0.
+    22 77  BYTE-OFFSET PIC S9(8) COMP VALUE +0.
+    23 77  ws-eof-sw                   pic x  value spaces.
+    24     88  end-of-input                  value 'Y'.
+    25 77  ws-error-sw                 pic x  value spaces.
+    26     88  error-found               value 'Y'.
+    27 77  ws-string-len               pic s999 comp-3 value zeros.
+    28 01  P pointer.
+    29 01  KIXSYS                      pic X(7)  VALUE Z"KIXSYS".
+    30 01  var-ptr pointer.
+    31 01  env-var-len                 pic 9(4)  binary.
+    32 01  rc                          pic 9(9)  binary.
+    33 01  WS-KIXSYS.
+    34     05  WS-KIX-FIL1             PIC X(10).
+    35     05  WS-KIX-APPS             PIC X(10).
+    36     05  WS-KIX-ENV              PIC X(10).
+    37     05  WS-KIX-MYENV            PIC X(10).
+    38     05  WS-KIX-SYS              PIC X(10).
+    39 01  ws-xml-stuff.
+    40     05  ws-fld-1                pic x(20) value spaces.
+    41     05  ws-fld-2                pic x(20) value spaces.
+    42     05  ws-fld-3                pic x(50) value spaces.
+    43     05  ws-error-cd redefines
+    44         ws-fld-3                pic 9.
+    45     05  ws-len-of-5 redefines
+    46         ws-fld-3                pic 9(5).
+    47     05  ws-model-year redefines
+    48         ws-fld-3                pic 9999.
+    49     05  ws-base-price redefines
+    50         ws-fld-3                pic 9(11).
+    51     05  ws-fld-4                pic x(20) value spaces.
+    52     05  ws-fld-5                pic x(20) value spaces.
+*   53 EXEC SQL
+*   54    INCLUDE SQLDA
+*   55 END-EXEC
+    56 01 SQLDA sync.
+    57    05 SQLDAID               PIC X(8)  VALUE "SQLDA  ".
+    58    05 SQLDABC               PIC S9(9) COMP-5 value 0.
+    59    05 SQLN                  PIC S9(4) COMP-5 value 0.
+    60    05 SQLD                  PIC S9(4) COMP-5 value 0.
+    61    05 SQLVAR OCCURS 0 TO 1489 TIMES DEPENDING ON SQLD.
+    62       10 SQLTYPE            PIC S9(4) COMP-5.
+    63       10 SQLLEN             PIC S9(4) COMP-5.
+    64$IF P64 SET
+    65X      *> For 64-bit environments, ensure that SQLDATA is
+    66X      *> aligned on an 8-byte boundary.
+    67X      10 FILLER             PIC S9(9) COMP-5.
+    68$END
+    69       10 SQLDATA            USAGE POINTER.
+    70       10 SQLIND             USAGE POINTER.
+    71       10 SQLNAME.
+* Micro Focus Server Express         V5.1 revision 000 08-Dec-17 08:45 Page   3
+* WSZIPCD.cbl (/opt/lib/cobol/cpylib/sqlda.cpy)
+    72          15 SQLNAMEL        PIC S9(4) COMP-5.
+    73          15 SQLNAMEC        PIC X(30).
+    74
+    75* Values for SQLTYPE
+    76
+    77 78  ESQL-DATE-CHAR              VALUE 384.
+    78 78  ESQL-DATE-CHAR-NULL         VALUE 385.
+    79 78  ESQL-DATE-REC               VALUE 386.
+    80 78  ESQL-DATE-REC-NULL          VALUE 387.
+    81 78  ESQL-TIME-CHAR              VALUE 388.
+    82 78  ESQL-TIME-CHAR-NULL         VALUE 389.
+    83 78  ESQL-TIME-REC               VALUE 390.
+    84 78  ESQL-TIME-REC-NULL          VALUE 391.
+    85 78  ESQL-TIMESTAMP-CHAR         VALUE 392.
+    86 78  ESQL-TIMESTAMP-CHAR-NULL    VALUE 393.
+    87 78  ESQL-TIMESTAMP-REC          VALUE 394.
+    88 78  ESQL-TIMESTAMP-REC-NULL     VALUE 395.
+    89 78  ESQL-TS-OFFSET-CHAR         VALUE 396. *> added nx51sp1
+    90 78  ESQL-TS-OFFSET-CHAR-NULL    VALUE 397.
+    91 78  ESQL-TS-OFFSET-REC          VALUE 398.
+    92 78  ESQL-TS-OFFSET-REC-NULL     VALUE 399. *> end adds nx51sp1
+    93 78  ESQL-LONGVARBINARY          VALUE 404.
+    94 78  ESQL-LONGVARBINARY-NULL     VALUE 405.
+    95 78  ESQL-LONGVARCHAR            VALUE 408.
+    96 78  ESQL-LONGVARCHAR-NULL       VALUE 409.
+    97 78  ESQL-BINARY                 VALUE 444.
+    98 78  ESQL-BINARY-NULL            VALUE 445.
+    99 78  ESQL-VARBINARY              VALUE 446.
+   100 78  ESQL-VARBINARY-NULL         VALUE 447.
+   101 78  ESQL-VARCHAR                VALUE 448.
+   102 78  ESQL-VARCHAR-NULL           VALUE 449.
+   103
+   104 78  ESQL-CHARVARYING            VALUE 450.  *> added esq03n31
+   105 78  ESQL-CHARVARYING-NULL       VALUE 451.  *> added esq03n31
+   106
+   107 78  ESQL-CHAR                   VALUE 452.
+   108 78  ESQL-CHAR-NULL              VALUE 453.
+   109
+   110 78  ESQL-CHAR-FIXED             VALUE 454.  *> added esq03n31
+   111 78  ESQL-CHAR-FIXED-NULL        VALUE 455.  *> added esq03n31
+   112
+   113 78  ESQL-DOUBLE                 VALUE 480.
+   114 78  ESQL-DOUBLE-NULL            VALUE 481.
+   115 78  ESQL-REAL                   VALUE 482.
+   116 78  ESQL-REAL-NULL              VALUE 483.
+   117 78  ESQL-DECIMAL                VALUE 484.
+   118 78  ESQL-DECIMAL-NULL           VALUE 485.
+   119 78  ESQL-INTEGER                VALUE 496.
+   120 78  ESQL-INTEGER-NULL           VALUE 497.
+   121 78  ESQL-SMALLINT               VALUE 500.
+   122 78  ESQL-SMALLINT-NULL          VALUE 501.
+   123 78  ESQL-TINYINT                VALUE 502.
+   124 78  ESQL-TINYINT-NULL           VALUE 503.
+*  125 EXEC SQL
+*  126    INCLUDE SQLCA
+*  127 END-EXEC
+   128 01 SQLCA.
+   129     05  SQLCAID         PIC X(8)         VALUE "SQLCA   ".
+* Micro Focus Server Express         V5.1 revision 000 08-Dec-17 08:45 Page   4
+* WSZIPCD.cbl (/opt/lib/cobol/cpylib/sqlca.cpy)
+   130     05  SQLCABC         PIC S9(9) COMP-5 VALUE 136.
+   131     05  SQLCODE         PIC S9(9) COMP-5 VALUE 0.
+   132     05  SQLERRM.
+   133         49  SQLERRML    PIC S9(4) COMP-5.
+   134         49  SQLERRMC    PIC X(70).
+   135     05  SQLERRP         PIC X(8).
+   136     05  SQLERRD         PIC S9(9) COMP-5 OCCURS 6 VALUE 0.
+   137     05  SQLWARN.
+   138         10  SQLWARN0    PIC X.
+   139         10  SQLWARN1    PIC X.
+   140         10  SQLWARN2    PIC X.
+   141         10  SQLWARN3    PIC X.
+   142         10  SQLWARN4    PIC X.
+   143         10  SQLWARN5    PIC X.
+   144         10  SQLWARN6    PIC X.
+   145         10  SQLWARN7    PIC X.
+   146     05  SQLEXT.
+   147         10  SQLWARN8    PIC X.
+   148         10  SQLWARN9    PIC X.
+   149         10  SQLWARN10   PIC X.
+   150         10  SQLWARNA    REDEFINES SQLWARN10 PIC X .
+   151     05  SQLSTATE    PIC X(5).
+   152 EXEC SQL
+   153    BEGIN DECLARE SECTION
+   154 END-EXEC
+   155 01  sqlcmd                      pic x(1024).
+   156 01  svr                         pic x(32).
+   157 01  usr                         pic x(32).
+   158 01  pass                        pic x(32).
+   159 01  usr-pass                    pic x(64).
+   160 01  ws-disp-code                pic s9(11).
+   161***-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_***
+   162***                                                            ***
+   163***  These indicators are used to determine if a variable      ***
+   164***  is passed nulls from sql. The indicator will be -1        ***
+   165***  if the value on sql is nulls and +0 if the value is       ***
+   166***  something other than nulls. Here is an example on how     ***
+   167***  to use the indicator variables.                           ***
+   168***                                                            ***
+   169***     EXEC SQL                                               ***
+   170***        fetch checkapp into                                 ***
+   171***           :db-app-status :nu-app-status,                   ***
+   172***           :db-app-by     :nu-app-by,                       ***
+   173***           :db-app-date   :nu-app-date,                     ***
+   174***           :db-app-batch  :nu-app-batch                     ***
+   175***     END-EXEC                                               ***
+   176***                                                            ***
+   177***_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-***
+   178 01  indicator-vaiables-for-nulls.
+   179     05  nu-state                pic s9(4) comp value +0.
+   180     05  nu-city                 pic s9(4) comp value +0.
+   181     05  nu-county               pic s9(4) comp value +0.
+   182 01  zip-codes.
+   183     05  zc-zipcode              pic x(5).
+   184     05  zc-state                pic xx.
+   185     05  zc-city                 pic x(30).
+   186     05  zc-cityPreferred        pic x(40).
+   187 EXEC SQL
+* Micro Focus Server Express         V5.1 revision 000 08-Dec-17 08:45 Page   5
+* WSZIPCD.cbl
+   188    END DECLARE SECTION
+   189 END-EXEC
+   190 01  ws-misc.
+   191     12  ws-file-in              pic x(26) value spaces.
+   192     12  ws-connect-sw               pic x  value ' '.
+   193         88  connected-to-db             value 'Y'.
+   194     12  ws-file-in-status       pic xx  value spaces.
+   195     12  ws-curl-return-cd       pic s9(8) comp-5 value +0.
+   196     12  ws-curl-string.
+   197         16  f                   pic x(16) value
+   198          'curl -o /tmp/zip'.
+   199         16  filename-zip        pic x(5)  value spaces.
+   200         16  f                   pic xxxx value '.txt'.
+   201         16  f                   pic x(15) value
+   202          ' --data "USZip='.
+   203         16  curl-zip            pic x(5) value zeros.
+   204         16  f                   pic x(48) value
+   205          '" http://webservicex.net/uszip.asmx/GetInfoByZIP'.
+   206         16  f                   pic x value low-values.
+   207 01  WS-RESPONSE                 PIC S9(8) COMP VALUE +0.
+   208     88  RESP-NORMAL                    VALUE +0.
+   209     88  resp-file-notfnd               value +12.
+   210     88  RESP-NOTFND                    VALUE +13.
+   211     88  resp-duprec                    value +14.
+   212     88  resp-dupkey                    value +15.
+   213     88  resp-invreq                    value +16.
+   214     88  RESP-NOTOPEN                   VALUE +19.
+   215     88  RESP-ENDFILE                   VALUE +20.
+   216     88  resp-lengtherr                 value +22.
+   217 01  f.
+   218     05  ws-outputzip            pic x(5).
+   219     05  ws-city                 pic x(50).
+   220     05  ws-state                pic xx.
+   221 01  WS-PASS-AREa.
+   222     03  PA-ZIP                  PIC X(5).
+   223     03  PA-ErrorCode            PIC X(10).
+   224     03  PA-city                 PIC x(50).
+   225     03  PA-state                PIC XX.
+   226****************************************************************
+   227*
+   228* Copyright (c) 2007-2013 Dell Inc.
+   229* All rights reserved.
+   230*
+   231****************************************************************
+   232 01  DFHEIV.
+   233   02  DFHEIV0               PIC X(35).
+   234   02  DFHEIV1               PIC X(08).
+   235   02  DFHEIV2               PIC X(08).
+   236   02  DFHEIV3               PIC X(08).
+   237   02  DFHEIV4               PIC X(06).
+   238   02  DFHEIV5               PIC X(04).
+   239   02  DFHEIV6               PIC X(04).
+   240   02  DFHEIV7               PIC X(02).
+   241   02  DFHEIV8               PIC X(02).
+   242   02  DFHEIV9               PIC X(01).
+   243   02  DFHEIV10              PIC S9(7) COMP-3.
+   244   02  DFHEIV11              PIC S9(4) COMP SYNC.
+   245   02  DFHEIV12              PIC S9(4) COMP SYNC.
+* Micro Focus Server Express         V5.1 revision 000 08-Dec-17 08:45 Page   6
+* WSZIPCD.cbl
+   246   02  DFHEIV13              PIC S9(4) COMP SYNC.
+   247   02  DFHEIV14              PIC S9(4) COMP SYNC.
+   248   02  DFHEIV15              PIC S9(4) COMP SYNC.
+   249   02  DFHEIV16              PIC S9(9) COMP SYNC.
+   250   02  DFHEIV17              PIC X(04).
+   251   02  DFHEIV18              PIC X(04).
+   252   02  DFHEIV19              PIC X(04).
+   253   02  DFHEIV20              USAGE IS POINTER.
+   254   02  DFHEIV21              USAGE IS POINTER.
+   255   02  DFHEIV22              USAGE IS POINTER.
+   256   02  DFHEIV23              USAGE IS POINTER.
+   257   02  DFHEIV24              USAGE IS POINTER.
+   258   02  DFHEIV25              PIC S9(9) COMP SYNC.
+   259   02  DFHEIV26              PIC S9(9) COMP SYNC.
+   260   02  DFHEIV27              PIC S9(9) COMP SYNC.
+   261   02  DFHEIV28              PIC S9(9) COMP SYNC.
+   262   02  DFHEIV29              PIC S9(9) COMP SYNC.
+   263   02  DFHEIV30              PIC S9(9) COMP SYNC.
+   264   02  DFHEIV31              PIC S9(9) COMP SYNC.
+   265   02  DFHEIV32              PIC S9(4) COMP SYNC.
+   266   02  DFHEIV33              PIC S9(4) COMP SYNC.
+   267   02  DFHEIV34              PIC S9(4) COMP SYNC.
+   268   02  DFHEIV35              PIC S9(4) COMP SYNC.
+   269   02  DFHEIV97              PIC S9(7) COMP-3 VALUE ZERO.
+   270   02  DFHEIV98              PIC S9(4) COMP SYNC VALUE ZERO.
+   271   02  FILLER                PIC X(02).
+   272   02  DFHEIV99              PIC X(08) VALUE SPACE.
+   273   02  DFHEIVL0              PIC X(48) VALUE SPACE.
+   274   02  DFHEIVL1              PIC X(48) VALUE SPACE.
+   275   02  DFHEIVL2              PIC X(48) VALUE SPACE.
+   276   02  DFHEIVL3              PIC X(48) VALUE SPACE.
+   277   02  DFHEIVL4              PIC X(255) VALUE SPACE.
+   278   02  DFHEIVL5              PIC X(255) VALUE SPACE.
+   279 LINKAGE  SECTION.
+   280*****************************************************************
+   281*                                                               *
+   282* Copyright (c) 2007-2013 Dell Inc.                             *
+   283* All rights reserved.                                          *
+   284*                                                               *
+   285*****************************************************************
+   286 01  dfheiblk.
+   287     02  eibtime          pic s9(7) comp-3.
+   288     02  eibdate          pic s9(7) comp-3.
+   289     02  eibtrnid         pic x(4).
+   290     02  eibtaskn         pic s9(7) comp-3.
+   291     02  eibtrmid         pic x(4).
+   292     02  dfheigdi         pic s9(4) comp.
+   293     02  eibcposn         pic s9(4) comp.
+   294     02  eibcalen         pic s9(4) comp.
+   295     02  eibaid           pic x(1).
+   296     02  eibfiller1       pic x(1).
+   297     02  eibfn            pic x(2).
+   298     02  eibfiller2       pic x(2).
+   299     02  eibrcode         pic x(6).
+   300     02  eibfiller3       pic x(2).
+   301     02  eibds            pic x(8).
+   302     02  eibreqid         pic x(8).
+   303     02  eibrsrce         pic x(8).
+* Micro Focus Server Express         V5.1 revision 000 08-Dec-17 08:45 Page   7
+* WSZIPCD.cbl
+   304     02  eibsync          pic x(1).
+   305     02  eibfree          pic x(1).
+   306     02  eibrecv          pic x(1).
+   307     02  eibsend          pic x(1).
+   308     02  eibatt           pic x(1).
+   309     02  eibeoc           pic x(1).
+   310     02  eibfmh           pic x(1).
+   311     02  eibcompl         pic x(1).
+   312     02  eibsig           pic x(1).
+   313     02  eibconf          pic x(1).
+   314     02  eiberr           pic x(1).
+   315     02  eibrldbk         pic x(1).
+   316     02  eiberrcd         pic x(4).
+   317     02  eibsynrb         pic x(1).
+   318     02  eibnodat         pic x(1).
+   319     02  eibfiller5       pic x(2).
+   320     02  eibresp          pic s9(8) comp.
+   321     02  eibresp2         pic s9(8) comp.
+   322     02  dfheigdj         pic s9(4) comp.
+   323     02  dfheigdk         pic s9(4) comp.
+   324 01  DFHCOMMAREA                 PIC X(587).
+   325 01  var  pic x(30).
+   326 PROCEDURE DIVISION USING DFHEIBLK DFHCOMMAREA VAR.
+   327 0000-DFHEXIT SECTION.
+   328     MOVE '9#                    $   ' TO DFHEIV0.
+   329     MOVE 'WSZIPCD' TO DFHEIV1.
+   330     CALL 'kxdfhei1' USING DFHEIV0 DFH-START DFHEIV DFHEIV1.
+   331     display ' entering program WSZIPCD'
+   332     move dfhcommarea            to ws-pass-AREA
+   333     set P to address of KIXSYS
+   334     CALL "getenv" using by value P returning var-ptr
+   335     if var-ptr = null then
+   336        display ' kixsys not set '
+   337     else
+   338        set address of var to var-ptr
+   339        move 0 to env-var-len
+   340        inspect var tallying env-var-len
+   341          for characters before X'00'
+   342        unstring var (1:env-var-len) delimited by '/'
+   343           into WS-KIX-FIL1 WS-KIX-APPS WS-KIX-ENV WS-KIX-MYENV
+   344              WS-KIX-SYS
+   345        end-unstring
+   346     end-if
+   347     perform 0010-init           thru 0010-exit
+   348     perform 0020-connect        thru 0020-exit
+   349     perform 0030-get-zipcd-data thru 0030-exit
+   350     perform 0050-bld-pass-area  thru 0050-exit
+   351     perform 0060-disconnect     thru 0060-exit
+   352     .
+   353 0000-return.
+   354     move ws-pass-area           to dfhcommarea
+   355
+   356* exec cics return
+   357*    end-exec
+   358*    MOVE '.(                    ''   #00000258' TO DFHEIV0
+   359     MOVE X'2E2820202020202020202020' TO DFHEIV0(1:12)
+   360     MOVE X'202020202020202020202720' TO DFHEIV0(13:12)
+   361     MOVE X'2020233030303030323538' TO DFHEIV0(25:11)
+* Micro Focus Server Express         V5.1 revision 000 08-Dec-17 08:45 Page   8
+* WSZIPCD.cbl
+   362     CALL 'kxdfhei1' USING DFHEIV0,
+   363           DFHEIV99,
+   364           DFHEIV99,
+   365           DFHEIV99,
+   366           DFHEIV99,
+   367           DFHEIV99,
+   368           DFHEIV99
+   369     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+   370
+   371* GOBACK
+   372
+   373     MOVE '9%                    "   ' TO DFHEIV0
+   374     MOVE 'WSZIPCD' TO DFHEIV1
+   375     CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+   376     GOBACK
+   377     .
+   378 0010-init.
+   379     move pa-zip                 to zc-zipcode
+   380     move pa-city                to zc-city
+   381     move pa-state               to zc-state
+   382     .
+   383 0010-exit.
+   384     exit.
+   385 0020-connect.
+   386     move 'NTCSO2_CertNotify'    to svr
+   387     move 'sa'                   to usr
+   388     move 'ntcso2'               to pass
+   389     string
+   390         usr delimited space
+   391         "." delimited size
+   392         pass delimited space into usr-pass
+   393     end-string
+   394     EXEC SQL
+   395        CONNECT TO :svr USER :usr-pass
+   396     END-EXEC
+   397     if sqlcode not = 0
+   398        display "Error: cannot connect "
+   399        display sqlcode
+   400        display sqlerrmc
+   401     end-if
+   402     set connected-to-db to true
+   403     .
+   404 0020-exit.
+   405     exit.
+   406 0030-get-zipcd-data.
+   407     EXEC SQL
+   408        SELECT
+   409           CityPreferred
+   410        INTO
+   411           :zc-cityPreferred
+   412        FROM
+   413           ZIPCode
+   414        WHERE
+   415           ZipCode = :zc-zipcode
+   416           and State = :zc-state
+   417           and City = :zc-city
+   418     END-EXEC
+   419     if sqlcode not = 0
+* Micro Focus Server Express         V5.1 revision 000 08-Dec-17 08:45 Page   9
+* WSZIPCD.cbl
+   420        move 'NOTFOUND'          to pa-errorcode
+   421        display "Error: cannot read row "
+   422        display ' sql return code ' sqlcode
+   423        display ' sql err mess    ' sqlerrmc
+   424        display ' zip code        ' zc-zipcode
+   425        go to 0030-exit
+   426     end-if
+   427     .
+   428 0030-exit.
+   429     exit.
+   430 0050-bld-pass-area.
+   431     move function upper-case(zc-city)
+   432                                 to pa-city
+   433     move zc-state               to pa-state
+   434     .
+   435 0050-exit.
+   436     exit.
+   437 0060-disconnect.
+   438     EXEC SQL
+   439        DISCONNECT ALL
+   440     END-EXEC
+   441     if sqlcode not = 0
+   442        display "Error: cannot disconnect zipcodes "
+   443        display ' sql return code ' sqlcode
+   444        display ' sql err mess    ' sqlerrmc
+   445     end-if
+   446     .
+   447 0060-exit.
+   448     exit.
+   449 0125-calc-field-len.
+   450     move 0                      to ws-string-len
+   451     inspect ws-fld-3 tallying ws-string-len for all ' '
+   452*    display ' string len b4 ' ws-string-len
+   453     compute ws-string-len = 50 - ws-string-len
+   454*    display ' string len af ' ws-string-len
+   455     .
+   456 0125-exit.
+   457     exit.
+   458
+   459 9999-DFHBACK SECTION.
+   460     MOVE '9%                    "   ' TO DFHEIV0
+   461     MOVE 'WSZIPCD' TO DFHEIV1
+   462     CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+   463     GOBACK.
+   464 9999-DFHEXIT.
+   465     IF DFHEIGDJ EQUAL 0001
+   466         NEXT SENTENCE.
+   467     MOVE '9%                    "   ' TO DFHEIV0
+   468     MOVE 'WSZIPCD' TO DFHEIV1
+   469     CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+   470     GOBACK.
+* Micro Focus Server Express         V5.1 revision 000 Compiler
+* Copyright (C) Micro Focus IP Development Limited 1984-2012.
+*                                                        REF GNR-008065005AF
+* Total Messages:     0
+* Data:      135312     Code:        2889

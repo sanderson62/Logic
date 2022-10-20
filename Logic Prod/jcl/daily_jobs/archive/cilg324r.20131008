@@ -1,0 +1,54 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+ONRETCODE GT 11 GOTO END_JOB 
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job aborted, not mdoff"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=EL324R
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.WW.CLMDLY.EXTR' disp='i-o' normal='k' abend='k' 
+#ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.ME.CLMDLY.EXTR_00' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.EL517.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A'  
+
+EXECPGM pgmname='EL324R' stepname='EL324R' 
+
+################################################################################
+LABEL name=CPY324R
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL324R/SYS008_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH324R' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY324R' parm='ALL'
+   
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the files from above and creates pdf files
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/CI.DL.CIADM.FICH324R $SEQFILES/EL324R.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+	  echo " Nothing to print at this time "
+    "smtp -f slunikix -t pema -s '$JOBNAME is complete' -ml 'Daily EL324R Complete'"
+    "uuencode $SEQFILES/EL324R.pdf EL324R.pdf|mailx -s 'EL324R Report' -r 'slunikix@cso.com' pema@cso.com,djwb@cso.com,jmsb@cso.com,kmsb@cso.com"
+else
+	echo " Job aborted, print not released "
+endif
+
+################################################################################
+
+ENDJOB 
+################################################################################

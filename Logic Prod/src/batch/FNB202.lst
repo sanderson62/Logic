@@ -1,0 +1,706 @@
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page   1
+* FNB202.cbl
+* Options: int("FNB202.int") anim csi verbose NOBOUND PARAMCOUNTCHECK
+*          directives(cobopt.bth) endp list("FNB202.lst")
+* Setting: NOACCEPTREFRESH NOADV ALIGN"8" ALPHASTART"1" NOALTER NOAMODE ANIM
+*          NOANIMPREP ANS85 APOST NOAREACHECK ARITHMETIC"OSVS" ASSIGN
+*          "EXTERNAL" NOASSIGN-PRINTER NOAUTOLOCK NOBELL NOBOUND NOBRIEF
+*          NOBS2000 BWZSTAR NOBYTEMODEMOVE CALLFH"ebmlsfile" NOCALLMCS
+*          NOCALLRECOVERY CALLSORT"EXTSM" CANCEL CANCELLBR NOCHANGEMESSAGE
+*          CHARSET"ASCII" NOCHECKDIV NOCHECKREFMOD NOCICS CICS-CPY
+*          NOCICSOPTIMIZE NOCMPR2 NOCOBFSTATCONV NOCOBIDY NOCOBOL370 COBOLDIR
+*          NOCOMP COMP-5"2" COMP-6"2" NOCOMS85 CONFIRM NOCONVERTRET CONVSPACE
+*          COPYEXT",cbl,cpy" NOCOPYLBR COPYLIST COPYLISTCOMMENT"1" CSI
+*          CURRENCY-SIGN"36" CURRENT-DATE"MMDDYY" NODATA DATACOMPRESS"0"
+*          NODATA-CONTEXT DATE DBCHECK DBCS"2" NODBCSSOSI DBSPACE DE-EDIT"2"
+*          DEFAULTBYTE"32" NODEFAULTCALLS DETECTLOCK NODG DIALECT"MF"
+*          NODIRECTIVES-IN-COMMENTS NODOSVS NODPCINSUBSCRIPT DYNAM
+*          NOEARLY-RELEASE ECHO NOECHOALL NOEDITOR ENSUITE"0" NOENTCOBOL
+*          ERRFORMAT"1" ERRLIST"EMBED" NOERRQ FASTSORT NOFCD3 NOFCDREG
+*          NOFDCLEAR NOFILESHARE FILETYPE"0" NOFLAG NOFLAGAS NOFLAGCD
+*          NOFLAGEUC NOFLAGMIG NOFLAGQ FLAGSINEDIT NOFLAGSTD NOFOLDCALLNAME
+*          NOFOLDCOPYNAME FORM"60" NOFP-ROUNDING NOHOSTARITHMETIC
+*          NOHOSTCONTZERO NOHOST-NUMCOMPARE NOHOST-NUMMOVE NOHOSTFD NOHOSTRW
+*          NOIBM-MS IBMCOMP IDXFORMAT"0" NOILGEN IMPLICITSCOPE NOINDD
+*          INFORETURN"0" NOINITCALL INITPTR INT"FNB202.int" INTDATE"ANSI"
+*          INTLEVEL"2" IOCONV NOISO2002 NOIXNLSKEY NOIXNUMKEY KEEP-INT
+*          KEYCHECK KEYCOMPRESS"0" LIBRARIAN"2" NOLINE-COUNT LIST"FNB202.lst"
+*          LISTPATH"" LISTWIDTH"80" LITVAL-SIZE"4" LOCKTYPE"0" NOMAPNAME
+*          NOMAXERROR METHODDEFAULT"REFERENCE" MF"15" MFCOMMENT NOMOVELENCHECK
+*          NOMS NOMVS NATIVE"ASCII" NONATIVEFLOATINGPOINT NONCHAR
+*          NONEWBASENAME NONLS NSYMBOL"DBCS" NOODOOSVS NOODOSLIDE
+*          NOOLDBLANKLINE NOOLDCOPY NOOLDINDEX NOOLDNEXTSENTENCE NOOLDREADINTO
+*          NOOLDSTRMIX OOCTRL"-C-E-G-P+Q+R-S+W" OPTIONAL-FILE NOOS390 OSEXT""
+*          NOOSVS NOOUTDD NOP64 NOPANVALET PERFORM-TYPE"OSVS" NOPREPLIST
+*          NOPREPROCESS NOPRINT-EXT NOPROFILE NOPROGID-COMMENT
+*          NOPROGID-INT-NAME NOPROTECT-LINKAGE PROTOTYPE"RELAXED" QUAL
+*          QUALPROC NOQUERY NOQUOTE NORAWLIST NORDW RECMODE"F" NOREENTRANT
+*          NOREF NOREFNO REMAINDER"1" REPORT-LINE"256" RESEQ NORETRYLOCK
+*          REWRITE-LS NORM RTNCODE-SIZE"4" NORWHARDPAGE NOSAA SEG NOSEQCHK
+*          SEQUENTIAL"RECORD" NOSERIAL SETTING"LINE" NOSHAREOUTDD NOSHOW-DIR
+*          SIGN"ASCII" NOSIGNDISCARD NOSIGNFIXUP SORTTYPE"DFSORT" SOURCEFORMAT
+*          "FIXED" SOURCETABSTOP"8" NOSPZERO NOSSRANGE STDERR NOSTICKY-LINKAGE
+*          NOSTICKY-PERFORM SUPFF SWITCHTYPE"1" SYMBSTART"1" SYSPUNCH"132"
+*          TERMPAGE TIME NOTRACE NOTRUNC NOTRUNCCALLNAME NOTRUNCCOPY TRUNCINC
+*          "10" UNICODE"NATIVE" VERBOSE VSC2"2" WARNING"1" NOWB NOWB2 NOWB3
+*          WEBSERVER"CGI" NOWRITELOCK NOWRITETHRU NOXOPEN NOXREF
+*          NOZEROLENGTHFALSE NOZEROSEQ NOZWB
+     1 IDENTIFICATION DIVISION.
+     2 PROGRAM-ID.    FNB202.
+     3*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+     4*  DESCRIPTION:                                                          :
+     5*      THIS PROGRAM GENERATES A REPORT LISTING OUTSTANDING               :
+     6*      DRAFTS, ACCT #2724500150-00-0000-000000-00.                       :
+     7*                                                                        :
+     8*      THE RECORDS ARE SORTED BY ACCOUNT NO., SUSPENSE CODE,             :
+     9*      TRANSACTION AMOUNT AND TRANSACTION DATE.                          :
+    10*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    11*    DATE    BY  MODIFICATION                                            :
+    12* ========== === ========================================================:
+    13* 01/29/1999 VXO CREATION DATE                                           :
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page   2
+* FNB202.cbl
+    14* 03/18/2003 DJN CONVERT FROM MAINFRAME TO MICROFOCUS COBOL.             :
+    15* 07/28/2006 DJN DO NOT ADVANCE TO NEW PAGE ON FIRST PAGE OF REPORTS.    :
+    16* 08/25/2006 AJR REMOVE FROM CLAIMS SYSTEM.                              :
+    17*:::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+    18 ENVIRONMENT DIVISION.
+    19 INPUT-OUTPUT SECTION.
+    20 FILE-CONTROL.
+    21*
+    22     SELECT GL-SUSPENSE-TRANS-FILE
+    23         ASSIGN TO EXTERNAL SYS010
+    24         ORGANIZATION IS LINE SEQUENTIAL
+    25         STATUS IS SYS010-STATUS.
+    26
+    27     SELECT FNB202-GLS-OUTST-DRAFTS
+    28         ASSIGN TO EXTERNAL SYS007
+    29         ORGANIZATION IS LINE SEQUENTIAL.
+    30
+    31**** PARM FILE
+    32     SELECT PARM-FILE        ASSIGN       TO EXTERNAL IPARM
+    33                             ORGANIZATION IS LINE SEQUENTIAL
+    34                             FILE STATUS  IS PARM-STATUS.
+    35
+    36
+    37 DATA DIVISION.
+    38 FILE SECTION.
+    39
+    40 FD  GL-SUSPENSE-TRANS-FILE
+    41     LABEL RECORDS ARE STANDARD
+    42     RECORDING MODE IS F
+    43     RECORD CONTAINS 120 CHARACTERS
+    44     BLOCK CONTAINS 0 RECORDS.
+    45 01  GL-SUSPENSE-TRANS-RECORD.
+*   46     COPY FNC028.
+    47*****************************************************************
+    48*                                                               *
+    49*          FREEDOM GENERAL LEDGER SUSPENSE TRANSACTION          *
+    50*                                                               *
+    51************************************************V5.50 01/21/99***
+    52*
+    53     05  GLS-KEY.
+    54         10  GLS-SUSPENSE-CODE     PIC X(15).
+    55         10  GLS-ACCOUNT-NO.
+    56             15  GLS-MAJ-ACCT      PIC X(10).
+    57             15  GLS-DIV           PIC X(2).
+    58             15  GLS-CENTER        PIC X(4).
+    59             15  GLS-PRODUCT       PIC X(6).
+    60             15  GLS-STATE         PIC X(2).
+    61         10  GLS-TRANS-DATE        PIC X(8).
+    62         10  GLS-TRANS-TIME        PIC X(8).
+    63     05  GLS-TRANS-AMOUNT          PIC S9(12)V99
+    64                                   SIGN TRAILING SEPARATE.
+    65     05  GLS-DESCRIPTION           PIC X(30).
+    66     05  GLS-REFERENCE             PIC X(10).
+    67     05  GLS-SOURCE                PIC X(6).
+    68     05  FILLER                    PIC X(4).
+    69
+    70
+    71 FD  FNB202-GLS-OUTST-DRAFTS
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page   3
+* FNB202.cbl
+    72     LABEL RECORDS ARE OMITTED
+    73     RECORDING MODE IS F
+    74     RECORD CONTAINS 132 CHARACTERS
+    75     BLOCK CONTAINS 0 RECORDS.
+    76 01  PRINT-RECORD     PIC X(132).
+    77
+    78**** PARM FILE
+    79 FD  PARM-FILE
+    80     LABEL RECORDS ARE STANDARD
+    81     RECORDING MODE IS F
+    82     BLOCK CONTAINS 0 RECORDS.
+    83 01  PARM.
+    84     05  PARM-CYCLE-DATE PIC X(10) VALUE SPACES.
+    85
+    86
+    87 WORKING-STORAGE SECTION.
+    88
+    89 01 RC                       PIC S9(9)   COMP-5 VALUE 0.
+    90 01 LIST-REC                 PIC X(132).
+    91
+    92 01  FILLER.
+    93     05  SYS010-STATUS      PIC XX         VALUE ZERO.
+    94         88  EOF                           VALUE '10'.
+    95     05  PARM-STATUS        PIC XX         VALUE SPACES.
+    96
+    97 01  FILLER.
+    98     05  LINE-COUNT         PIC S9(3)      VALUE ZERO.
+    99     05  PAGE-COUNT         PIC S9(3)      VALUE ZERO.
+   100     05  OUTPUT-COUNT       PIC S9(8)      VALUE ZERO.
+   101     05  ERROR-COUNT        PIC S9(8)      VALUE ZERO.
+   102     05  ZERO-AMT-COUNT     PIC S9(8)      VALUE ZERO.
+   103     05  INPUT-COUNT        PIC S9(8)      VALUE ZERO.
+   104         88  FIRST-RECORD                  VALUE +1.
+   105
+   106 01  WS-CTRL-SUSP-CODE      PIC X(15)      VALUE SPACES.
+   107 01  WS-CTRL-BREAK          PIC X          VALUE 'N'.
+   108 01  WS-LAST-RECORD         PIC X          VALUE 'N'.
+   109
+   110 01  WS-ACCUM-AMT           PIC S9(12)V99  VALUE ZEROES.
+   111 01  WS-ACCUM-TOTAL-AMT     PIC S9(12)V99  VALUE ZEROES.
+   112 01  WS-TOTAL-AMT           PIC S9(12)V99  VALUE ZEROES.
+   113
+   114 01  FILLER.
+   115     05  WS-CYCLE-DATE       PIC X(10)     VALUE SPACES.
+   116
+   117 01  WS-CURRENT-DATE.
+   118     05  WS-CURR-MM         PIC 99         VALUE ZEROES.
+   119     05  WS-CURR-DD         PIC 99         VALUE ZEROES.
+   120     05  WS-CURR-CC         PIC 99         VALUE ZEROES.
+   121     05  WS-CURR-YY         PIC 99         VALUE ZEROES.
+   122
+   123 01  WK-TRANS-DATE.
+   124     05  WK-CC              PIC 99         VALUE ZEROES.
+   125     05  WK-YY              PIC 99         VALUE ZEROES.
+   126     05  WK-MM              PIC 99         VALUE ZEROES.
+   127     05  WK-DD              PIC 99         VALUE ZEROES.
+   128
+   129 01  WORK-DATE.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page   4
+* FNB202.cbl
+   130     05  WRK-YR    PIC 9999.
+   131     05  WRK-MO    PIC 99.
+   132     05  WRK-DAY   PIC 99.
+   133
+   134 01  SYSTEM-DATE.
+   135     05  SYS-MO    PIC 99.
+   136     05  SYS-DAY   PIC 99.
+   137     05  SYS-YR    PIC 9999.
+   138
+   139 01  PRINT-SUSPENSE-CODE    PIC X          VALUE ZERO.
+   140     88  PRINT-SUSP-CODE                   VALUE '1'.
+   141     88  DO-NOT-PRINT-CODE                 VALUE '2'.
+   142*****************************************************************
+   143*  REPORT HEADER DEFINITION                                     *
+   144*****************************************************************
+   145 01  HDR-1.
+   146     05  FILLER           PIC X(06)   VALUE 'DATE: '.
+   147     05  WS-RPT-DATE.
+   148         10  WS-RPT-MM    PIC 99      VALUE ZEROES.
+   149         10  FILLER       PIC X(01)   VALUE '/'.
+   150         10  WS-RPT-DD    PIC 99      VALUE ZEROES.
+   151         10  FILLER       PIC X(01)   VALUE '/'.
+   152         10  WS-RPT-CC    PIC 99      VALUE ZEROES.
+   153         10  WS-RPT-YY    PIC 99      VALUE ZEROES.
+   154     05  FILLER           PIC X(20)   VALUE SPACES.
+   155     05  FILLER           PIC X(07)   VALUE 'AS OF: '.
+   156     05  WS-CYC-DATE      PIC X(10)   VALUE SPACES.
+   157     05  FILLER           PIC X(31)   VALUE SPACES.
+   158     05  FILLER           PIC X(06)   VALUE 'FNB202'.
+   159     05  FILLER           PIC X(42)   VALUE SPACES.
+   160
+   161 01  HDR-2.
+   162     05  FILLER           PIC X(16)   VALUE 'SUSPENSE SUMMARY'.
+   163     05  FILLER           PIC X(16)   VALUE ' - TOTALS REPORT'.
+   164     05  FILLER           PIC X(100)  VALUE SPACES.
+   165
+   166 01  HDR-3.
+   167     05  FILLER           PIC X(13)   VALUE 'MSA ACCOUNT: '.
+   168     05  WS-MSA-ACCT      PIC X(07)   VALUE '2257150'.
+   169     05  FILLER           PIC X(06)   VALUE SPACES.
+   170     05  FILLER           PIC X(17)   VALUE 'FREEDOM ACCOUNT: '.
+   171     05  WS-FREEDOM-ACCT  PIC X(10)   VALUE '2724500150'.
+   172     05  FILLER           PIC X(79)   VALUE SPACES.
+   173
+   174 01  HDR-4.
+   175     05  FILLER           PIC X(10)   VALUE 'CSO CLAIM '.
+   176     05  FILLER           PIC X(15)   VALUE 'DRAFT CLEARING '.
+   177     05  FILLER           PIC X(10)   VALUE 'ACCOUNT   '.
+   178     05  FILLER           PIC X(97)   VALUE SPACES.
+   179
+   180 01  HDR-5.
+   181     05  FILLER           PIC X(14)  VALUE 'DISTRIBUTION: '.
+   182     05  FILLER           PIC X(17)  VALUE 'CORPORATE FINANCE'.
+   183     05  FILLER           PIC X(101) VALUE SPACES.
+   184
+   185 01  DETAIL-HDR1.
+   186     05  FILLER           PIC X(10)  VALUE '   MAJOR  '.
+   187     05  FILLER           PIC X(05)  VALUE SPACES.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page   5
+* FNB202.cbl
+   188     05  FILLER           PIC X(15)  VALUE '    SUSPENSE   '.
+   189     05  FILLER           PIC X(05)  VALUE SPACES.
+   190     05  FILLER           PIC X(15)  VALUE '  TRANSACTION  '.
+   191     05  FILLER           PIC X(05)  VALUE SPACES.
+   192     05  FILLER           PIC X(08)  VALUE ' TRANS  '.
+   193     05  FILLER           PIC X(05)  VALUE SPACES.
+   194     05  FILLER           PIC X(30)  VALUE SPACES.
+   195     05  FILLER           PIC X(05)  VALUE SPACES.
+   196     05  FILLER           PIC X(15)  VALUE ' SUSPENSE CODE '.
+   197     05  FILLER           PIC X(14)  VALUE SPACES.
+   198
+   199 01  DETAIL-HDR1B.
+   200     05  FILLER           PIC X(10)  VALUE '  ACCOUNT '.
+   201     05  FILLER           PIC X(05)  VALUE SPACES.
+   202     05  FILLER           PIC X(15)  VALUE '      CODE     '.
+   203     05  FILLER           PIC X(05)  VALUE SPACES.
+   204     05  FILLER           PIC X(15)  VALUE '    AMOUNT     '.
+   205     05  FILLER           PIC X(05)  VALUE SPACES.
+   206     05  FILLER           PIC X(08)  VALUE '  DATE  '.
+   207     05  FILLER           PIC X(05)  VALUE SPACES.
+   208     05  FILLER           PIC X(30)  VALUE
+   209                          'TRANSACTION DESCRIPTION       '.
+   210     05  FILLER           PIC X(05)  VALUE SPACES.
+   211     05  FILLER           PIC X(15)  VALUE ' TOTAL AMOUNT  '.
+   212     05  FILLER           PIC X(14)  VALUE SPACES.
+   213
+   214 01  DETAIL-HDR2.
+   215     05  FILLER           PIC X(10)  VALUE ALL '*'.
+   216     05  FILLER           PIC X(05)  VALUE SPACES.
+   217     05  FILLER           PIC X(15)  VALUE ALL '*'.
+   218     05  FILLER           PIC X(05)  VALUE SPACES.
+   219     05  FILLER           PIC X(15)  VALUE ALL '*'.
+   220     05  FILLER           PIC X(05)  VALUE SPACES.
+   221     05  FILLER           PIC X(08)  VALUE ALL '*'.
+   222     05  FILLER           PIC X(05)  VALUE SPACES.
+   223     05  FILLER           PIC X(30)  VALUE ALL '*'.
+   224     05  FILLER           PIC X(05)  VALUE SPACES.
+   225     05  FILLER           PIC X(15)  VALUE ALL '*'.
+   226     05  FILLER           PIC X(14)  VALUE SPACES.
+   227
+   228 01  DETAIL-HDR3.
+   229     05  FILLER           PIC X(118) VALUE ALL '-'.
+   230     05  FILLER           PIC X(14)  VALUE SPACES.
+   231
+   232 01  BLANK-LINE.
+   233     05  FILLER           PIC X(132) VALUE SPACES.
+   234
+   235 01  DETAIL-1.
+   236     05  WS-MAJOR-ACCT    PIC X(10)                VALUE SPACES.
+   237     05  FILLER           PIC X(05)                VALUE SPACES.
+   238     05  WS-SUSP-CODE     PIC X(15)                VALUE SPACES.
+   239     05  FILLER           PIC X(05)                VALUE SPACES.
+   240     05  WS-TRANS-AMOUNT  PIC ----,---,--9.99      VALUE ZEROES.
+   241     05  FILLER           PIC X(05)                VALUE SPACES.
+   242     05  WS-TRANS-DATE.
+   243         10  WS-TRANS-MM  PIC X(02)                VALUE SPACES.
+   244         10  FILLER       PIC X(01)                VALUE '/'.
+   245         10  WS-TRANS-DD  PIC X(02)                VALUE SPACES.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page   6
+* FNB202.cbl
+   246         10  FILLER       PIC X(01)                VALUE '/'.
+   247         10  WS-TRANS-YY  PIC X(02)                VALUE SPACES.
+   248     05  FILLER           PIC X(05)                VALUE SPACES.
+   249     05  WS-DESCRIPTION   PIC X(30)                VALUE SPACES.
+   250     05  FILLER           PIC X(34)                VALUE SPACES.
+   251
+   252 01  TOTAL-1.
+   253     05  FILLER           PIC X(103)             VALUE SPACES.
+   254     05  WS-SUSP-TOTAL    PIC ----,---,--9.99    VALUE ZEROES.
+   255     05  FILLER           PIC X(14)              VALUE SPACES.
+   256
+   257 01  TOTAL-2.
+   258     05  FILLER           PIC X(89)             VALUE SPACES.
+   259     05  FILLER           PIC X(14)             VALUE
+   260                                               'REPORT TOTAL: '.
+   261     05  WS-REPORT-TOTAL  PIC ----,---,--9.99   VALUE ZEROES.
+   262     05  FILLER           PIC X(14)             VALUE SPACES.
+   263
+   264 01  FOOTER-1.
+   265     05  FILLER           PIC X(62)              VALUE SPACES.
+   266     05  FILLER           PIC X(05)              VALUE 'PAGE '.
+   267     05  WS-PAGE-NO       PIC ZZ9                VALUE ZEROES.
+   268     05  FILLER           PIC X(62)              VALUE SPACES.
+   269
+   270*    EXEC SQL INCLUDE ISTDWORK.INC END-EXEC.
+   271
+   272 PROCEDURE DIVISION.
+   273
+   274     PERFORM 0000-START
+   275
+   276     PERFORM 0500-PRINT-HEADERS
+   277
+   278     PERFORM 1000-GENERATE-REPORT UNTIL EOF
+   279
+   280     PERFORM 7000-PRINT-SUSPENSE-TOTALS
+   281
+   282     PERFORM 7500-PRINT-REPORT-TOTAL
+   283
+   284     PERFORM 8000-FORMAT-PAGE-LINE UNTIL LINE-COUNT > +55
+   285
+   286     PERFORM 9000-END
+   287
+   288*    GOBACK GIVING RC.
+   289     STOP RUN GIVING RC.
+   290
+   291***---------------------------------------------------------***
+   292***--  PROCESS 0000-START:                                --***
+   293***--  1.  OPEN INPUT AND OUTPUT FILE.                    --***
+   294***--  2.  CHECK OPEN STATUS ON INPUT FILE.               --***
+   295***--  3.  INITIALIZE COUNTS.                             --***
+   296***---------------------------------------------------------***
+   297 0000-START.
+   298
+   299     CALL 'FNBLIST' USING 'O' LIST-REC
+   300     OPEN   INPUT  GL-SUSPENSE-TRANS-FILE
+   301
+   302     IF SYS010-STATUS NOT = '00'
+   303       DISPLAY 'SYS010 OPEN ERROR ' SYS010-STATUS UPON SYSERR
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page   7
+* FNB202.cbl
+   304       MOVE SPACES TO LIST-REC
+   305       STRING  'SYS010 OPEN ERROR ' SYS010-STATUS
+   306         DELIMITED BY SIZE INTO LIST-REC
+   307       CALL 'FNBLIST' USING 'W' LIST-REC
+   308       CALL 'FNBLIST' USING 'C' LIST-REC
+   309       MOVE 16 TO RC
+   310*      GOBACK GIVING RC
+   311       STOP RUN GIVING RC
+   312     END-IF
+   313
+   314     OPEN   OUTPUT FNB202-GLS-OUTST-DRAFTS
+   315
+   316     MOVE  ZEROES   TO  INPUT-COUNT
+   317     MOVE  ZEROES   TO  OUTPUT-COUNT
+   318     MOVE  ZEROES   TO  LINE-COUNT
+   319     MOVE  ZEROES   TO  PAGE-COUNT
+   320     MOVE  ZEROES   TO  ERROR-COUNT.
+   321
+   322***---------------------------------------------------------***
+   323***--  PROCESS 0500-PRINT-HEADERS:                        --***
+   324***--  1.  INITIALIZE LINE COUNT.                         --***
+   325***--  2.  PRINT HEADER LINES.                            --***
+   326***--  3.  TALLY LINE COUNT BY NUMBER OF LINES WRITTEN.   --***
+   327***---------------------------------------------------------***
+   328 0500-PRINT-HEADERS.
+   329
+   330     MOVE   ZEROES  TO  LINE-COUNT
+   331
+   332     ACCEPT WORK-DATE FROM DATE YYYYMMDD
+   333     MOVE WRK-YR  TO SYS-YR
+   334     MOVE WRK-MO  TO SYS-MO
+   335     MOVE WRK-DAY TO SYS-DAY
+   336
+   337     MOVE SYSTEM-DATE TO WS-CURRENT-DATE
+   338*    CALL 'SYSDATE' USING WS-CURRENT-DATE
+   339     MOVE WS-CURR-MM TO WS-RPT-MM
+   340     MOVE WS-CURR-DD TO WS-RPT-DD
+   341     MOVE WS-CURR-CC TO WS-RPT-CC
+   342     MOVE WS-CURR-YY TO WS-RPT-YY
+   343
+   344*    CALL IGETPARM USING IG-P1
+   345*    MOVE IG-P1 TO WS-CYCLE-DATE
+   346*
+   347*    MOVE WS-CYCLE-DATE TO IV-P2
+   348*    MOVE 'MM/DD/YEAR'  TO IV-P3
+   349*    INITIALIZE            IV-P4
+   350*    CALL IVERDATE USING IV-P1 IV-P2 IV-P3 IV-P4
+   351*    IF IV-P1 = 'Y'
+   352     OPEN INPUT PARM-FILE.
+   353     IF PARM-STATUS NOT = '00'
+   354       STRING  'ERROR OPENING PARM FILE, STATUS = '
+   355              PARM-STATUS
+   356         DELIMITED BY SIZE INTO LIST-REC
+   357       CALL 'FNBLIST' USING 'W' LIST-REC
+   358       CALL 'FNBLIST' USING 'C' LIST-REC
+   359       MOVE 16 TO RC
+   360       STOP RUN GIVING RC
+   361     END-IF.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page   8
+* FNB202.cbl
+   362     READ PARM-FILE.
+   363     IF PARM-CYCLE-DATE GREATER THAN SPACES
+   364       MOVE PARM-CYCLE-DATE TO WS-CYCLE-DATE
+   365       MOVE WS-CYCLE-DATE TO WS-CYC-DATE
+   366     ELSE
+   367       MOVE SPACES TO LIST-REC
+   368       STRING '*** INVALID DATE CARD: ' WS-CYCLE-DATE
+   369         DELIMITED BY SIZE INTO LIST-REC
+   370       CALL 'FNBLIST' USING 'W' LIST-REC
+   371       CALL 'FNBLIST' USING 'C' LIST-REC
+   372       MOVE 16 TO RC
+   373*      GOBACK GIVING RC
+   374       STOP RUN GIVING RC
+   375     END-IF
+   376
+   377     WRITE PRINT-RECORD FROM HDR-1        AFTER ADVANCING 0 LINES
+   378
+   379     WRITE PRINT-RECORD FROM HDR-2        AFTER ADVANCING 1 LINE
+   380
+   381     WRITE PRINT-RECORD FROM HDR-3        AFTER ADVANCING 1 LINE
+   382
+   383     WRITE PRINT-RECORD FROM HDR-4        AFTER ADVANCING 1 LINE
+   384
+   385     WRITE PRINT-RECORD FROM BLANK-LINE   AFTER ADVANCING 1 LINE
+   386
+   387     WRITE PRINT-RECORD FROM HDR-5        AFTER ADVANCING 1 LINE
+   388
+   389     WRITE PRINT-RECORD FROM BLANK-LINE   AFTER ADVANCING 1 LINE
+   390
+   391     WRITE PRINT-RECORD FROM BLANK-LINE   AFTER ADVANCING 1 LINE
+   392
+   393     WRITE PRINT-RECORD FROM DETAIL-HDR1  AFTER ADVANCING 1 LINE
+   394
+   395     WRITE PRINT-RECORD FROM DETAIL-HDR1B AFTER ADVANCING 1 LINE
+   396
+   397     WRITE PRINT-RECORD FROM DETAIL-HDR2  AFTER ADVANCING 1 LINE
+   398
+   399     ADD +10   TO  LINE-COUNT
+   400     ADD +1    TO  PAGE-COUNT.
+   401
+   402***---------------------------------------------------------***
+   403***--  PROCESS 0800-PRINT-DETAIL-HEADERS.                 --***
+   404***--  1.  INITIALIZE LINE COUNT.                         --***
+   405***--  2.  PRINT HEADER LINES.                            --***
+   406***--  3.  TALLY LINE COUNT BY NUMBER OF LINES WRITTEN.   --***
+   407***---------------------------------------------------------***
+   408 0800-PRINT-DETAIL-HEADERS.
+   409
+   410     MOVE   ZEROES  TO  LINE-COUNT
+   411
+   412     WRITE PRINT-RECORD FROM DETAIL-HDR1  AFTER ADVANCING PAGE
+   413
+   414     WRITE PRINT-RECORD FROM DETAIL-HDR1B AFTER ADVANCING 1 LINE
+   415
+   416     WRITE PRINT-RECORD FROM DETAIL-HDR2  AFTER ADVANCING 1 LINE
+   417
+   418     ADD +3 TO LINE-COUNT
+   419     ADD +1 TO PAGE-COUNT.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page   9
+* FNB202.cbl
+   420
+   421***---------------------------------------------------------***
+   422***--  PROCESS 1000-GENERATE-REPORT:                      --***
+   423***--  1. READ INPUT FILE AND ACCUMULATE INPUT COUNT.     --***
+   424***--  2. ONLY PROCESS RECORDS W/SIGNIFICANT TRANSACTION  --***
+   425***--     AMOUNTS AND WITH ONE OF THE SPECIFIED ACCOUNT   --***
+   426***--     NUMBERS.                                        --***
+   427***--  3. PERFORM CENTER CONTROL CHECK BREAK.             --***
+   428***--  4. PERFORM ROUTINE TO PROCESS VALID RECORDS.       --***
+   429***--  5. PERFORM ROUTINE TO WRITE VALID OUTPUT RECORDS.  --***
+   430***---------------------------------------------------------***
+   431 1000-GENERATE-REPORT.
+   432
+   433     READ GL-SUSPENSE-TRANS-FILE
+   434       AT END EXIT PARAGRAPH
+   435     END-READ
+   436
+   437     ADD +1 TO INPUT-COUNT
+   438     IF GLS-ACCOUNT-NO NOT = '272450015000000000000000'
+   439       ADD +1 TO ERROR-COUNT
+   440       EXIT PARAGRAPH
+   441     END-IF
+   442
+   443     PERFORM 5000-CONTROL-BREAK-CHECK
+   444
+   445     IF WS-CTRL-BREAK = 'Y'
+   446       PERFORM 7000-PRINT-SUSPENSE-TOTALS
+   447     END-IF
+   448
+   449     PERFORM 3000-PROCESS-DETAIL-LINE
+   450
+   451     PERFORM 4000-WRITE-DETAIL-LINE.
+   452
+   453***---------------------------------------------------------***
+   454***--  PROCESS 3000-PROCESS-DETAIL-LINE:                  --***
+   455***--  1.  PERFORM ROUTINE TO FORMAT DATE TO MM/DD/YY.    --***
+   456***--  2.  MOVE INPUT DATA TO OUTPUT FIELDS.              --***
+   457***--  2.  SUSPENSE CODE SHOULD ONLY BE PRINTED ON FIRST  --***
+   458***--      LINE FOR OF THAT GROUPING.                     --***
+   459***---------------------------------------------------------***
+   460 3000-PROCESS-DETAIL-LINE.
+   461
+   462     IF  PRINT-SUSP-CODE
+   463       WRITE PRINT-RECORD FROM DETAIL-HDR3 AFTER ADVANCING 1 LINE
+   464       ADD  +1  TO  LINE-COUNT
+   465       MOVE GLS-SUSPENSE-CODE TO WS-SUSP-CODE
+   466     ELSE
+   467       MOVE SPACES            TO WS-SUSP-CODE
+   468     END-IF
+   469
+   470     PERFORM  6000-FORMAT-TRANS-DATE
+   471
+   472     MOVE  GLS-MAJ-ACCT       TO  WS-MAJOR-ACCT
+   473     MOVE  GLS-DESCRIPTION    TO  WS-DESCRIPTION
+   474     MOVE  GLS-TRANS-AMOUNT   TO  WS-TRANS-AMOUNT.
+   475
+   476***---------------------------------------------------------***
+   477***--  PROCESS 4000-WRITE-DETAIL-LINE.                    --***
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page  10
+* FNB202.cbl
+   478***--  1.  DETERMINE IF HEADERS SHOULD BE PRINTED.        --***
+   479***--  2.  WRITE OUTPUT RECORDS.                          --***
+   480***--  3.  ACCUMULATE OUTPUT AMOUNT BY CENTER.            --***
+   481***--  3.  ACCUMULATE LINE AND OUTPUT COUNTS.             --***
+   482***---------------------------------------------------------***
+   483 4000-WRITE-DETAIL-LINE.
+   484
+   485     IF  LINE-COUNT > +55
+   486       MOVE  PAGE-COUNT  TO  WS-PAGE-NO
+   487       WRITE PRINT-RECORD FROM BLANK-LINE AFTER ADVANCING 1 LINE
+   488       ADD +1  TO  LINE-COUNT
+   489       WRITE PRINT-RECORD FROM FOOTER-1   AFTER ADVANCING 1 LINE
+   490       PERFORM 0800-PRINT-DETAIL-HEADERS
+   491     END-IF
+   492
+   493     WRITE PRINT-RECORD FROM DETAIL-1 AFTER ADVANCING 1 LINE
+   494
+   495     ADD   +1                  TO  OUTPUT-COUNT
+   496     ADD   +1                  TO  LINE-COUNT
+   497     ADD   GLS-TRANS-AMOUNT    TO  WS-ACCUM-AMT
+   498     ADD   GLS-TRANS-AMOUNT    TO  WS-TOTAL-AMT.
+   499
+   500***---------------------------------------------------------***
+   501***--  PROCESS 5000-CONTROL-BREAK-CHECK.                  --***
+   502***--  1. MOVE INPUT DATE TO FORMATTED OUTPUT DATE FIELD. --***
+   503***--  2.                                                 --***
+   504***---------------------------------------------------------***
+   505 5000-CONTROL-BREAK-CHECK.
+   506
+   507     IF OUTPUT-COUNT = ZERO
+   508       MOVE GLS-SUSPENSE-CODE TO WS-CTRL-SUSP-CODE
+   509       MOVE 'N' TO WS-CTRL-BREAK
+   510       MOVE '1' TO PRINT-SUSPENSE-CODE
+   511       EXIT PARAGRAPH
+   512     END-IF
+   513
+   514     IF GLS-SUSPENSE-CODE = WS-CTRL-SUSP-CODE
+   515       MOVE 'N' TO WS-CTRL-BREAK
+   516       MOVE '2' TO PRINT-SUSPENSE-CODE
+   517     ELSE
+   518       MOVE '1' TO PRINT-SUSPENSE-CODE
+   519       MOVE 'Y' TO WS-CTRL-BREAK
+   520     END-IF
+   521
+   522     MOVE GLS-SUSPENSE-CODE TO WS-CTRL-SUSP-CODE.
+   523
+   524***---------------------------------------------------------***
+   525***--  PROCESS 6000-FORMAT-TRANS-DATE.                    --***
+   526***--  1. MOVE INPUT DATE TO FORMATTED OUTPUT DATE FIELD. --***
+   527***--  2.                                                 --***
+   528***---------------------------------------------------------***
+   529 6000-FORMAT-TRANS-DATE.
+   530
+   531     MOVE GLS-TRANS-DATE TO WK-TRANS-DATE
+   532     MOVE WK-MM          TO WS-TRANS-MM
+   533     MOVE WK-DD          TO WS-TRANS-DD
+   534     MOVE WK-YY          TO WS-TRANS-YY.
+   535
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page  11
+* FNB202.cbl
+   536***---------------------------------------------------------***
+   537***--  PROCESS 7000-PRINT-SUSPENSE-TOTALS.                --***
+   538***--  1.  MOVE SUSPENSE ACCUMULATED AMOUNT TO OUTPUT.    --***
+   539***--  2.  WRITE TOTAL LINE.                              --***
+   540***--  3.  ADD TO LINE COUNT.                             --***
+   541***--  4.  RESET THE WS ACCUMULATED AMOUNT FIELD TO ZERO. --***
+   542***---------------------------------------------------------***
+   543 7000-PRINT-SUSPENSE-TOTALS.
+   544
+   545     MOVE WS-ACCUM-AMT TO WS-SUSP-TOTAL.
+   546
+   547     WRITE PRINT-RECORD FROM TOTAL-1 AFTER ADVANCING 1 LINE
+   548
+   549     ADD  +1           TO LINE-COUNT
+   550     MOVE ZEROES       TO WS-ACCUM-AMT.
+   551
+   552***---------------------------------------------------------***
+   553***--  PROCESS 7500-PRINT-REPORT-TOTAL.                   --***
+   554***--  1.  MOVE ACCUMULATED TRANSACTION AMOUNTS TO THE    --***
+   555***--      OUTPUT FIELD.                                  --***
+   556***--  2.  WRITE REPORT TOTAL LINE.                       --***
+   557***--  3.  ADD TO LINE COUNT.                             --***
+   558***---------------------------------------------------------***
+   559 7500-PRINT-REPORT-TOTAL.
+   560
+   561     MOVE  WS-TOTAL-AMT    TO  WS-REPORT-TOTAL
+   562
+   563     WRITE PRINT-RECORD FROM DETAIL-HDR3 AFTER ADVANCING 1 LINE
+   564
+   565     WRITE PRINT-RECORD FROM BLANK-LINE  AFTER ADVANCING 1 LINE
+   566
+   567     WRITE PRINT-RECORD FROM TOTAL-2     AFTER ADVANCING 2 LINES
+   568
+   569     ADD   +4    TO  LINE-COUNT.
+   570
+   571***---------------------------------------------------------***
+   572***--  PROCESS 8000-FORMAT-PAGE-LINE.                     --***
+   573***--  1. FORCE LINE COUNT TO 55 IN ORDER TO PRINT PAGE   --***
+   574***--     NO ON LINE 57.                                  --***
+   575***---------------------------------------------------------***
+   576 8000-FORMAT-PAGE-LINE.
+   577
+   578     WRITE PRINT-RECORD FROM BLANK-LINE AFTER ADVANCING 1 LINE
+   579
+   580     ADD  +1  TO  LINE-COUNT.
+   581
+   582***---------------------------------------------------------***
+   583***--  PROCESS 9000-END.                                  --***
+   584***--  1. PRINT LAST PAGE NUMBER.                         --***
+   585***--  2. CLOSE FILES                                     --***
+   586***--  3. DISPLAY VARIOUS RECORD COUNTS.                  --***
+   587***---------------------------------------------------------***
+   588 9000-END.
+   589
+   590     MOVE   PAGE-COUNT  TO  WS-PAGE-NO.
+   591     WRITE PRINT-RECORD FROM FOOTER-1 AFTER ADVANCING 1 LINE.
+   592
+   593     DISPLAY '*=====================================*' UPON SYSERR
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page  12
+* FNB202.cbl
+   594     DISPLAY '*   FNB202 - GLS OUTSTANDING DRAFTS   *' UPON SYSERR
+   595     DISPLAY '*=====================================*' UPON SYSERR
+   596     DISPLAY '* OUTPUT FILE:  ZN.DD.FNB202._______  *' UPON SYSERR
+   597     DISPLAY '*-------------------------------------*' UPON SYSERR
+   598     DISPLAY '     INPUT RECORDS READ: ' INPUT-COUNT   UPON SYSERR
+   599     DISPLAY '  RECORDS NOT PROCESSED: ' ERROR-COUNT   UPON SYSERR
+   600     DISPLAY ' OUTPUT RECORDS WRITTEN: ' OUTPUT-COUNT  UPON SYSERR
+   601     DISPLAY '*=====================================*' UPON SYSERR
+   602
+   603     MOVE    '*=====================================*' TO LIST-REC
+   604     CALL 'FNBLIST' USING 'W' LIST-REC
+   605     MOVE    '*   FNB202 - GLS OUTSTANDING DRAFTS   *' TO LIST-REC
+   606     CALL 'FNBLIST' USING 'W' LIST-REC
+   607     MOVE    '*=====================================*' TO LIST-REC
+   608     CALL 'FNBLIST' USING 'W' LIST-REC
+   609     MOVE    '* OUTPUT FILE:  ZN.DD.FNB202._______  *' TO LIST-REC
+   610     CALL 'FNBLIST' USING 'W' LIST-REC
+   611     MOVE    '*-------------------------------------*' TO LIST-REC
+   612     CALL 'FNBLIST' USING 'W' LIST-REC
+   613     MOVE SPACES TO LIST-REC
+   614     STRING  '     INPUT RECORDS READ: ' INPUT-COUNT
+   615       DELIMITED BY SIZE INTO LIST-REC
+   616     CALL 'FNBLIST' USING 'W' LIST-REC
+   617     MOVE SPACES TO LIST-REC
+   618     STRING  '  RECORDS NOT PROCESSED: ' ERROR-COUNT
+   619       DELIMITED BY SIZE INTO LIST-REC
+   620     CALL 'FNBLIST' USING 'W' LIST-REC
+   621     MOVE SPACES TO LIST-REC
+   622     STRING  ' OUTPUT RECORDS WRITTEN: ' OUTPUT-COUNT
+   623       DELIMITED BY SIZE INTO LIST-REC
+   624     CALL 'FNBLIST' USING 'W' LIST-REC
+   625     MOVE    '*=====================================*' TO LIST-REC
+   626     CALL 'FNBLIST' USING 'W' LIST-REC
+   627
+   628     CLOSE  GL-SUSPENSE-TRANS-FILE
+   629            FNB202-GLS-OUTST-DRAFTS.
+   630
+   631     CALL 'FNBLIST' USING 'C' LIST-REC.
+   632     CLOSE  PARM-FILE.
+* Micro Focus Server Express         V5.1 revision 000 Compiler
+* Copyright (C) Micro Focus IP Development Limited 1984-2012.
+*                                                        REF GNR-008065005AF
+* Total Messages:     0
+* Data:        4304     Code:        3929

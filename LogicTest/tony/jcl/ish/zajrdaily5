@@ -1,0 +1,89 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: fnfrd50               Translated  : Tue May 22 09:51:06 2001        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+if ($EBMSYS != "tony") then
+   echo "Job aborting, not Tony"
+   exit 1
+endif
+
+################################################################################
+LABEL name=FNB164 
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+#  DATE MMDDYYYY 
+#  FROM CILGEXTR
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.WW.LG.DFTACT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+
+#  DOWNLOAD
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZN.DL.FX.CIDCLMS' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='FNB164' stepname='FNB164' parm='03312018' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                     PRINT SUMMARY REPORT 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYS007' dataset='FN.DD.PRINT.DATA' member='FNFRD50' filename='\${SEQFILES}/FNFRD50' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZN.DL.FX.CIDCLMS' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='CIDCLAIMS' 
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' dataset='FN.DD.PRINT.DATA' member='FNFRD50' filename='\${SEQFILES}/FNFRD50' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID CLAIMS 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' dataset='ZN.DL.FX.CIDCLMS' filename='\${SEQFILES}/ZN.DL.FX.CIDCLMS' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/CIDCLMS_03-31-18.DAT' disp='o' abend='d' normal='k' recsize='250' recfmt='F'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+
+################################################################################
+
+#ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajrdaily5
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+   echo "test Job, dont want to print "
+#     "exelpr.sh l133std.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+else
+   echo "Job aborted print not released "
+endif
+
+################################################################################
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#111902                 PEMA    ADD SYS019 TO FNB164
+#011604                 SMVA    ADD CLIENT ID/FILE ID PARM TO FNB170

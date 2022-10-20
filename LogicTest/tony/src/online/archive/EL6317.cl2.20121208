@@ -1,0 +1,2144 @@
+       IDENTIFICATION DIVISION.
+
+       PROGRAM-ID.                 EL6317.
+      *
+      *AUTHOR.        PABLO
+      *               OMAHA, NEBRASKA
+
+      *DATE-COMPILED.
+
+      *SECURITY.   *****************************************************
+      *            *                                                   *
+      *            *   THIS PROGRAM IS THE PROPERTY OF CNETRAL STATES  *
+      *            *   HEALTH AND LIFE                                 *
+      *            *   USE OF THIS PROGRAM BY OTHER THAN THE EMPLOYEES *
+      *            *   OF CSO.        IS EXPRESSLY PROHIBITED WITHOUT  *
+      *            *   THE PRIOR WRITTEN PERMISSION OF CENTRAL STATES. *
+      *            *                                                   *
+      *            *****************************************************
+052307*-----------------------------------------------------------------
+052307*                   C H A N G E   L O G
+052307*
+052307* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+052307*-----------------------------------------------------------------
+052307*  CHANGE  CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+052307* EFFECTIVE    NUMBER
+052307*-----------------------------------------------------------------
+      *          2011022800001  PEMA  NEW PROGRAM
+012412* 012412   2011022800001  AJRA  NAPERSOFT
+062712* 062712   2011022800001  AJRA  REDEFINE ORIG DATA
+071712* 071712 CR2011022800001  AJRA  NAPERSOFT CANCELS
+072312* 072312   2011022800001  AJRA  NAPERSOFT MISC
+052307*-----------------------------------------------------------------
+
+      *REMARKS.
+      *        TRANSACTION - EXBD - CERTIFICATE VERIFICATION
+       EJECT
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77  FILLER  PIC X(32)  VALUE '********************************'.
+       77  FILLER  PIC X(32)  VALUE '*    EL6317 WORKING STORAGE    *'.
+       77  FILLER  PIC X(32)  VALUE '******** VMOD=2.001 ************'.
+       77  NOTE-SUB PIC S9(5) COMP-3 VALUE +0.
+       77  WS-SEQ-NO                   PIC 9(4) BINARY.
+       77  WS-SET-CODES-MDT            PIC X  VALUE SPACES.
+       77  s1                          pic s999 comp-3 value +0.
+       77  s2                          pic s999 comp-3 value +0.
+       77  W-ARCH-NUMBER               PIC S9(08)      COMP value +0.
+062712 77  WS-REASON-SW                PIC X  VALUE ' '.
+062712     88  REASONS-FOUND                  VALUE 'Y'.
+062712     88  REASONS-NOT-FOUND              VALUE 'N'.
+072312 77  WS-STOP-SW                  PIC X  VALUE ' '.
+072312     88  I-SAY-TO-STOP      VALUE 'Y'.
+072312 77  WS-CERT-UPDATE-SW           PIC X  VALUE ' '.
+072312     88  NO-CERT-RW                 VALUE 'N'.
+072312     88  CERT-RW                    VALUE 'Y'.
+
+       01  P pointer.
+       01  KIXSYS                      pic X(7)  VALUE Z"KIXSYS".
+       01  KIXHOST             pic x(9) value Z"HOSTNAME".
+       01  var-ptr pointer.
+       01  env-var-len                 pic 9(4)  binary.
+       01  rc                          pic 9(9)  binary.
+
+       01  WS-KIXHOST                  PIC X(10).
+       01  WS-KIXSYS.
+           05  WS-KIX-FIL1             PIC X(10).
+           05  WS-KIX-APPS             PIC X(10).
+           05  WS-KIX-ENV              PIC X(10).
+           05  WS-KIX-MYENV            PIC X(10).
+           05  WS-KIX-SYS              PIC X(10).
+
+                                       COPY ELCSCTM.
+                                       COPY ELCSCRTY.
+       01 srch-commarea.
+                                       copy ELCADLTRSPI.
+
+012412
+012412*** Z CONTROL LAYOUT MOVED TO COPYBOOK ELCZREC
+012412                                 COPY ELCZREC.
+
+       01  WS-PASSED-REASON-CODES      PIC X(60)  VALUE SPACES.
+
+       01  STANDARD-AREAS.
+00102      12  W-ARCH-SUPPRESS         PIC ZZZZZZZ9.
+00103      12  W-ARCH-EDIT REDEFINES W-ARCH-SUPPRESS
+00104                                  PIC  X(08).
+00552      12  W-ARCH-LENGTH           PIC S9(04)  COMP  VALUE +250.
+00142      12  QID.
+00143          16  QID-TERM        PIC X(4)    VALUE SPACES.
+00144          16  FILLER          PIC X(4)    VALUE '631J'.
+           12  MAP-LENGTH          PIC 9(4)   VALUE 359 BINARY.
+           12  TIME-MT                 PIC S9(7).
+           12  TIME-MT-R  REDEFINES TIME-MT.
+               16  FILLER              PIC X.
+               16  TIME-LMT            PIC 99V99.
+               16  FILLER              PIC X(2).
+           12  GETMAIN-SPACE           PIC X VALUE SPACES.
+PEMMOD     12  ERENDT-LENGTH           PIC S9(04) VALUE +579 COMP.
+           12  ERPNDB-LENGTH           PIC 9(04)  VALUE 585 COMP.
+072312     12  ERCNOT-LENGTH           PIC S9(04) VALUE +150 COMP.
+072312     12  ERNOTE-LENGTH           PIC S9(04) VALUE +825 COMP.
+072312     12  ELEOBC-LENGTH           PIC S9(04) VALUE +350 COMP.
+
+00434      12  W-CNTL-KEY.
+00435          16  W-CNTL-COMPANY-ID   PIC  X(03).
+00436          16  W-CNTL-RECORD-TYPE  PIC  X(01)   VALUE '1'.
+00437          16  W-CNTL-GENL.
+00438              20  W-CNTL-GEN1     PIC  X(02)   VALUE SPACES.
+00439              20  W-CNTL-GEN2.
+00440                  24 W-CNTL-GEN3  PIC  X(01)   VALUE SPACES.
+00441                  24 W-CNTL-GEN4  PIC  X(01)   VALUE SPACES.
+00442          16  W-CNTL-SEQ-NO       PIC S9(04)   VALUE +0    COMP.
+
+072312     12  WS-ELCERT-KEY.
+072312         16  W-CERT-COMPANY-CD   PIC X.
+072312         16  W-CERT-CARRIER      PIC X.
+072312         16  W-CERT-GROUPING     PIC X(6).
+072312         16  W-CERT-STATE        PIC XX.
+072312         16  W-CERT-ACCOUNT      PIC X(10).
+072312         16  W-CERT-CERT-EFF-DT  PIC XX.
+072312         16  W-CERT-CERT-PRIME   PIC X(10).
+072312         16  W-CERT-CERT-SFX     PIC X.
+072312     12  WS-ELEOBC-KEY.
+072312         16  WS-EOBC-COMPANY-CD  PIC X.
+072312         16  WS-EOBC-REC-TYPE    PIC X.
+072312         16  WS-EOBC-CODE        PIC X(4).
+072312         16  FILLER              PIC X(9).
+           12  WS-ERNOTE-KEY.
+               16  W-NOTE-COMPANY-CD   PIC X.
+               16  W-NOTE-CARRIER      PIC X.
+               16  W-NOTE-GROUPING     PIC X(6).
+               16  W-NOTE-STATE        PIC XX.
+               16  W-NOTE-ACCOUNT      PIC X(10).
+               16  W-NOTE-CERT-EFF-DT  PIC XX.
+               16  W-NOTE-CERT-PRIME   PIC X(10).
+               16  W-NOTE-CERT-SFX     PIC X.
+           12  ELLETR-KEY.
+               16  LETR-COMPANY-CD     PIC X.
+               16  LETR-LETTER-ID      PIC X(4).
+               16  LETR-FILLER         PIC X(8).
+               16  LETR-SEQ-NO         PIC 9(4) BINARY.
+           12  ERPNDB2-KEY.
+               16  PNDB2-COMPANY-CD    PIC X.
+               16  PNDB2-CARRIER       PIC X.
+               16  PNDB2-GROUPING      PIC X(6).
+               16  PNDB2-STATE         PIC XX.
+               16  PNDB2-ACCOUNT       PIC X(10).
+               16  PNDB2-CERT-EFF-DT   PIC XX.
+               16  PNDB2-CERT-PRIME    PIC X(10).
+               16  PNDB2-CERT-SFX      PIC X.
+               16  PNDB2-CHG-SEQ-NO    PIC 9(4) BINARY.
+               16  PNDB2-RECORD-TYPE   PIC X.
+           12  ERPNDB-KEY.
+               16  PNDB-COMPANY-CD     PIC X.
+               16  PNDB-BATCH-NO       PIC X(6).
+               16  PNDB-BATCH-SEQ-NO   PIC 9(4) BINARY.
+               16  PNDB-CHG-SEQ-NO     PIC 9(4) BINARY.
+           12  ERENDT-KEY.
+               16  ENDT-COMPANY-CD       PIC X.
+               16  ENDT-CARRIER          PIC X.
+               16  ENDT-GROUPING         PIC X(6).
+               16  ENDT-STATE            PIC XX.
+               16  ENDT-ACCOUNT          PIC X(10).
+               16  ENDT-CERT-EFF-DT      PIC XX.
+               16  ENDT-CERT-PRIME       PIC X(10).
+               16  ENDT-CERT-SFX         PIC X.
+               16  ENDT-RECORD-TYPE      PIC X.
+               16  ENDT-SEQ-NO           PIC 9(4) BINARY.
+           12  ELCRTO-KEY.
+               16  CRTO-COMPANY-CD     PIC X.
+               16  CRTO-CARRIER        PIC X.
+               16  CRTO-GROUPING       PIC X(6).
+               16  CRTO-STATE          PIC XX.
+               16  CRTO-ACCOUNT        PIC X(10).
+               16  CRTO-CERT-EFF-DT    PIC XX.
+               16  CRTO-CERT-PRIME     PIC X(10).
+               16  CRTO-CERT-SFX       PIC X.
+               16  CRTO-RECORD-TYPE    PIC X.
+               16  CRTO-SEQ-NO         PIC 9(4) BINARY.
+           12  WS-ERMAIL-KEY.
+               16  MAIL-COMPANY-CD     PIC X.
+               16  MAIL-CARRIER        PIC X.
+               16  MAIL-GROUPING       PIC X(6).
+               16  MAIL-STATE          PIC XX.
+               16  MAIL-ACCOUNT        PIC X(10).
+               16  MAIL-CERT-EFF-DT    PIC XX.
+               16  MAIL-CERT-PRIME     PIC X(10).
+               16  MAIL-CERT-SFX       PIC X.
+           12  WS-LF-CANC-DT           PIC XX   VALUE LOW-VALUES.
+           12  WS-AH-CANC-DT           PIC XX   VALUE LOW-VALUES.
+           12  WS-CURRENT-DT.
+               16  FILLER              PIC X(6)    VALUE SPACES.
+               16  WS-CURRENT-YR       PIC XX      VALUE SPACES.
+           12  WS-CURRENT-BIN-DT       PIC XX    VALUE LOW-VALUES.
+           12  WS-ISS-CAN-SW           PIC X     VALUE LOW-VALUES.
+               88  CANCEL-REC            VALUE 'C'.
+               88  ISSUE-REC             VALUE 'I'.
+           12  WS-WORK-AMT             PIC S9(9)V99 COMP-3 VALUE +0.
+           12  WS-HOLD-ACCT-KEY        PIC X(26) VALUE LOW-VALUES.
+           12  ELCNTL-KEY.
+               16  CNTL-COMP-ID        PIC X(3)  VALUE SPACES.
+               16  CNTL-REC-TYPE       PIC X     VALUE SPACES.
+               16  CNTL-ACCESS.
+                   20  CNTL-STATE      PIC XX    VALUE SPACES.
+                   20  FILLER          PIC X     VALUE SPACES.
+                   20  CNTL-CARRIER    PIC X     VALUE SPACES.
+               16  CNTL-SEQ            PIC S9(4) VALUE +0 COMP.
+           12  ERACCT-KEY.
+               16  ERACCT-COMP-KEY.
+                   20  ACCT-CO         PIC X     VALUE SPACES.
+                   20  ACCT-CARRIER    PIC X     VALUE SPACES.
+                   20  ACCT-GROUPING   PIC X(6)  VALUE SPACES.
+                   20  ACCT-STATE      PIC XX    VALUE SPACES.
+                   20  ACCT-ACCOUNT    PIC X(10) VALUE SPACES.
+               16  ACCT-EXP-DATE       PIC XX    VALUE SPACES.
+               16  FILLER              PIC X(4)  VALUE LOW-VALUES.
+           12  ERACCT-SAVE-KEY         PIC X(20) VALUE SPACES.
+           12  WS-ELCERT-FILE-ID       PIC X(8) VALUE 'ELCERT'.
+           12  WS-ELCNTL-FILE-ID       PIC X(8) VALUE 'ELCNTL'.
+           12  WS-ERNOTE-FILE-ID       PIC X(8) VALUE 'ERNOTE'.
+           12  WS-ELCRTO-FILE-ID       PIC X(8) VALUE 'ELCRTO'.
+           12  WS-ERENDT-FILE-ID       PIC X(8) VALUE 'ERENDT'.
+           12  WS-ERPNDB2-FILE-ID      PIC X(8) VALUE 'ERPNDB2'.
+           12  WS-ERPNDB-FILE-ID       PIC X(8) VALUE 'ERPNDB'.
+           12  WS-ERACCT2-FILE-ID      PIC X(8) VALUE 'ERACCT2'.
+072312     12  WS-ERCNOT-FILE-ID       PIC X(8) VALUE 'ERCNOT'.
+072312     12  WS-ELEOBC-FILE-ID       PIC X(8) VALUE 'ELEOBC'.
+           12  WS-RESPONSE             PIC S9(8)   COMP.
+               88  RESP-NORMAL                  VALUE +00.
+               88  RESP-NOTFND                  VALUE +13.
+062712         88  RESP-DUPREC                  VALUE +14.
+062712         88  RESP-DUPKEY                  VALUE +15.
+               88  RESP-NOTOPEN                 VALUE +19.
+               88  RESP-ENDFILE                 VALUE +20.
+           12  MAP-NAME            PIC X(8)    VALUE 'EL631J'.
+           12  MAPSET-NAME         PIC X(8)    VALUE 'EL6317S'.
+           12  SCREEN-NUMBER       PIC X(4)    VALUE '631J'.
+           12  TRANS-ID            PIC X(4)    VALUE 'EXBD'.
+           12  THIS-PGM            PIC X(8)    VALUE 'EL6317'.
+           12  PGM-NAME            PIC X(8).
+           12  TIME-IN             PIC S9(7).
+           12  TIME-OUT-R  REDEFINES TIME-IN.
+               16  FILLER          PIC X.
+               16  TIME-OUT        PIC 99V99.
+               16  FILLER          PIC X(2).
+           12  XCTL-005            PIC X(8)    VALUE 'EL005'.
+           12  XCTL-010            PIC X(8)    VALUE 'EL010'.
+           12  XCTL-626            PIC X(8)    VALUE 'EL626'.
+           12  XCTL-6311           PIC X(8)    VALUE 'EL6311'.
+           12  LINK-001            PIC X(8)    VALUE 'EL001'.
+           12  LINK-004            PIC X(8)    VALUE 'EL004'.
+           12  LINK-ELDATCV        PIC X(8)    VALUE 'ELDATCV'.
+           12  WS-PHONE.
+               16  WS-PH1              PIC XXX.
+               16  WS-PH2              PIC XXX.
+               16  WS-PH3              PIC XXXX.
+           12  WS-PHONE-NUM REDEFINES WS-PHONE PIC 9(10).
+           12  WS-DEV-RT               PIC S9V9(6) COMP-3.
+072312     12  WS-CERT-NOTE            PIC X(63).
+072312
+072312     12  WS-BILLING-NOTE.
+072312         16  WS-BN-NOTE          PIC X(25).
+072312         16  WS-BN-LTRID         PIC X(4).
+072312         16  FILLER              PIC X(3).
+072312         16  WS-BN-DATE          PIC X(8).
+072312         16  FILLER              PIC X(3).
+072312         16  WS-BN-USERID        PIC X(4).
+072312         16  FILLER              PIC X(30).
+062712
+062712 01  NEW-ELCRTO-REC.
+062712     12  NEW-ELCRTO-KEY.
+062712         16  NCRTO-COMPANY-CD      PIC X.
+062712         16  NCRTO-CARRIER         PIC X.
+062712         16  NCRTO-GROUPING        PIC X(6).
+062712         16  NCRTO-STATE           PIC XX.
+062712         16  NCRTO-ACCOUNT         PIC X(10).
+062712         16  NCRTO-CERT-EFF-DT     PIC XX.
+062712         16  NCRTO-CERT-PRIME      PIC X(10).
+062712         16  NCRTO-CERT-SFX        PIC X.
+062712         16  NCRTO-RECORD-TYPE     PIC X.
+062712         16  NCRTO-SEQ-NO          PIC 9(4) BINARY.
+062712     12  NEW-ORIG-REC.
+062712         16  NCRTO-INS-LAST-NAME   PIC X(15).
+062712         16  NCRTO-INS-FIRST-NAME  PIC X(10).
+062712         16  NCRTO-INS-MIDDLE-INIT PIC X.
+062712         16  NCRTO-INS-AGE         PIC S999     COMP-3.
+062712         16  NCRTO-JNT-LAST-NAME   PIC X(15).
+062712         16  NCRTO-JNT-FIRST-NAME  PIC X(10).
+062712         16  NCRTO-JNT-MIDDLE-INIT PIC X.
+062712         16  NCRTO-JNT-AGE         PIC S999     COMP-3.
+062712         16  NCRTO-LF-BENCD        PIC XX.
+062712         16  NCRTO-LF-TERM         PIC S999      COMP-3.
+062712         16  NCRTO-LF-BEN-AMT      PIC S9(9)V99  COMP-3.
+062712         16  NCRTO-LF-PRM-AMT      PIC S9(7)V99  COMP-3.
+062712         16  NCRTO-LF-ALT-BEN-AMT  PIC S9(9)V99  COMP-3.
+062712         16  NCRTO-LF-ALT-PRM-AMT  PIC S9(7)V99  COMP-3.
+062712         16  NCRTO-LF-EXP-DT       PIC XX.
+062712         16  NCRTO-LF-COMM-PCT     PIC SV9(5)    COMP-3.
+062712         16  NCRTO-LF-CANCEL-DT    PIC XX.
+062712         16  NCRTO-LF-CANCEL-AMT   PIC S9(7)V99  COMP-3.
+071712         16  NCRTO-LF-ITD-CANCEL-AMT PIC S9(7)V99 COMP-3.
+062712         16  NCRTO-AH-BENCD        PIC XX.
+062712         16  NCRTO-AH-TERM         PIC S999      COMP-3.
+062712         16  NCRTO-AH-BEN-AMT      PIC S9(9)V99  COMP-3.
+062712         16  NCRTO-AH-PRM-AMT      PIC S9(7)V99  COMP-3.
+062712         16  NCRTO-AH-EXP-DT       PIC XX.
+062712         16  NCRTO-AH-COMM-PCT     PIC SV9(5)    COMP-3.
+062712         16  NCRTO-AH-CP           PIC 99.
+062712         16  NCRTO-AH-CANCEL-DT    PIC XX.
+062712         16  NCRTO-AH-CANCEL-AMT   PIC S9(7)V99  COMP-3.
+071712         16  NCRTO-AH-ITD-CANCEL-AMT PIC S9(7)V99 COMP-3.
+062712         16  NCRTO-CRED-BENE-NAME  PIC X(25).
+062712         16  NCRTO-1ST-PMT-DT      PIC XX.
+062712         16  FILLER                PIC X(239).
+
+       01  ERROR-MESSAGES.
+           12  ER-0000                 PIC X(4)  VALUE '0000'.
+           12  ER-0004                 PIC X(4)  VALUE '0004'.
+           12  ER-0008                 PIC X(4)  VALUE '0008'.
+           12  ER-0023                 PIC X(4)  VALUE '0023'.
+           12  ER-0029                 PIC X(4)  VALUE '0029'.
+           12  ER-0068                 PIC X(4)  VALUE '0068'.
+           12  ER-0132                 PIC X(4)  VALUE '0132'.
+           12  ER-0142                 PIC X(4)  VALUE '0142'.
+           12  ER-0148                 PIC X(4)  VALUE '0148'.
+           12  ER-0215                 PIC X(4)  VALUE '0215'.
+           12  ER-0280                 PIC X(4)  VALUE '0280'.
+           12  ER-0348                 PIC X(4)  VALUE '0348'.
+           12  ER-0419                 PIC X(4)  VALUE '0419'.
+           12  ER-1101                 PIC X(4)  VALUE '1101'.
+           12  ER-1236                 PIC X(4)  VALUE '1236'.
+           12  ER-1818                 PIC X(4)  VALUE '1818'.
+           12  ER-1820                 PIC X(4)  VALUE '1820'.
+           12  ER-2056                 PIC X(4)  VALUE '2056'.
+           12  ER-2079                 PIC X(4)  VALUE '2079'.
+           12  ER-2208                 PIC X(4)  VALUE '2208'.
+           12  ER-2209                 PIC X(4)  VALUE '2209'.
+           12  ER-2237                 PIC X(4)  VALUE '2237'.
+           12  ER-2238                 PIC X(4)  VALUE '2238'.
+           12  ER-2253                 PIC X(4)  VALUE '2253'.
+           12  ER-2619                 PIC X(4)  VALUE '2619'.
+           12  ER-2651                 PIC X(4)  VALUE '2651'.
+           12  ER-2784                 PIC X(4)  VALUE '2784'.
+           12  ER-2785                 PIC X(4)  VALUE '2785'.
+           12  ER-2786                 PIC X(4)  VALUE '2786'.
+052307     12  ER-2791                 PIC X(4)  VALUE '2791'.
+           12  ER-2845                 PIC X(4)  VALUE '2845'.
+           12  ER-2848                 PIC X(4)  VALUE '2848'.
+           12  ER-2851                 PIC X(4)  VALUE '2851'.
+062412     12  ER-3830                 PIC X(4)  VALUE '3830'.
+062712     12  ER-3832                 PIC X(4)  VALUE '3832'.
+           12  ER-7345                 PIC X(4)  VALUE '7345'.
+           12  ER-7638                 PIC X(4)  VALUE '7638'.
+           12  ER-8888                 PIC X(4)  VALUE '8888'.
+           12  ER-9999                 PIC X(4)  VALUE '9999'.
+
+           COPY ELCDATE.
+
+           COPY ELCTEXT.
+           COPY ELCLOGOF.
+
+           COPY ELCATTR.
+
+           COPY ELCEMIB.
+
+           COPY ELCINTF.
+           12  FILLER REDEFINES PI-PROGRAM-WORK-AREA.
+              16  PI-ISS-CAN-SW           PIC X.
+              16  PI-ERENDT-KEY.
+                  20  PI-ENDT-COMPANY-CD  PIC X.
+                  20  PI-ENDT-CARRIER     PIC X.
+                  20  PI-ENDT-GROUPING    PIC X(6).
+                  20  PI-ENDT-STATE       PIC XX.
+                  20  PI-ENDT-ACCOUNT     PIC X(10).
+                  20  PI-ENDT-CERT-EFF-DT PIC XX.
+                  20  PI-ENDT-CERT-PRIME  PIC X(10).
+                  20  PI-ENDT-CERT-SFX    PIC X.
+                  20  PI-ENDT-RECORD-TYPE PIC X.
+                  20  PI-ENDT-SEQ-NO      PIC 9(4) BINARY.
+              16  PI-ELCRTO-KEY.
+                  20  PI-CRTO-COMPANY-CD  PIC X.
+                  20  PI-CRTO-CARRIER     PIC X.
+                  20  PI-CRTO-GROUPING    PIC X(6).
+                  20  PI-CRTO-STATE       PIC XX.
+                  20  PI-CRTO-ACCOUNT     PIC X(10).
+                  20  PI-CRTO-CERT-EFF-DT PIC XX.
+                  20  PI-CRTO-CERT-PRIME  PIC X(10).
+                  20  PI-CRTO-CERT-SFX    PIC X.
+                  20  PI-CRTO-RECORD-TYPE PIC X.
+                  20  PI-CRTO-SEQ-NO      PIC 9(4) BINARY.
+              16  PI-ERPNDB-KEY           PIC X(11).
+              16  PI-DOCUMENT-PROCESSED   PIC X.
+                  88  PI-VERI-PROCESSED      VALUE 'V'.
+                  88  PI-ENDO-PROCESSED      VALUE 'G'.
+062712        16  PI-PREV-ERENDT-KEY      PIC X(36).
+062712        16  PI-RES-REF-CLM-TYPE     PIC X.
+011712        16  PI-CLM-REFORM-IND       PIC X.
+062712        16  PI-CLEAR-ERROR-SW       PIC X.
+062712            88  PI-CLEAR-ERROR         VALUE 'Y'.
+062712        16  PI-PRINT-CERTIFICATE    PIC X.
+062712        16  PI-ENTERED.
+062712            20  PI-PRTSW-ENTERED    PIC X.
+062712            20  PI-SIGREQ-ENTERED   PIC X.
+062712            20  PI-MONEY-ENTERED    PIC X.
+062712            20  PI-LTRID-ENTERED    PIC X(4).
+062712            20  PI-REASONS-ENTERED  PIC X(84).
+072312            20  PI-CERTNT1-ENTERED  PIC X(63).
+072312            20  PI-CERTNT2-ENTERED  PIC X(63).
+072312        16  FILLER                  PIC X(17).
+072312        16  PI-FINALIZED-IND        PIC X.
+072312        16  FILLER                  PIC X(280).
+          12  FILLER                      PIC X(276).
+
+           COPY ELCAID.
+
+       01  FILLER    REDEFINES DFHAID.
+           12  FILLER              PIC X(8).
+           12  PF-VALUES           PIC X       OCCURS 24 TIMES.
+
+          COPY EL6317S.
+
+       01  filler redefines el631ji.
+072312     12  filler                   pic x(182).
+062712     12  REASONCDS.
+062712         16  filler occurs 12.
+062712             20  reacdl       pic s9(4) comp.
+062712             20  reacda       pic x.
+062712             20  reacd-in     pic x(4).
+          
+
+       LINKAGE SECTION.
+       01  DFHCOMMAREA                 PIC X(1300).
+       01  var  pic x(30).
+
+                                       COPY ERCACCT.
+                                       COPY ELCCNTL.
+                                       COPY ERCPNDB.
+                                       COPY ELCCERT.
+                                       COPY ELCCRTO.
+                                       COPY ERCENDT.
+                                       COPY ERCNOTE.
+                                       COPY ERCMAIL.
+                                       COPY ERCARCH.
+072312                                 COPY ERCCNOT.
+072312                                 COPY ELCEOBC.
+
+       PROCEDURE DIVISION.
+           MOVE DFHCOMMAREA            TO PROGRAM-INTERFACE-BLOCK
+
+           MOVE EIBDATE                TO DC-JULIAN-YYDDD
+           MOVE '5'                    TO DC-OPTION-CODE
+           PERFORM 9700-DATE-LINK
+           MOVE DC-GREG-DATE-1-EDIT    TO WS-CURRENT-DT
+           MOVE DC-BIN-DATE-1          TO WS-CURRENT-BIN-DT
+           MOVE EIBTRMID               TO QID-TERM
+           MOVE 2                      TO EMI-NUMBER-OF-LINES
+
+           IF EIBCALEN = 0
+              GO TO 8800-UNAUTHORIZED-ACCESS
+           END-IF
+
+           MOVE FUNCTION LENGTH(EL631JI) TO MAP-LENGTH
+
+           IF PI-CALLING-PROGRAM NOT = THIS-PGM
+              IF PI-RETURN-TO-PROGRAM NOT = THIS-PGM
+                 MOVE PI-SAVED-PROGRAM-5   TO PI-SAVED-PROGRAM-6
+                 MOVE PI-SAVED-PROGRAM-4   TO PI-SAVED-PROGRAM-5
+                 MOVE PI-SAVED-PROGRAM-3   TO PI-SAVED-PROGRAM-4
+                 MOVE PI-SAVED-PROGRAM-2   TO PI-SAVED-PROGRAM-3
+                 MOVE PI-SAVED-PROGRAM-1   TO PI-SAVED-PROGRAM-2
+                 MOVE PI-RETURN-TO-PROGRAM TO PI-SAVED-PROGRAM-1
+                 MOVE PI-CALLING-PROGRAM   TO PI-RETURN-TO-PROGRAM
+                 MOVE THIS-PGM             TO PI-CALLING-PROGRAM
+                 MOVE LOW-VALUES           TO EL631JI
+062712           MOVE 'Y'                  TO PI-CLEAR-ERROR-SW
+                 GO TO 0350-BUILD-INIT-MAP
+              END-IF
+           END-IF
+
+           IF PI-CALLING-PROGRAM = 'EL614'
+              MOVE PI-PROGRAM-WORK-AREA (1:60)
+                                       TO WS-PASSED-REASON-CODES
+              DISPLAY ' COMING BACK FROM 614 ' WS-PASSED-REASON-CODES
+              IF WS-PASSED-REASON-CODES NOT = SPACES
+                 MOVE 'Y'              TO WS-SET-CODES-MDT
+              ELSE
+                 MOVE 'N'              TO WS-SET-CODES-MDT
+              END-IF
+              PERFORM 0600-RECOVER-TEMP-STORAGE
+                                       THRU 0600-EXIT 
+062712        GO TO 0350-BUILD-INIT-MAP
+           END-IF
+
+           IF EIBAID = DFHCLEAR
+062712        IF PI-CLEAR-ERROR
+062712           MOVE SPACES            TO PI-CLEAR-ERROR-SW
+062712           MOVE ER-3832           TO EMI-ERROR
+062712           PERFORM 9900-ERROR-FORMAT THRU 9900-EXIT
+062712           GO TO 0350-BUILD-INIT-MAP
+062712        ELSE
+062712           GO TO 9400-CLEAR
+062712        END-IF
+           END-IF
+
+           .
+       0200-RECEIVE.
+
+           IF EIBAID = DFHPA1 OR DFHPA2 OR DFHPA3
+              MOVE ER-0008             TO EMI-ERROR
+              PERFORM 9900-ERROR-FORMAT
+                                       THRU 9900-EXIT
+              MOVE -1                  TO PFENTRL
+              GO TO 8100-SEND-INITIAL-MAP
+           END-IF
+
+           EXEC CICS RECEIVE
+               MAP      (MAP-NAME)
+               MAPSET   (MAPSET-NAME)
+               INTO     (EL631JI)
+           END-EXEC
+
+           IF PFENTRL = 0
+               GO TO 0300-CHECK-PFKEYS
+           END-IF
+           IF EIBAID NOT = DFHENTER
+               MOVE ER-0004            TO EMI-ERROR
+               GO TO 0320-INPUT-ERROR
+           END-IF
+
+           IF (PFENTRI NUMERIC) AND (PFENTRI > 0 AND < 25)
+              MOVE PF-VALUES (PFENTRI) TO EIBAID
+           ELSE
+              MOVE ER-0029            TO EMI-ERROR
+              GO TO 0320-INPUT-ERROR
+           END-IF
+
+           .
+       0300-CHECK-PFKEYS.
+
+           IF EIBAID = DFHPF1
+062712        MOVE 'Y'                 TO PI-CLEAR-ERROR-SW
+              PERFORM 0500-CREATE-TEMP-STORAGE THRU 0500-EXIT   
+              MOVE 'EL614'             TO PGM-NAME
+              MOVE SPACES              TO PI-PROGRAM-WORK-AREA
+              move +1                  to s2
+              perform varying s1 from +1 by +1 until s1 > +12
+                 if reacd-in (s1) not = spaces and low-values
+                    move reacd-in (s1)    to pi-program-work-area (s2:4)
+                    add +5 to s2
+                 end-if
+              END-perform
+              DISPLAY ' GOING TO 614 ' PI-PROGRAM-WORK-AREA (1:60)
+              GO TO 9300-XCTL
+           END-IF
+
+           IF EIBAID = DFHPF2 OR DFHPF8
+              GO TO 0360-FINALIZE
+           END-IF
+
+           IF EIBAID = DFHPF23
+062712        IF PI-CLEAR-ERROR
+062712           MOVE SPACES            TO PI-CLEAR-ERROR-SW
+062712           MOVE ER-3832           TO EMI-ERROR
+062712           PERFORM 9900-ERROR-FORMAT THRU 9900-EXIT
+062712           GO TO 0350-BUILD-INIT-MAP
+062712        ELSE
+062712           GO TO 8810-PF23
+062712        END-IF
+           END-IF
+
+           IF EIBAID = DFHPF24
+062712        IF PI-CLEAR-ERROR
+062712           MOVE SPACES            TO PI-CLEAR-ERROR-SW
+062712           MOVE ER-3832           TO EMI-ERROR
+062712           PERFORM 9900-ERROR-FORMAT THRU 9900-EXIT
+062712           GO TO 0350-BUILD-INIT-MAP
+062712        ELSE
+062712           GO TO 9200-RETURN-MAIN-MENU
+062712        END-IF
+           END-IF
+
+           IF EIBAID = DFHPF12
+              GO TO 9500-PF12
+           END-IF
+
+           IF EIBAID = DFHENTER
+062712        MOVE 'Y'                 TO PI-CLEAR-ERROR-SW
+              GO TO 0325-EDIT-SCREEN
+           END-IF
+
+           MOVE ER-0029                TO EMI-ERROR
+
+           .
+       0320-INPUT-ERROR.
+
+           PERFORM 9900-ERROR-FORMAT THRU 9900-EXIT
+           MOVE AL-UNBON               TO PFENTRA
+           MOVE -1                     TO PFENTRL
+           GO TO 8200-SEND-DATAONLY
+
+           .
+       0325-EDIT-SCREEN.
+
+           if prtswl > zeros
+              if prtswi = 'Y' OR 'N' OR 'P' OR ' '
+072312*          MOVE AL-UANON       TO PRTSWA
+072312*          IF PRTSWI = ' '
+072312              MOVE 'P'         TO PRTSWI
+072312*          END-IF
+072312*          MOVE PRTSWI         TO PI-PRTSW-ENTERED
+              END-IF
+           END-IF
+           
+           IF (SIGREQL > ZEROS)
+              AND (SIGREQI = 'Y' OR 'N' OR ' ')
+              MOVE AL-UANON         TO SIGREQA
+              IF SIGREQI = ' '
+                 MOVE 'N'           TO SIGREQI
+              END-IF
+062712        MOVE SIGREQI          TO PI-SIGREQ-ENTERED
+           ELSE
+              MOVE ER-2651          TO EMI-ERROR
+              MOVE -1               TO SIGREQL
+              MOVE AL-UABON         TO SIGREQA
+              PERFORM 9900-ERROR-FORMAT
+                                       THRU 9900-EXIT
+           END-IF
+
+
+           IF LTRIDL > ZEROS
+              AND LTRIDI > SPACES
+              MOVE PI-COMPANY-CD       TO LETR-COMPANY-CD
+              MOVE LTRIDI              TO LETR-LETTER-ID
+062712                                    PI-LTRID-ENTERED  
+              MOVE SPACES              TO LETR-FILLER
+              MOVE 1                   TO LETR-SEQ-NO
+              EXEC CICS READ
+                  DATASET   ('ELLETR')
+                  INTO      (TEXT-FILES)
+                  RIDFLD    (ELLETR-KEY)
+                  RESP      (WS-RESPONSE)
+              END-EXEC
+              IF RESP-NORMAL
+                 MOVE AL-UANON         TO LTRIDA
+                 IF TX-LINE-SQUEEZE-CONTROL = 'Z'
+                    MOVE TX-TEXT-LINE  TO W-Z-CONTROL-DATA
+                 ELSE
+                    MOVE SPACES        TO W-Z-CONTROL-DATA
+                 END-IF
+062712           MOVE W-PRINT-CERTIFICATE TO PI-PRINT-CERTIFICATE
+              ELSE
+                 MOVE ER-1236          TO EMI-ERROR
+                 MOVE -1               TO LTRIDL
+                 MOVE AL-UABON         TO LTRIDA
+                 PERFORM 9900-ERROR-FORMAT
+                                       THRU 9900-EXIT
+              END-IF
+           ELSE
+              MOVE ER-1236          TO EMI-ERROR
+              MOVE -1               TO LTRIDL
+              MOVE AL-UABON         TO LTRIDA
+              PERFORM 9900-ERROR-FORMAT
+                                       THRU 9900-EXIT
+           END-IF
+
+062712     SET REASONS-NOT-FOUND TO TRUE
+062712     PERFORM VARYING S1 FROM +1 BY +1 UNTIL S1 > +12
+062712        IF REACDL (S1) = +4 OR
+062712          (REACD-IN (S1) NOT = SPACES AND LOW-VALUES)
+062712              MOVE AL-SANON     TO REACDA (S1)
+062712              SET REASONS-FOUND TO TRUE
+062712        END-IF
+062712     END-PERFORM
+062712     
+062712     IF REASONS-NOT-FOUND
+062712        MOVE ER-1820             TO EMI-ERROR
+062712        MOVE -1                  TO PFENTRL
+062712        PERFORM 9900-ERROR-FORMAT
+062712                                 THRU 9900-EXIT
+062712     ELSE
+062712        MOVE REASONCDS           TO PI-REASONS-ENTERED
+062712     END-IF
+062712     
+072312     IF CRTNT1L > ZEROS
+072312        IF CRTNT1I > SPACES
+072312           MOVE CRTNT1I          TO PI-CERTNT1-ENTERED
+072312        END-IF
+072312     END-IF
+072312
+072312     IF CRTNT2L > ZEROS
+072312        IF CRTNT2I > SPACES
+072312           MOVE CRTNT2I          TO PI-CERTNT2-ENTERED
+072312        END-IF
+072312     END-IF
+072312
+
+           .
+       0325-EXIT.
+           EXIT.
+
+       0330-CHECK-ERRORS.
+
+           IF EMI-NO-ERRORS
+062712        GO TO 0350-BUILD-INIT-MAP
+           ELSE
+              GO TO 8200-SEND-DATAONLY
+           END-IF
+
+           .
+       0330-EXIT.
+           EXIT.
+
+       0350-BUILD-INIT-MAP.
+062712
+062712     IF PI-RETURN-TO-PROGRAM = 'EL1273'
+              display 'coming from el1273 '
+062712        MOVE PI-COMPANY-CD          TO CRTO-COMPANY-CD
+062712        MOVE PI-CARRIER             TO CRTO-CARRIER
+062712        MOVE PI-GROUPING            TO CRTO-GROUPING
+062712        MOVE PI-STATE               TO CRTO-STATE
+062712        MOVE PI-ACCOUNT             TO CRTO-ACCOUNT
+062712        MOVE PI-CERT-PRIME          TO CRTO-CERT-PRIME
+062712        MOVE PI-CERT-SFX            TO CRTO-CERT-SFX
+062712        MOVE PI-CERT-EFF-DT         TO CRTO-CERT-EFF-DT
+062712        MOVE 'I'                    TO CRTO-RECORD-TYPE
+062712        MOVE ZEROS                  TO CRTO-SEQ-NO
+062712        MOVE ELCRTO-KEY             TO PI-ELCRTO-KEY
+062712                                       PI-ERENDT-KEY
+062712     END-IF
+
+           MOVE PI-CRTO-CARRIER        TO CARRO
+           MOVE PI-CRTO-GROUPING       TO GROUPO
+           MOVE PI-CRTO-STATE          TO STATEO
+           MOVE PI-CRTO-ACCOUNT        TO ACCTO
+           MOVE PI-CRTO-CERT-PRIME     TO CERTNOO
+           MOVE PI-CRTO-CERT-SFX       TO CRTSFXO
+           MOVE PI-CRTO-SEQ-NO         TO SEQNOO
+
+           MOVE PI-CRTO-CERT-EFF-DT    TO DC-BIN-DATE-1
+           MOVE ' '                    TO DC-OPTION-CODE
+           PERFORM 9700-DATE-LINK
+           IF NO-CONVERSION-ERROR
+              MOVE DC-GREG-DATE-1-EDIT TO EFFDTO
+           END-IF
+062712     
+072312*    IF PI-PRTSW-ENTERED > SPACES
+072312*       MOVE PI-PRTSW-ENTERED    TO PRTSWI
+072312*       MOVE AL-UANON            TO PRTSWA
+072312*       MOVE +1                  TO PRTSWL
+072312*    END-IF
+062712
+062712     IF PI-SIGREQ-ENTERED > SPACES
+062712        MOVE PI-SIGREQ-ENTERED   TO SIGREQI
+062712        MOVE AL-UANON            TO SIGREQA
+062712        MOVE +1                  TO SIGREQL
+062712     END-IF
+062712
+062712     IF PI-LTRID-ENTERED > SPACES
+062712        MOVE PI-LTRID-ENTERED    TO LTRIDI
+062712        MOVE AL-UANON            TO LTRIDA
+062712        MOVE +4                  TO LTRIDL
+062712     END-IF
+062712
+062712     MOVE PI-REASONS-ENTERED     TO REASONCDS
+062712     PERFORM VARYING S1 FROM +1 BY +1 UNTIL S1 > +12
+062712        IF REACDL (S1) = +4 OR
+062712          (REACD-IN (S1) NOT = SPACES AND LOW-VALUES)
+062712              MOVE AL-SANON      TO REACDA (S1)
+062712              MOVE +4            TO REACDL (S1)
+062712              SET REASONS-FOUND  TO TRUE
+062712        END-IF
+062712     END-PERFORM
+062712      
+           GO TO 8100-SEND-INITIAL-MAP       
+
+           .
+       0360-FINALIZE.
+
+           display ' made it to 0360 '
+
+           PERFORM 0325-EDIT-SCREEN    THRU 0325-EXIT
+
+           IF NOT EMI-NO-ERRORS
+              GO TO 8200-SEND-DATAONLY
+           END-IF
+
+           set P to address of KIXSYS
+           CALL "getenv" using by value P returning var-ptr
+           if var-ptr = null then
+              display ' kixsys not set '
+           else
+              set address of var to var-ptr
+              move 0 to env-var-len
+              inspect var tallying env-var-len
+                for characters before X'00' 
+      *       DISPLAY '  KIXSYS = ' var (1:env-var-len)
+              unstring var (1:env-var-len) delimited by '/'
+                 into WS-KIX-FIL1 WS-KIX-APPS WS-KIX-ENV WS-KIX-MYENV
+                    WS-KIX-SYS
+              end-unstring
+      *       DISPLAY ' WS KIX SYS ' WS-KIXSYS
+      *       DISPLAY ' WS KIX MYENV ' WS-KIX-MYENV
+           end-if
+
+           set P to address of KIXHOST
+           CALL "getenv" using by value P returning var-ptr
+           if var-ptr = null then
+              display ' kixhost not set '
+           else
+              set address of var to var-ptr
+              move 0 to env-var-len
+              inspect var tallying env-var-len
+                for characters before X'00' 
+      *       DISPLAY '  KIXHOST = ' var (1:env-var-len)
+              MOVE var(1:env-var-len)  to ws-kixhost
+              DISPLAY ' WS KIX HOST ' WS-KIXhost
+           end-if
+
+           MOVE PI-ELCRTO-KEY          TO ELCRTO-KEY
+
+           PERFORM 0362-READ-ELCRTO    THRU 0362-EXIT
+
+           IF RESP-NORMAL
+062712        AND (PI-ELCRTO-KEY (1:33) = OC-CONTROL-PRIMARY (1:33))
+              DISPLAY ' RESP NORMAL AND = '
+062712        MOVE OC-KEY-SEQ-NO  TO CRTO-SEQ-NO
+062712                               PI-CRTO-SEQ-NO
+062712        MOVE LOW-VALUES     TO NEW-ELCRTO-REC
+062712        MOVE PI-ELCRTO-KEY  TO NEW-ELCRTO-KEY
+062712        SUBTRACT +1         FROM NCRTO-SEQ-NO           
+              PERFORM 0400-ADD-ERENDT  THRU 0400-EXIT
+      *       PERFORM 1000-BUILD-ERARCH THRU 1000-EXIT
+              PERFORM 1100-CALL-NS-BUS-LOGIC
+                                       THRU 1100-EXIT
+              IF BL-OK
+                 CONTINUE
+              ELSE
+                 MOVE ER-8888          TO EMI-ERROR-NUMBER (1)
+                 MOVE BL-MESSAGE       TO EMI-ERROR-TEXT (1)
+                 MOVE -1               TO CARRL
+              END-IF
+           ELSE
+              MOVE ER-9999             TO EMI-ERROR
+              PERFORM 9900-ERROR-FORMAT
+                                       THRU 9900-EXIT
+              MOVE -1                  TO CARRL
+              GO TO 8100-SEND-INITIAL-MAP
+           END-IF
+
+           MOVE FUNCTION UPPER-CASE(WS-KIX-MYENV)
+                                       TO SYSO
+           MOVE WS-KIXHOST             TO HOSTO
+           MOVE PI-COMPANY-ID          TO COMPANYO
+062712     IF PI-RETURN-TO-PROGRAM = 'EL1273'
+062712         MOVE '2'                TO DATASORO
+062712     ELSE
+062712         MOVE '4'                TO DATASORO
+062712     END-IF
+           MOVE BL-BATCH-NO            TO BATCHNOO
+           MOVE BL-BATCH-SEQ           TO BSEQNOO
+           MOVE BL-ARCHIVE-NO          TO ARCHNOO
+           MOVE PI-PROCESSOR-ID        TO PROCIDO
+072312*    MOVE -1                     TO PRTSWL
+072312*    MOVE AL-UANON               TO PRTSWA
+072312     MOVE -1                     TO SIGREQL
+072312     MOVE AL-UANON               TO SIGREQA
+           if eibaid = dfhpf2
+062712        MOVE SPACES              TO PI-CLEAR-ERROR-SW
+              MOVE ER-0280             TO EMI-ERROR
+              PERFORM 9900-ERROR-FORMAT
+                                       THRU 9900-EXIT
+              MOVE BL-ARCHIVE-NO       TO W-ARCH-SUPPRESS
+              MOVE W-ARCH-EDIT         TO EMI-TEXT-VARIABLE (1)
+072312        MOVE 'Y'                 TO PI-FINALIZED-IND
+072312        GO TO 9400-CLEAR
+           ELSE
+              MOVE ER-1818             TO EMI-ERROR
+              PERFORM 9900-ERROR-FORMAT
+                                       THRU 9900-EXIT
+           END-IF
+
+           GO TO 0350-BUILD-INIT-MAP
+
+           .
+       0360-EXIT.
+           EXIT.
+
+       0362-READ-ELCRTO.
+
+           display ' made it to 0362 '
+           EXEC CICS READ
+               DATASET   (WS-ELCRTO-FILE-ID)
+               SET       (ADDRESS OF ORIGINAL-CERTIFICATE)
+               RIDFLD    (ELCRTO-KEY)
+062712         GTEQ
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           .
+       0362-EXIT.
+           EXIT.
+
+       0363-READ-ELCRTO-UPD.
+
+           display ' made it to 0363 '
+           EXEC CICS READ
+               DATASET   (WS-ELCRTO-FILE-ID)
+               SET       (ADDRESS OF ORIGINAL-CERTIFICATE)
+               RIDFLD    (ELCRTO-KEY)
+               UPDATE
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           .
+       0363-EXIT.
+           EXIT.
+
+       0365-READ-ERENDT.
+
+           EXEC CICS READ
+               DATASET   (WS-ERENDT-FILE-ID)
+               SET       (ADDRESS OF ENDORSEMENT-RECORD)
+               RIDFLD    (ERENDT-KEY)
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           .
+       0365-EXIT.
+           EXIT.
+
+       0400-ADD-ERENDT.
+
+           PERFORM 1500-GET-ARCH-NO    THRU 1500-EXIT
+
+           display ' made it to 0400 '
+           EXEC CICS GETMAIN
+                SET      (ADDRESS OF ENDORSEMENT-RECORD)
+                LENGTH   (ERENDT-LENGTH)
+                INITIMG  (GETMAIN-SPACE)
+           END-EXEC
+       
+           PERFORM 0410-INIT-ERENDT    THRU 0410-EXIT
+           MOVE PI-PROCESSOR-ID        TO EN-LAST-MAINT-BY
+           MOVE EIBTIME                TO EN-LAST-MAINT-HHMMSS
+           MOVE WS-CURRENT-BIN-DT      TO EN-LAST-MAINT-DT
+                                          EN-INPUT-DT
+                                          EN-PROCESS-DT
+
+062712
+062712     MOVE OC-INS-FIRST-NAME    TO EN-INS-ORIG-FIRST-NAME
+062712     MOVE OC-INS-MIDDLE-INIT   TO EN-INS-ORIG-MIDDLE-INIT
+062712     MOVE OC-INS-LAST-NAME     TO EN-INS-ORIG-LAST-NAME
+062712     MOVE OC-INS-AGE           TO EN-INS-ORIG-AGE
+062712     MOVE OC-JNT-FIRST-NAME    TO EN-JNT-ORIG-FIRST-NAME
+062712     MOVE OC-JNT-MIDDLE-INIT   TO EN-JNT-ORIG-MIDDLE-INIT
+062712     MOVE OC-JNT-LAST-NAME     TO EN-JNT-ORIG-LAST-NAME
+062712     MOVE OC-JNT-AGE           TO EN-JNT-ORIG-AGE
+062712     MOVE OC-LF-BENCD          TO EN-LF-ORIG-BENCD
+062712     IF OC-LF-BENCD NOT = '00' AND '  '
+062712        MOVE OC-LF-BEN-AMT       TO EN-LF-ORIG-BEN-AMT
+062712        MOVE OC-LF-PRM-AMT       TO EN-LF-ORIG-PRM-AMT
+062712        MOVE OC-LF-ALT-BEN-AMT   TO EN-LF-ORIG-ALT-BEN-AMT
+062712        MOVE OC-LF-ALT-PRM-AMT   TO EN-LF-ORIG-ALT-PRM-AMT
+062712        MOVE OC-LF-TERM          TO EN-LF-ORIG-TERM
+062712        MOVE OC-LF-EXP-DT        TO EN-LF-ORIG-EXP-DT
+062712        MOVE OC-LF-COMM-PCT      TO EN-LF-ORIG-COMM-PCT
+062712     END-IF
+062712     MOVE OC-AH-BENCD          TO EN-AH-ORIG-BENCD    
+062712     IF OC-AH-BENCD NOT = '00' AND '  '
+062712        MOVE OC-AH-BEN-AMT       TO EN-AH-ORIG-BEN-AMT  
+062712        MOVE OC-AH-PRM-AMT       TO EN-AH-ORIG-PRM-AMT     
+062712        MOVE OC-AH-TERM          TO EN-AH-ORIG-TERM     
+062712        MOVE OC-AH-EXP-DT        TO EN-AH-ORIG-EXP-DT
+062712        MOVE OC-AH-CP            TO EN-AH-ORIG-CP
+062712        MOVE OC-AH-COMM-PCT      TO EN-AH-ORIG-COMM-PCT
+062712     END-IF
+062712     MOVE OC-CRED-BENE-NAME      TO EN-ORIG-CRED-BENE
+062712
+062712     IF PI-RETURN-TO-PROGRAM = 'EL1273'
+               display 'from el1273, using crto for new crto'
+062712
+062712        MOVE OC-INS-FIRST-NAME    TO EN-INS-NEW-FIRST-NAME
+062712                                     NCRTO-INS-FIRST-NAME
+062712        MOVE OC-INS-MIDDLE-INIT   TO EN-INS-NEW-MIDDLE-INIT
+062712                                     NCRTO-INS-MIDDLE-INIT
+062712        MOVE OC-INS-LAST-NAME     TO EN-INS-NEW-LAST-NAME
+062712                                     NCRTO-INS-LAST-NAME
+062712        MOVE OC-INS-AGE           TO EN-INS-NEW-AGE
+062712                                     NCRTO-INS-AGE
+062712        MOVE OC-JNT-FIRST-NAME    TO EN-JNT-NEW-FIRST-NAME
+062712                                     NCRTO-JNT-FIRST-NAME
+062712        MOVE OC-JNT-MIDDLE-INIT   TO EN-JNT-NEW-MIDDLE-INIT
+062712                                     NCRTO-JNT-MIDDLE-INIT
+062712        MOVE OC-JNT-LAST-NAME     TO EN-JNT-NEW-LAST-NAME
+062712                                     NCRTO-JNT-LAST-NAME
+062712        MOVE OC-JNT-AGE           TO EN-JNT-NEW-AGE
+062712                                     NCRTO-JNT-AGE
+062712        MOVE OC-LF-BENCD          TO EN-LF-NEW-BENCD
+062712                                     NCRTO-LF-BENCD
+062712        IF OC-LF-BENCD NOT = '00' AND '  '
+062712           MOVE OC-LF-BEN-AMT       TO EN-LF-NEW-BEN-AMT
+062712                                       NCRTO-LF-BEN-AMT
+062712           MOVE OC-LF-PRM-AMT       TO EN-LF-NEW-PRM-AMT
+062712                                       NCRTO-LF-PRM-AMT
+062712           MOVE OC-LF-ALT-BEN-AMT   TO EN-LF-NEW-ALT-BEN-AMT
+062712                                       NCRTO-LF-ALT-BEN-AMT
+062712           MOVE OC-LF-ALT-PRM-AMT   TO EN-LF-NEW-ALT-PRM-AMT
+062712                                       NCRTO-LF-ALT-PRM-AMT
+062712           MOVE OC-LF-TERM          TO EN-LF-NEW-TERM
+062712                                       NCRTO-LF-TERM
+062712           MOVE OC-LF-EXP-DT        TO EN-LF-NEW-EXP-DT
+062712                                       NCRTO-LF-EXP-DT
+062712           MOVE OC-LF-COMM-PCT      TO EN-LF-NEW-COMM-PCT
+062712                                       NCRTO-LF-COMM-PCT
+062712           MOVE OC-LF-CANCEL-DT     TO NCRTO-LF-CANCEL-DT
+062712           MOVE OC-LF-CANCEL-AMT    TO NCRTO-LF-CANCEL-AMT
+071712           MOVE OC-LF-ITD-CANCEL-AMT TO NCRTO-LF-ITD-CANCEL-AMT
+062712        END-IF
+062712        MOVE OC-AH-BENCD          TO EN-AH-NEW-BENCD    
+062712                                     NCRTO-AH-BENCD
+062712        IF OC-AH-BENCD NOT = '00' AND '  '
+062712           MOVE OC-AH-BEN-AMT       TO EN-AH-NEW-BEN-AMT  
+062712                                       NCRTO-AH-BEN-AMT
+062712           MOVE OC-AH-PRM-AMT       TO EN-AH-NEW-PRM-AMT     
+062712                                       NCRTO-AH-PRM-AMT
+062712           MOVE OC-AH-TERM          TO EN-AH-NEW-TERM     
+062712                                       NCRTO-AH-TERM
+062712           MOVE OC-AH-EXP-DT        TO EN-AH-NEW-EXP-DT
+062712                                       NCRTO-AH-EXP-DT
+062712           MOVE OC-AH-CP            TO EN-AH-NEW-CP
+062712                                       NCRTO-AH-CP
+062712           MOVE OC-AH-COMM-PCT      TO EN-AH-NEW-COMM-PCT
+062712                                       NCRTO-AH-COMM-PCT
+062712           MOVE OC-AH-CANCEL-DT     TO NCRTO-AH-CANCEL-DT
+062712           MOVE OC-AH-CANCEL-AMT    TO NCRTO-AH-CANCEL-AMT
+071712           MOVE OC-AH-ITD-CANCEL-AMT TO NCRTO-AH-ITD-CANCEL-AMT
+062712        END-IF
+062712        MOVE OC-CRED-BENE-NAME      TO EN-ORIG-CRED-BENE
+062712                                       NCRTO-CRED-BENE-NAME
+062712
+062712        GO TO 0400-WRITE-ENDT
+062712     END-IF
+
+           EXEC CICS GETMAIN
+                SET      (ADDRESS OF PENDING-BUSINESS)
+                LENGTH   (ERPNDB-LENGTH)
+                INITIMG  (GETMAIN-SPACE)
+           END-EXEC
+           DISPLAY ' JUST DID GETMAIN ON ERPNDB '
+
+           MOVE PI-ERPNDB-KEY          TO ERPNDB-KEY
+           EXEC CICS READ
+               DATASET   (WS-ERPNDB-FILE-ID)
+               INTO      (PENDING-BUSINESS)
+               RIDFLD    (ERPNDB-KEY)
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           IF NOT RESP-NORMAL
+              GO TO 0400-EXIT
+           END-IF
+
+      *    set found-pndb to true
+           display ' good read on erpndb '
+
+           MOVE PB-I-INSURED-FIRST-NAME  TO EN-INS-NEW-FIRST-NAME
+062712                                      NCRTO-INS-FIRST-NAME
+           MOVE PB-I-INSURED-MIDDLE-INIT TO EN-INS-NEW-MIDDLE-INIT
+062712                                      NCRTO-INS-MIDDLE-INIT
+           MOVE PB-I-INSURED-LAST-NAME   TO EN-INS-NEW-LAST-NAME
+062712                                      NCRTO-INS-LAST-NAME
+           MOVE PB-I-AGE                 TO EN-INS-NEW-AGE
+062712                                      NCRTO-INS-AGE
+           MOVE PB-I-JOINT-FIRST-NAME    TO EN-JNT-NEW-FIRST-NAME
+062712                                      NCRTO-JNT-FIRST-NAME
+           MOVE PB-I-JOINT-MIDDLE-INIT   TO EN-JNT-NEW-MIDDLE-INIT
+062712                                      NCRTO-JNT-MIDDLE-INIT
+           MOVE PB-I-JOINT-LAST-NAME     TO EN-JNT-NEW-LAST-NAME
+062712                                      NCRTO-JNT-LAST-NAME
+           MOVE PB-I-JOINT-AGE           TO EN-JNT-NEW-AGE
+062712                                      NCRTO-JNT-AGE
+
+062712     MOVE PB-I-LF-BENEFIT-CD       TO EN-LF-NEW-BENCD
+062712                                      NCRTO-LF-BENCD
+           IF PB-I-LF-BENEFIT-CD NOT = '00' AND '  '
+              MOVE PB-I-LF-BENEFIT-AMT   TO EN-LF-NEW-BEN-AMT
+062712                                      NCRTO-LF-BEN-AMT
+              MOVE PB-I-LF-PREMIUM-AMT   TO EN-LF-NEW-PRM-AMT
+062712                                      NCRTO-LF-PRM-AMT
+              MOVE PB-I-LF-ALT-BENEFIT-AMT TO EN-LF-NEW-ALT-BEN-AMT
+062712                                      NCRTO-LF-ALT-BEN-AMT
+              MOVE PB-I-LF-ALT-PREMIUM-AMT TO EN-LF-NEW-ALT-PRM-AMT
+062712                                      NCRTO-LF-ALT-PRM-AMT
+              MOVE PB-I-LF-TERM          TO EN-LF-NEW-TERM
+062712                                      NCRTO-LF-TERM
+              MOVE PB-I-LF-EXPIRE-DT     TO EN-LF-NEW-EXP-DT
+062712                                      NCRTO-LF-EXP-DT
+              IF PB-I-JOINT-COMMISSION > +0
+                 MOVE PB-I-JOINT-COMMISSION
+                                         TO EN-LF-NEW-COMM-PCT
+062712                                      NCRTO-LF-COMM-PCT
+              ELSE
+                 MOVE PB-I-LIFE-COMMISSION
+                                         TO EN-LF-NEW-COMM-PCT
+062712                                      NCRTO-LF-COMM-PCT
+062712        MOVE LOW-VALUES            TO NCRTO-LF-CANCEL-DT
+062712        MOVE +0                    TO NCRTO-LF-CANCEL-AMT
+071712                                      NCRTO-LF-ITD-CANCEL-AMT
+              END-IF
+           END-IF
+
+062712     MOVE PB-I-AH-BENEFIT-CD       TO EN-AH-NEW-BENCD    
+062712                                      NCRTO-AH-BENCD
+           IF PB-I-AH-BENEFIT-CD NOT = '00' AND '  '
+              MOVE PB-I-AH-BENEFIT-AMT   TO EN-AH-NEW-BEN-AMT  
+062712                                      NCRTO-AH-BEN-AMT
+              MOVE PB-I-AH-PREMIUM-AMT   TO EN-AH-NEW-PRM-AMT     
+062712                                      NCRTO-AH-PRM-AMT
+              MOVE PB-I-AH-TERM          TO EN-AH-NEW-TERM     
+062712                                      NCRTO-AH-TERM
+              MOVE PB-I-AH-EXPIRE-DT     TO EN-AH-NEW-EXP-DT   
+062712                                      NCRTO-AH-EXP-DT
+              MOVE PB-I-AH-CRIT-PER      TO EN-AH-NEW-CP
+062712                                      NCRTO-AH-CP
+              MOVE PB-I-AH-COMMISSION    TO EN-AH-NEW-COMM-PCT
+062712                                      NCRTO-AH-COMM-PCT
+062712        MOVE LOW-VALUES            TO NCRTO-AH-CANCEL-DT
+062712        MOVE +0                    TO NCRTO-AH-CANCEL-AMT
+071712                                      NCRTO-AH-ITD-CANCEL-AMT
+           END-IF
+           
+062712     MOVE PB-I-1ST-PMT-DT          TO NCRTO-1ST-PMT-DT
+072312     MOVE PB-ENTRY-BATCH           TO EN-BATCH-NUMBER
+
+           move pb-control-by-account (1:33)
+                                       to ws-ermail-key
+           EXEC CICS READ
+               DATASET   ('ERMAIL')
+               SET       (ADDRESS OF MAILING-DATA)
+               RIDFLD    (WS-ERMAIL-KEY)
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           IF RESP-NORMAL
+              DISPLAY ' FOUND ERMAIL '
+              MOVE MA-CRED-BENE-NAME   TO EN-NEW-CRED-BENE
+062712                                    NCRTO-CRED-BENE-NAME
+           ELSE
+              DISPLAY ' ERMAIL READ ' WS-RESPONSE
+           END-IF
+       
+062712      .
+062712 0400-WRITE-ENDT.
+062712
+           PERFORM VARYING S1 FROM +1 BY +1 UNTIL S1 > +12
+              IF REACD-IN (S1) NOT = LOW-VALUES
+                 MOVE REACD-IN (S1)    TO EN-REASON-CODE (S1)
+              END-IF
+           END-PERFORM
+           MOVE LTRIDI                 TO EN-TEMPLATE-USED
+           MOVE 'V'                    TO EN-DOCU-TYPE
+           MOVE ' '                    TO EN-MONEY-SW
+           MOVE SIGREQI                TO EN-SIG-SW
+072312     MOVE W-ACCT-SUMM            TO EN-ACCT-SUMM
+072312     MOVE W-CSO-SUMM             TO EN-CSO-SUMM
+
+           PERFORM 0430-WRITE-ERENDT   THRU 0430-EXIT
+
+           IF NOT EMI-NO-ERRORS
+              DISPLAY ' GOING TO 8200 FROM 0400 '
+              GO TO 8200-SEND-DATAONLY
+           END-IF
+           DISPLAY ' 0400 EXIT '
+
+           .
+       0400-EXIT.
+           EXIT.
+
+       0410-INIT-ERENDT.
+
+           display ' made it to 0410 '
+           MOVE OC-CONTROL-PRIMARY     TO ERENDT-KEY
+           MOVE ZEROS                  TO ENDT-SEQ-NO
+
+           EXEC CICS READ
+               DATASET    (WS-ERENDT-FILE-ID)
+               RIDFLD     (ERENDT-KEY)
+               INTO       (ENDORSEMENT-RECORD)
+               RESP       (WS-RESPONSE)
+               GTEQ
+           END-EXEC
+
+           IF RESP-NORMAL
+              AND (EN-CONTROL-PRIMARY (1:34) =
+                 OC-CONTROL-PRIMARY (1:34))
+              COMPUTE WS-SEQ-NO = EN-SEQ-NO - +1
+           ELSE
+              MOVE +4096               TO WS-SEQ-NO
+           END-IF
+
+           MOVE 'EN'                   TO ENDORSEMENT-RECORD
+           MOVE OC-CONTROL-PRIMARY     TO EN-CONTROL-PRIMARY
+           MOVE EN-COMPANY-CD          TO EN-COMPANY-CD-A1
+           MOVE WS-SEQ-NO              TO EN-SEQ-NO
+
+           INITIALIZE EN-ISSUE-RECORD
+
+           MOVE LOW-VALUES             TO EN-LF-ORIG-EXP-DT
+                                          EN-AH-ORIG-EXP-DT
+                                          EN-LF-NEW-EXP-DT
+                                          EN-AH-NEW-EXP-DT
+                                          EN-PROCESS-DT
+
+           .
+       0410-EXIT.
+           EXIT.
+
+       0420-UPDATE-ELCRTO.
+
+           PERFORM 0363-READ-ELCRTO-UPD THRU 0363-EXIT
+           IF RESP-NORMAL
+              MOVE WS-CURRENT-BIN-DT   TO OC-ENDORSEMENT-PROCESSED-DT
+062712                                    OC-LAST-MAINT-DT
+062712        MOVE EIBTIME             TO OC-LAST-MAINT-HHMMSS
+062712        MOVE PI-PROCESSOR-ID     TO OC-LAST-MAINT-BY
+              EXEC CICS REWRITE
+                 FROM     (ORIGINAL-CERTIFICATE)
+                 DATASET  ('ELCRTO')
+              END-EXEC
+           END-IF
+
+           .
+       0420-EXIT.
+           EXIT.
+062712
+062712 0425-ADD-NEW-ELCRTO.
+062712     MOVE SPACES                 TO ORIGINAL-CERTIFICATE
+062712     MOVE 'OC'                   TO OC-RECORD-ID
+062712     MOVE NEW-ELCRTO-KEY         TO OC-CONTROL-PRIMARY
+062712     MOVE PI-PROCESSOR-ID        TO OC-LAST-MAINT-BY
+062712     MOVE EIBTIME                TO OC-LAST-MAINT-HHMMSS
+062712     MOVE WS-CURRENT-BIN-DT      TO OC-LAST-MAINT-DT
+062712     MOVE NCRTO-INS-FIRST-NAME   TO OC-INS-FIRST-NAME   
+062712     MOVE NCRTO-INS-MIDDLE-INIT  TO OC-INS-MIDDLE-INIT  
+062712     MOVE NCRTO-INS-LAST-NAME    TO OC-INS-LAST-NAME    
+062712     MOVE NCRTO-INS-AGE          TO OC-INS-AGE          
+062712     MOVE NCRTO-JNT-FIRST-NAME   TO OC-JNT-FIRST-NAME   
+062712     MOVE NCRTO-JNT-MIDDLE-INIT  TO OC-JNT-MIDDLE-INIT  
+062712     MOVE NCRTO-JNT-LAST-NAME    TO OC-JNT-LAST-NAME    
+062712     MOVE NCRTO-JNT-AGE          TO OC-JNT-AGE          
+062712     MOVE NCRTO-LF-BENCD         TO OC-LF-BENCD    
+062712     MOVE NCRTO-LF-BEN-AMT       TO OC-LF-BEN-AMT   
+062712     MOVE NCRTO-LF-PRM-AMT       TO OC-LF-PRM-AMT   
+062712     MOVE NCRTO-LF-ALT-BEN-AMT   TO OC-LF-ALT-BEN-AMT
+062712     MOVE NCRTO-LF-ALT-PRM-AMT   TO OC-LF-ALT-PRM-AMT
+062712     MOVE NCRTO-LF-TERM          TO OC-LF-TERM          
+062712     MOVE NCRTO-LF-EXP-DT        TO OC-LF-EXP-DT     
+062712     MOVE NCRTO-LF-COMM-PCT      TO OC-LF-COMM-PCT
+062712     MOVE NCRTO-LF-CANCEL-DT     TO OC-LF-CANCEL-DT    
+062712     MOVE NCRTO-LF-CANCEL-AMT    TO OC-LF-CANCEL-AMT
+071712     MOVE NCRTO-LF-ITD-CANCEL-AMT TO OC-LF-ITD-CANCEL-AMT
+062712     MOVE NCRTO-AH-BENCD         TO OC-AH-BENCD 
+062712     MOVE NCRTO-AH-BEN-AMT       TO OC-AH-BEN-AMT
+062712     MOVE NCRTO-AH-PRM-AMT       TO OC-AH-PRM-AMT
+062712     MOVE NCRTO-AH-TERM          TO OC-AH-TERM       
+062712     MOVE NCRTO-AH-EXP-DT        TO OC-AH-EXP-DT  
+062712     MOVE NCRTO-AH-CP            TO OC-AH-CP   
+062712     MOVE NCRTO-AH-COMM-PCT      TO OC-AH-COMM-PCT   
+062712     MOVE NCRTO-AH-CANCEL-DT     TO OC-AH-CANCEL-DT    
+062712     MOVE NCRTO-AH-CANCEL-AMT    TO OC-AH-CANCEL-AMT
+071712     MOVE NCRTO-AH-ITD-CANCEL-AMT TO OC-AH-ITD-CANCEL-AMT
+062712     MOVE NCRTO-CRED-BENE-NAME   TO OC-CRED-BENE-NAME
+062712     MOVE NCRTO-1ST-PMT-DT       TO OC-1ST-PMT-DT
+062712     MOVE LOW-VALUES             TO OC-ENDORSEMENT-PROCESSED-DT
+062712     .
+062712 0425-WRITE-ELCRTO.
+062712
+062712     EXEC CICS WRITE
+062712        DATASET   ('ELCRTO')
+062712        FROM      (ORIGINAL-CERTIFICATE)
+062712        RIDFLD    (OC-CONTROL-PRIMARY)
+062712        RESP      (WS-RESPONSE)
+062712     END-EXEC
+062712
+062712     display ' just wrote new crto ' ws-response 
+                                 ' ' oc-key-seq-no
+062712     IF RESP-DUPKEY
+062712        SUBTRACT +1              FROM OC-KEY-SEQ-NO
+062712        GO TO 0425-WRITE-ELCRTO
+062712     ELSE
+062712        IF NOT RESP-NORMAL
+062712           MOVE -1               TO SIGREQL
+062712           MOVE ER-3830          TO EMI-ERROR
+062712           PERFORM 9900-ERROR-FORMAT
+062712                                 THRU 9900-EXIT
+062712        ELSE
+062712           MOVE OC-CONTROL-PRIMARY TO PI-ELCRTO-KEY
+062712        END-IF
+062712     END-IF
+062712
+062712     .
+062712 0425-EXIT.
+062712     EXIT.
+062712
+072312 0426-ADD-CERT-NOTES.
+072312
+072312     EXEC CICS GETMAIN
+072312          SET      (ADDRESS OF CERT-NOTE-FILE)
+072312          LENGTH   (ERCNOT-LENGTH)
+072312          INITIMG  (GETMAIN-SPACE)
+072312     END-EXEC
+072312
+072312     MOVE LOW-VALUES TO WS-CERT-NOTE
+072312     IF PI-CERTNT1-ENTERED > SPACES
+072312         MOVE PI-CERTNT1-ENTERED TO WS-CERT-NOTE
+072312         PERFORM 1700-WRITE-CERT-NOTE THRU 1799-EXIT
+072312     END-IF
+072312
+072312     MOVE LOW-VALUES TO WS-CERT-NOTE
+072312     IF PI-CERTNT2-ENTERED > SPACES
+072312         MOVE PI-CERTNT2-ENTERED TO WS-CERT-NOTE
+072312         PERFORM 1700-WRITE-CERT-NOTE THRU 1799-EXIT
+072312     END-IF
+072312
+072312     .
+072312 0426-EXIT.
+072312     EXIT.
+072312
+       0430-WRITE-ERENDT.
+
+           DISPLAY ' NO ERRORS, ABOUT TO WRITE ERENDT '
+           MOVE EN-CONTROL-PRIMARY     TO PI-ERENDT-KEY
+           MOVE W-ARCH-NUMBER          TO EN-ARCHIVE-NO
+           EXEC CICS WRITE
+                DATASET   (WS-ERENDT-FILE-ID)
+                FROM      (ENDORSEMENT-RECORD)
+                RIDFLD    (EN-CONTROL-PRIMARY)
+                RESP      (WS-RESPONSE)
+           END-EXEC
+           IF RESP-NORMAL
+              MOVE 'V'                 TO PI-DOCUMENT-PROCESSED
+              display ' good write erendt '
+062712        IF EIBAID = DFHPF2
+062712           PERFORM 0420-UPDATE-ELCRTO THRU 0420-EXIT
+062712           PERFORM 0425-ADD-NEW-ELCRTO THRU 0425-EXIT
+072312           PERFORM 0426-ADD-CERT-NOTES THRU 0426-EXIT
+072312           PERFORM 0440-ADD-BILLING-NOTE THRU 0440-EXIT
+062712        END-IF
+           ELSE
+              DISPLAY ' NOT A GOOD WRITE ERENDT ' WS-RESPONSE
+              MOVE -1                  TO CARRL
+              MOVE ER-0132             TO EMI-ERROR
+              MOVE AL-UABON            TO CARRA
+              PERFORM 9900-ERROR-FORMAT THRU 9900-EXIT
+           END-IF
+
+           .
+       0430-EXIT.
+           EXIT.
+
+072312 0440-ADD-BILLING-NOTE.
+           DISPLAY 'ADD BILLING NOTE'
+           
+072312     EXEC CICS GETMAIN
+072312          SET      (ADDRESS OF EOB-CODES)
+072312          LENGTH   (ELEOBC-LENGTH)
+072312          INITIMG  (GETMAIN-SPACE)
+072312     END-EXEC           
+072312
+072312     MOVE LOW-VALUES             TO WS-ELEOBC-KEY
+072312     MOVE PI-COMPANY-CD          TO WS-EOBC-COMPANY-CD
+072312     MOVE '5'                    TO WS-EOBC-REC-TYPE
+072312
+072312     EXEC CICS STARTBR                                            
+072312         DATASET   ('ELEOBC')
+072312         RIDFLD    (WS-ELEOBC-KEY)
+072312         GTEQ
+072312         RESP      (WS-RESPONSE)
+072312     END-EXEC
+072312
+072312     IF NOT RESP-NORMAL
+072312        GO TO 0440-EXIT
+072312     END-IF
+072312      .
+072312 0440-READNEXT-ELEOBC.
+072312
+072312     EXEC CICS READNEXT
+072312        INTO    (EOB-CODES)
+072312        DATASET ('ELEOBC')
+072312        RIDFLD  (WS-ELEOBC-KEY)
+072312        RESP    (WS-RESPONSE)
+072312     END-EXEC
+072312
+072312     IF RESP-NORMAL
+072312         IF EO-RECORD-TYPE NOT = '5'
+072312             GO TO 0440-EXIT
+072312         END-IF
+072312     ELSE
+072312         GO TO 0440-EXIT
+072312     END-IF
+072312     
+072312     IF EO-RECORD-TYPE = '5' AND
+072312        EO-EOB-CODE = PI-LTRID-ENTERED
+072312           CONTINUE
+072312     ELSE
+072312         GO TO 0440-READNEXT-ELEOBC
+072312     END-IF
+072312     
+           DISPLAY 'FOUND BILL NOTE ' EOB-CODES
+           
+072312     MOVE SPACES TO WS-BILLING-NOTE
+072312     MOVE EO-DESCRIPTION TO WS-BN-NOTE
+072312     MOVE PI-LTRID-ENTERED TO WS-BN-LTRID
+072312     MOVE WS-CURRENT-DT TO WS-BN-DATE
+072312     MOVE PI-PROCESSOR-ID TO WS-BN-USERID
+072312
+072312     EXEC CICS GETMAIN
+072312          SET      (ADDRESS OF CERTIFICATE-NOTE)
+072312          LENGTH   (ERNOTE-LENGTH)
+072312          INITIMG  (GETMAIN-SPACE)
+072312     END-EXEC           
+072312     
+072312     MOVE PI-ERENDT-KEY (1:33) TO WS-ERNOTE-KEY
+072312
+072312     EXEC CICS READ
+072312        DATASET    (WS-ERNOTE-FILE-ID)
+072312        RIDFLD     (WS-ERNOTE-KEY)
+072312        INTO       (CERTIFICATE-NOTE)
+072312        RESP       (WS-RESPONSE)
+072312        UPDATE
+072312     END-EXEC
+072312
+072312     IF RESP-NORMAL
+072312       IF CN-BILLING-START-LINE-NO NOT NUMERIC
+072312          MOVE ZEROS            TO CN-BILLING-START-LINE-NO
+072312       END-IF
+072312       IF CN-BILLING-END-LINE-NO NOT NUMERIC
+072312          MOVE ZEROS            TO CN-BILLING-END-LINE-NO
+072312       END-IF
+072312       PERFORM VARYING NOTE-SUB FROM +1 BY +1 UNTIL
+072312           (NOTE-SUB > +10) OR
+072312           (CN-LINE (NOTE-SUB) (1:20) = WS-BN-NOTE)
+072312       END-PERFORM
+072312       IF CN-LINE (NOTE-SUB) (1:20) = WS-BN-NOTE
+072312         EXEC CICS UNLOCK
+072312            DATASET    (WS-ERNOTE-FILE-ID)
+072312         END-EXEC
+072312       ELSE
+072312         PERFORM VARYING NOTE-SUB FROM +1 BY +1 UNTIL
+072312           (NOTE-SUB > +10) OR
+072312           (CN-LINE (NOTE-SUB) = SPACES OR LOW-VALUES) 
+072312         END-PERFORM
+072312         IF (NOTE-SUB < +11)
+072312           IF NOTE-SUB >= CN-BILLING-START-LINE-NO AND
+072312              NOTE-SUB <= CN-BILLING-END-LINE-NO
+072312                MOVE WS-BILLING-NOTE TO CN-LINE (NOTE-SUB)
+072312           ELSE 
+072312             IF (CN-BILLING-END-LINE-NO NOT = ZEROS) AND
+072312              (NOTE-SUB = (CN-BILLING-END-LINE-NO + +1))
+072312                MOVE WS-BILLING-NOTE   TO CN-LINE (NOTE-SUB)
+072312                MOVE NOTE-SUB     TO CN-BILLING-END-LINE-NO
+072312             ELSE
+072312               IF (CN-BILLING-START-LINE-NO NOT = ZEROS) AND
+072312                  (NOTE-SUB = (CN-BILLING-START-LINE-NO - +1))
+072312                     MOVE WS-BILLING-NOTE TO CN-LINE (NOTE-SUB)
+072312                     MOVE NOTE-SUB  TO CN-BILLING-START-LINE-NO
+072312               ELSE
+072312                 IF (CN-BILLING-END-LINE-NO = ZEROS)
+072312                   MOVE WS-BILLING-NOTE  TO CN-LINE (NOTE-SUB)
+072312                   MOVE NOTE-SUB    TO CN-BILLING-END-LINE-NO
+072312                                       CN-BILLING-START-LINE-NO
+072312                 ELSE
+072312                    PERFORM 0442-SQUEEZE-IT-IN THRU 0442-EXIT
+072312                 END-IF
+072312               END-IF                          
+072312             END-IF
+072312           END-IF
+072312           MOVE PI-PROCESSOR-ID     TO CN-LAST-MAINT-USER
+072312           MOVE WS-CURRENT-BIN-DT   TO CN-LAST-MAINT-DT
+072312           MOVE EIBTIME             TO CN-LAST-MAINT-HHMMSS
+072312           EXEC CICS REWRITE
+072312              DATASET    (WS-ERNOTE-FILE-ID)
+072312              FROM       (CERTIFICATE-NOTE)
+072312              RESP       (WS-RESPONSE)
+072312           END-EXEC
+072312           PERFORM 0445-CERTIFICATE-UPDATE THRU 0445-EXIT
+072312         END-IF
+072312       END-IF
+072312     ELSE
+072312        MOVE SPACES              TO CERTIFICATE-NOTE
+072312        MOVE 'CN'                TO CN-RECORD-ID
+072312        MOVE PI-ERENDT-KEY (1:33) TO CN-CONTROL-PRIMARY
+072312                                     WS-ERNOTE-KEY
+072312        MOVE 01                  TO CN-BILLING-START-LINE-NO
+072312                                    CN-BILLING-END-LINE-NO
+072312        MOVE WS-BILLING-NOTE     TO CN-LINE (01)
+072312        MOVE PI-PROCESSOR-ID     TO CN-LAST-MAINT-USER
+072312        MOVE WS-CURRENT-BIN-DT   TO CN-LAST-MAINT-DT
+072312        MOVE EIBTIME             TO CN-LAST-MAINT-HHMMSS
+072312        EXEC CICS WRITE
+072312           DATASET    (WS-ERNOTE-FILE-ID)
+072312           FROM       (CERTIFICATE-NOTE)
+072312           RIDFLD     (WS-ERNOTE-KEY)
+072312           RESP       (WS-RESPONSE)
+072312        END-EXEC
+072312
+072312        PERFORM 0445-CERTIFICATE-UPDATE THRU 0445-EXIT
+072312     END-IF              
+072312
+072312     .
+072312 0440-EXIT.
+072312     EXIT.
+072312
+072312
+072312 0442-SQUEEZE-IT-IN.
+072312
+072312     IF NOTE-SUB < CN-BILLING-START-LINE-NO
+072312        PERFORM VARYING NOTE-SUB FROM NOTE-SUB BY +1 UNTIL
+072312           NOTE-SUB = +10
+072312           MOVE CN-LINE (NOTE-SUB + 1) TO CN-LINE (NOTE-SUB)
+072312           IF (NOTE-SUB + 1) = (CN-BILLING-START-LINE-NO - 1)
+072312             MOVE WS-BILLING-NOTE TO CN-LINE (NOTE-SUB + 1)
+072312             COMPUTE CN-BILLING-START-LINE-NO = NOTE-SUB + 1
+072312             MOVE +9 TO NOTE-SUB
+072312           END-IF
+072312        END-PERFORM
+072312     ELSE
+072312        IF NOTE-SUB > CN-BILLING-END-LINE-NO
+072312           PERFORM VARYING NOTE-SUB FROM NOTE-SUB BY -1 
+072312             UNTIL NOTE-SUB = +1
+072312             MOVE CN-LINE (NOTE-SUB - 1) TO CN-LINE (NOTE-SUB)
+072312             IF (NOTE-SUB - 1) = (CN-BILLING-END-LINE-NO + 1)
+072312                MOVE WS-BILLING-NOTE  TO CN-LINE (NOTE-SUB - 1)
+072312                COMPUTE CN-BILLING-END-LINE-NO = NOTE-SUB - 1
+072312                MOVE +2          TO NOTE-SUB
+072312             END-IF
+072312           END-PERFORM
+072312        END-IF  
+072312     END-IF
+072312
+072312     .
+072312 0442-EXIT.
+072312     EXIT.
+072312
+072312 0445-CERTIFICATE-UPDATE.
+
+          display 'billing note written, updating cert'
+072312     PERFORM 1800-READ-ELCERT-UPDATE THRU 1800-EXIT
+072312     IF RESP-NORMAL
+072312        EVALUATE CM-NOTE-SW
+072312           WHEN '2'
+072312           WHEN '3'
+072312           WHEN '6'
+072312           WHEN '7'
+072312              SET NO-CERT-RW     TO TRUE
+072312           WHEN ' '
+072312              MOVE '2'           TO CM-NOTE-SW
+072312           WHEN '1'
+072312              MOVE '3'           TO CM-NOTE-SW
+072312           WHEN '4'
+072312              MOVE '6'           TO CM-NOTE-SW
+072312           WHEN '5'
+072312              MOVE '7'           TO CM-NOTE-SW
+072312        END-EVALUATE
+072312     END-IF
+072312     IF NOT NO-CERT-RW
+072312        PERFORM 1810-REWRITE-ELCERT
+072312                                 THRU 1810-EXIT
+072312     ELSE
+072312        EXEC CICS UNLOCK
+072312           DATASET    (WS-ELCERT-FILE-ID)
+072312        END-EXEC
+072312     END-IF
+072312
+072312     .
+072312 0445-EXIT.
+072312     EXIT.
+072312
+
+       0500-CREATE-TEMP-STORAGE.                          
+                                                          
+           display ' about to write pi ' program-interface-block
+           EXEC CICS WRITEQ TS                            
+               QUEUE (QID)                                
+               FROM  (PROGRAM-INTERFACE-BLOCK)            
+               LENGTH(PI-COMM-LENGTH)                     
+           END-EXEC
+                                                          
+           display ' about to write map ' el631ji
+           EXEC CICS WRITEQ TS                            
+               QUEUE (QID)                                
+               FROM  (EL631JI)                            
+               LENGTH(MAP-LENGTH)                         
+           END-EXEC.                                      
+                                                          
+       0500-EXIT.                                         
+            EXIT.                                         
+
+       0600-RECOVER-TEMP-STORAGE.
+
+           display ' about to recover pi '
+
+
+           EXEC CICS READQ TS
+               QUEUE (QID)
+               INTO  (PROGRAM-INTERFACE-BLOCK)
+               LENGTH(PI-COMM-LENGTH)
+           END-EXEC
+                                                             
+           display ' pi ' pi-program-work-area
+           display ' about to recover map '
+           EXEC CICS READQ TS                                
+               QUEUE (QID)                                   
+               INTO  (EL631JI)
+               LENGTH(MAP-LENGTH)                            
+           END-EXEC
+                                                             
+           display ' map ' el631ji
+           PERFORM 0800-DELETE-TS THRU 0800-EXIT.            
+                                                             
+           MOVE AL-UANON            TO SIGREQA
+
+           MOVE AL-UANON            TO LTRIDA
+
+           IF WS-SET-CODES-MDT = 'Y'
+              move +1                  to s2
+              perform varying s1 from +1 by +5 until s1 > +60
+                 MOVE WS-PASSED-REASON-CODES (s1:4)
+                                       TO reacd-in (s2)
+012412           IF REACD-IN (S2) NOT EQUAL SPACES AND LOW-VALUES
+012412               MOVE AL-SANON     TO REACDA (S2)
+062712               MOVE +4           TO REACDL (S2)
+012412           END-IF
+                 add +1                to s2
+              end-perform
+062712        MOVE REASONCDS       TO PI-REASONS-ENTERED
+           END-IF
+072312
+072312     IF CRTNT1I > SPACES
+072312         MOVE AL-UANON       TO CRTNT1A
+072312     END-IF
+072312
+072312     IF CRTNT2I > SPACES
+072312         MOVE AL-UANON       TO CRTNT2A
+072312     END-IF
+
+           .
+       0600-EXIT.                                              
+            EXIT.                                              
+
+       0800-DELETE-TS.                    
+                                          
+           EXEC CICS DELETEQ TS           
+               QUEUE(QID)                 
+           END-EXEC
+
+           .                                          
+       0800-EXIT.                         
+            EXIT.                         
+
+       1000-BUILD-ERARCH.
+
+           display ' made it to 1000 '
+           MOVE SPACES                 TO W-CNTL-KEY
+           MOVE PI-COMPANY-ID          TO W-CNTL-COMPANY-ID
+           MOVE '1'                    TO W-CNTL-RECORD-TYPE
+           MOVE ZEROS                  TO W-CNTL-SEQ-NO
+      
+           EXEC CICS READ
+                DATASET    (WS-ELCNTL-FILE-ID)
+                SET        (ADDRESS OF CONTROL-FILE)
+                RIDFLD     (W-CNTL-KEY)
+                UPDATE
+                RESP       (WS-RESPONSE)
+           END-EXEC
+
+           IF RESP-NORMAL
+              display ' good read elcntl '
+              IF CF-CREDIT-LAST-ARCH-NUM NOT NUMERIC
+                 MOVE ZEROS            TO CF-CREDIT-LAST-ARCH-NUM
+              END-IF
+              ADD 1                    TO CF-CREDIT-LAST-ARCH-NUM
+              MOVE CF-CREDIT-LAST-ARCH-NUM
+                                       TO W-ARCH-NUMBER
+              EXEC CICS REWRITE
+                 FROM      (CONTROL-FILE)
+                 DATASET   (WS-ELCNTL-FILE-ID)
+              END-EXEC
+           END-IF
+      
+           EXEC CICS GETMAIN
+              SET      (ADDRESS OF LETTER-ARCHIVE)
+              LENGTH   (W-ARCH-LENGTH)
+           END-EXEC
+      
+           MOVE 'LA'                   TO LETTER-ARCHIVE
+
+           MOVE W-ARCH-NUMBER          TO LA-ARCHIVE-NO
+                                          LA-ARCHIVE-NO-A2
+                                          LA-ARCHIVE-NO-A3
+                                          LA-ARCHIVE-NO-A4
+                                          LA-ARCHIVE-NO-A5
+                                          LA-ARCHIVE-NO-A6
+
+           MOVE PI-COMPANY-CD          TO LA-COMPANY-CD
+                                          LA-COMPANY-CD-A2
+                                          LA-COMPANY-CD-A3
+                                          LA-COMPANY-CD-A4
+                                          LA-COMPANY-CD-A5
+                                          LA-COMPANY-CD-A6
+           MOVE PB-CARRIER             TO LA-CARRIER-A2
+                                          LA-CARRIER-A3
+                                          LA-CARRIER-A4
+                                          LA-CARRIER-A5
+           MOVE Pb-cert-eff-dt         TO LA-EFFECT-DATE-A2
+           MOVE PB-GROUPING            TO LA-GROUPING-A2
+                                          LA-GROUPING-A3
+                                          LA-GROUPING-A4
+                                          LA-GROUPING-A5
+           MOVE PB-ACCOUNT             TO LA-ACCOUNT-A2
+                                          LA-ACCOUNT-A3
+                                          LA-ACCOUNT-A4
+                                          LA-ACCOUNT-A5
+           MOVE PB-STATE               TO LA-STATE-A2
+                                          LA-STATE-A3
+                                          LA-STATE-A4
+                                          LA-STATE-A5
+           MOVE PB-CERT-PRIME          TO LA-CERT-PRIME-A2
+           MOVE PB-CERT-SFX            TO LA-CERT-SUFFIX-A2
+           MOVE PB-ENTRY-BATCH         TO LA-ENTRY-A6
+
+           MOVE PI-PROCESSOR-ID        TO LA-PROCESSOR-CD
+      
+           MOVE LOW-VALUES             TO LA-LAST-RESENT-PRINT-DATE
+                                          LA-INITIAL-PRINT-DATE
+                                          LA-SENT-DATE
+                                          LA-REPLY-DATE
+                                          LA-RESEND-DATE
+                                          LA-FOLLOW-UP-DATE
+
+           MOVE 'A'                    TO LA-STATUS
+           MOVE W-NUMBER-OF-COPIES     TO LA-NO-OF-COPIES
+           MOVE W-AUTO-CLOSE-IND       TO LA-FINAL-ACT-IND
+           MOVE LTRIDI                 TO LA-FORM-A3
+           MOVE '4'                    TO LA-DATA-SOURCE
+           MOVE WS-CURRENT-BIN-DT      TO LA-CREATION-DATE
+
+           MOVE ZEROS                  TO LA-NUMBER-LABEL-LINES
+                                          LA-NO-OF-TEXT-RECORDS
+
+           EXEC CICS WRITE
+                DATASET   ('ERARCH')
+                FROM      (LETTER-ARCHIVE)
+                RIDFLD    (LA-CONTROL-PRIMARY)
+                RESP      (WS-RESPONSE)
+           END-EXEC
+      
+           IF RESP-NORMAL
+              display ' good write erarch '
+              MOVE ER-0280             TO EMI-ERROR
+032712        MOVE -1                  TO SIGREQL
+              PERFORM 9900-ERROR-FORMAT
+                                       THRU 9900-EXIT
+              MOVE W-ARCH-NUMBER       TO W-ARCH-SUPPRESS
+              MOVE W-ARCH-EDIT         TO EMI-TEXT-VARIABLE (1)
+           ELSE
+              MOVE ER-7345             TO EMI-ERROR
+062712        MOVE -1                  TO SIGREQL
+              PERFORM 9900-ERROR-FORMAT
+                                       THRU 9900-EXIT
+           END-IF
+
+           .
+       1000-EXIT.
+           EXIT.
+
+       1100-CALL-NS-BUS-LOGIC.
+
+           DISPLAY ' MADE IT TO 1100 '
+
+           MOVE SPACES                 TO BL-INPUT
+           MOVE W-ARCH-NUMBER          TO BL-ARCHIVE-NO
+062712     IF PI-RETURN-TO-PROGRAM = 'EL1273'
+062712         MOVE '2'                TO BL-DATA-SRCE
+062712         MOVE SPACES             TO BL-BATCH-NO
+062712         MOVE ZEROS              TO BL-BATCH-SEQ
+062712     ELSE
+062712         MOVE '4'                TO BL-DATA-SRCE
+062712         MOVE PB-ENTRY-BATCH     TO BL-BATCH-NO
+062712         MOVE PB-BATCH-SEQ-NO    TO BL-BATCH-SEQ
+062712     END-IF
+062712     MOVE PI-CARRIER             TO BL-CARRIER
+062712     MOVE PI-GROUPING            TO BL-GROUP
+062712     MOVE PI-STATE               TO BL-STATE
+062712     MOVE PI-ACCOUNT             TO BL-ACCOUNT
+062712     IF PI-CERT-EFF-DT NOT = LOW-VALUES
+062712        MOVE PI-CERT-EFF-DT      TO DC-BIN-DATE-1
+              MOVE ' '                 TO DC-OPTION-CODE
+              PERFORM 9700-date-link
+              IF NO-CONVERSION-ERROR
+062712           MOVE DC-GREG-DATE-1-EDIT
+                                       TO BL-EFF-DT
+              END-IF
+           END-IF
+062712     MOVE PI-CERT-NO             TO BL-CERT-NO
+           MOVE SPACES                 TO BL-RESP-NO
+           MOVE LTRIDI                 TO BL-LETTER-ID
+           MOVE W-NUMBER-OF-COPIES     TO BL-NO-OF-COPIES
+           MOVE PI-PROCESSOR-ID        TO BL-PROC-ID
+      *    MOVE 'ALWA'                 TO BL-PROC-ID
+           MOVE PI-COMPANY-ID          TO BL-COMP-ID
+      *    MOVE IFF-PRINT-NOW-SW       TO BL-PRINT-NOW-SW
+      *    MOVE IFF-ENC-CD             TO BL-ENC-CD
+           IF EIBAID = DFHPF2
+              MOVE 'B'                 TO BL-WRITE-ERARCH
+           ELSE
+              MOVE 'T'                 TO BL-WRITE-ERARCH
+           END-IF
+
+           PERFORM VARYING S1 FROM +1 BY +1 UNTIL S1 > +12
+              MOVE REACD-IN (S1)       TO BL-REASON-CODE (S1)
+           END-PERFORM
+
+PEMTST    DISPLAY ' ABOUT TO LINK TO NSRASBL '
+      *****************************************
+      * Invoke the LETTER business logic
+      *****************************************
+
+           exec cics link
+              program('NSRASBL')
+              commarea(srch-commarea)
+           end-exec.
+
+           DISPLAY ' MADE IT BACK FROM NSRASBL ' BL-STATUS ' '
+              BL-MESSAGE
+
+           .
+       1100-EXIT.
+           EXIT.
+
+       1500-GET-ARCH-NO.
+
+           display ' made it to 1500 '
+           MOVE SPACES                 TO ELCNTL-KEY
+           MOVE PI-COMPANY-ID          TO CNTL-COMP-ID
+           MOVE '1'                    TO CNTL-REC-TYPE
+           MOVE ZEROS                  TO CNTL-SEQ
+      
+           EXEC CICS READ
+                DATASET    (WS-ELCNTL-FILE-ID)
+                SET        (ADDRESS OF CONTROL-FILE)
+                RIDFLD     (ELCNTL-KEY)
+                UPDATE
+                RESP       (WS-RESPONSE)
+           END-EXEC
+
+           IF RESP-NORMAL
+              display ' good read elcntl '
+              IF CF-CREDIT-LAST-ARCH-NUM NOT NUMERIC
+                 MOVE ZEROS            TO CF-CREDIT-LAST-ARCH-NUM
+              END-IF
+              ADD 1                    TO CF-CREDIT-LAST-ARCH-NUM
+              MOVE CF-CREDIT-LAST-ARCH-NUM
+                                       TO W-ARCH-NUMBER
+              display ' new arch number ' w-arch-number
+              EXEC CICS REWRITE
+                 FROM      (CONTROL-FILE)
+                 DATASET   (WS-ELCNTL-FILE-ID)
+              END-EXEC
+           END-IF
+
+           .
+       1500-EXIT.
+           EXIT.
+072312           
+072312     
+072312 1700-WRITE-CERT-NOTE      SECTION.
+072312
+           display 'made it to 1700-'
+           
+072312     MOVE 'CZ'                   TO CERT-NOTE-FILE
+072312     MOVE PI-COMPANY-CD          TO CZ-COMPANY-CD
+072312     MOVE PI-CRTO-CARRIER        TO CZ-CARRIER
+072312     MOVE PI-CRTO-GROUPING       TO CZ-GROUPING
+072312     MOVE PI-CRTO-STATE          TO CZ-STATE
+072312     MOVE PI-CRTO-ACCOUNT        TO CZ-ACCOUNT
+072312     MOVE PI-CRTO-CERT-EFF-DT    TO CZ-CERT-EFF-DT
+072312     MOVE PI-CRTO-CERT-PRIME     TO CZ-CERT-PRIME
+072312     MOVE PI-CRTO-CERT-SFX       TO CZ-CERT-SFX
+072312     MOVE '1'                    TO CZ-RECORD-TYPE
+072312     MOVE +1                     TO CZ-NOTE-SEQUENCE
+072312
+072312     MOVE PI-PROCESSOR-ID        TO CZ-LAST-MAINT-USER
+072312     MOVE EIBTIME                TO CZ-LAST-MAINT-HHMMSS
+072312     MOVE WS-CURRENT-BIN-DT      TO CZ-LAST-MAINT-DT
+072312     MOVE WS-CERT-NOTE           TO CZ-NOTE
+072312
+072312     MOVE ' '                    TO WS-STOP-SW
+          display 'about to write cert note ' cert-note-file
+072312     PERFORM UNTIL I-SAY-TO-STOP
+072312        EXEC CICS WRITE
+072312            FROM      (CERT-NOTE-FILE)
+072312            DATASET   (WS-ERCNOT-FILE-ID)
+072312            RIDFLD    (CZ-CONTROL-PRIMARY)
+072312            RESP      (WS-RESPONSE)
+072312        END-EXEC
+072312        IF RESP-DUPREC
+072312           ADD +1                TO CZ-NOTE-SEQUENCE
+072312        ELSE
+072312           SET I-SAY-TO-STOP     TO TRUE
+072312        END-IF
+072312     END-PERFORM
+072312
+072312     PERFORM 1800-READ-ELCERT-UPDATE THRU 1800-EXIT
+072312     IF RESP-NORMAL
+072312        EVALUATE CM-NOTE-SW
+072312           WHEN '1'
+072312           WHEN '3'
+072312           WHEN '5'
+072312           WHEN '7'
+072312              SET NO-CERT-RW     TO TRUE
+072312           WHEN ' '
+072312              MOVE '1'           TO CM-NOTE-SW
+072312           WHEN '2'
+072312              MOVE '3'           TO CM-NOTE-SW
+072312           WHEN '4'
+072312              MOVE '5'           TO CM-NOTE-SW
+072312           WHEN '6'
+072312              MOVE '7'           TO CM-NOTE-SW
+072312        END-EVALUATE
+072312     END-IF
+072312     IF NOT NO-CERT-RW
+072312        PERFORM 1810-REWRITE-ELCERT
+072312                                 THRU 1810-EXIT
+072312     ELSE
+072312        EXEC CICS UNLOCK
+072312           DATASET    (WS-ELCERT-FILE-ID)
+072312        END-EXEC
+072312     END-IF
+072312
+072312     .
+072312 1799-EXIT.
+072312     EXIT.
+072312
+072312 1800-READ-ELCERT-UPDATE.
+072312
+072312     MOVE PI-COMPANY-CD          TO  W-CERT-COMPANY-CD.
+072312     MOVE PI-CRTO-CARRIER        TO  W-CERT-CARRIER.
+072312     MOVE PI-CRTO-GROUPING       TO  W-CERT-GROUPING.
+072312     MOVE PI-CRTO-STATE          TO  W-CERT-STATE.
+072312     MOVE PI-CRTO-ACCOUNT        TO  W-CERT-ACCOUNT.
+072312     MOVE PI-CRTO-CERT-EFF-DT    TO  W-CERT-CERT-EFF-DT.
+072312     MOVE PI-CRTO-CERT-PRIME     TO  W-CERT-CERT-PRIME.
+072312     MOVE PI-CRTO-CERT-SFX       TO  W-CERT-CERT-SFX.
+072312
+072312     EXEC CICS READ
+072312         UPDATE
+072312         DATASET  (WS-ELCERT-FILE-ID)
+072312         RIDFLD   (WS-ELCERT-KEY)
+072312         SET      (ADDRESS OF CERTIFICATE-MASTER)
+072312         RESP     (WS-RESPONSE)
+072312     END-EXEC
+072312
+072312     .
+072312 1800-EXIT.
+072312     EXIT.
+072312
+072312 1810-REWRITE-ELCERT.
+072312
+072312     EXEC CICS REWRITE
+072312         FROM     (CERTIFICATE-MASTER)
+072312         DATASET  (WS-ELCERT-FILE-ID)
+072312         RESP     (WS-RESPONSE)
+072312     END-EXEC.
+072312
+072312     .
+072312 1810-EXIT.
+072312     EXIT.
+072312
+
+       8100-SEND-INITIAL-MAP.
+
+           MOVE EIBDATE                TO DC-JULIAN-YYDDD.
+           MOVE '5'                    TO DC-OPTION-CODE.
+           PERFORM 9700-DATE-LINK.
+           MOVE DC-GREG-DATE-1-EDIT    TO DATEO.
+           MOVE EIBTIME                TO TIME-IN.
+           MOVE TIME-OUT               TO TIMEO.
+
+062712     MOVE -1                     TO SIGREQL.
+
+012412     IF PI-PROCESSOR-IS-CSR-SUPER
+              perform varying s1 from +1 by +1 until
+                 s1 > +12
+                 MOVE AL-UANON            TO reacda (s1)
+              end-perform
+012412     END-IF              
+
+           MOVE EMI-MESSAGE-AREA (1)   TO ERRMSG1O.
+           MOVE EMI-MESSAGE-AREA (2)   TO ERRMSG2O.
+           EXEC CICS SEND
+               MAP      (MAP-NAME)
+               MAPSET   (MAPSET-NAME)
+               FROM     (EL631JO)
+               ERASE
+               CURSOR
+           END-EXEC.
+
+           GO TO 9100-RETURN-TRAN.
+
+       8200-SEND-DATAONLY.
+
+           MOVE EIBDATE                TO DC-JULIAN-YYDDD.
+           MOVE '5'                    TO DC-OPTION-CODE.
+           PERFORM 9700-DATE-LINK.
+           MOVE DC-GREG-DATE-1-EDIT    TO DATEO.
+           MOVE EIBTIME                TO TIME-IN.
+           MOVE TIME-OUT               TO TIMEO.
+           MOVE -1                     TO PFENTRL
+           MOVE EMI-MESSAGE-AREA (1)   TO ERRMSG1O
+           MOVE EMI-MESSAGE-AREA (2)   TO ERRMSG2O
+           EXEC CICS SEND
+               MAP      (MAP-NAME)
+               MAPSET   (MAPSET-NAME)
+               FROM     (EL631JO)
+               DATAONLY
+               ERASEAUP
+               CURSOR
+           END-EXEC.
+
+           GO TO 9100-RETURN-TRAN.
+
+       8300-SEND-TEXT.
+           EXEC CICS SEND TEXT
+               FROM     (LOGOFF-TEXT)
+               LENGTH   (LOGOFF-LENGTH)
+               ERASE
+               FREEKB
+           END-EXEC.
+
+           EXEC CICS RETURN
+           END-EXEC.
+
+       8800-UNAUTHORIZED-ACCESS.
+           MOVE UNACCESS-MSG           TO LOGOFF-MSG.
+           GO TO 8300-SEND-TEXT.
+
+       8810-PF23.
+           MOVE EIBAID                 TO PI-ENTRY-CD-1.
+           MOVE XCTL-005               TO PGM-NAME.
+           GO TO 9300-XCTL.
+       9000-RETURN-CICS.
+           EXEC CICS RETURN
+           END-EXEC.
+
+       9100-RETURN-TRAN.
+           MOVE EMI-ERROR-NUMBER (1)   TO PI-LAST-ERROR-NO.
+           MOVE SCREEN-NUMBER          TO PI-CURRENT-SCREEN-NO.
+
+           EXEC CICS RETURN
+               TRANSID    (TRANS-ID)
+               COMMAREA   (PROGRAM-INTERFACE-BLOCK)
+               LENGTH     (PI-COMM-LENGTH)
+           END-EXEC.
+
+       9200-RETURN-MAIN-MENU.
+           MOVE XCTL-626               TO PGM-NAME.
+           GO TO 9300-XCTL.
+
+       9300-XCTL.
+           EXEC CICS XCTL
+               PROGRAM    (PGM-NAME)
+               COMMAREA   (PROGRAM-INTERFACE-BLOCK)
+               LENGTH     (PI-COMM-LENGTH)
+           END-EXEC.
+
+       9400-CLEAR.
+           MOVE PI-RETURN-TO-PROGRAM   TO PGM-NAME.
+
+           EXEC CICS XCTL
+               PROGRAM    (PGM-NAME)
+               COMMAREA   (PROGRAM-INTERFACE-BLOCK)
+               LENGTH     (PI-COMM-LENGTH)
+           END-EXEC.
+
+       9500-PF12.
+           MOVE XCTL-010               TO PGM-NAME.
+           GO TO 9300-XCTL.
+
+       9600-PGMID-ERROR.
+           EXEC CICS HANDLE CONDITION
+               PGMIDERR    (8300-SEND-TEXT)
+           END-EXEC.
+
+           MOVE PGM-NAME               TO PI-CALLING-PROGRAM.
+           MOVE ' '                    TO PI-ENTRY-CD-1.
+           MOVE XCTL-005               TO PGM-NAME.
+           MOVE PGM-NAME               TO LOGOFF-PGM.
+           MOVE PGMIDERR-MSG           TO LOGOFF-FILL.
+           GO TO 9300-XCTL.
+
+       9700-DATE-LINK.
+           MOVE LINK-ELDATCV           TO PGM-NAME.
+
+           EXEC CICS LINK
+               PROGRAM    (PGM-NAME)
+               COMMAREA   (DATE-CONVERSION-DATA)
+               LENGTH     (DC-COMM-LENGTH)
+           END-EXEC.
+
+       9900-ERROR-FORMAT.
+           IF NOT EMI-ERRORS-COMPLETE
+              MOVE LINK-001            TO PGM-NAME
+              EXEC CICS LINK
+                  PROGRAM    (PGM-NAME)
+                  COMMAREA   (ERROR-MESSAGE-INTERFACE-BLOCK)
+                  LENGTH     (EMI-COMM-LENGTH)
+              END-EXEC
+           END-IF
+
+           .
+       9900-EXIT.
+           EXIT.
+
+       9990-ABEND.
+           MOVE LINK-004               TO PGM-NAME.
+           MOVE DFHEIBLK               TO EMI-LINE1.
+           EXEC CICS LINK
+               PROGRAM   (PGM-NAME)
+               COMMAREA  (EMI-LINE1)
+               LENGTH    (72)
+           END-EXEC.
+
+           GO TO 8200-SEND-DATAONLY.
+
+           GOBACK.
+
+       9995-SECURITY-VIOLATION.
+                                   COPY ELCSCTP.
+
+       9995-EXIT.
+           EXIT.
+

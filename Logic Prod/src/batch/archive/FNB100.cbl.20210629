@@ -1,0 +1,280 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    FNB100.
+       AUTHOR.        Cowtown.
+       DATE-COMPILED.
+
+111714*-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-**
+111714*                   C H A N G E   L O G
+111714*
+111714* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+111714*-----------------------------------------------------------------
+111714*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+111714* EFFECTIVE    NUMBER
+111714*-----------------------------------------------------------------
+111714* 100614 CR2014073000001   PEMA  NEW PROGRAM Positive Pay
+022217* 022217 CR2017022000001   PEMA  ADD DCC TO Process.
+071420* 071420  IR2020071400001  PEMA  Add VPP processing
+111714*-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-**
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT DAILY-DRAFTS         ASSIGN TO SYS010.
+
+           SELECT POS-PAY-FILE         ASSIGN TO SYS011 
+               organization is line sequential.
+
+           SELECT DISK-DATE            ASSIGN TO SYS019.
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  DAILY-DRAFTS
+           LABEL RECORDS ARE STANDARD
+           RECORDING MODE IS F.
+                                       COPY CLO420.
+
+       FD  POS-PAY-FILE
+           LABEL RECORDS ARE STANDARD
+           RECORDING MODE IS F.
+       01  POS-PAY-RECORD              PIC X(159).
+
+       FD  DISK-DATE
+                                       COPY ELCDTEFD.
+
+       WORKING-STORAGE SECTION.                                         
+                                                                        
+       77  ws-grand-total              pic 9(9)v99 value zeros.
+       77  ws-in-recs                  pic 9(5) value zeros.
+       77  ws-sel-recs                 pic 9(5) value zeros.
+       77  ws-out-recs                 pic 9(5) value zeros.
+       77  ws-file-sw                  pic x value spaces.
+           88  end-of-input              value 'Y'.
+       77  PGM-SUB                     PIC S9(4) COMP VALUE +310.
+
+       01  WS-ABEND-MESSAGE            PIC X(80)  VALUE SPACES.
+       01  WS-RETURN-CODE              PIC S999  COMP-3 VALUE +0.
+
+       01  ws-positive-pay-record.
+           05  pp-record-type          pic x.
+           05  pp-account-no           pic x(10).
+           05  pp-check-no             pic x(10).
+           05  pp-issue-date           pic x(8).
+           05  pp-amount               pic 9(8)v99 value zeros.
+           05  pp-payee-line-1         pic x(60).
+           05  pp-payee-line-2         pic x(59).
+           05  pp-EOR                  PIC X.
+
+       01  ws-positive-pay-total-rec.
+           05  filler                  pic x value 'T'.
+           05  pp-total-amount         pic 9(10)v99 value zeros.
+           05  filler                  pic x(145) value spaces.
+           05  PP-TOTAL-EOR            PIC X.
+
+                                       COPY ELCFUNDT.
+                                       COPY ELCDATE.
+                                       COPY ELCDTECX.
+                                       COPY ELCDTEVR.
+
+       LINKAGE SECTION.
+                                                                        
+       01  PARM.                                                        
+           05  PARM-LENGTH      PIC S9(4)   COMP.                       
+           05  CYCLE-DATE       PIC X(8).                               
+
+       PROCEDURE DIVISION USING PARM.                                   
+
+                                       COPY ELCDTERX.
+
+           PERFORM 0010-OPEN-FILES     THRU 0010-EXIT
+           PERFORM 0020-INIT           THRU 0020-EXIT
+           PERFORM 1000-PROCESS-INPUT  THRU 1000-EXIT UNTIL
+              END-OF-INPUT
+           perform 1200-post-total-rec thru 1200-exit
+           PERFORM 2000-CLOSE-FILES    THRU 2000-EXIT
+
+           display '     Records read ' ws-in-recs
+           display ' Records selected ' ws-sel-recs
+           display '  Records written ' ws-out-recs
+           goback
+
+           .
+       0010-OPEN-FILES.
+
+           OPEN INPUT  DAILY-DRAFTS
+                OUTPUT POS-PAY-FILE
+
+           .
+       0010-EXIT.
+           EXIT.
+
+       0020-INIT.
+
+           IF PARM-LENGTH = +0                                          
+              DISPLAY 'PARAMETER DATE IS MISSING'                      
+              perform abend-pgm
+           end-if
+
+           move 'L'                    to dc-option-code
+           move cycle-date             to DC-GREG-DATE-CYMD-R
+           perform 8500-date-convert   thru 8500-exit
+           if not no-conversion-error
+              display ' invalid parm date - abort '
+              perform abend-pgm
+           end-if
+           
+           PERFORM 0050-READ-INPUT     THRU 0050-EXIT
+
+           .
+       0020-EXIT.
+           EXIT.
+
+       0050-READ-INPUT.
+
+           READ DAILY-DRAFTS AT END
+              SET END-OF-INPUT TO TRUE
+           END-READ
+
+           IF NOT END-OF-INPUT
+              ADD +1 TO WS-IN-RECS
+           END-IF
+
+           .
+       0050-EXIT.
+           EXIT.
+
+       1000-PROCESS-INPUT.
+
+           IF PR-POLICY-TYPE NOT = 'CR'
+              GO TO 1000-EXIT
+           END-IF
+
+      ***=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=****
+      ***                                                           ****
+      ***  Anything with a check written date prior to 05/01/2015   ****
+      ***  is a draft and we want to bypass any processing.         ****
+      ***  Anything with a draft status of M is a manual check      ****
+      ***  and that also needs to be bypassed.                      ****
+      ***                                                           ****
+      ***=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=_=****
+
+           if (dte-client = 'DCC')
+              and (cr-last-paid < 20170524)
+              go to 1000-continue
+           end-if
+
+           if cr-last-paid > 20150430
+              continue
+           else
+              go to 1000-continue
+           end-if
+
+022217     if cr-ach-payment = 'Y'
+022217        display ' Bypassing ACH Payment ' dr-record-key
+022217        go to 1000-continue
+022217     end-if
+
+           if dr-draft-status <> 'M'
+              continue
+           else
+              display ' bypassing Manual record ' dr-record-key
+              go to 1000-continue
+           end-if
+
+           if (dr-draft-status = 'S')
+              and (dr-note-code = 01)
+              display ' bypassing Manual negative adjustment '
+                 dr-record-key
+              go to 1000-continue
+           end-if
+
+           ADD +1 TO WS-sel-RECS
+
+           compute ws-grand-total = ws-grand-total +
+              dr-amount-paid
+
+           move zeros                  to pp-check-no
+           IF (DR-DRAFT-STATUS = 'S')
+              OR (DR-NOTE-CODE = 01)
+              move 'V'                 to pp-record-type
+              MOVE dr-record-key (3:7)
+                                       to pp-check-no (4:7)
+           else
+              MOVE '0'                 TO PP-RECORD-TYPE
+              MOVE dr-record-key (3:7)
+                                       to pp-check-no (4:7)
+           end-if
+022217     evaluate dte-client
+022217        when 'CID'
+022217           MOVE '0110428873'     TO PP-ACCOUNT-NO
+022217        when 'AHL'
+022217           MOVE '0110428886'     TO PP-ACCOUNT-NO
+022217        when 'DCC'
+022217           MOVE '0110382498'     TO PP-ACCOUNT-NO
+071420        when 'VPP'
+071420           MOVE '0110382498'     TO PP-ACCOUNT-NO
+022217     end-evaluate
+           move cycle-date             to pp-issue-date
+           move dr-amount-paid         to pp-amount
+           move dr-payee               to pp-payee-line-1
+           move spaces to pp-payee-line-2
+           string
+              cr-claim-number (1:7) ' '
+              dr-payee-state
+              delimited by size into pp-payee-line-2
+           end-string
+           move '*'                    to pp-eor
+
+           perform 1100-write-pos-pay-record
+                                       thru 1100-exit
+
+           .
+       1000-continue.
+
+           PERFORM 0050-READ-INPUT     THRU 0050-EXIT
+
+           .
+       1000-EXIT.
+           EXIT.
+
+       1100-write-pos-pay-record.
+
+           write pos-pay-record from ws-positive-pay-record
+           add 1 to ws-out-recs
+
+           .
+       1100-exit.
+           exit.
+
+       1200-post-total-rec.
+
+           move ws-grand-total         to pp-total-amount
+           move '*'                    to pp-total-eor
+           write pos-pay-record from ws-positive-pay-total-rec
+           add 1 to ws-out-recs
+
+           .
+       1200-exit.
+           exit.
+
+       2000-close-files.
+
+           close daily-drafts pos-pay-file
+
+           .
+       2000-exit.
+           exit.
+
+       8500-date-convert.
+
+           call 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+       8500-exit.
+           exit.
+
+       ABEND-PGM.
+
+           call 'ABORTME'
+           goback.                                                                      

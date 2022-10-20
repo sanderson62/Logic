@@ -1,0 +1,91 @@
+BEGINJOB mode='MVS' jobclass='M' 
+
+if ($EBMSYS != "tony") then
+   echo "Job aborting, not Tony"
+   exit 1
+endif
+
+################################################################################
+LABEL name=CPACCT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cp /slunikix/data/test/mdoff/seqfiles/eracctt.backup /data/test/tony/seqfiles/
+!
+EXECPGM pgmname='BPXBATCH' stepname='CPACCT' parm='SH'
+
+################################################################################
+LABEL name=CPRTBL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cp /slunikix/data/test/mdoff/seqfiles/errtblt.backup /data/test/tony/seqfiles/
+!
+EXECPGM pgmname='BPXBATCH' stepname='CPRTBL' parm='SH'
+
+################################################################################
+LABEL name=LODACCT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d ERACCTT
+unikixbld -t v -d ERACCTT -s /data/test/tony/seqfiles/eracctt.backup
+!
+EXECPGM pgmname='BPXBATCH' stepname='LODACCT' parm='SH'
+
+################################################################################
+LABEL name=LODRTBL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d ERRTBLT
+unikixbld -t v -d ERRTBLT -s /data/test/tony/seqfiles/errtblt.backup
+!
+EXECPGM pgmname='BPXBATCH' stepname='LODRTBL' parm='SH'
+
+################################################################################
+LABEL name=EL300
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLOG' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='J' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' dataset='CI.DD.LG.ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' dataset='CI.DD.LG.ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' dataset='CI.DD.LG.ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD.AJREPXA' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCCID1
+CLAS113014                          1
+!
+
+EXECPGM pgmname='EL300' stepname='EL300'
+
+################################################################################
+LABEL name=CIDEPXA
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='ERRTBLT' type='VS' filename='ERRTBLT' disp='i-o' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+#ASSGNDD ddname='SYS010' filename='/data/test/tony/seqfiles/CI.XX.EPEC_DEC12' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='/slunikix/data/seqfiles/CI.XX.EPEC_00' disp='i-o' 
+#ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD.AJREPXA' disp='i-o'
+ASSGNDD ddname='SYS019' filename='/slunikix/data/seqfiles/CI.DD.ER.DATECARD' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.EPEC.EXTRACT.AJRA.NOV14' disp='o' normal='k' abend='k' recsize='792'
+ASSGNDD ddname='SYS012' filename='\${SEQFILES}/ZI.EPEC.REINEXT.AJRA.NOV14' disp='o' normal='k' abend='k' recsize='792'
+ASSGNDD ddname='SYS013' filename='\${SEQFILES}/ZI.EPEC.EXTRITD.AJRA.NOV14' disp='o' normal='k' abend='k' recsize='792'
+ASSGNDD ddname='SYS014' filename='\${SEQFILES}/ZI.EPEC.REINITD.AJRA.NOV14' disp='o' normal='k' abend='k' recsize='792'
+EXECPGM pgmname='CIDEPXA' stepname='CIDEPXA' 
+#EXECPGM pgmname='CIDEPXAO' stepname='CIDEPXA' 
+
+if ($JOBSTATUS == 0) then
+    "ftp -n ntcso1 < $JCLLIB/ftp-zajrepxa"
+    echo " Test job dont want print "
+else
+    echo " Job aborted, print not released "
+endif
+
+
+ENDJOB 

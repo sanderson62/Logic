@@ -1,0 +1,61 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: cilg539p              Translated  : Wed Aug 23 12:31:26 2000        #
+#                                                                              #
+# This job is used to fix the Pending Business file from the previous monthend #
+#  Affected accounts and certs must be hard coded in EL539P, moving the        #
+#  appropriate loan officer code to PB-I-LOAN-OFFICER.                         #
+#  Issues are processed in paragraph 0430-PICKUP.
+#  Cancels are processed in paragraph 0440-CHK-CANCEL.
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+
+unikixbld -t s -d ERLOFC -s erlofc.txt
+unikixbld -i -dERLOFCT
+unikixbld -t v -d ERLOFCT -s erlofc.txt
+
+################################################################################
+LABEL name=EL539 
+################################################################################
+#  ******************************************************************    
+#  ***                                                                   
+#  ***                   MONTHLY FILE VERIFICATION                       
+#  ***            SEE RESTART INSTRUCTIONS BEFORE RESTARTING             
+#  ***                                                                   
+#  ******************************************************************    
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/CI.XX.EXTR521_00' disp='i-o' normal='k' abend='k' 
+#ASSGNDD ddname='SYS010' filename='\${SEQFILES}/pema.extr521' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERPNDB2' dataset='CI.DD.LG.ERPNDB2' type='VS' filename='ERPNDB2' disp='i-o' 
+ASSGNDD ddname='ERLOFC' type='VS' filename='ERLOFCT' disp='i-o' 
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+!
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='ELREPT' type='DUMMY'
+#  **************************************************** I/O FILES        
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL539P' stepname='EL539' 
+
+################################################################################
+LABEL name=CPY539
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/cilg539p/EL539/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.CIADM.FICH539.sepfix1' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY539' parm='ALL' 
+
+################################################################################
+
+ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-cilg539p
+
+################################################################################
+
+ENDJOB 

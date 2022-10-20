@@ -1,0 +1,40 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+if ($EBMSYS != "tony") then
+   echo "Job aborted, not tony"
+   exit 1
+endif
+
+#################################################################################
+
+ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-cidzrecget
+
+#################################################################################
+LABEL name=BKPLETR
+#################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ELLETR -s $SEQFILES/elletr.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPLETR' parm='SH'
+
+################################################################################
+LABEL name=CIDZRECA
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='SYS010' filename='/data/test/tony/seqfiles/ZrecordExtract.txt' disp='i'
+ASSGNDD ddname='ELLETR' type='VS' filename='ELLETR' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/data/test/tony/seqfiles/CI.DD.ER.DATECARD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+ASSGNDD ddname='SYS011' filename='$SEQFILES/newletr.txt' disp='o' normal='k' abend='d' recsize='100' recfmt='F'
+
+EXECPGM pgmname='CIDZRECA' stepname='CIDZRECA'
+
+if ($JOBSTATUS == 0) then
+   echo " Nothing to print "
+else
+   echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

@@ -1,0 +1,66 @@
+################################################################################
+#                                                                              #
+#     JOB: cilg356                                                             #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+#if ($EBMSYS != 'mdoff') then
+#   echo "Job aborting, not MODEL OFFICE"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=EL356
+################################################################################
+ONRETCODE MAXRC GT '11' BYPASS scope='STEP'  
+
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ELDENY' type='VS' filename='ELDENY' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' filename='$SEQFILES/CI.EX.FICH356' disp='o' normal='k' abend='k' recfmt='F' recsize='133'
+
+EXECPGM pgmname='EL356' stepname='EL356'
+
+################################################################################
+LABEL name=CPY356
+################################################################################
+#ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL356/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.EX.FICH356' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH356' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPY356' parm='ALL'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the files from above and creates pdf files
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/CI.DL.CIADM.FICH356 $SEQFILES/CI.EL356.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+	  echo " Nothing to print at this time "
+    "echo 'el356.pdf | mutt -s '$JOBNAME is complete'  pema@cso.com"
+    "mutt -s 'CID EL356 Report' -a $SEQFILES/CI.EL356.pdf -- dsyslg324r@cso.com < /dev/null"
+else
+   echo "job aborted print not released "
+endif
+
+################################################################################
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################

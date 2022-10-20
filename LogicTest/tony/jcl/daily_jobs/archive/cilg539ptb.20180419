@@ -1,0 +1,73 @@
+################################################################################
+#   R E A D    M E       R E A D    M E      R E A D   M E   
+#   R E A D    M E       R E A D    M E      R E A D   M E   
+#   R E A D    M E       R E A D    M E      R E A D   M E   
+#
+#   IF YOU MAKE CHANGES TO THIS JOB YOU MUST COPY IT TO
+#       \\NTCSO1\USERDATA\BUS_GRP\CI\LOGIC\DATA
+#
+#   R E A D    M E       R E A D    M E      R E A D   M E   
+#   R E A D    M E       R E A D    M E      R E A D   M E   
+#   R E A D    M E       R E A D    M E      R E A D   M E   
+#   R E A D    M E       R E A D    M E      R E A D   M E   
+#
+#     JOB: cilg539ptb
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+
+unikixbld -t s -d ERLOFC -s /data/seqfiles/erlofc.bkp
+unikixbld -i -dERLOFCT
+unikixbld -t v -d ERLOFCT -s /data/seqfiles/erlofc.bkp
+
+################################################################################
+LABEL name=EL539PT 
+################################################################################
+#*******************************************************************************
+#*  The process option is set to 1 in the EL300 step above, which causes
+#*  program EL539 to use the online pending business file as input instead
+#*  of the monthend extract file, CI.XX.EXTR521.
+#*******************************************************************************
+ASSGNDD ddname='SYS010' dataset='CI.XX.EXTR521' gdg='0' filename='\${SEQFILES}/CI.XX.EXTR521' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.PTB.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERPNDB2' dataset='CI.DD.LG.ERPNDB2' type='VS' filename='ERPNDB2' disp='i-o' 
+ASSGNDD ddname='ERLOFC' type='VS' filename='ERLOFCT' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+PTB
+!
+ASSGNDD ddname='ELREPT' type='DUMMY'
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL539' stepname='EL539PT' 
+
+################################################################################
+LABEL name=CPY539PT
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/$JOBNAME/EL539PT/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${REQJOBFILES}/CI.DL.CIADM.FICH539.PTB' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY539PT' parm='ALL' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+   "ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-cilg539pt"
+   "smtp -f slunikix -t info,saca,prva,pema -s '$JOBNAME is complete' -mf /apps/prod/cid1p/emails/$JOBNAME.txt"
+else
+   echo " Job aborted, print not released "
+endif
+
+################################################################################
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 021003 2002122000003   SMVA   ADD $JOBPARM IN PLACE OF CLAS CARD IN EL300 STP

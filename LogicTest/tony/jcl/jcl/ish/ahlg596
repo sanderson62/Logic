@@ -1,0 +1,59 @@
+BEGINJOB MODE='MVS' verbose
+ONRETCODE GT 7 GOTO END_JOB 
+setenv cdte `date +%m%d`
+echo $LD_LIBRARY_PATH
+
+################################################################################
+LABEL name=EL596
+################################################################################
+
+ASSGNDD ddname='SYS008' type='SYSOUT' recfmt='F' recsize='133'
+ASSGNDD ddname='SYS021' filename='$SEQFILES/$cdte\_refunds.freedom.nrm.ahl' disp='o' normal='k' abend='d' recsize='400' recfmt='F'
+ASSGNDD ddname='SYS022' filename='$SEQFILES/$cdte\_refunds.freedom.man.ahl' disp='o' normal='k' abend='d' recsize='400' recfmt='F'
+ASSGNDD ddname='SYS023' filename='$SEQFILES/$cdte\_refunds.freedom.voids.ahl' disp='o' normal='k' abend='d' recsize='40' recfmt='F'
+ASSGNDD ddname='SYS020' filename='$SEQFILES/AH.EX.FICH596' disp='o' normal='k' abend='d' recsize='133' recfmt='F'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i-o'
+ASSGNDD DDNAME='SYSOUT' TYPE='SYSOUT' CLASS='Y' 
+ASSGNDD ddname='ERCHEK' type='VS' filename='ERCHEK' disp='i-o' 
+ASSGNDD ddname='ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+ASSGNDD ddname='ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+
+EXECPGM PGMNAME='EL596' STEPNAME='EL596' parm='2022101720221018'
+
+################################################################################
+LABEL name=CPY596
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.EX.FICH596' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.CIADM.FICH596' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY596' parm='ALL'
+LABEL name=PERL1
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+/export/home/mtpadmin/bin/elrpt2pdf $SEQFILES/AH.DL.CIADM.FICH596 $SEQFILES/AHL.CHECKS.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+   rm -f $JCLLIB/ftp-ahlg596-tmp
+   sed 's/\$cdte/$cdte/' < $JCLLIB/ftp-ahlg596 > $JCLLIB/ftp-ahlg596-tmp
+else
+        echo " Job aborted, print not released "
+endif
+
+################################################################################
+LABEL name=ENDSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+ftp -n ntcso1 < $JCLLIB/ftp-ahlg596-tmp
+!
+EXECPGM pgmname='BPXBATCH' stepname='ENDSTEP' parm='SH'
+
+LABEL name=EMAIL
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+mutt -s 'AHL Checks Requested' -a $SEQFILES/AHL.CHECKS.pdf dfnap@cso.com < /dev/null
+!
+EXECPGM pgmname='BPXBATCH' stepname='EMAIL' parm='SH'
+
+ENDJOB 
+
+

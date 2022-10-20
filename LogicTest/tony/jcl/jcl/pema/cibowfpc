@@ -1,0 +1,174 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+#
+################################################################################
+
+###perl /apps/prod/cid1p/jcl/ish/comm_fed.pl /export/home/cidftp/data/com_fed_cd.txt /data/seqfiles/new_cso.txt
+################################################################################
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job Aborted, Not CID1T"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+tr -d '\015' < /data/seqfiles/amcso.txt > /data/seqfiles/bow_input_file
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=STEP2
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d CFCNTL
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP2' parm='SH'
+
+################################################################################
+LABEL name=STEP3
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ELCNTL -s $SEQFILES/bow_cntl_bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP3' parm='SH'
+
+################################################################################
+LABEL name=STEP4
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t v -d CFCNTL -s $SEQFILES/bow_cntl_bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP4' parm='SH'
+
+################################################################################
+LABEL name=CIBOWCNV 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                     
+#  *  CONVERT ACCOUNT NUMBERS ON COMMERCIAL FEDERAL FILE TO CSO          
+#  *  ACCOUNT NUMBERS FOR INPUT TO THE LOGIC SYSTEM.                     
+#  *                                                                     
+#  ********************************************************************* 
+#ASSGNDD ddname='SYS010' filename='$SEQFILES/TAMCSO' disp='i' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/bow_input_file' disp='i' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/CI.DD.BOW.CNV' disp='o' normal='k' abend='d' recfmt='F' recsize='480' 
+
+EXECPGM pgmname='CIBOWCNV' stepname='CIBOWCNV' 
+
+################################################################################
+LABEL name=SORTBOW
+################################################################################
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.DD.BOW.CNV.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='480'
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.DD.BOW.CNV' disp='i-o' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(10 2)(146 10)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTBOW'
+
+################################################################################
+LABEL name=CIBOW511
+################################################################################
+#  ********************************************************************* 
+#  *                                                                     
+#  *  EXTRACT TRANSACTIONS FROM COMMERCIAL FEDERAL FILE FOR INPUT        
+#  *  TO LOGIC AND THE PP&A RECORDS FOR DOWNLOADING TO A PC FILE.        
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.DD.BOW.CNV.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/CI.DD.BOW.LOGIC' disp='o' normal='k' abend='d' recsize='90' recfmt='F' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+
+EXECPGM pgmname='CIBOW511' stepname='CIBOW511' 
+
+################################################################################
+LABEL name=CPY511
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/$JOBNAME/CIBOW511/SYS013_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH511.BOW' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY511' parm='ALL' 
+
+################################################################################
+LABEL name=SORTLGX 
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.DD.BOW.LOGIC.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.DD.BOW.LOGIC' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 10)(1 10)(79 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTLGX'
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                   * 
+#  *   PREPARE COMFD800 REFORMATTED RECORDS TO LOAD TO PEND. BUS. FILE * 
+#  *                                                                   * 
+#  ********************************************************************* 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.DD.BOW.LOGIC.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DD.BOW.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='CFCNTL' disp='i-o' normal='k' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL512/SYS008_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH512.BOW' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+#   "smtp -f slunikix -t alwa,amwa,pema -s '$JOBNAME is complete' -mf /apps/prod/cid1p/emails/$JOBNAME.txt"
+else
+   echo " Job aborted, print not released "
+endif
+
+##ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-cibowfpc
+
+ENDJOB 
+################################################################################

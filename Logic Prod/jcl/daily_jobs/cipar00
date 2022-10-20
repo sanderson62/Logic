@@ -1,0 +1,149 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: CIPAR00               Translated  : Wed Aug 23 12:33:38 2000        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 8 GOTO END_JOB 
+
+################################################################################
+LABEL name=REMOVE
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/central.txt $SEQFILES/new_central.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='REMOVE' parm='SH'
+
+################################################################################
+LABEL name=FTP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < $HOME/misc/ftp-getpacesetter
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $JCLLIB/sublowv.pl $SEQFILES/central.txt $SEQFILES/new_central.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=CIDPACPY 
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/new_central.txt' disp='i-o' 
+ASSGNDD ddname='SYS011' dataset='CI.XX.PACESETR.TAPE' gdg='+1' filename='$SEQFILES/CI.XX.PACESETR.TAPE' disp='o' normal='k' abend='d' recsize='800' recfmt='F' 
+
+EXECPGM pgmname='CIDPACPY' stepname='CIDPACPY' 
+
+################################################################################
+LABEL name=SORTIT 
+################################################################################
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.DD.PACESETR.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='800'
+ASSGNDD ddname='SORTIN' dataset='CI.XX.PACESETR.TAPE' gdg='+1' filename='$SEQFILES/CI.XX.PACESETR.TAPE' disp='i-o' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+ASSGNDD ddname='SORTWK06' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(4 10) (2 2)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTIT' parm='SIZE=4096K' 
+
+################################################################################
+LABEL name=CIPA511 
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.DD.PACESETR.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/CI.DD.PACESETR.LOGIC' disp='o' normal='k' abend='d' recsize='90' recfmt='F' 
+ASSGNDD  ddname='SYS013' type='SYSOUT' class='A' 
+ASSGNDD  ddname='SYS008' type='DUMMY' 
+
+EXECPGM pgmname='CIPA511T' stepname='CIPA511' 
+
+################################################################################
+LABEL name=CPY511
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/CIPA511/SYS013_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH511.PACE' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY511' parm='ALL' 
+
+################################################################################
+LABEL name=SORTCNV 
+################################################################################
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.WW.PACESETR.LOGIC.SORT' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.DD.PACESETR.LOGIC' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 10)(1 10)(78 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTCNV' 
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.WW.PACESETR.LOGIC.SORT' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.WW.PACESETR.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='CFCNTL' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL512/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH512.PACE' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL' 
+
+################################################################################
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+     "exelpr.sh l133std.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/CIPA511/SYS013_$JON"
+     "smtp -f slunikix -t pema,krha,jjva,info -s '$JOBNAME is complete - EL511' -mf $SEQFILES/CI.DL.CIADM.FICH511.PACE"
+     "smtp -f slunikix -t pema,krha,jjva,info -s '$JOBNAME is complete - EL512' -mf $SEQFILES/CI.DL.CIADM.FICH512.PACE"
+else
+	echo " Job aborted, print not released"
+endif
+
+ftp -n ntcso1 < $JCLLIB/ftp-cipar00
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 110602                 SMVA   CHG DIR TO TAPELDFILES, REMOVE CIPA511/SYS008,
+#                               ADD STEP CPY511, AND ADD FTP COMMAND 
+# 042303                 SMVA   REMOVE EL512 PRINT; WILL USE EL512 TEXT FILE
+# 012704                 SMVA   ADD DADA TO EMAIL NOTICE
+# 121504                 PEMA   REMOVE BUILD OF CFCNTL PUT IN JOB CILGDBLD 

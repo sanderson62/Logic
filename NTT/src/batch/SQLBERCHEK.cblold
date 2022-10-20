@@ -1,0 +1,1087 @@
+      *$SET SQL(dbman=ODBC, TARGETDB=MSSQLSERVER, NOAUTOCOMMIT)
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2014 by Central States Health and Life          *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. SQLBERCHEK.
+       AUTHOR.   Pablo.
+
+091817******************************************************************
+091817*                   C H A N G E   L O G
+091817*
+091817* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+091817*-----------------------------------------------------------------
+091817*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+091817* EFFECTIVE    NUMBER
+091817*-----------------------------------------------------------------
+091817* 022616  CR2017091400001  PEMA  Use new stored procedure
+062121* 062121  CR2021021600001  PEMA  ADD PROCESSING FOR NEW COMP FNL
+070221* 070221  IR2021070200001  PEMA  Correct end of file processing.
+010722* 010722 CR2019012500003   PEMA  Convert to SQLSERVER (pdbnkinfo)
+091817******************************************************************
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT ERCHEK           ASSIGN TO ERCHEK
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS DYNAMIC
+                                   RECORD KEY IS CH-CONTROL-primary
+                                   FILE STATUS IS ERCHEK-FILE-STATUS.
+
+           SELECT DISK-DATE        ASSIGN TO SYS019.
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  ERCHEK.
+
+                                       copy ERCCHEK.
+
+       FD  DISK-DATE
+                                    COPY ELCDTEFD.
+
+       working-storage section.
+
+NTTDel*EXEC SQL
+NTTDel*   INCLUDE SQLDA
+NTTDel*END-EXEC
+      
+       EXEC SQL
+          INCLUDE SQLCA
+       END-EXEC
+      
+       77  s1                          pic s999 comp-3 value +0.
+       77  rec-cnt                     pic 9(9) value zeros.
+       77  ws-recs-in                  pic 9(7) value zeros.
+       77  ws-sql-code                 pic s9(7) value zeros.
+       77  ws-dis-sql-code             pic -9999999 value zeros.
+       77  erchek-file-status          pic xx value low-values.
+       77  eof-sw                      pic x value ' '.
+           88  end-of-input               value 'Y'.
+
+021714 01  P pointer.
+021714 01  KIXSYS                      pic X(7)  VALUE Z"KIXSYS".
+021714 01  var-ptr pointer.
+021714 01  env-var-len                 pic 9(4)  binary.
+021714 01  rc                          pic 9(9)  binary.
+021714
+021714 01  WS-KIXSYS.
+021714     05  WS-KIX-FIL1             PIC X(10).
+021714     05  WS-KIX-APPS             PIC X(10).
+021714     05  WS-KIX-ENV              PIC X(10).
+021714     05  WS-KIX-MYENV            PIC X(10).
+021714     05  WS-KIX-SYS              PIC X(10).
+
+       EXEC SQL
+          BEGIN DECLARE SECTION
+       END-EXEC
+
+       01  sqlcmd                      pic x(1024).
+       01  WS-MOE-DATE                 pic x(10).
+       01  svr                         pic x(32).
+       01  database                    pic x(32).
+       01  usr                         pic x(32).
+       01  pass                        pic x(32).
+       01  usr-pass                    pic x(64).
+       01  ws-disp-code                pic s9(11).
+
+       01  ws-paid-bank-work-area.
+           05  ws-pb-compid            pic x(9).
+           05  ws-pb-check-no          pic x(10).
+           05  ws-pb-bad-check-no      pic x(10).
+021714     05  ws-check-amount         pic x(10).
+
+       01  Paid-Bank-Info.
+           05  pb-check-no             pic 9(10).
+           05  pb-tran-type            pic x.
+           05  pb-bank-acct-desc       pic x(50).
+           05  pb-amount               pic x(12).
+           05  pb-paid-date            pic x(25).
+
+      ***-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_***
+      ***                                                            ***
+      ***  These indicators are used to tell sql server that i am    ***
+      ***  passing it a null value.  The indicator will be -1        ***
+      ***  if the value is nulls and +0 if the value is other than   ***
+      ***  nulls.  Here is a sample on how to use it.                ***
+      ***                                                            ***
+      ***      if db-date1 = spaces move -1 to nu-date1 end-if       *** 
+      ***     EXEC SQL                                               ***
+      ***        insert into ERCHEK (                                ***
+      ***           date1,                                           ***
+      ***           date2)                                           ***
+      ***        values (                                            ***
+      ***           :db-date1      :nu-date1,                        ***
+      ***           :db-date2      :nu-date2)                        ***
+      ***     END-EXEC                                               ***
+      ***                                                            ***
+      ***_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-***
+
+       01  indicator-vaiables-for-nulls.
+           05  NU-RECORDED-DT          PIC s9(4) comp value +0.
+           05  NU-CHECK-WRITTEN-DT     PIC s9(4) comp value +0.
+           05  nu-check-cashed-dt      pic s9(4) comp value +0.
+           05  NU-CREDIT-SELECT-DT     PIC s9(4) comp value +0.
+           05  NU-CREDIT-ACCEPT-DT     PIC s9(4) comp value +0.
+           05  NU-VOID-DT              PIC s9(4) comp value +0.
+           05  NU-APPROVAL-DT          PIC s9(4) comp value +0.
+           05  NU-CANC-DT              PIC s9(4) comp value +0.
+
+
+       01  ERCHEK-TABLE-RECORD.
+           05  TB-TPA-ID               pic 9.
+           05  TB-CARRIER              PIC X.               
+           05  TB-GROUPING             PIC X(6).            
+           05  TB-STATE                PIC XX.              
+           05  TB-ACCOUNT              PIC X(10).           
+           05  TB-CERT-EFF-DT          PIC X(10).
+           05  TB-CERT-NO              PIC X(10).
+           05  TB-CERT-SUFFIX          PIC X.
+           05  TB-SEQUENCE-NO          PIC 9(7).
+           05  TB-RECORDED-DT          PIC X(10).
+           05  TB-RECORDED-BY          PIC X(4).
+           05  TB-AMOUNT-PAID          PIC 9(7).99.
+           05  TB-AMOUNT-PAID-A REDEFINES
+               TB-AMOUNT-PAID          PIC X(10).
+           05  TB-CHECK-NO             PIC X(7).
+           05  TB-CHECK-WRITTEN-DT     PIC X(10).
+           05  TB-CHECK-CASHED-DT      PIC X(10).
+           05  TB-PAYEE-NAME-1         PIC X(30).           
+           05  TB-PAYEE-NAME-2         PIC X(30).           
+           05  TB-PAYEE-ADDRESS-1      PIC X(30).           
+           05  TB-PAYEE-ADDRESS-2      PIC X(30).           
+           05  TB-PAYEE-CITY           PIC X(28).
+           05  TB-PAYEE-STATE          PIC XX.
+           05  TB-PAYEE-ZIP-CODE       PIC X(9).
+           05  TB-STUB-LINE-1          PIC X(30).           
+           05  TB-TEXT-LINE-1          PIC X(50).           
+           05  TB-TEXT-LINE-2          PIC X(50).           
+           05  TB-TEXT-LINE-3          PIC X(40).           
+           05  TB-RETURN-TO            PIC X(30).           
+           05  TB-COMP-CARRIER         PIC X.               
+           05  TB-COMP-GROUPING        PIC X(6).            
+           05  TB-COMP-FIN-RESP        PIC X(10).           
+           05  TB-COMP-ACCOUNT         PIC X(10).           
+           05  TB-CREDIT-SELECT-DT     PIC X(10).
+           05  TB-CREDIT-ACCEPT-DT     PIC X(10).
+           05  TB-PAYEE-CODE           PIC X(6).
+           05  TB-VOID-DT              PIC X(10).
+           05  TB-VOID-BY              PIC X(4).            
+           05  TB-VOID-REASON          PIC X(25).           
+           05  TB-APPROVAL-DT          PIC X(10).
+           05  TB-APPROVAL-STATUS      PIC X.
+           05  TB-APPROVED-BY          PIC XXXX.
+           05  TB-CANC-DT              PIC X(10).
+           05  TB-LF-REFUND            PIC 9(7).99.
+           05  TB-LF-REFUND-A REDEFINES
+               TB-LF-REFUND            PIC X(10).
+           05  TB-AH-REFUND            PIC 9(7).99.
+           05  TB-AH-REFUND-A REDEFINES
+               TB-AH-REFUND            PIC X(10).
+           05  TB-INSURED-NAME         PIC X(28).           
+           05  TB-CSR                  PIC X(4).
+           05  TB-DEDUCT-COMMISSION    PIC X.
+
+       EXEC SQL
+          END DECLARE SECTION
+       END-EXEC
+
+       01  FILLER.
+           05  WS-CHECK-AMT-TMP        PIC Z(7).99.
+           05  WS-CHECK-AMT-TMPX REDEFINES             
+               WS-CHECK-AMT-TMP        PIC X(10).  
+           05  ABEND-CODE              PIC X(4)  VALUE SPACES.
+           05  ABEND-OPTION            PIC X     VALUE 'Y'.
+           05  WS-ABEND-MESSAGE        PIC X(80) VALUE SPACES.
+           05  WS-ABEND-FILE-STATUS    PIC XX    VALUE ZERO.
+           05  WS-RETURN-CODE          PIC S9(3) VALUE ZERO COMP-3.
+           05  PGM-SUB                 PIC S999  VALUE +344 COMP-3.
+
+                                       COPY ELCDTECX.
+                                       copy ELCDTEVR.
+                                       COPY ELCDATE.
+
+       01  connect-string              pic x(60) value spaces.
+       01  sqlconnect-parms.
+           05  p-sql-server            PIC X(30).
+           05  p-sql-database          PIC X(30).
+           05  p-connect-return-code   pic s9(5) comp-5.
+           05  p-sql-return-message    pic x(256).
+
+       LINKAGE SECTION.                                                 
+
+       01  var  pic x(30).
+
+       procedure division.
+                                       COPY ELCDTERX.
+       0000-begin.
+
+      *    display ' Begin Program '
+
+           set P to address of KIXSYS
+           CALL "getenv" using by value P returning var-ptr
+           if var-ptr = null then
+              display ' kixsys not set '
+           else
+              set address of var to var-ptr
+              move 0 to env-var-len
+              inspect var tallying env-var-len
+                for characters before X'00' 
+              unstring var (1:env-var-len) delimited by '/'
+                 into WS-KIX-FIL1 WS-KIX-APPS WS-KIX-ENV WS-KIX-MYENV
+                    WS-KIX-SYS
+              end-unstring
+           end-if
+
+           display ' KIXSYS  ' ws-kix-myenv
+
+           perform 0010-init           thru 0010-exit
+           perform 2000-connect-to-logic
+                                       thru 2000-exit
+           perform 2010-connect-to-paidbank
+                                       thru 2010-exit
+      *    perform 1010-drop-table     thru 1010-exit
+062121     if dte-client <> 'FNL'  *> already truncated by AHL
+              perform 1020-truncate-table
+                                       thru 1020-exit
+062121     end-if
+      *    perform 1000-create-table   thru 1000-exit
+           perform 0020-open-files     thru 0020-exit
+
+           EXEC SQL
+              SET AUTOCOMMIT OFF
+           END-EXEC
+
+           perform 0030-start-input    thru 0030-exit
+070221     if not end-of-input
+              perform 0046-read-input  thru 0046-exit
+070221     end-if
+           perform 0045-process-input  thru 0045-exit until
+              end-of-input
+      *      or ws-recs-in > 10000
+
+           perform 0060-finish-up      thru 0060-exit
+           close ERCHEK
+           display ' End Program '
+           display ' rows inserted ' rec-cnt
+           display ' records read  ' ws-recs-in
+           goback
+
+           .
+       0010-init.
+
+           MOVE BIN-RUN-DATE           TO DC-BIN-DATE-1
+           MOVE    ' '                 TO DC-OPTION-CODE
+           PERFORM 8500-DATE-CONVERT   THRU 8590-EXIT
+           move dc-greg-date-a-edit    to ws-moe-date
+
+           evaluate dte-client
+              when 'AHL'
+                 move 'AHL - AP%'      to ws-pb-compid
+062121        when 'FNL'
+062121           move 'FNL - AP%'      to ws-pb-compid
+              when other
+                 move 'CSO - AP%'      to ws-pb-compid
+           end-evaluate
+
+           .
+       0010-exit.
+           exit.
+
+       0020-open-files.
+
+           open input ERCHEK
+           if erchek-file-status not = '00'
+              display ' error-erchek-open ' erchek-file-status
+              perform abend-pgm
+           end-if
+
+           .
+       0020-exit.
+           exit.
+
+       0030-start-input.
+
+           move dte-clasic-company-cd  to ch-control-primary
+           start erchek key >= ch-control-primary
+           if erchek-file-status = '10' or '23'
+              set end-of-input to true
+           else
+              if erchek-file-status not = '00'
+                 display ' error-erchek-start ' erchek-file-status
+                 perform abend-pgm
+              end-if
+           end-if
+
+           .
+       0030-exit.
+           exit.
+
+       0045-process-input.
+
+           perform 0050-insert-row     thru 0050-exit
+           perform 0046-read-input     thru 0046-exit
+
+           .
+       0045-exit.
+           exit.
+
+       0046-read-input.
+
+           read erchek next record
+           
+           evaluate true
+              when (erchek-file-status = '10' or '23')
+                 or (ch-company-cd not = dte-clasic-company-cd)
+                 set end-of-input      to true
+              when erchek-file-status not = '00'
+                 display ' error-erchek-read ' erchek-file-status
+                 perform abend-pgm
+              when other
+                 add 1 to ws-recs-in
+           end-evaluate
+
+           .
+       0046-exit.
+           exit.
+
+       0050-insert-row.
+
+           perform 0052-build-values   thru 0052-exit
+           perform 0055-get-cashed-dt  thru 0055-exit
+           perform 0057-insert-row     thru 0057-exit
+
+           .
+       0050-exit.
+           exit.
+
+       0052-build-values.
+
+062121     if dte-client = 'AHL'
+062121        move 1                   to tb-tpa-id
+062121     else
+062121        if dte-client = 'FNL'
+062121           move 2                to tb-tpa-id
+062121        end-if
+062121     end-if
+           move ch-carrier             to tb-carrier
+           move ch-grouping            to tb-grouping
+           move ch-state               to tb-state
+           move ch-account             to tb-account
+           move ch-cert-prime          to tb-cert-no
+           move ch-cert-sfx            to tb-cert-suffix           
+
+           move ch-cert-eff-dt         to dc-bin-date-1
+           move ' '                    to dc-option-code
+           PERFORM 8500-DATE-CONVERT   THRU 8590-EXIT
+           if no-conversion-error
+              move dc-greg-date-a-edit to tb-cert-eff-dt
+           end-if
+
+           move ch-sequence-no         to tb-sequence-no
+           
+           move ch-recorded-dt         to dc-bin-date-1
+           move ' '                    to dc-option-code
+           PERFORM 8500-DATE-CONVERT   THRU 8590-EXIT
+           if no-conversion-error
+              move dc-greg-date-a-edit to tb-recorded-dt
+              move +0                  to nu-recorded-dt
+           else
+              move spaces              to tb-recorded-dt
+              move -1                  to nu-recorded-dt
+           end-if
+
+           move ch-recorded-by         to tb-recorded-by
+           move ch-amount-paid         to tb-amount-paid
+           move ch-check-no            to tb-check-no
+
+           move ch-check-written-dt    to dc-bin-date-1
+           move ' '                    to dc-option-code
+           PERFORM 8500-DATE-CONVERT   THRU 8590-EXIT
+           if no-conversion-error
+              move dc-greg-date-a-edit to tb-check-written-dt
+              move +0                  to nu-check-written-dt
+           else
+              move spaces              to tb-check-written-dt
+              move -1                  to nu-check-written-dt
+           end-if
+
+           move ch-payee-name-1        to tb-payee-name-1
+           move ch-payee-name-2        to tb-payee-name-2
+           move ch-payee-address-1     to tb-payee-address-1
+           move ch-payee-address-2     to tb-payee-address-2
+           move ch-payee-city          to tb-payee-city
+           move ch-payee-state         to tb-payee-state
+           move ch-payee-zip-code      to tb-payee-zip-code
+
+           move ch-STUB-LINE-1         to TB-STUB-LINE-1      
+           move ch-TEXT-LINE-1         to TB-TEXT-LINE-1      
+           move ch-TEXT-LINE-2         to TB-TEXT-LINE-2      
+           move ch-TEXT-LINE-3         to TB-TEXT-LINE-3      
+           move ch-RETURN-TO           to TB-RETURN-TO        
+           move ch-COMP-CARRIER        to TB-COMP-CARRIER     
+           move ch-COMP-GROUPING       to TB-COMP-GROUPING    
+           move ch-COMP-FIN-RESP       to TB-COMP-FIN-RESP    
+           move ch-COMP-ACCOUNT        to TB-COMP-ACCOUNT     
+
+           move ch-credit-select-dt    to dc-bin-date-1
+           move ' '                    to dc-option-code
+           PERFORM 8500-DATE-CONVERT   THRU 8590-EXIT
+           if no-conversion-error
+              move dc-greg-date-a-edit to tb-credit-select-dt
+              move +0                  to nu-credit-select-dt
+           else
+              move spaces              to tb-credit-select-dt
+              move -1                  to nu-credit-select-dt
+           end-if
+
+           move ch-credit-accept-dt    to dc-bin-date-1
+           move ' '                    to dc-option-code
+           PERFORM 8500-DATE-CONVERT   THRU 8590-EXIT
+           if no-conversion-error
+              move dc-greg-date-a-edit to tb-credit-accept-dt
+              move +0                  to nu-credit-accept-dt
+           else
+              move spaces              to tb-credit-accept-dt
+              move -1                  to nu-credit-accept-dt
+           end-if
+
+           move ch-PAYEE-CODE          to TB-PAYEE-CODE       
+           move ch-void-dt             to dc-bin-date-1
+           move ' '                    to dc-option-code
+           PERFORM 8500-DATE-CONVERT   THRU 8590-EXIT
+           if no-conversion-error
+              move dc-greg-date-a-edit to tb-void-dt
+              move +0                  to nu-void-dt
+           else
+              move spaces              to tb-void-dt
+              move -1                  to nu-void-dt
+           end-if
+
+           move ch-approval-dt         to dc-bin-date-1
+           move ' '                    to dc-option-code
+           PERFORM 8500-DATE-CONVERT   THRU 8590-EXIT
+           if no-conversion-error
+              move dc-greg-date-a-edit to tb-approval-dt
+              move +0                  to nu-approval-dt
+           else
+              move spaces              to tb-approval-dt
+              move -1                  to nu-approval-dt
+           end-if
+
+           move ch-canc-dt             to dc-bin-date-1
+           move ' '                    to dc-option-code
+           PERFORM 8500-DATE-CONVERT   THRU 8590-EXIT
+           if no-conversion-error
+              move dc-greg-date-a-edit to tb-canc-dt
+              move +0                  to nu-canc-dt
+           else
+              move spaces              to tb-canc-dt
+              move -1                  to nu-canc-dt
+           end-if
+
+           move ch-VOID-BY             to TB-VOID-BY          
+           move ch-VOID-REASON         to TB-VOID-REASON      
+           move ch-APPROVAL-STATUS     to TB-APPROVAL-STATUS  
+           move ch-APPROVED-BY         to TB-APPROVED-BY      
+
+           move ch-LF-REFUND           to TB-LF-REFUND        
+           move ch-AH-REFUND           to TB-AH-REFUND        
+           move ch-INSURED-NAME        to TB-INSURED-NAME     
+           move ch-CSR                 to TB-CSR              
+           move ch-DEDUCT-COMMISSION   to TB-DEDUCT-COMMISSION
+
+           .
+       0052-exit.
+           exit.
+
+       0055-get-cashed-dt.
+
+           perform 2015-set-pdbnk-connect
+                                       thru 2015-exit
+ 
+           move spaces                 to tb-check-cashed-dt
+           move -1                     to nu-check-cashed-dt
+           move '000'                  to ws-pb-check-no (1:3)
+           move ch-check-no            to ws-pb-check-no (4:7)
+
+           move spaces                 to ws-pb-bad-check-no
+           perform varying s1 from +1 by +1 until
+              (s1 > +10)
+              or (ws-pb-check-no (s1:1) not = '0')
+           end-perform
+
+           if s1 < +11
+              move ws-pb-check-no (s1:11 - s1)
+                                  to ws-pb-bad-check-no (1: 11 - s1)
+           end-if
+
+           MOVE ch-AMOUNT-PAID      TO WS-CHECK-AMT-TMP
+           MOVE WS-CHECK-AMT-TMPX   TO WS-CHECK-AMOUNT
+           MOVE SPACES              TO pb-paid-date
+
+091817     EXEC SQL
+091817        CALL pbi_GetCashDate_by_TransactionNbr
+NTTIns           (
+091817           @compid          = :ws-pb-compid,
+091817           @checkno         = :ws-pb-check-no,
+091817           @badcheckno      = :ws-pb-bad-check-no,
+091817           @checkamount     = :ws-check-amount,
+091817           @checkcasheddate = :pb-paid-date OUT
+NTTIns           )
+091817     END-EXEC
+
+           if sqlcode not = 0
+              display "Error: cannot find cashed dt " ws-pb-check-no
+                 ' ' ws-check-amount
+              move sqlcode            to ws-sql-code
+              move ws-sql-code to ws-dis-sql-code
+              display ' dis sql code ' ws-dis-sql-code
+              display ' sql err mess    ' sqlerrmc
+              go to 0055-exit
+           end-if
+
+pemtst*    display ' chkno  ' pb-check-no
+pemtst*    display ' desc   ' pb-bank-acct-desc
+pemtst*    display ' trn typ' pb-tran-type
+pemtst*    display ' amt   *' pb-amount '**'
+pemtst*    display ' pd dte ' pb-paid-date
+
+091817     string pb-paid-date (1:4)
+091817            pb-paid-date (6:2)
+091817            pb-paid-date (9:2)
+091817        delimited by size into dc-greg-date-cymd-r
+091817     end-string
+           move 'L'                    to dc-option-code
+           perform 8500-date-convert   thru 8590-exit
+           if no-conversion-error
+      *       move dc-bin-date-1       to ws-bin-cashed-dt
+              move dc-greg-date-a-edit to tb-check-cashed-dt
+              move +0                  to nu-check-cashed-dt
+           else
+              display ' error cvtdte cash dt ' pb-paid-date ' '
+                 dc-error-code
+           end-if
+
+           .
+       0055-exit.
+           exit.
+
+       0057-insert-row.
+
+           perform 2005-set-logic-connect
+                                       thru 2005-exit
+
+062121     if dte-client = 'AHL' OR 'FNL'
+062121        EXEC SQL
+062121           insert into ERCHEK (
+062121              TPA_ID           ,
+062121              CARRIER          ,
+062121              GROUPING         ,
+062121              STATE            ,
+062121              ACCOUNT          ,
+062121              CERT_EFF_DT      ,
+062121              CERT_NO          ,
+062121              CERT_SUFFIX      ,
+062121              SEQUENCE_NO      ,
+062121              RECORDED_DT      ,
+062121              RECORDED_BY      ,
+062121              AMOUNT_PAID      ,
+062121              CHECK_NO         ,
+062121              CHECK_WRITTEN_DT ,
+062121              CHECK_CASHED_DT  ,
+062121              PAYEE_NAME_1     ,
+062121              PAYEE_NAME_2     ,
+062121              PAYEE_ADDRESS_1  ,
+062121              PAYEE_ADDRESS_2  ,
+062121              PAYEE_CITY       ,
+062121              PAYEE_STATE      ,
+062121              PAYEE_ZIP_CODE   ,
+062121              STUB_LINE_1      ,
+062121              TEXT_LINE_1      ,
+062121              TEXT_LINE_2      ,
+062121              TEXT_LINE_3      ,
+062121              RETURN_TO        ,
+062121              COMP_CARRIER     ,
+062121              COMP_GROUPING    ,
+062121              COMP_FIN_RESP    ,
+062121              COMP_ACCOUNT     ,
+062121              CREDIT_SELECT_DT ,
+062121              CREDIT_ACCEPT_DT ,
+062121              PAYEE_CODE       ,
+062121              VOID_DT          ,
+062121              VOID_BY          ,
+062121              VOID_REASON      ,
+062121              APPROVAL_DT      ,
+062121              APPROVAL_STATUS  ,
+062121              APPROVED_BY      ,
+062121              CANC_DT          ,
+062121              LF_REFUND        ,
+062121              AH_REFUND        ,
+062121              INSURED_NAME     ,
+062121              CSR              ,
+062121              DEDUCT_COMMISSION)
+062121           values (
+062121              :TB-TPA-ID           ,
+062121              :TB-CARRIER          ,
+062121              :TB-GROUPING         ,
+062121              :TB-STATE            ,
+062121              :TB-ACCOUNT          ,
+062121              :TB-CERT-EFF-DT      ,
+062121              :TB-CERT-NO          ,
+062121              :TB-CERT-SUFFIX      ,
+062121              :TB-SEQUENCE-NO      ,
+062121              :TB-RECORDED-DT :nu-recorded-dt,
+062121              :TB-RECORDED-BY      ,
+062121              :TB-AMOUNT-PAID-A    ,
+062121              :TB-CHECK-NO         ,
+062121              :TB-CHECK-WRITTEN-DT :nu-check-written-dt,
+062121              :TB-CHECK-CASHED-DT :nu-check-cashed-dt,
+062121              :TB-PAYEE-NAME-1     ,
+062121              :TB-PAYEE-NAME-2     ,
+062121              :TB-PAYEE-ADDRESS-1  ,
+062121              :TB-PAYEE-ADDRESS-2  ,
+062121              :TB-PAYEE-CITY       ,
+062121              :TB-PAYEE-STATE      ,
+062121              :TB-PAYEE-ZIP-CODE   ,
+062121              :TB-STUB-LINE-1      ,
+062121              :TB-TEXT-LINE-1      ,
+062121              :TB-TEXT-LINE-2      ,
+062121              :TB-TEXT-LINE-3      ,
+062121              :TB-RETURN-TO        ,
+062121              :TB-COMP-CARRIER     ,
+062121              :TB-COMP-GROUPING    ,
+062121              :TB-COMP-FIN-RESP    ,
+062121              :TB-COMP-ACCOUNT     ,
+062121              :TB-CREDIT-SELECT-DT :nu-credit-select-dt,
+062121              :TB-CREDIT-ACCEPT-DT :nu-credit-accept-dt,
+062121              :TB-PAYEE-CODE       ,
+062121              :TB-VOID-DT :nu-void-dt,
+062121              :TB-VOID-BY          ,
+062121              :TB-VOID-REASON      ,
+062121              :TB-APPROVAL-DT :nu-approval-dt,
+062121              :TB-APPROVAL-STATUS  ,
+062121              :TB-APPROVED-BY      ,
+062121              :TB-CANC-DT :nu-canc-dt,
+062121              :TB-LF-REFUND-A      ,
+062121              :TB-AH-REFUND-A      ,
+062121              :TB-INSURED-NAME     ,
+062121              :TB-CSR              ,
+062121              :TB-DEDUCT-COMMISSION)
+062121        end-exec
+062121     ELSE
+              EXEC SQL
+                 insert into ERCHEK (
+                    CARRIER          ,
+                    GROUPING         ,
+                    STATE            ,
+                    ACCOUNT          ,
+                    CERT_EFF_DT      ,
+                    CERT_NO          ,
+                    CERT_SUFFIX      ,
+                    SEQUENCE_NO      ,
+                    RECORDED_DT      ,
+                    RECORDED_BY      ,
+                    AMOUNT_PAID      ,
+                    CHECK_NO         ,
+                    CHECK_WRITTEN_DT ,
+                    CHECK_CASHED_DT  ,
+                    PAYEE_NAME_1     ,
+                    PAYEE_NAME_2     ,
+                    PAYEE_ADDRESS_1  ,
+                    PAYEE_ADDRESS_2  ,
+                    PAYEE_CITY       ,
+                    PAYEE_STATE      ,
+                    PAYEE_ZIP_CODE   ,
+                    STUB_LINE_1      ,
+                    TEXT_LINE_1      ,
+                    TEXT_LINE_2      ,
+                    TEXT_LINE_3      ,
+                    RETURN_TO        ,
+                    COMP_CARRIER     ,
+                    COMP_GROUPING    ,
+                    COMP_FIN_RESP    ,
+                    COMP_ACCOUNT     ,
+                    CREDIT_SELECT_DT ,
+                    CREDIT_ACCEPT_DT ,
+                    PAYEE_CODE       ,
+                    VOID_DT          ,
+                    VOID_BY          ,
+                    VOID_REASON      ,
+                    APPROVAL_DT      ,
+                    APPROVAL_STATUS  ,
+                    APPROVED_BY      ,
+                    CANC_DT          ,
+                    LF_REFUND        ,
+                    AH_REFUND        ,
+                    INSURED_NAME     ,
+                    CSR              ,
+                    DEDUCT_COMMISSION)
+	                values (
+                    :TB-CARRIER          ,
+                    :TB-GROUPING         ,
+                    :TB-STATE            ,
+                    :TB-ACCOUNT          ,
+                    :TB-CERT-EFF-DT      ,
+                    :TB-CERT-NO          ,
+                    :TB-CERT-SUFFIX      ,
+                    :TB-SEQUENCE-NO      ,
+                    :TB-RECORDED-DT :nu-recorded-dt,
+                    :TB-RECORDED-BY      ,
+                    :TB-AMOUNT-PAID-A    ,
+                    :TB-CHECK-NO         ,
+                    :TB-CHECK-WRITTEN-DT :nu-check-written-dt,
+                    :TB-CHECK-CASHED-DT :nu-check-cashed-dt,
+                    :TB-PAYEE-NAME-1     ,
+                    :TB-PAYEE-NAME-2     ,
+                    :TB-PAYEE-ADDRESS-1  ,
+                    :TB-PAYEE-ADDRESS-2  ,
+                    :TB-PAYEE-CITY       ,
+                    :TB-PAYEE-STATE      ,
+                    :TB-PAYEE-ZIP-CODE   ,
+                    :TB-STUB-LINE-1      ,
+                    :TB-TEXT-LINE-1      ,
+                    :TB-TEXT-LINE-2      ,
+                    :TB-TEXT-LINE-3      ,
+                    :TB-RETURN-TO        ,
+                    :TB-COMP-CARRIER     ,
+                    :TB-COMP-GROUPING    ,
+                    :TB-COMP-FIN-RESP    ,
+                    :TB-COMP-ACCOUNT     ,
+                    :TB-CREDIT-SELECT-DT :nu-credit-select-dt,
+                    :TB-CREDIT-ACCEPT-DT :nu-credit-accept-dt,
+                    :TB-PAYEE-CODE       ,
+                    :TB-VOID-DT :nu-void-dt,
+                    :TB-VOID-BY          ,
+                    :TB-VOID-REASON      ,
+                    :TB-APPROVAL-DT :nu-approval-dt,
+                    :TB-APPROVAL-STATUS  ,
+                    :TB-APPROVED-BY      ,
+                    :TB-CANC-DT :nu-canc-dt,
+                    :TB-LF-REFUND-A      ,
+                    :TB-AH-REFUND-A      ,
+                    :TB-INSURED-NAME     ,
+                    :TB-CSR              ,
+                    :TB-DEDUCT-COMMISSION)
+              end-exec
+           end-if
+
+           if sqlcode not = 0
+              display "Error: cannot insert row "
+              move sqlcode             to ws-sql-code
+              move ws-sql-code         to ws-dis-sql-code
+              display ' sqlcode ' ws-dis-sql-code
+              display ' sql err mess    ' sqlerrmc
+              display ' in out cnt ' ws-recs-in ' ' rec-cnt
+              display ' offending rec ' erchek-table-record
+           else
+              add 1 to rec-cnt
+           end-if
+
+           .
+       0057-exit.
+           exit.
+
+       0060-finish-up.
+
+           EXEC SQL
+NTTDel*        commit transaction
+NTTIns         commit
+           END-EXEC
+           if sqlcode not = 0
+              display "Error: commit "
+              display ' sql return code ' sqlcode
+              display ' sql err mess    ' sqlerrmc
+              goback
+           end-if
+      
+
+           EXEC SQL
+              DISCONNECT 'Logic'
+           END-EXEC
+
+           EXEC SQL
+              DISCONNECT 'PdBnk'
+           END-EXEC
+
+           .
+       0060-exit.
+           exit.
+
+       1000-create-table.
+
+           EXEC SQL
+              create table ERCHEK (
+                TPA_ID              int not null,
+                CARRIER             char(1) NOT NULL,
+                GROUPING            char(6) not null,
+                STATE               char(2) not null,
+                ACCOUNT             char(10) not null,
+                CERT_EFF_DT         datetime not null,
+                CERT_NO             char(10) not null,
+                CERT_SUFFIX         char(1)  not null,
+                SEQUENCE_NO         int not null,
+                RECORDED_DT         datetime null,
+                RECORDED_BY         char(4),
+                AMOUNT_PAID         decimal(9,2),
+                CHECK_NO            char(7),
+                CHECK_WRITTEN_DT    datetime null,
+                CHECK_CASHED_DT     datetime null,
+                PAYEE_NAME_1        varchar(30),
+                PAYEE_NAME_2        varchar(30),
+                PAYEE_ADDRESS_1     varchar(30),
+                PAYEE_ADDRESS_2     varchar(30),
+                PAYEE_CITY          varchar(30),
+                PAYEE_STATE         char(2),
+                PAYEE_ZIP_CODE      char(9),
+                STUB_LINE_1         varchar(30),
+                TEXT_LINE_1         varchar(50),
+                TEXT_LINE_2         varchar(50),
+                TEXT_LINE_3         varchar(40),
+                RETURN_TO           varchar(30),
+                COMP_CARRIER        char(1),
+                COMP_GROUPING       char(6),
+                COMP_FIN_RESP       char(10),
+                COMP_ACCOUNT        char(10),
+                CREDIT_SELECT_DT    datetime null,
+                CREDIT_ACCEPT_DT    datetime null,
+                PAYEE_CODE          varchar(10),
+                VOID_DT             datetime null,
+                VOID_BY             char(4),
+                VOID_REASON         varchar(30),
+                APPROVAL_DT         datetime null,
+                APPROVAL_STATUS     char(10),
+                APPROVED_BY         char(4),
+                CANC_DT             datetime null,
+                LF_REFUND           decimal(9,2),
+                AH_REFUND           decimal(9,2),
+                INSURED_NAME        varchar(30),
+                CSR                 char(4),
+                DEDUCT_COMMISSION   char(1)
+                 CONSTRAINT PK_ERCHEK PRIMARY KEY CLUSTERED
+                   (CARRIER, GROUPING, STATE, ACCOUNT,
+                    CERT_EFF_DT, CERT_NO, SEQUENCE_NO)
+             	   )
+           END-EXEC
+
+           if sqlcode not = 0
+              display "Error: cannot create table "
+              move sqlcode             to ws-disp-code
+              display ' sql return code ' ws-disp-code
+              display ' sql err mess    ' sqlerrmc
+              goback
+           end-if
+
+           .
+       1000-exit.
+           exit.
+
+       1010-drop-table.
+
+           perform 2005-set-logic-connect
+                                       thru 2005-exit
+
+           display 'Begin Drop table'
+           EXEC SQL
+               drop table ERCHEK
+           END-EXEC
+           if sqlcode not = 0
+              display "Error(anticipated) : cannot drop table "
+              move sqlcode             to ws-sql-code
+              move ws-sql-code         to ws-dis-sql-code
+              display ' sqlcode ' ws-dis-sql-code
+              display ' message ' sqlerrmc
+           end-if
+
+           .
+       1010-exit.
+           exit.
+
+       1020-truncate-table.
+
+           perform 2005-set-logic-connect
+                                       thru 2005-exit
+
+           display 'Begin Truncate table'
+           EXEC SQL
+NTTDEL*        truncate table ERCHEK
+NTTIns         EXECUTE IMMEDIATE 'truncate table ERCHEK'
+           END-EXEC
+
+           if sqlcode not = 0
+              display "Error : cannot truncate table "
+              move sqlcode             to ws-sql-code
+              move ws-sql-code         to ws-dis-sql-code
+              display ' sqlcode ' ws-dis-sql-code
+              display ' message ' sqlerrmc
+           end-if
+
+           .
+       1020-exit.
+           exit.
+
+       2000-connect-to-logic.
+
+           display ' about to connect to Logic '
+
+       ***  The below code is for when the db has been
+       ***  converted to sql server 2016
+           evaluate ws-kix-myenv
+              when 'cid1p'
+                 move '//sdv-db01.cso.local:1433;'
+                                       to p-sql-server
+              when 'mdoff'
+                 move '//hov-tstdb01.cso.local:55330;'
+                                       to p-sql-server
+              when other
+                 move '//hov-tstdb01.cso.local:1433;'
+                                       to p-sql-server
+           end-evaluate
+
+
+           move spaces                 to connect-string
+           string
+              'jdbc:sqlserver:' delimited size
+              p-sql-server delimited space
+              'databaseName=' delimited size
+              into connect-string
+           end-string
+           display ' connection string = **' connect-string '**'
+
+           SET ENVIRONMENT "jdbc.url" to connect-string
+
+           evaluate true
+              when (dte-client = 'AHL' or 'FNL')
+                 move 'Logic_TPA'      to p-sql-database
+              when other
+                 move 'Logic'          to p-sql-database
+           end-evaluate
+
+           move 'appuser'              to usr
+           move 'appuser@cso'          to pass
+           move p-sql-database         to database
+
+            exec sql
+              connect to :database AS 'Logic'
+               user      :usr
+               using     :pass
+            end-exec
+
+           if sqlcode not = 0
+              display "Error: cannot connect to Logic"
+              move sqlcode             to ws-sql-code
+              move ws-sql-code         to ws-dis-sql-code
+              display ' sqlcode ' ws-dis-sql-code
+              display sqlerrmc
+              goback
+           end-if
+
+           .
+       2000-exit.
+           exit.
+
+       2005-set-logic-connect.
+
+           display ' about to set Logic  connection '
+           EXEC SQL
+              set connection 'Logic'
+           END-EXEC
+
+           if sqlcode not = 0
+              display "Error: cannot set Logic connection "
+              move sqlcode             to ws-sql-code
+              move ws-sql-code         to ws-dis-sql-code
+              display ' sqlcode ' ws-dis-sql-code
+              display sqlerrmc
+              goback
+           end-if
+
+           .
+       2005-exit.
+           exit.
+
+       2010-connect-to-paidbank.
+
+           display ' about to connect to paid bank '
+      ****  The below code is for when the db has been
+      ****  converted to sql server 2016
+           evaluate ws-kix-myenv
+              when 'cid1p'
+                 move '//sdv-db01.cso.local:1433;'
+                                       to p-sql-server
+              when 'mdoff'
+                 move '//hov-tstdb01.cso.local:55330;'
+                                       to p-sql-server
+              when other
+                 move '//hov-tstdb01.cso.local:1433;'
+                                       to p-sql-server
+           end-evaluate
+
+
+           move spaces                 to connect-string
+           string
+              'jdbc:sqlserver:' delimited size
+              p-sql-server delimited space
+              'databaseName=' delimited size
+              into connect-string
+           end-string
+           display ' connection string = **' connect-string '**'
+
+           SET ENVIRONMENT "jdbc.url" to connect-string
+
+           move 'PaidBankInfo'         to database
+
+            exec sql
+              connect to :database AS 'PdBnk'
+               user      :usr
+               using     :pass
+            end-exec
+
+           if sqlcode not = 0
+              display "Error: cannot connect to PaidBank"
+              move sqlcode             to ws-sql-code
+              move ws-sql-code         to ws-dis-sql-code
+              display ' sqlcode ' ws-dis-sql-code
+              display sqlerrmc
+              goback
+           end-if
+
+           .
+       2010-exit.
+           exit.
+
+       2015-set-pdbnk-connect.
+
+           display ' about to set paid bank connection '
+
+           EXEC SQL
+              set connection 'PdBnk'
+           END-EXEC
+
+           if sqlcode not = 0
+              display "Error: cannot set PdBnk connection "
+              move sqlcode             to ws-sql-code
+              move ws-sql-code         to ws-dis-sql-code
+              display ' sqlcode ' ws-dis-sql-code
+              display sqlerrmc
+              goback
+           end-if
+
+           .
+       2015-exit.
+           exit.
+
+       8500-DATE-CONVERT.              
+                                       COPY ELCDCS.
+
+       abend-pgm.
+
+            call 'ABORTME'.
+            
+            goback.

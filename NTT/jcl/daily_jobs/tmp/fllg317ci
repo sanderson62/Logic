@@ -1,0 +1,123 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+ONRETCODE GT 11 GOTO END_JOB 
+
+setenv cdte `date +%m%d`
+#setenv cdte "0129"
+echo " cdte = " $cdte
+
+################################################################################
+LABEL name=BKPTRLR
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+unikixbld -t s -d ELTRLR -s $SEQFILES/fl.eltrlr_el317ci.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPTRLR' parm='SH'
+
+################################################################################
+LABEL name=BKPMSTR
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+unikixbld -t s -d ELMSTR -s $SEQFILES/fl.elmstr_el317ci.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPMSTR' parm='SH'
+
+################################################################################
+LABEL name=BKPACTQ
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+unikixbld -t s -d ELACTQ -s $SEQFILES/fl.elactq_el317ci.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPACTQ' parm='SH'
+
+################################################################################
+LABEL name=EL300A
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLOG' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='J' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/FL.DD.ER.DATECARD.EL317CI' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCFNL1
+CLAS@MDDYY
+PRCO-317-2
+!
+
+EXECPGM pgmname='EL300' stepname='EL300A'
+
+################################################################################
+LABEL name=SORT1
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.WW.CLMDLY.EXTR' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/FL.WW.CLMINT.EXTR' disp='o' normal='k' abend='d' recfmt='F' recsize='319' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+         INCLUDE=(4 1 EQ CHAR 'B') AND (6 3 EQ CHAR 'FNL') AND (9 1 EQ CHAR 'A') AND (113 1 EQ CHAR 'I')
+       KEYS=(10 1) (54 7) (43 11)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT1' 
+
+################################################################################
+LABEL name=EL317CI
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ELACTQ' type='VS' filename='ELACTQ' disp='i-o' 
+ASSGNDD ddname='ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/FL.WW.CLMINT.EXTR' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/FL.DD.ER.DATECARD.EL317CI' disp='i-o' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/FL.EX.FICH317CI' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='SYS021' filename='$SEQFILES/$cdte\_interest.freedom.fnl' disp='o' normal='k' abend='d' recfmt='F' recsize='400' 
+ASSGNDD ddname='SYS022' filename='$SEQFILES/$cdte\_interest.napersoft.fnl' disp='o' normal='k' abend='d' recfmt='F' recsize='1500' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='EL317CI' stepname='EL317CI' parm='@CCYYYYMMDD'
+
+################################################################################
+LABEL name=CPY317
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/FL.EX.FICH317CI' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/FL.DL.CIADM.FICH317CI' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY317' parm='ALL'
+
+if ($JOBSTATUS == 0) then
+   rm -f $JCLLIB/ftp-fllg317ci-tmp
+   sed 's/\$cdte/$cdte/' < $JCLLIB/ftp-fllg317ci > $JCLLIB/ftp-fllg317ci-tmp
+   rm -f $JCLLIB/ftp-fllg317ci-ntis2-tmp
+   sed 's/\$cdte/$cdte/' < $JCLLIB/ftp-fllg317ci-ntis2 > $JCLLIB/ftp-fllg317ci-ntis2-tmp
+else
+        echo " Job aborted, print not released "
+endif
+
+################################################################################
+LABEL name=ENDSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+cat $SEQFILES/FL.DL.CIADM.FICH317CI | mutt -s 'FNL CLM INT RPT READY' dsysclmdlyrpts
+ftp -n ntis1.cso.local < $JCLLIB/ftp-fllg317ci-tmp
+ftp -n ntis1.cso.local < $JCLLIB/ftp-fllg317ci-ntis2-tmp
+!
+EXECPGM pgmname='BPXBATCH' stepname='ENDSTEP' parm='SH'
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#052821                   PEMA   New FNL Job Script

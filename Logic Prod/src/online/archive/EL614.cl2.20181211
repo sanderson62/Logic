@@ -1,0 +1,1374 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.                 EL614 .
+      *                            VMOD=2.001.                          
+      *                                                                 
+      *                                                                 
+      *AUTHOR.    PABLO.                                                
+      *           COLLEYVILLE TX.                                     
+                                                                        
+      *DATE-COMPILED.                                                   
+                                                                        
+      *SECURITY.   *****************************************************
+      *            *                                                   *
+      *            *   THIS PROGRAM IS THE PROPERTY OF CSO             *
+      *            *                                                   *
+      *            *   USE OF THIS PROGRAM BY OTHER THAN THE EMPLOYEES *
+      *            *   OF    CSO      IS EXPRESSLY PROHIBITED WITHOUT  *
+      *            *   THE PRIOR WRITTEN PERMISSION OF CSO.            *
+      *            *                                                   *
+      *            *****************************************************
+                                                                        
+      *REMARKS.                                                         
+      *        THIS PROGRAM PROVIDES THE MAINTENANCE FUNCTIONS NEEDED   
+      *    FOR THE  EOB   CODES IN THE CLAIM SYSTEM.
+      *                                                                 
+      *    SCREENS     - EL614A - EOB CODE MAINTENANCE
+      *                                                                 
+      *    ENTERED BY  - EL101 - SYSTEM ADMINISTRATION MENU             
+      *                  EL156 - PAYMENT WORKSHEET
+      *                  EL6317 - CERTIFICATE VERIFICATION                      
+      *    EXIT TO     - EL101 - SYSTEM ADMINISTRATION MENU             
+      *                  EL156 - PAYMENT WORKSHEET                      
+      *                  EL6317 - CERTIFICATE VERIFICATION                      
+      *    COMMAREA    - PASSED                                         
+      *                                                                 
+      *    NARRATIVE   - FIRST ENTRY IS VIA AN XCTL FROM EL101.  ON     
+      *                  FIRST ENTRY, A SKELETON SCREEN IS SENT AND THE 
+      *                  PROGRAM EXITS TO WAIT FOR INPUT.  ON SUCCESSIVE
+      *                  ENTRIES (XCTL FROM CICS VIA EX  ) THE SCREEN   
+      *                  WILL BE READ AND ACTION WILL BE BASED ON THE   
+      *                  MAINTENANCE TYPE INDICATED.                    
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      * 083110    2009122800001  PEMA  NEW PROGRAM
+011811* 011811    2009122800001  AJRA  FIX SELECTION      
+042211* 042211    2011040600001  PEMA  FIX ISSUE NO RECORDS FOUND
+081511* 081511    2011022800001  PEMA  ADMIN SERV NAPERSOFT CHANGES
+121012* 121012    2012101700002  AJRA  HIGHLIGHT REASON CODES
+112113* 112113    2013090300001  AJRA  NAPERSOFT PHASE 2
+      ******************************************************************
+
+       ENVIRONMENT DIVISION.                                            
+       DATA DIVISION.                                                   
+       WORKING-STORAGE SECTION.                                         
+                                                                        
+       77  FILLER  PIC X(32)  VALUE '********************************'. 
+       77  FILLER  PIC X(32)  VALUE '*   EL614  WORKING STORAGE     *'. 
+       77  FILLER  PIC X(32)  VALUE '***********VMOD=2.001 **********'. 
+       77  CI1                PIC S999  COMP-3 VALUE +0.
+       77  B1                 PIC S999  COMP-3 VALUE +0.
+       77  S1                 PIC S999  COMP-3 VALUE +0.
+121012 77  S2                 PIC S999  COMP-3 VALUE +0.
+       77  E1                 PIC S999  COMP-3 VALUE +0.
+       77  WS-DUP-EOB-SW      PIC X VALUE ' '.
+           88  FOUND-DUP-EOB     VALUE 'Y'.
+
+           COPY ELCSCTM.                                                
+           COPY ELCSCRTY.                                               
+                                                                        
+       01  WS-PASSED-FROM-CALL-PGM     PIC X(60)  VALUE SPACES.
+       01  WS-DATE-AREA.                                                
+           05  SAVE-DATE           PIC X(8)    VALUE SPACES.            
+          05  SAVE-BIN-DATE       PIC X(2)    VALUE SPACES.            
+                                                                        
+       01  WS-SELECTED-EOB-CODES.
+           05  WS-SELECTED-CODES OCCURS 12.
+               10  WS-SEL-EOB-CODE PIC XXXX.
+               10  FILLER          PIC X.
+
+
+
+       01  FILLER                          COMP-3.                      
+           05  WS-RECORD-COUNT             PIC S9(3)   VALUE ZERO.      
+           05  WS-READNEXT-SW              PIC S9      VALUE ZERO.      
+           05  WS-LAST-ERROR-COUNT         PIC S9(3)   VALUE ZERO.      
+           05  WS-UPDATE-SW                PIC S9      VALUE ZERO.      
+           05  WS-COMPLETED-SUCCESSFUL     PIC S9      VALUE ZERO.      
+             88  TRANSACTION-SUCCESSFUL                    VALUE +1.    
+             88  INITIAL-TRANSACTION                       VALUE +2.    
+             88  CHANGE-SUCCESSFUL                         VALUE +3.    
+                                                                        
+           05  TIME-IN                     PIC S9(7)   VALUE ZERO.      
+           05  TIME-OUT                    REDEFINES                    
+               TIME-IN                     PIC S9(3)V9(4).              
+112113
+112113     05  WS-BUILD-FORWARD            PIC X       VALUE 'N'.
+112113         88 NEEDTOBUILDFORWARD                   VALUE 'Y'.
+112113     05  WS-CODE-LOADED              PIC X       VALUE 'N'.
+112113         88 CODEALREADYLOADED                    VALUE 'Y'.
+                                                                        
+       01  FILLER                          COMP SYNC.                   
+           05  WS-INDEX                    PIC S9(4)   VALUE ZERO.      
+           05  WS-JOURNAL-FILE-ID          PIC S9(4)   VALUE +1.        
+           05  WS-JOURNAL-RECORD-LENGTH    PIC S9(4)   VALUE +773.      
+           05  ELEOBC-LENGTH               PIC S9(4)   VALUE +350.
+           05  GETMAIN-SPACE               PIC  X      VALUE SPACE.
+112113
+112113 01  FILLER.
+112113     05  QID.
+112113         10  QID-TERM            PIC X(4).
+112113         10  FILLER              PIC X(4)    VALUE '614A'.
+112113     05  QID-ITEM                PIC S9(4)   COMP VALUE +0.
+112113     05  MAX-LINES               PIC 999     VALUE 96.
+112113     05  NUM-LINES-PER-SCREEN    PIC 99      VALUE 17.
+112113     05  TS-NUM-REC-IN-GROUP     PIC 99      VALUE 12.
+112113     05  TS-GROUP-WORK           PIC 9(5)    VALUE 0  COMP-3.
+112113     05  TS-LENGTH               PIC S9(4)   VALUE +3360 COMP.
+                                                                        
+       01  FILLER.                                                      
+           05  SC-ITEM             PIC S9(4) COMP VALUE +1.             
+           05  DEEDIT-FIELD        PIC  X(10).
+           05  DEEDIT-FIELD-V0  REDEFINES
+               DEEDIT-FIELD        PIC S9(10).
+           05  WS-RESPONSE             PIC S9(8)   COMP.
+               88  RESP-NORMAL              VALUE +00.
+               88  RESP-ERROR               VALUE +01.
+               88  RESP-NOTFND              VALUE +13.
+               88  RESP-NOTOPEN             VALUE +19.
+               88  RESP-ENDFILE             VALUE +20.
+           05  WS-ELEOBC-KEY.
+               10  WS-COMPANY-CD           PIC X      VALUE LOW-VALUES.
+               10  WS-EOB-REC-TYPE         PIC X      VALUE LOW-VALUES.
+               10  WS-EOB-CODE             PIC X(4)   VALUE LOW-VALUES.
+               10  FILLER                  PIC X(9)   VALUE LOW-VALUES.
+                                                                        
+           05  WS-MAPSET-NAME              PIC X(8)  VALUE 'EL614S'.
+           05  WS-MAP-NAME                 PIC X(8)  VALUE 'EL614A'.
+                                                                        
+           05  FILLER                      REDEFINES                    
+               WS-MAP-NAME.                                             
+               10  FILLER                  PIC XX.                      
+               10  WS-MAP-NUMBER           PIC X(4).                    
+               10  FILLER                  PIC XX.                      
+                                                                        
+           05  THIS-PGM                    PIC X(8)  VALUE 'EL614'.     
+                                                                        
+           05  WS-JOURNAL-TYPE-ID          PIC XX      VALUE 'EL'.      
+                                                                        
+           05  WS-LOW-VALUES               PIC X VALUE LOW-VALUES.      
+           05  WS-SPACE                    PIC X       VALUE SPACE.     
+                                                                        
+           05  WS-TRANS-ID                 PIC X(4)    VALUE 'EXAI'.
+                                                                        
+           05  WS-TEMP-STORAGE-KEY.                                     
+               10  WS-TS-TERM-ID           PIC X(4)    VALUE 'XXXX'.    
+               10  FILLER                  PIC X(4)    VALUE '614'.
+
+121012     05  WS-REASON-CODE-PASSED       PIC X(26).
+121012     05  WS-TABLE-CODE.
+121012         10  WS-TAB-CODE-1           PIC X(1).
+121012         10  WS-TAB-CODE-2-4         PIC X(3).
+121012     05  WS-SCREEN-CODE.
+121012         10  WS-SCR-CODE-1-3         PIC X(3).
+121012         10  WS-SCR-CODE-4           PIC X(1).
+
+           05  WS-ERROR-MESSAGE-AREA.                                   
+               10  ER-0000                 PIC 9(4)   VALUE 0000.
+               10  ER-0004                 PIC 9(4)   VALUE 0004.
+               10  ER-0006                 PIC 9(4)   VALUE 0006.
+               10  ER-0008                 PIC 9(4)   VALUE 0008.
+               10  ER-0023                 PIC 9(4)   VALUE 0023.
+               10  ER-0029                 PIC 9(4)   VALUE 0029.
+112113         10  ER-0033                 PIC 9(4)   VALUE 0033.
+               10  ER-0070                 PIC 9(4)   VALUE 0070.
+               10  ER-0150                 PIC 9(4)   VALUE 0150.
+               10  ER-0491                 PIC 9(4)   VALUE 0491.
+               10  ER-1079                 PIC 9(4)   VALUE 1079.
+               10  ER-1257                 PIC 9(4)   VALUE 1257.
+               10  ER-1258                 PIC 9(4)   VALUE 1258.
+112113         10  ER-1698                 PIC 9(4)   VALUE 1698.
+112113         10  ER-1699                 PIC 9(4)   VALUE 1699.
+               10  ER-2261                 PIC 9(4)   VALUE 2261.
+               10  ER-3800                 PIC 9(4)   VALUE 3800.
+               10  ER-3801                 PIC 9(4)   VALUE 3801.
+               10  ER-3802                 PIC 9(4)   VALUE 3802.
+               10  ER-3803                 PIC 9(4)   VALUE 3803.
+               10  ER-3804                 PIC 9(4)   VALUE 3804.
+               10  ER-3805                 PIC 9(4)   VALUE 3805.
+               10  ER-3806                 PIC 9(4)   VALUE 3806.
+               10  ER-3807                 PIC 9(4)   VALUE 3807.
+               10  ER-3840                 PIC 9(4)   VALUE 3840.
+               10  ER-3841                 PIC 9(4)   VALUE 3841.
+               10  ER-3842                 PIC 9(4)   VALUE 3842.
+               10  ER-7220                 PIC 9(4)   VALUE 7220.
+               10  ER-7698                 PIC 9(4)   VALUE 7698.
+               10  ER-9999                 PIC 9(4)   VALUE 9999.
+
+           COPY ELCINTF.                                                
+           12  FILLER REDEFINES PI-PROGRAM-WORK-AREA.                   
+               16  PI-SELECTED-EOB-CODES.
+                   20  PI-SELECTED-CODES OCCURS 12.
+                       24  PI-EOB-CODE     PIC XXXX.
+                       24  FILLER          PIC X.
+
+               16  PI-1ST-TIME-SW          PIC S9     COMP-3.           
+               16  PI-MODE                 PIC X.
+                   88  ADD-FUNCTION         VALUE 'A'.
+               16  PI-DN-RCODE             PIC XXXX.
+               16  PI-DN-TOP-KEY           PIC X(15).
+               16  PI-DN-BOT-KEY           PIC X(15).
+               16  PI-DN-KEYS OCCURS 17.
+                   20  PI-DN-KEY           PIC X(15).
+               16  PI-LINE-COUNT           PIC S9(3)  COMP-3.           
+               16  PI-BROWSE-SW            PIC S9     COMP-3.           
+               16  PI-SHOW-SW              PIC S9     COMP-3.           
+               16  PI-CHANGE-SW            PIC S9     COMP-3.
+               16  PI-RECORD-TYPE          PIC X.
+                                                                        
+112113         16  pi-FILLER               PIC X(244).
+112113         16  PI-TOTAL-LINES          PIC S9(3).
+112113         16  PI-CURRENT-LINE         PIC S9(3)   COMP-3.
+112113         16  PI-TOP-LINE-NUM         PIC S9(3)   COMP-3.
+112113         16  PI-BOT-LINE-NUM         PIC S9(3)   COMP-3.
+112113         16  PI-TEMP-STOR-ITEMS      PIC S9(4)   COMP.
+121012         16  PI-REASON-CODE-IND.
+121012             20 PI-REASON-CODE-FLAG  OCCURS 26 TIMES PIC X(1).
+121012         16  PI-EXPANDED-VIEW        PIC X(1).
+121012         16  FILLER                  PIC X(1).
+
+           COPY EL614S.                                                 
+
+       01  EL614AO-R REDEFINES EL614AI.
+           05  FILLER                      PIC X(37).
+           05  WS-MAP-LINE                 OCCURS 17
+121012                                     INDEXED BY M1 M2 N1.
+               10  SELL                    PIC S9(4)  COMP.
+               10  SELA                    PIC X.
+               10  SELI                    PIC X.
+               10  RCODEL                  PIC S9(4)  COMP.             
+               10  RCODEA                  PIC X.                       
+               10  RCODEO                  PIC XXXX.
+               10  RCODEI                  REDEFINES                    
+                   RCODEO                  PIC XXXX.
+               10  DESCL                   PIC S9(4)   COMP.            
+               10  DESCA                   PIC X.                       
+               10  DESCO                   PIC X(60).
+               10  DESCI                   REDEFINES                    
+                   DESCO                   PIC X(60).
+121012     05  FILLER                      PIC X(137).
+                                                                        
+           COPY ELCJPFX.                                                
+                                           PIC X(750).                  
+
+                                       COPY ELCEOBC.
+
+           COPY ELCEMIB.                                                
+           COPY ELCDATE.                                                
+           COPY ELCLOGOF.                                               
+           COPY ELCATTR.                                                
+           COPY ELCAID.                                                 
+       01  FILLER    REDEFINES DFHAID.                                  
+           05  FILLER                      PIC X(8).                    
+           05  PF-VALUES                   PIC X                        
+               OCCURS 24 TIMES.                                         
+112113
+
+       01  record-table pic x(93744).
+       01  rec-table redefines record-table.
+           12  ts-group occurs 28 times indexed by ts-indx pic x(3348).
+112113 01  REC-ENTRIES REDEFINES RECORD-TABLE.
+112113     12  REC-ENT OCCURS 336 TIMES INDEXED BY TB-INDX TB-INDX1.
+112113         16  REC-EOB-CODE                PIC XXXX.
+112113         16  REC-DESCRIPTION             PIC X(275).
+
+
+
+
+112113* 01  RECORD-TABLE                PIC X(26784) VALUE SPACES.
+112113* 01  REC-TABLE  REDEFINES RECORD-TABLE.
+112113*     12  TS-GROUP OCCURS 8 TIMES INDEXED BY TS-INDX PIC X(3348).
+112113* 01  REC-ENTRIES REDEFINES RECORD-TABLE.
+112113*     12  REC-ENT OCCURS 96 TIMES INDEXED BY TB-INDX TB-INDX1.
+112113*         16  REC-EOB-CODE                PIC XXXX.
+112113*         16  REC-DESCRIPTION             PIC X(275).
+112113
+112113 01  TS-WORK-AREA                        PIC X(3348).
+112113
+                                                                        
+       LINKAGE SECTION.                                                 
+       01  DFHCOMMAREA                     PIC X(1024).                 
+
+       PROCEDURE DIVISION.                                              
+                                                                        
+           MOVE EIBDATE               TO DC-JULIAN-YYDDD.               
+           MOVE '5'                   TO DC-OPTION-CODE.                
+           PERFORM 8500-DATE-CONVERSION
+                                      THRU 8500-EXIT
+           MOVE DC-GREG-DATE-1-EDIT   TO  SAVE-DATE.                    
+           MOVE DC-BIN-DATE-1         TO  SAVE-BIN-DATE.                
+                                                                        
+           MOVE DFHCOMMAREA           TO  PROGRAM-INTERFACE-BLOCK.      
+                                                                        
+           MOVE +1                    TO  EMI-NUMBER-OF-LINES           
+                                          EMI-SWITCH2.                  
+                                                                        
+           IF EIBCALEN NOT > ZERO
+              MOVE UNACCESS-MSG        TO LOGOFF-MSG
+              GO TO 8300-SEND-TEXT
+           END-IF
+                                                                        
+           EXEC CICS HANDLE CONDITION
+               PGMIDERR (9600-PGMIDERR)
+               ERROR    (9990-ERROR)
+           END-EXEC
+
+           IF PI-CALLING-PROGRAM NOT = THIS-PGM
+              IF PI-RETURN-TO-PROGRAM NOT = THIS-PGM
+                 MOVE PI-SAVED-PROGRAM-5   TO  PI-SAVED-PROGRAM-6
+                 MOVE PI-SAVED-PROGRAM-4   TO  PI-SAVED-PROGRAM-5
+                 MOVE PI-SAVED-PROGRAM-3   TO  PI-SAVED-PROGRAM-4
+                 MOVE PI-SAVED-PROGRAM-2   TO  PI-SAVED-PROGRAM-3
+                 MOVE PI-SAVED-PROGRAM-1   TO  PI-SAVED-PROGRAM-2
+                 MOVE PI-RETURN-TO-PROGRAM TO  PI-SAVED-PROGRAM-1
+                 MOVE PI-CALLING-PROGRAM   TO  PI-RETURN-TO-PROGRAM
+                 MOVE THIS-PGM             TO  PI-CALLING-PROGRAM
+              ELSE
+                 MOVE PI-RETURN-TO-PROGRAM TO  PI-CALLING-PROGRAM
+                 MOVE PI-SAVED-PROGRAM-1   TO  PI-RETURN-TO-PROGRAM
+                 MOVE PI-SAVED-PROGRAM-2   TO  PI-SAVED-PROGRAM-1
+                 MOVE PI-SAVED-PROGRAM-3   TO  PI-SAVED-PROGRAM-2
+                 MOVE PI-SAVED-PROGRAM-4   TO  PI-SAVED-PROGRAM-3
+                 MOVE PI-SAVED-PROGRAM-5   TO  PI-SAVED-PROGRAM-4
+                 MOVE PI-SAVED-PROGRAM-6   TO  PI-SAVED-PROGRAM-5
+                 MOVE SPACES               TO  PI-SAVED-PROGRAM-6
+              END-IF
+           END-IF
+
+           IF EIBTRNID NOT = WS-TRANS-ID
+              GO TO 1000-INITIAL-SCREEN
+           END-IF
+                                                                        
+           IF EIBAID = DFHCLEAR                                         
+              GO TO 9400-CLEAR
+           END-IF
+
+           IF EIBAID = DFHPA1 OR DFHPA2 OR DFHPA3
+              MOVE LOW-VALUES          TO EL614AO
+              MOVE -1                  TO APFKL
+              MOVE ER-0008             TO EMI-ERROR
+              GO TO 8200-SEND-DATAONLY
+           END-IF
+
+           EXEC CICS RECEIVE
+               INTO   (EL614AO)
+               MAPSET (WS-MAPSET-NAME)
+               MAP    (WS-MAP-NAME)
+           END-EXEC
+
+           IF APFKL > ZERO
+              IF EIBAID NOT = DFHENTER
+                 MOVE ER-0004          TO EMI-ERROR
+                 MOVE AL-UNBOF         TO APFKA
+                 MOVE -1               TO APFKL
+                 GO TO 8200-SEND-DATAONLY
+              ELSE
+                 IF APFKO NUMERIC AND
+                    (APFKO > ZERO AND LESS '25')
+                    MOVE PF-VALUES (APFKI)
+                                       TO  EIBAID
+                 ELSE
+                    MOVE ER-0029       TO  EMI-ERROR
+                    MOVE AL-UNBOF      TO  APFKA
+                    MOVE -1            TO  APFKL
+                    GO TO 8200-SEND-DATAONLY
+                 END-IF
+              END-IF
+           END-IF
+
+           IF EIBAID = DFHPF12
+              MOVE 'EL010'             TO THIS-PGM
+              GO TO 9300-XCTL
+           END-IF
+
+           IF EIBAID = DFHPF23
+              GO TO 9000-RETURN-CICS
+           END-IF
+
+           IF EIBAID = DFHPF24
+              IF CREDIT-SESSION
+                 MOVE 'EL626'          TO THIS-PGM
+                 GO TO 9300-XCTL
+              ELSE
+                 MOVE 'EL126'          TO THIS-PGM
+                 GO TO 9300-XCTL
+              END-IF
+           END-IF
+
+           IF EIBAID = DFHENTER OR DFHPF1 OR DFHPF2
+121012        OR DFHPF3 OR DFHPF4 OR DFHPF5
+              CONTINUE
+           ELSE
+              MOVE ER-0008             TO EMI-ERROR
+              MOVE -1                  TO APFKL
+              GO TO 8200-SEND-DATAONLY
+           END-IF
+
+           IF EIBAID = DFHPF1 OR DFHPF2 OR DFHPF3
+              OR DFHPF4 OR DFHENTER OR DFHPF5
+              MOVE 'S'                 TO PI-MODE
+           ELSE
+              MOVE AL-UABOF            TO APFKA
+              MOVE -1                  TO APFKL
+              MOVE ER-0023             TO EMI-ERROR
+              PERFORM 9900-ERROR-FORMAT
+           END-IF
+
+           IF EMI-FATAL-CTR > ZERO
+              GO TO 8200-SEND-DATAONLY
+           END-IF
+
+           IF PI-MODE EQUAL 'S'                                         
+              GO TO 2000-PROCESS-SHOW
+           END-IF
+
+           MOVE 'LOGIC ERROR HAS OCCURRED - PROGRAM EL614'              
+                                       TO LOGOFF-MSG
+           GO TO 8300-SEND-TEXT
+
+           .
+       1000-INITIAL-SCREEN.
+
+           MOVE PI-PROGRAM-WORK-AREA (1:60)
+                                       TO WS-PASSED-FROM-CALL-PGM
+121012     MOVE PI-REASON-CODE-IND     TO WS-REASON-CODE-PASSED
+
+           EVALUATE TRUE
+              WHEN PI-RETURN-TO-PROGRAM = 'EL156'
+                 MOVE WS-PASSED-FROM-CALL-PGM
+                                       TO PI-PROGRAM-WORK-AREA
+                 MOVE '1'              TO PI-RECORD-TYPE
+              WHEN PI-RETURN-TO-PROGRAM = 'EL6316'
+                 MOVE WS-PASSED-FROM-CALL-PGM
+                                       TO PI-PROGRAM-WORK-AREA
+                 MOVE '4'              TO PI-RECORD-TYPE
+              WHEN PI-RETURN-TO-PROGRAM = 'EL6317'
+                 MOVE WS-PASSED-FROM-CALL-PGM
+                                       TO PI-PROGRAM-WORK-AREA
+                 MOVE '2'              TO PI-RECORD-TYPE
+              WHEN PI-RETURN-TO-PROGRAM = 'EL6318'
+                 MOVE WS-PASSED-FROM-CALL-PGM
+                                       TO PI-PROGRAM-WORK-AREA
+121012           MOVE WS-REASON-CODE-PASSED TO PI-REASON-CODE-IND
+121012           MOVE 'N'              TO PI-EXPANDED-VIEW
+                 MOVE '3'              TO PI-RECORD-TYPE
+              WHEN OTHER
+                 MOVE SPACES           TO PI-PROGRAM-WORK-AREA
+                                          WS-PASSED-FROM-CALL-PGM
+                                          PI-RECORD-TYPE
+           END-EVALUATE
+
+112113     MOVE PI-COMPANY-CD          TO WS-ELEOBC-KEY
+           MOVE PI-RECORD-TYPE         TO WS-EOB-REC-TYPE
+
+           MOVE ZERO                   TO PI-1ST-TIME-SW
+                                          PI-LINE-COUNT
+                                          PI-BROWSE-SW
+                                          PI-SHOW-SW
+                                          PI-CHANGE-SW
+
+           MOVE LOW-VALUES             TO EL614AO
+
+112113     GO TO 7000-BUILD-TABLE
+
+           .
+       2000-PROCESS-SHOW.
+
+      **  THE FIRST THING TO DO IS CHECK
+      **  FOR PF4 (CLEAR SELECTED CODES) IF PRESSED
+      **  SPACE OUT THE PRIOR SELECTIONS. NEXT CHECK
+      **  THE SELECTED CODES 
+      **  AGAINST THE TABLE AND SYNC THEM UP.
+      **  IF THEY SPACE ONE OUT THEN GET RID OF IT FROM THE 
+      **  TABLE
+
+           IF EIBAID = DFHPF4
+              MOVE SPACES              TO PI-SELECTED-EOB-CODES
+112113        MOVE PI-TOP-LINE-NUM     TO PI-CURRENT-LINE
+112113        PERFORM 7450-SET-INDX THRU 7450-EXIT
+112113        GO TO 7050-FORMAT-LINES-FWD
+           END-IF
+121012
+121012     IF EIBAID = DFHPF5
+121012         IF PI-EXPANDED-VIEW = 'Y'
+121012             MOVE 'N'        TO PI-EXPANDED-VIEW
+121012         ELSE
+121012             MOVE 'Y'        TO PI-EXPANDED-VIEW
+121012         END-IF
+112113         MOVE PI-TOP-LINE-NUM TO PI-CURRENT-LINE
+112113         PERFORM 7450-SET-INDX THRU 7450-EXIT
+112113         GO TO 7050-FORMAT-LINES-FWD
+121012     END-IF
+
+           IF PI-RETURN-TO-PROGRAM = 'EL156' OR 'EL6317' OR 'EL6318'
+              OR 'EL6316'
+              PERFORM VARYING M1 FROM +1 BY +1 UNTIL
+                 M1 > +17
+                 IF SELL (M1) > +0
+                    IF SELI (M1) = SPACES
+                       PERFORM VARYING E1 FROM +1 BY +1 UNTIL
+                          E1 > +12
+                          IF PI-EOB-CODE (E1) = RCODEI (M1)
+                             MOVE SPACES TO PI-EOB-CODE (E1)
+                          END-IF
+                       END-PERFORM
+                    ELSE
+                       MOVE ' '       TO WS-DUP-EOB-SW
+                       PERFORM VARYING E1 FROM +1 BY +1 UNTIL
+                          E1 > +12
+011811                    IF RCODEI (M1) = PI-EOB-CODE (E1)
+                             SET FOUND-DUP-EOB TO TRUE
+                          END-IF
+                       END-PERFORM
+                       IF NOT FOUND-DUP-EOB
+                          PERFORM VARYING E1 FROM +1 BY +1 UNTIL
+                             (PI-EOB-CODE (E1) = SPACES)
+                             OR (E1 > +12)
+                          END-PERFORM
+                          IF E1 < +13
+                             MOVE RCODEI (M1) TO PI-EOB-CODE (E1)
+                          END-IF
+                       END-IF
+                    END-IF
+                 END-IF
+              END-PERFORM
+           END-IF
+
+           EVALUATE TRUE
+              WHEN EIBAID = DFHPF2
+112113           MOVE PI-TOP-LINE-NUM TO PI-BOT-LINE-NUM
+112113                                   PI-CURRENT-LINE
+112113           PERFORM 7450-SET-INDX THRU 7450-EXIT
+112113           GO TO 7150-FORMAT-LINES-BWD
+              WHEN EIBAID = DFHPF1
+112113           MOVE PI-BOT-LINE-NUM TO PI-TOP-LINE-NUM
+112113                                   PI-CURRENT-LINE
+112113           PERFORM 7450-SET-INDX THRU 7450-EXIT
+112113           GO TO 7050-FORMAT-LINES-FWD
+              WHEN EIBAID = DFHPF3
+                 PERFORM 6100-FORMAT-EOB-CODES
+                                       THRU 6100-EXIT
+                 GO TO 9400-CLEAR
+              
+              WHEN OTHER
+      *          MOVE PI-COMPANY-CD    TO WS-ELEOBC-KEY
+      *          GO TO 7000-BROWSE-FWD
+                 MOVE -1 TO SELL (1)
+                 GO TO 8200-SEND-DATAONLY
+           END-EVALUATE
+
+           .
+       6100-FORMAT-EOB-CODES.
+
+      **  THIS ROUTINE JUST ELIMINATES ANY EOB CODES THAT
+      **  WERE "UN SELECTED"
+
+           MOVE SPACES                 TO WS-SELECTED-EOB-CODES
+           MOVE +1                     TO E1 S1
+           PERFORM UNTIL E1 > +12
+              IF PI-EOB-CODE (E1) NOT = SPACES
+                 MOVE PI-EOB-CODE (E1) TO WS-SEL-EOB-CODE (S1)
+                 ADD +1                TO S1
+              END-IF
+              ADD +1                   TO E1
+           END-PERFORM
+           MOVE WS-SELECTED-EOB-CODES  TO PI-SELECTED-EOB-CODES
+
+           .
+       6100-EXIT.
+           EXIT.
+           
+112113
+112113 7000-BUILD-TABLE.
+112113
+112113     SET TB-INDX TO 1.
+112113     MOVE ZEROS                  TO  PI-TOTAL-LINES
+112113                                     PI-CURRENT-LINE
+112113                                     PI-TEMP-STOR-ITEMS.
+112113     MOVE ZERO                   TO PI-LINE-COUNT
+112113     MOVE +1                     TO PI-BROWSE-SW
+112113     MOVE LOW-VALUES             TO EL614AO
+112113
+112113****IF TEMP STORAGE EXISTS, DELETE IT.
+112113     PERFORM 7500-READ-TS THRU 7599-EXIT
+112113
+112113     IF PI-TEMP-STOR-ITEMS NOT = ZERO
+112113        PERFORM 7250-DELETE-TEMP-STOR THRU 7299-EXIT
+112113     END-IF.
+112113
+112113     EXEC CICS STARTBR
+112113         DATASET   ('ELEOBC')
+112113         RIDFLD    (WS-ELEOBC-KEY)
+112113         GTEQ
+112113         RESP      (WS-RESPONSE)
+112113     END-EXEC.
+112113
+112113     EVALUATE TRUE
+112113        WHEN RESP-ENDFILE
+112113           GO TO 7030-ENDBR
+112113        WHEN RESP-NORMAL
+112113           CONTINUE
+112113        WHEN RESP-NOTFND
+112113           GO TO 7030-ENDBR
+112113     END-EVALUATE.
+112113
+112113***IF COMING FROM EL6318 WE WANT TO LOAD THE HIGHLIGHTED REASON CODES FIRST
+112113***FOLLOWED BY THE NON HIGHLIGHTED. FOR ALL OTHER SCREENS WE JUST LOAD ALL
+112113***REASON CODES IN ORDER.
+112113     IF PI-RETURN-TO-PROGRAM NOT EQUAL 'EL6318'
+112113         GO TO 7020-LOOP
+112113     END-IF.
+112113
+112113 7001-HIGHLIGHT-LOOP.
+112113     EXEC CICS READNEXT
+112113         INTO    (EOB-CODES)
+112113         DATASET ('ELEOBC')
+112113         RIDFLD  (WS-ELEOBC-KEY)
+112113         RESP    (WS-RESPONSE)
+112113     END-EXEC
+112113
+112113     EVALUATE TRUE
+112113        WHEN RESP-ENDFILE
+112113           GO TO 7005-ENDBR
+112113        WHEN (PI-COMPANY-CD NOT = WS-COMPANY-CD)
+112113           OR ((PI-RECORD-TYPE NOT = EO-RECORD-TYPE)
+112113               AND (PI-RECORD-TYPE NOT = SPACES))
+112113           GO TO 7005-ENDBR
+112113        WHEN RESP-NORMAL
+112113           CONTINUE
+112113        WHEN RESP-NOTFND
+112113           GO TO 7005-ENDBR
+112113        WHEN EO-COMPANY-CD NOT = PI-COMPANY-CD
+112113           GO TO 7005-ENDBR
+112113     END-EVALUATE
+112113
+112113     PERFORM VARYING S2 FROM +1 BY +1 UNTIL
+112113        S2 > +26
+112113           IF EO-EOB-CODE (1:1) = PI-REASON-CODE-FLAG (S2)
+112113              MOVE EO-EOB-CODE TO REC-EOB-CODE (TB-INDX)
+112113              MOVE EO-DESCRIPTION TO REC-DESCRIPTION (TB-INDX)
+112113              SET TB-INDX UP BY 1
+112113           END-IF
+112113     END-PERFORM
+112113
+112113     GO TO 7001-HIGHLIGHT-LOOP.
+112113
+112113 7005-ENDBR.
+112113     EXEC CICS ENDBR
+112113         DATASET ('ELEOBC')
+112113     END-EXEC
+112113
+112113     MOVE LOW-VALUES             TO WS-ELEOBC-KEY
+112113     MOVE PI-COMPANY-CD          TO WS-ELEOBC-KEY
+112113     MOVE PI-RECORD-TYPE         TO WS-EOB-REC-TYPE
+112113     EXEC CICS STARTBR
+112113         DATASET   ('ELEOBC')
+112113         RIDFLD    (WS-ELEOBC-KEY)
+112113         GTEQ
+112113         RESP      (WS-RESPONSE)
+112113     END-EXEC.
+112113
+112113     EVALUATE TRUE
+112113        WHEN RESP-ENDFILE
+112113           GO TO 7030-ENDBR
+112113        WHEN RESP-NORMAL
+112113           CONTINUE
+112113        WHEN RESP-NOTFND
+112113           GO TO 7030-ENDBR
+112113     END-EVALUATE.
+112113
+112113 7010-NON-HIGHLIGHT-LOOP.
+112113     EXEC CICS READNEXT
+112113         INTO    (EOB-CODES)
+112113         DATASET ('ELEOBC')
+112113         RIDFLD  (WS-ELEOBC-KEY)
+112113         RESP    (WS-RESPONSE)
+112113     END-EXEC
+112113
+112113     EVALUATE TRUE
+112113        WHEN RESP-ENDFILE
+112113           GO TO 7030-ENDBR
+112113        WHEN (PI-COMPANY-CD NOT = WS-COMPANY-CD)
+112113           OR ((PI-RECORD-TYPE NOT = EO-RECORD-TYPE)
+112113               AND (PI-RECORD-TYPE NOT = SPACES))
+112113           GO TO 7030-ENDBR
+112113        WHEN RESP-NORMAL
+112113           CONTINUE
+112113        WHEN RESP-NOTFND
+112113           GO TO 7030-ENDBR
+112113        WHEN EO-COMPANY-CD NOT = PI-COMPANY-CD
+112113           GO TO 7030-ENDBR
+112113     END-EVALUATE
+112113
+112113     MOVE 'N' TO WS-CODE-LOADED
+112113     PERFORM VARYING S2 FROM +1 BY +1 UNTIL
+112113        S2 > +26
+112113           IF EO-EOB-CODE (1:1) = PI-REASON-CODE-FLAG (S2)
+112113               SET CODEALREADYLOADED TO TRUE
+112113           END-IF
+112113     END-PERFORM
+112113
+112113     IF NOT CODEALREADYLOADED
+112113        MOVE EO-EOB-CODE TO REC-EOB-CODE (TB-INDX)
+112113        MOVE EO-DESCRIPTION TO REC-DESCRIPTION (TB-INDX)
+112113        SET TB-INDX UP BY 1
+112113     END-IF
+112113
+112113     GO TO 7010-NON-HIGHLIGHT-LOOP.
+112113
+112113 7020-LOOP.
+112113     EXEC CICS READNEXT
+112113         INTO    (EOB-CODES)
+112113         DATASET ('ELEOBC')
+112113         RIDFLD  (WS-ELEOBC-KEY)
+112113         RESP    (WS-RESPONSE)
+112113     END-EXEC
+112113
+112113     EVALUATE TRUE
+112113        WHEN RESP-ENDFILE
+112113           GO TO 7030-ENDBR
+112113        WHEN (PI-COMPANY-CD NOT = WS-COMPANY-CD)
+112113           OR ((PI-RECORD-TYPE NOT = EO-RECORD-TYPE)
+112113               AND (PI-RECORD-TYPE NOT = SPACES))
+112113           GO TO 7030-ENDBR
+112113        WHEN RESP-NORMAL
+112113           CONTINUE
+112113        WHEN RESP-NOTFND
+112113           GO TO 7030-ENDBR
+112113        WHEN EO-COMPANY-CD NOT = PI-COMPANY-CD
+112113           GO TO 7030-ENDBR
+112113     END-EVALUATE
+112113
+112113     MOVE EO-EOB-CODE TO REC-EOB-CODE (TB-INDX)
+112113     MOVE EO-DESCRIPTION TO REC-DESCRIPTION (TB-INDX)
+112113     SET TB-INDX UP BY 1
+112113     GO TO 7020-LOOP.
+112113
+112113 7030-ENDBR.
+
+112113     IF TB-INDX = 1
+112113         MOVE ER-0006            TO EMI-ERROR
+112113         MOVE -1                 TO APFKL
+112113         MOVE AL-UABOF           TO APFKA
+112113         PERFORM 9900-ERROR-FORMAT THRU 9900-EXIT
+112113         MOVE ZEROS              TO PI-TOTAL-LINES
+112113         GO TO 8100-SEND-INITIAL-MAP
+112113     END-IF.
+112113
+112113     IF PI-BROWSE-SW = +1
+112113        EXEC CICS ENDBR
+112113           DATASET ('ELEOBC')
+112113        END-EXEC
+112113        MOVE +0                  TO PI-BROWSE-SW
+112113     END-IF
+112113
+112113     SET TB-INDX DOWN BY 1.
+112113     SET PI-TOTAL-LINES TO TB-INDX.
+112113     MOVE 1                      TO PI-CURRENT-LINE.
+112113     MOVE 1                      TO PI-TOP-LINE-NUM.
+112113     SET TB-INDX                 TO PI-CURRENT-LINE.
+112113
+112113 7050-FORMAT-LINES-FWD.
+112113     IF PI-CURRENT-LINE >= PI-TOTAL-LINES
+112113        MOVE ER-1699             TO EMI-ERROR
+112113        PERFORM 9900-ERROR-FORMAT THRU 9900-EXIT
+112113        MOVE PI-TOP-LINE-NUM TO PI-CURRENT-LINE
+112113        PERFORM 7450-SET-INDX THRU 7450-EXIT
+112113     END-IF.
+112113
+112113     MOVE LOW-VALUES             TO EL614AI.
+112113     PERFORM 7100-FORMAT-SCREEN-FWD THRU 7100-EXIT
+112113             VARYING M1 FROM 1
+112113             BY 1 UNTIL M1 > NUM-LINES-PER-SCREEN.
+112113     PERFORM 7200-PUT-TEMP-STOR THRU 7249-EXIT.
+112113     GO TO 8100-SEND-INITIAL-MAP.
+112113
+112113 7100-FORMAT-SCREEN-FWD.
+112113
+112113     IF TB-INDX > PI-TOTAL-LINES
+112113         GO TO 7100-EXIT
+112113     END-IF.
+112113
+112113     IF PI-RETURN-TO-PROGRAM = 'EL6318'
+112113         MOVE REC-EOB-CODE (TB-INDX) TO WS-TABLE-CODE
+112113         MOVE WS-TAB-CODE-1      TO WS-SCR-CODE-4
+112113         MOVE WS-TAB-CODE-2-4    TO WS-SCR-CODE-1-3
+112113         MOVE WS-SCREEN-CODE     TO RCODEO (M1)
+112113     ELSE
+112113         MOVE REC-EOB-CODE (TB-INDX) TO RCODEO (M1)
+112113     END-IF
+112113     MOVE REC-DESCRIPTION (TB-INDX)  TO DESCO (M1)
+112113
+112113     IF PI-RETURN-TO-PROGRAM = 'EL6318'
+112113        PERFORM VARYING S2 FROM +1 BY +1 UNTIL
+112113          S2 > +26
+112113            IF RCODEO (M1)(4:1) = PI-REASON-CODE-FLAG (S2)
+112113               MOVE AL-SABON TO RCODEA (M1)
+112113               MOVE AL-SABOF TO DESCA (M1)
+112113            END-IF
+112113        END-PERFORM
+112113     END-IF
+112113
+112113     IF PI-RETURN-TO-PROGRAM = 'EL156' OR 'EL6317'
+112113        OR 'EL6316'
+112113        PERFORM VARYING E1 FROM +1 BY +1 UNTIL
+112113           E1 > +12
+112113           IF REC-EOB-CODE (TB-INDX) = PI-EOB-CODE (E1)
+112113              MOVE 'S'           TO SELI (M1)
+112113              MOVE +1            TO SELL (M1)
+112113           END-IF
+112113        END-PERFORM
+112113     END-IF
+112113
+112113     IF PI-RETURN-TO-PROGRAM = 'EL6318'
+112113        PERFORM VARYING E1 FROM +1 BY +1 UNTIL
+112113           E1 > +12
+112113           MOVE PI-EOB-CODE (E1) TO WS-SCREEN-CODE
+112113           MOVE WS-SCR-CODE-1-3  TO WS-TAB-CODE-2-4
+112113           MOVE WS-SCR-CODE-4    TO WS-TAB-CODE-1
+112113           IF REC-EOB-CODE (TB-INDX) = WS-TABLE-CODE
+112113              MOVE 'S'           TO SELI (M1)
+112113              MOVE +1            TO SELL (M1)
+112113           END-IF
+112113        END-PERFORM
+112113     END-IF
+112113
+112113     IF PI-EXPANDED-VIEW = 'Y' 
+112113         IF REC-DESCRIPTION (TB-INDX) (61:60) > SPACES 
+112113           AND M1 < +17
+112113             SET N1 TO M1
+112113             SET M1 UP BY +1
+112113             MOVE REC-DESCRIPTION (TB-INDX)(61:60) TO DESCO (M1)
+112113             MOVE DESCA (N1)    TO DESCA (M1)
+112113             MOVE AL-SADOF      TO SELA (M1)
+112113         END-IF
+112113         IF REC-DESCRIPTION (TB-INDX) (121:60) > SPACES 
+112113           AND M1 < +17
+112113             SET N1 TO M1
+112113             SET M1 UP BY +1
+112113             MOVE REC-DESCRIPTION (TB-INDX)(121:60) TO DESCO (M1)
+112113             MOVE DESCA (N1)    TO DESCA (M1)
+112113             MOVE AL-SADOF      TO SELA (M1)
+112113         END-IF
+112113         IF REC-DESCRIPTION (TB-INDX) (181:60) > SPACES
+112113           AND M1 < +17
+112113             SET N1 TO M1
+112113             SET M1 UP BY +1
+112113             MOVE REC-DESCRIPTION (TB-INDX)(181:60) TO DESCO (M1)
+112113             MOVE DESCA (N1)    TO DESCA (M1)
+112113             MOVE AL-SADOF      TO SELA (M1)
+112113         END-IF
+112113         IF REC-DESCRIPTION (TB-INDX) (241:35) > SPACES
+112113           AND M1 < +17
+112113             SET N1 TO M1
+112113             SET M1 UP BY +1
+112113             MOVE REC-DESCRIPTION (TB-INDX)(241:35) TO DESCO (M1)
+112113             MOVE DESCA (N1)    TO DESCA (M1)
+112113             MOVE AL-SADOF      TO SELA (M1)
+112113         END-IF
+112113     END-IF
+112113
+112113     SET PI-BOT-LINE-NUM TO TB-INDX
+112113     SET TB-INDX UP BY 1.
+112113
+112113 7100-EXIT.
+112113      EXIT.
+112113
+112113
+112113 7150-FORMAT-LINES-BWD.
+112113     IF PI-CURRENT-LINE <= 1
+112113        MOVE ER-1698             TO EMI-ERROR
+112113        PERFORM 9900-ERROR-FORMAT THRU 9900-EXIT
+112113        MOVE PI-BOT-LINE-NUM TO PI-CURRENT-LINE
+112113        PERFORM 7450-SET-INDX THRU 7450-EXIT
+112113     END-IF.
+112113
+112113     MOVE LOW-VALUES             TO EL614AI.
+112113     MOVE 'N' TO WS-BUILD-FORWARD.
+112113     PERFORM 7150-FORMAT-SCREEN-BWD THRU 7150-EXIT
+112113             VARYING M1 FROM 17
+112113             BY -1 UNTIL M1 < 1 OR NEEDTOBUILDFORWARD.
+112113     IF NEEDTOBUILDFORWARD
+112113        PERFORM 7450-SET-INDX THRU 7450-EXIT
+112113        GO TO 7050-FORMAT-LINES-FWD
+112113     END-IF
+112113     PERFORM 7200-PUT-TEMP-STOR THRU 7249-EXIT.
+112113     GO TO 8100-SEND-INITIAL-MAP.
+112113
+112113 7150-FORMAT-SCREEN-BWD.
+112113
+112113     IF TB-INDX < 1
+112113         GO TO 7150-END
+112113     END-IF.
+112113
+112113     IF PI-EXPANDED-VIEW = 'Y'
+112113         EVALUATE TRUE
+112113           WHEN REC-DESCRIPTION (TB-INDX)(241:35) > SPACES
+112113             IF M1 < +5
+112113                 GO TO 7150-END
+112113             ELSE
+112113                 SET M1 DOWN BY +4
+112113             END-IF
+112113           WHEN REC-DESCRIPTION (TB-INDX)(181:60) > SPACES
+112113             IF M1 < +4
+112113                 GO TO 7150-END
+112113             ELSE
+112113                 SET M1 DOWN BY +3
+112113             END-IF
+112113           WHEN REC-DESCRIPTION (TB-INDX)(121:60) > SPACES
+112113             IF M1 < +3
+112113                 GO TO 7150-END
+112113             ELSE
+112113                 SET M1 DOWN BY +2
+112113             END-IF
+112113           WHEN REC-DESCRIPTION (TB-INDX)(61:60) > SPACES
+112113             IF M1 < +2
+112113                 GO TO 7150-END
+112113             ELSE
+112113                 SET M1 DOWN BY +1
+112113             END-IF
+112113         END-EVALUATE
+112113     END-IF
+112113
+112113     IF PI-RETURN-TO-PROGRAM = 'EL6318'
+112113         MOVE REC-EOB-CODE (TB-INDX) TO WS-TABLE-CODE
+112113         MOVE WS-TAB-CODE-1      TO WS-SCR-CODE-4
+112113         MOVE WS-TAB-CODE-2-4    TO WS-SCR-CODE-1-3
+112113         MOVE WS-SCREEN-CODE     TO RCODEO (M1)
+112113     ELSE
+112113         MOVE REC-EOB-CODE (TB-INDX) TO RCODEO (M1)
+112113     END-IF
+112113     MOVE REC-DESCRIPTION (TB-INDX)  TO DESCO (M1)
+112113
+112113     IF PI-RETURN-TO-PROGRAM = 'EL6318'
+112113        PERFORM VARYING S2 FROM +1 BY +1 UNTIL
+112113          S2 > +26
+112113            IF RCODEO (M1)(4:1) = PI-REASON-CODE-FLAG (S2)
+112113               MOVE AL-SABON TO RCODEA (M1)
+112113               MOVE AL-SABOF TO DESCA (M1)
+112113            END-IF
+112113        END-PERFORM
+112113     END-IF
+112113
+112113     IF PI-RETURN-TO-PROGRAM = 'EL156' OR 'EL6317'
+112113        OR 'EL6316'
+112113        PERFORM VARYING E1 FROM +1 BY +1 UNTIL
+112113           E1 > +12
+112113           IF REC-EOB-CODE (TB-INDX) = PI-EOB-CODE (E1)
+112113              MOVE 'S'           TO SELI (M1)
+112113              MOVE +1            TO SELL (M1)
+112113           END-IF
+112113        END-PERFORM
+112113     END-IF
+112113
+112113     IF PI-RETURN-TO-PROGRAM = 'EL6318'
+112113        PERFORM VARYING E1 FROM +1 BY +1 UNTIL
+112113           E1 > +12
+112113           MOVE PI-EOB-CODE (E1) TO WS-SCREEN-CODE
+112113           MOVE WS-SCR-CODE-1-3  TO WS-TAB-CODE-2-4
+112113           MOVE WS-SCR-CODE-4    TO WS-TAB-CODE-1
+112113           IF REC-EOB-CODE (TB-INDX) = WS-TABLE-CODE
+112113              MOVE 'S'           TO SELI (M1)
+112113              MOVE +1            TO SELL (M1)
+112113           END-IF
+112113        END-PERFORM
+112113     END-IF
+112113
+112113     SET M2 TO M1
+112113     IF PI-EXPANDED-VIEW = 'Y'
+112113         IF REC-DESCRIPTION (TB-INDX) (61:60) > SPACES
+112113             SET N1 TO M1
+112113             SET M1 UP BY +1
+112113             MOVE REC-DESCRIPTION (TB-INDX)(61:60) TO DESCO(M1)
+112113             MOVE DESCA (N1)    TO DESCA (M1)
+112113             MOVE AL-SADOF      TO SELA (M1)
+112113         END-IF
+112113         IF REC-DESCRIPTION (TB-INDX) (121:60) > SPACES
+112113             SET N1 TO M1
+112113             SET M1 UP BY +1
+112113             MOVE REC-DESCRIPTION (TB-INDX)(121:60) TO DESCO(M1)
+112113             MOVE DESCA (N1)    TO DESCA (M1)
+112113             MOVE AL-SADOF      TO SELA (M1)
+112113         END-IF
+112113         IF REC-DESCRIPTION (TB-INDX) (181:60) > SPACES
+112113             SET N1 TO M1
+112113             SET M1 UP BY +1
+112113             MOVE REC-DESCRIPTION (TB-INDX)(181:60) TO DESCO(M1)
+112113             MOVE DESCA (N1)    TO DESCA (M1)
+112113             MOVE AL-SADOF      TO SELA (M1)
+112113         END-IF
+112113         IF REC-DESCRIPTION (TB-INDX) (241:35) > SPACES
+112113             SET N1 TO M1
+112113             SET M1 UP BY +1
+112113             MOVE REC-DESCRIPTION (TB-INDX)(241:35) TO DESCO(M1)
+112113             MOVE DESCA (N1)    TO DESCA (M1)
+112113             MOVE AL-SADOF      TO SELA (M1)
+112113         END-IF
+112113     END-IF
+112113     SET M1 TO M2
+112113
+112113     SET PI-TOP-LINE-NUM TO TB-INDX
+112113     SET TB-INDX DOWN BY 1.
+112113     GO TO 7150-EXIT.
+112113
+112113 7150-END.
+112113
+112113     IF M1 >= +1
+112113        MOVE 'Y' TO WS-BUILD-FORWARD
+112113        IF TB-INDX < +1
+112113           MOVE 1 TO PI-CURRENT-LINE PI-TOP-LINE-NUM
+112113        ELSE
+112113           MOVE PI-TOP-LINE-NUM TO PI-CURRENT-LINE
+112113        END-IF
+112113     END-IF.
+112113
+112113 7150-EXIT.
+112113      EXIT.
+112113
+112113 7200-PUT-TEMP-STOR.
+112113     PERFORM 7250-DELETE-TEMP-STOR THRU 7299-EXIT.
+112113     SET TS-INDX TO 1.
+112113     MOVE 0                      TO PI-TEMP-STOR-ITEMS.
+112113     PERFORM 7300-WRITE-TS THRU 7399-EXIT
+112113             VARYING TS-GROUP-WORK FROM 0 BY TS-NUM-REC-IN-GROUP
+112113             UNTIL TS-GROUP-WORK NOT LESS THAN PI-TOTAL-LINES.
+112113 7249-EXIT.
+112113      EXIT.
+112113 7250-DELETE-TEMP-STOR.
+112113     EXEC CICS HANDLE CONDITION
+112113          QIDERR(7299-EXIT)
+112113     END-EXEC.
+112113     EXEC CICS DELETEQ TS
+112113          QUEUE(QID)
+112113     END-EXEC.
+112113 7299-EXIT.
+112113     EXIT.
+112113
+112113 7300-WRITE-TS.
+112113     MOVE TS-GROUP (TS-INDX)     TO TS-WORK-AREA.
+112113     SET TS-INDX UP BY 1.
+112113     ADD 1 TO PI-TEMP-STOR-ITEMS.
+112113     EXEC CICS WRITEQ TS
+112113          FROM(TS-WORK-AREA)
+112113          QUEUE(QID)
+112113          LENGTH(TS-LENGTH)
+112113          ITEM(PI-TEMP-STOR-ITEMS)
+112113     END-EXEC.
+112113 7399-EXIT.
+112113     EXIT.
+112113
+112113 7450-SET-INDX.
+112113     IF PI-CURRENT-LINE = 0 AND PI-TOTAL-LINES = 0
+112113        SET TB-INDX TO 1
+112113     ELSE
+112113        PERFORM 7500-READ-TS THRU 7599-EXIT
+112113        IF PI-CURRENT-LINE = 0
+112113           SET TB-INDX TO 1
+112113        ELSE
+112113           SET TB-INDX TO PI-CURRENT-LINE
+112113        END-IF
+112113     END-IF.
+112113 7450-EXIT.
+112113      EXIT.
+112113
+112113 7500-READ-TS.
+112113     EXEC CICS HANDLE CONDITION
+112113          QIDERR(7590-TS-QIDERR)
+112113          ITEMERR(7585-QID-ITEMERR)
+112113     END-EXEC.
+112113     SET TS-INDX TO 1.
+112113     MOVE 1                      TO QID-ITEM.
+112113 7501-LOOP.
+112113     EXEC CICS READQ TS
+112113          INTO(TS-WORK-AREA)
+112113          QUEUE(QID)
+112113          LENGTH(TS-LENGTH)
+112113          ITEM(QID-ITEM)
+112113     END-EXEC.
+112113     MOVE TS-WORK-AREA           TO TS-GROUP (TS-INDX).
+112113     SET TS-INDX UP BY 1.
+112113     ADD 1 TO QID-ITEM.
+112113     GO TO 7501-LOOP.
+112113
+112113 7585-QID-ITEMERR.
+112113     IF EIBTRNID NOT = WS-TRANS-ID
+112113        SUBTRACT 1 FROM QID-ITEM
+112113        MOVE QID-ITEM            TO PI-TEMP-STOR-ITEMS
+112113     END-IF.
+112113     GO TO 7599-EXIT.
+112113
+112113 7590-TS-QIDERR.
+112113     IF EIBTRNID = WS-TRANS-ID
+112113        AND EIBAID = DFHCLEAR
+112113           GO TO 9100-RETURN-TRAN
+112113     END-IF.
+112113     IF EIBTRNID = WS-TRANS-ID
+112113        MOVE ER-0033             TO EMI-ERROR
+112113        PERFORM 9900-ERROR-FORMAT THRU 9900-EXIT
+112113        GO TO 8100-SEND-INITIAL-MAP
+112113     END-IF.
+112113
+112113 7599-EXIT.
+112113      EXIT.
+112113
+
+           .
+      ***************************************************************** 
+       8100-SEND-INITIAL-MAP.
+      ***************************************************************** 
+           MOVE -1                     TO  APFKL.                     
+           MOVE ZERO                   TO  PI-BROWSE-SW.                
+                                                                        
+           MOVE SAVE-DATE              TO  ADATEO.                      
+           MOVE EIBTIME                TO  TIME-IN.                     
+           MOVE TIME-OUT               TO  ATIMEO.                      
+                                                                        
+           IF EMI-ERROR NOT = ZERO                                      
+               PERFORM 9900-ERROR-FORMAT                                
+           END-IF
+                                                                        
+           MOVE EMI-MESSAGE-AREA (1)    TO  AEMSGO
+
+           IF PI-RETURN-TO-PROGRAM NOT = 'EL156' AND 'EL6317' AND
+                 'EL6318' AND 'EL6316'
+              MOVE AL-SADOF            TO SELHA
+                                          F3KEYA
+              PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+                 S1 > +17
+                 MOVE AL-SADOF         TO SELA (S1)
+              END-PERFORM
+           END-IF
+121012
+121012     IF PI-EXPANDED-VIEW = 'Y'
+121012         MOVE 'PF5=UNEXPAND DESCRIPTIONS' TO F5KEYO
+121012     ELSE
+121012         MOVE 'PF5=EXPAND DESCRIPTIONS  ' TO F5KEYO
+121012     END-IF
+
+           EXEC CICS SEND                                               
+               FROM   (EL614AO)                                         
+               MAPSET (WS-MAPSET-NAME)                                  
+               MAP    (WS-MAP-NAME)                                     
+               CURSOR ERASE                                             
+           END-EXEC.                                                    
+                                                                        
+           GO TO 9100-RETURN-TRAN
+           .
+       8100-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+           EJECT                                                        
+      ***************************************************************** 
+       8200-SEND-DATAONLY.
+      ***************************************************************** 
+                                                                        
+           MOVE SAVE-DATE              TO  ADATEO.                      
+           MOVE EIBTIME                TO  TIME-IN.                     
+           MOVE TIME-OUT               TO  ATIMEO.                      
+                                                                        
+           IF EMI-ERROR NOT = ZERO                                      
+               PERFORM 9900-ERROR-FORMAT.                               
+                                                                        
+           MOVE EMI-MESSAGE-AREA (1)    TO  AEMSGO.                    
+                                                                        
+           IF PI-RETURN-TO-PROGRAM NOT = 'EL156' AND 'EL6317' AND
+                 'EL6318' AND 'EL6316'
+              MOVE AL-SADOF            TO SELHA
+                                          F3KEYA
+              PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+                 S1 > +17
+                 MOVE AL-SADOF         TO SELA (S1)
+              END-PERFORM
+           END-IF
+
+           EXEC CICS SEND DATAONLY                                      
+               FROM   (EL614AO)                                         
+               MAPSET (WS-MAPSET-NAME)                                  
+               MAP    (WS-MAP-NAME)                                     
+               CURSOR                                                   
+           END-EXEC.                                                    
+                                                                        
+           GO TO 9100-RETURN-TRAN
+           .
+       8200-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+           EJECT                                                        
+      ***************************************************************** 
+       8300-SEND-TEXT.
+      ***************************************************************** 
+                                                                        
+           EXEC CICS SEND TEXT                                          
+               FROM   (LOGOFF-TEXT)                                     
+               LENGTH (LOGOFF-LENGTH)                                   
+               ERASE  FREEKB                                            
+           END-EXEC.                                                    
+                                                                        
+           EXEC CICS RETURN                                             
+           END-EXEC.                                                    
+                                                                        
+       8300-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+           EJECT                                                        
+      ***************************************************************** 
+       8400-LOG-JOURNAL-RECORD.
+      ***************************************************************** 
+                                                                        
+           IF PI-JOURNAL-FILE-ID = 0                                    
+               GO TO 8400-EXIT.                                         
+                                                                        
+           MOVE PI-PROCESSOR-ID        TO  JP-USER-ID.                  
+           MOVE 'ELCNTL'               TO  JP-FILE-ID.                  
+           MOVE THIS-PGM               TO  JP-PROGRAM-ID.               
+                                                                        
+      *    EXEC CICS JOURNAL                                            
+      *        JFILEID (PI-JOURNAL-FILE-ID)                             
+      *        JTYPEID (WS-JOURNAL-TYPE-ID)                             
+      *        FROM    (JOURNAL-RECORD)                                 
+      *        LENGTH  (WS-JOURNAL-RECORD-LENGTH)                       
+      *    END-EXEC.                                                    
+                                                                        
+       8400-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+      ***************************************************************** 
+       8500-DATE-CONVERSION.
+      ***************************************************************** 
+                                                                        
+           EXEC CICS LINK                                               
+               PROGRAM  ('ELDATCV')                                     
+               COMMAREA (DATE-CONVERSION-DATA)                          
+               LENGTH   (DC-COMM-LENGTH)                                
+           END-EXEC.                                                    
+                                                                        
+       8500-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+           EJECT                                                        
+      ***************************************************************** 
+       9000-RETURN-CICS.
+      ***************************************************************** 
+                                                                        
+           MOVE 'EL005'                TO  THIS-PGM.                    
+           MOVE EIBAID                 TO  PI-ENTRY-CD-1.               
+           PERFORM 9300-XCTL.                                           
+                                                                        
+       9000-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+      ***************************************************************** 
+       9100-RETURN-TRAN.
+      ***************************************************************** 
+                                                                        
+           MOVE EMI-ERROR-NUMBER (1)   TO  PI-LAST-ERROR-NO.            
+           MOVE WS-MAP-NUMBER          TO  PI-CURRENT-SCREEN-NO.        
+                                                                        
+           EXEC CICS RETURN                                             
+               COMMAREA (PROGRAM-INTERFACE-BLOCK)                       
+               LENGTH   (PI-COMM-LENGTH)                                
+               TRANSID  (WS-TRANS-ID)                                   
+           END-EXEC.                                                    
+                                                                        
+       9100-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+      ***************************************************************** 
+       9300-XCTL.
+      ***************************************************************** 
+                                                                        
+           MOVE DFHENTER               TO  EIBAID.                      
+                                                                        
+           EXEC CICS XCTL                                               
+               PROGRAM  (THIS-PGM)                                      
+               COMMAREA (PROGRAM-INTERFACE-BLOCK)                       
+               LENGTH   (PI-COMM-LENGTH)                                
+           END-EXEC.                                                    
+                                                                        
+       9300-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+           EJECT                                                        
+      ***************************************************************** 
+       9400-CLEAR.
+      ***************************************************************** 
+                                                                        
+           MOVE PI-RETURN-TO-PROGRAM  TO  THIS-PGM.                     
+           PERFORM 9300-XCTL.                                           
+                                                                        
+       9400-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+      ***************************************************************** 
+       9600-PGMIDERR.
+      ***************************************************************** 
+                                                                        
+           EXEC CICS HANDLE CONDITION                                   
+               PGMIDERR (8300-SEND-TEXT)                                
+           END-EXEC.                                                    
+                                                                        
+           MOVE THIS-PGM               TO  PI-CALLING-PROGRAM           
+                                           LOGOFF-PGM.                  
+                                                                        
+           MOVE 'EL005'                TO  THIS-PGM.                    
+           MOVE PGMIDERR-MSG           TO  LOGOFF-FILL.                 
+           MOVE SPACES                 TO  PI-ENTRY-CD-1.               
+           PERFORM 9300-XCTL.                                           
+                                                                        
+       9600-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+      ***************************************************************** 
+       9900-ERROR-FORMAT.
+      ***************************************************************** 
+                                                                        
+           IF EMI-ERRORS-COMPLETE                                       
+               ADD +1             TO  EMI-FATAL-CTR                     
+               MOVE ZERO          TO  EMI-ERROR                         
+               GO TO 9900-EXIT.                                         
+                                                                        
+           EXEC CICS LINK                                               
+               PROGRAM  ('EL001')                                       
+               COMMAREA (ERROR-MESSAGE-INTERFACE-BLOCK)                 
+               LENGTH   (EMI-COMM-LENGTH)                               
+           END-EXEC.                                                    
+                                                                        
+           MOVE ZERO              TO  EMI-ERROR.                        
+                                                                        
+       9900-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+           EJECT                                                        
+      ***************************************************************** 
+       9990-ERROR.
+      ***************************************************************** 
+                                                                        
+           MOVE DFHEIBLK               TO EMI-LINE1.                    
+           EXEC CICS LINK                                               
+               PROGRAM   ('EL004')                                      
+               COMMAREA  (EMI-LINE1)                                    
+               LENGTH    (72)                                           
+           END-EXEC.                                                    
+                                                                        
+           PERFORM 8200-SEND-DATAONLY.                                  
+           GO TO 9100-RETURN-TRAN.                                      
+                                                                        
+       9990-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+      ***************************************************************** 
+       9995-SECURITY-VIOLATION.                                         
+      ***************************************************************** 
+                                                                        
+                  COPY ELCSCTP.                                         
+                                                                        
+       9995-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+       9999-LAST-PARAGRAPH SECTION.                                     
+           GOBACK.                                                      

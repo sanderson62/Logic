@@ -1,0 +1,541 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    DCCCRX2.
+       AUTHOR.        PABLO.
+       DATE-COMPILED.
+
+      *REMARKS.
+
+052814******************************************************************
+052814*                   C H A N G E   L O G
+052814*
+052814* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+052814*-----------------------------------------------------------------
+052814*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+052814* EFFECTIVE    NUMBER
+052814*-----------------------------------------------------------------
+052814* 052814  CR2014012300001  PEMA  DCC CREDIT UNION CHANGES
+052814******************************************************************
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT CERTS        ASSIGN TO SYS010.
+
+           SELECT EXTRACT      ASSIGN TO SYS011
+               ORGANIZATION IS LINE SEQUENTIAL.
+                                                                        
+           SELECT DISK-DATE        ASSIGN TO SYS019.
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  CERTS
+                                       COPY ECSCRIFD.
+                                       COPY ECSCRT01.
+
+       FD  EXTRACT
+           BLOCK CONTAINS 0 RECORDS
+           RECORDING MODE IS F.
+
+       01  EXTRACT-RECORD-HEAD         PIC x(1010).
+       01  EXTRACT-RECORD-OUT          PIC x(901).
+
+       FD  DISK-DATE                                                    
+                                   COPY ELCDTEFD.                       
+
+       WORKING-STORAGE SECTION.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  FILLER  PIC X(32) VALUE '     DCCCRX2 WORKING STORAGE    '.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+
+       77  WS-EOF-SW                   PIC X  VALUE SPACES.
+           88  END-OF-CERT                VALUE 'Y'.
+       77  PAGE-CTR                    PIC S9(07) VALUE +0  COMP-3.
+       77  LINE-CTR                    PIC S9(03) VALUE +99 COMP-3.
+       77  X                           PIC X      VALUE ' '.
+       77  CERT-IN-CNT                 PIC 9(11)  VALUE ZEROS.
+       77  EXTR-OUT-CNT                PIC 9(11)  VALUE ZEROS.
+       77  WS-CANC-DATE                PIC 9(8)  VALUE ZEROS.
+       77  S1                          PIC S999  VALUE +0 COMP-3.
+       77  WS-FACT                     PIC S999V9(5) VALUE +0 COMP-3.
+       77  WS-LF-REFUND                PIC S9(7)V99  VALUE +0 COMP-3.
+       77  WS-AH-REFUND                PIC S9(7)V99  VALUE +0 COMP-3.
+       77  WS-LF-OW-COMM               PIC S9(7)V99 VALUE +0 COMP-3.
+       77  WS-AH-OW-COMM               PIC S9(7)V99 VALUE +0 COMP-3.
+       77  WS-LF-DW-COMM               PIC S9(7)V99 VALUE +0 COMP-3.
+       77  WS-AH-DW-COMM               PIC S9(7)V99 VALUE +0 COMP-3.
+       01  EXTRACT-HEAD-RECORD.
+           05  FILLER                  PIC X(10) VALUE 'RECORD KEY'.
+           05  EXT-HTABA               PIC X.
+           05  FILLER                  PIC X(14) VALUE 'PREM TANS CODE'.
+           05  EXT-HTAB1               PIC X.
+           05  FILLER                  PIC X(8)  VALUE 'COV CODE'.
+           05  EXT-HTAB2               PIC X.
+           05  FILLER                  PIC X(5)  VALUE 'LOB'.
+           05  EXT-HTAB3               PIC X.
+           05  FILLER                  PIC X(6)  VALUE 'POL NO'.
+           05  EXT-HTAB4               PIC X.
+           05  FILLER                  PIC X(8)  VALUE 'REG CODE'.
+           05  EXT-HTAB5               PIC X.
+           05  FILLER                  PIC X(9)  VALUE 'COMP CODE'.
+           05  EXT-HTAB6               PIC X.
+           05  FILLER                  PIC X(7)  VALUE 'INST NO'.
+           05  EXT-HTAB7               PIC X.
+           05  FILLER                  PIC X(11) VALUE 'INST DUE DT'.
+           05  EXT-HTAB8               PIC X.
+           05  FILLER                  PIC X(12) VALUE 'PMT PLN CODE'.
+           05  EXT-HTAB9               PIC X.
+           05  FILLER                  PIC X(12) VALUE 'TRANS ACC DT'.
+           05  EXT-HTAB10              PIC X.
+           05  FILLER                  PIC X(12) VALUE 'TRANS COV DT'.
+           05  EXT-HTAB11              PIC X.
+           05  FILLER                  PIC X(7)  VALUE 'BILL DT'.
+           05  EXT-HTAB12              PIC X.
+           05  FILLER                  PIC X(8)  VALUE 'AGENT NO'.
+           05  EXT-HTAB13              PIC X.
+           05  FILLER                  PIC X(12) VALUE 'SUB AGENT NO'.
+           05  EXT-HTAB14              PIC X.
+           05  FILLER                  PIC X(10) VALUE 'POL EFF DT'.
+           05  EXT-HTAB15              PIC X.
+           05  FILLER                  PIC X(10) VALUE 'POL EXP DT'.
+           05  EXT-HTAB16              PIC X.
+           05  FILLER                  PIC X(12) VALUE 'CASH REC AMT'.
+           05  EXT-HTAB17              PIC X.
+           05  FILLER                  PIC X(13) VALUE 'CASH TRANS DT'.
+           05  EXT-HTAB18              PIC X.
+           05  FILLER                  PIC X(12) VALUE 'DIR PREM AMT'.
+           05  EXT-HTAB19              PIC X.
+           05  FILLER                  PIC X(10) VALUE 'STATE CODE'.
+           05  EXT-HTAB20              PIC X.
+           05  FILLER                  PIC X(12) VALUE 'ASS WRIT AMT'.
+           05  EXT-HTAB21              PIC X.
+           05  FILLER                  PIC X(13) VALUE 'ASS REIN COMP'.
+           05  EXT-HTAB22              PIC X.
+           05  FILLER                  PIC X(14) VALUE 'CEDED WRIT AMT'.
+           05  EXT-HTAB23              PIC X.
+           05  FILLER                 PIC X(15) VALUE 'CEDED REIN COMP'.
+           05  EXT-HTAB24              PIC X.
+           05  FILLER                  PIC X(8)  VALUE 'COMM AMT'.
+           05  EXT-HTAB25              PIC X.
+           05  FILLER                  PIC X(7)  VALUE 'UEP AMT'.
+           05  EXT-HTAB26              PIC X.
+           05  FILLER                  PIC X(10) VALUE 'GROSS PREM'.
+           05  EXT-HTAB27              PIC X.
+           05  FILLER                  PIC X(9)  VALUE 'BASE COMM'.
+           05  EXT-HTAB28              PIC X.
+           05  FILLER                  PIC X(7)  VALUE 'REFUNDS'.
+           05  EXT-HTAB29              PIC X.
+           05  FILLER                  PIC X(8)  VALUE 'NSP PREM'.
+           05  EXT-HTAB30              PIC X.
+           05  FILLER                  PIC X(3)  VALUE 'EOR'.
+       01  WS-INIT-EXTRACT             PIC X(900).
+       01  EXTRACT-RECORD.
+           05  EXT-RECORD-KEY          PIC X(38).
+           05  EXT-TABA                PIC X.
+           05  EXT-PT-CODE             PIC X.
+           05  EXT-TAB1                PIC X.
+           05  EXT-COV-CODE            PIC XX.
+           05  EXT-TAB2                PIC X.
+           05  EXT-LOB                 PIC X(4).
+           05  EXT-TAB3                PIC X.
+           05  EXT-ACCOUNT             PIC X(10).
+           05  EXT-TAB4                PIC X.
+           05  EXT-REG-CODE            PIC X.
+           05  EXT-TAB5                PIC X.
+           05  EXT-CARRIER             PIC X.
+           05  EXT-TAB6                PIC X.
+           05  EXT-INST-NO             PIC X.
+           05  EXT-TAB7                PIC X.
+           05  EXT-INST-DT             PIC X.
+           05  EXT-TAB8                PIC X.
+           05  EXT-PLAN-CODE           PIC X.
+           05  EXT-TAB9                PIC X.
+           05  EXT-TRANS-ACC-DT        PIC X(10).
+           05  EXT-TAB10               PIC X.
+           05  EXT-TRANS-EFF-DT        PIC X(10).
+           05  EXT-TAB11               PIC X.
+           05  EXT-BILL-DT             PIC X.
+           05  EXT-TAB12               PIC X.
+           05  EXT-AGENT-NO            PIC X(10).
+           05  EXT-TAB13               PIC X.
+           05  EXT-SUB-AGENT-NO        PIC X.
+           05  EXT-TAB14               PIC X.
+           05  EXT-POL-EFF-DT          PIC X(10).
+           05  EXT-TAB15               PIC X.
+           05  EXT-POL-EXP-DT          PIC X(10).
+           05  EXT-TAB16               PIC X.
+           05  EXT-CASH-REC-AMT        PIC X.
+           05  EXT-TAB17               PIC X.
+           05  EXT-CASH-TRAN-DT        PIC X.
+           05  EXT-TAB18               PIC X.
+           05  EXT-PREM-WRIT           PIC 99999999.99.
+           05  EXT-TAB19               PIC X.
+           05  EXT-CLP-ST              PIC XX.
+           05  EXT-TAB20               PIC X.
+           05  EXT-ASS-WRIT-AMT        PIC X.
+           05  EXT-TAB21               PIC X.
+           05  EXT-ASS-REIN-COMP       PIC X.
+           05  EXT-TAB22               PIC X.
+           05  EXT-CEDED-WRIT-AMT      PIC X.
+           05  EXT-TAB23               PIC X.
+           05  EXT-CEDED-REIN-COMP     PIC XXX.
+           05  EXT-TAB24               PIC X.
+           05  EXT-COMM-AMT            PIC 99999999.99.
+           05  EXT-TAB25               PIC X.
+           05  EXT-UEP-AMT             PIC 99999999.99.
+           05  EXT-TAB26               PIC X.
+           05  EXT-GROSS-PREM          PIC 99999999.99.
+           05  EXT-TAB27               PIC X.
+           05  EXT-BASE-COMM           PIC 99999999.99.
+           05  EXT-TAB28               PIC X.
+           05  EXT-REFUNDS             PIC 99999999.99.
+           05  EXT-TAB29               PIC X.
+           05  EXT-NSP-PREM            PIC 99999999.99.
+           05  EXT-TAB30               PIC X.
+           05  EXT-EOR                 PIC X.
+
+       01  WS-RECORD-KEY.
+           05  WS-RC-CARRIER           PIC X.
+           05  WS-RC-GROUP             PIC X(6).
+           05  WS-RC-STATE             PIC XX.
+           05  WS-RC-ACCOUNT           PIC X(10).
+           05  WS-RC-EFF-DT            PIC X(8).
+           05  WS-RC-CERT-NO           PIC X(11).
+       01  WS-ABEND-AREA.
+           05  WS-ABEND-FILE-STATUS    PIC X(02).
+           05  WS-ABEND-MESSAGE        PIC X(80) VALUE SPACES.
+           05  WS-RETURN-CODE          PIC S9(04)  COMP VALUE +0.
+           05  WS-ZERO                 PIC S9(01) VALUE +0 COMP-3.
+
+       01  WORK-ABEND-CODE.
+           12  WAC-1                   PIC X.
+           12  WAC-2                   PIC X.
+           12  WAC-3-4.
+               16  WAC-3               PIC X.
+               16  WAC-4               PIC X.
+
+       01  DATE-AREAS.
+           05  WS-DATE                 PIC 9(11) VALUE ZEROS.
+           05  WS-DATE-R REDEFINES WS-DATE.
+               10  FILLER              PIC 999.
+               10  WS-CCYY             PIC 9999.
+               10  WS-MM               PIC 99.
+               10  WS-DD               PIC 99.
+           05  WS-WORK-DATE            PIC 9(11).
+           05  FILLER REDEFINES WS-WORK-DATE.
+               10  FILLER              PIC XXX.
+               10  WS-WORK-CCYY        PIC X(4).
+               10  WS-WORK-MM          PIC XX.
+               10  WS-WORK-DD          PIC XX.
+
+       01  ABEND-FIELDS.
+           12  PGM-SUB                 PIC S999 COMP  VALUE +158.
+           12  FIRST-TIME-SW           PIC X  VALUE 'Y'.
+               88  FIRST-TIME                 VALUE 'Y'.
+
+                                       COPY ELCDATE.
+                                       COPY ELCDTECX.
+                                       COPY ELCDTEVR.
+
+       PROCEDURE DIVISION.
+
+                                       COPY ELCDTERX.                       
+
+           PERFORM 0010-INITIALIZE     THRU 0010-EXIT
+
+           PERFORM 0060-READ-CERT      THRU 0060-EXIT
+
+           PERFORM 0080-PROCESS-CERT   THRU 0080-EXIT UNTIL
+PEMTST           (END-OF-CERT)
+PEMTST*          OR (CERT-IN-CNT > 100000)
+
+           PERFORM 0030-CLOSE-FILES    THRU 0030-EXIT
+
+           GOBACK
+
+           .
+       0002-EXIT.
+           EXIT.
+
+       0010-INITIALIZE.
+
+           MOVE SPACES                 TO EXTRACT-RECORD
+           MOVE ';'                    TO EXT-HTAB1
+                                          EXT-HTABA
+                                          EXT-HTAB2
+                                          EXT-HTAB3
+                                          EXT-HTAB4 
+                                          EXT-HTAB5 
+                                          EXT-HTAB6
+                                          EXT-HTAB7 
+                                          EXT-HTAB8 
+                                          EXT-HTAB9 
+                                          EXT-HTAB10
+                                          EXT-HTAB11
+                                          EXT-HTAB12
+                                          EXT-HTAB13
+                                          EXT-HTAB14
+                                          EXT-HTAB15
+                                          EXT-HTAB16 
+                                          EXT-HTAB17
+                                          EXT-HTAB18
+                                          EXT-HTAB19
+                                          EXT-HTAB20
+                                          EXT-HTAB21
+                                          EXT-HTAB22
+                                          EXT-HTAB23
+                                          EXT-HTAB24
+                                          EXT-HTAB25
+                                          EXT-HTAB26
+                                          EXT-HTAB27
+                                          EXT-HTAB28
+                                          EXT-HTAB29
+                                          EXT-HTAB30
+
+           MOVE X'09'                  TO EXT-TAB1
+                                          EXT-TABA
+                                          EXT-TAB2
+                                          EXT-TAB3
+                                          EXT-TAB4 
+                                          EXT-TAB5 
+                                          EXT-TAB6
+                                          EXT-TAB7 
+                                          EXT-TAB8 
+                                          EXT-TAB9 
+                                          EXT-TAB10
+                                          EXT-TAB11
+                                          EXT-TAB12
+                                          EXT-TAB13
+                                          EXT-TAB14
+                                          EXT-TAB15
+                                          EXT-TAB16 
+                                          EXT-TAB17
+                                          EXT-TAB18
+                                          EXT-TAB19
+                                          EXT-TAB20
+                                          EXT-TAB21
+                                          EXT-TAB22
+                                          EXT-TAB23
+                                          EXT-TAB24
+                                          EXT-TAB25
+                                          EXT-TAB26
+                                          EXT-TAB27
+                                          EXT-TAB28
+                                          EXT-TAB29
+                                          EXT-TAB30
+
+           MOVE 'E'                    TO EXT-EOR
+           MOVE EXTRACT-RECORD         TO WS-INIT-EXTRACT
+
+           PERFORM 0020-OPEN-FILES     THRU 0020-EXIT
+           WRITE EXTRACT-RECORD-HEAD   FROM EXTRACT-HEAD-RECORD
+
+           .
+       0010-EXIT.
+           EXIT.
+
+       0020-OPEN-FILES.
+
+           OPEN INPUT CERTS
+               OUTPUT EXTRACT
+
+           .
+       0020-EXIT.
+           EXIT.
+
+       0030-CLOSE-FILES.
+
+           DISPLAY ' CERT IN RECORDS  ' CERT-IN-CNT
+           DISPLAY ' EXTR OUT RECORDS ' EXTR-OUT-CNT
+           CLOSE CERTS EXTRACT
+
+           .
+       0030-EXIT.
+           EXIT.
+
+       0060-READ-CERT.
+
+           READ CERTS AT END
+               SET END-OF-CERT TO TRUE
+           END-READ
+
+           IF NOT END-OF-CERT
+              ADD 1 TO CERT-IN-CNT
+           END-IF
+
+           .
+       0060-EXIT.
+           EXIT.
+
+       0080-PROCESS-CERT.
+
+           IF CR-ENTRY-STATUS = '1' OR '4'
+              PERFORM 0090-BUILD-EXTRACT
+                                       THRU 0090-EXIT
+           END-IF
+
+           PERFORM 0060-READ-CERT      THRU 0060-EXIT
+
+           .
+       0080-EXIT.
+           EXIT.
+
+       0090-BUILD-EXTRACT.
+
+           MOVE WS-INIT-EXTRACT        TO EXTRACT-RECORD
+
+           MOVE CR-CARRIER             TO WS-RC-CARRIER
+           MOVE CR-GROUPING            TO WS-RC-GROUP
+           MOVE CR-STATE               TO WS-RC-STATE
+           MOVE CR-ACCOUNT             TO WS-RC-ACCOUNT
+           MOVE CR-DT                  TO WS-DATE
+           MOVE WS-DATE-R (4:8)        TO WS-RC-EFF-DT
+           MOVE CR-CERT-NO             TO WS-RC-CERT-NO
+           MOVE WS-RECORD-KEY          TO EXT-RECORD-KEY
+           MOVE 'AH'                   TO EXT-COV-CODE
+           MOVE '0171'                 TO EXT-LOB
+           MOVE CR-ACCOUNT             TO EXT-ACCOUNT
+           MOVE CR-CARRIER             TO EXT-CARRIER
+           MOVE '20071231'             TO EXT-TRANS-ACC-DT
+           MOVE CR-ACCOUNT             TO EXT-AGENT-NO
+           MOVE CR-STATE               TO EXT-CLP-ST
+           IF CR-CLP-STATE NOT = SPACES AND ZEROS AND LOW-VALUES
+              MOVE CR-CLP-STATE        TO EXT-CLP-ST
+           END-IF
+           MOVE CR-REIN-TABLE          To EXT-CEDED-REIN-COMP
+
+           MOVE +0                     TO WS-LF-OW-COMM
+                                          WS-AH-OW-COMM
+                                          WS-LF-DW-COMM
+                                          WS-AH-DW-COMM
+
+           ADD CR-LFPRM-ALT            TO CR-LFPRM
+
+           IF CR-CARRIER = '3' OR '4'
+              PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+                 S1 > +10
+                 IF CR-AGT-TYPE (S1) = 'O' OR 'P'
+                    MOVE ZEROS         TO CR-LCOM-L (S1)
+                                          CR-LCOM-AH (S1)
+                 END-IF
+              END-PERFORM
+           END-IF
+
+           PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+              S1 > +10
+              IF CR-AGT-TYPE (S1) = 'O' OR 'P' or 'S'
+                 IF CR-LCOM-L (S1) NOT = ZEROS
+                    COMPUTE WS-LF-OW-COMM = WS-LF-OW-COMM +
+                       (CR-LCOM-L (S1) *
+      *                   CR-LF-NSP-PRM)
+                          (CR-LFPRM - CR-LFRFND))
+                 END-IF
+                 IF CR-LCOM-AH (S1) NOT = ZEROS
+                    COMPUTE WS-AH-OW-COMM = WS-AH-OW-COMM +
+                       (CR-LCOM-AH (S1) *
+      *                   CR-AH-NSP-PRM)
+                          (CR-AHPRM - CR-AHRFND))
+                 END-IF
+              ELSE
+                 IF CR-AGT-TYPE (S1) = 'C' OR 'D'
+                    IF CR-LCOM-L (S1) NOT = ZEROS
+                       COMPUTE WS-LF-DW-COMM = WS-LF-DW-COMM +
+                          (CR-LCOM-L (S1) *
+                             (CR-LFPRM - CR-LFRFND))
+                    END-IF
+                    IF CR-LCOM-AH (S1) NOT = ZEROS
+                       COMPUTE WS-AH-DW-COMM = WS-AH-DW-COMM +
+                          (CR-LCOM-AH (S1) * (CR-AHPRM - CR-AHRFND))
+                    END-IF
+                 ELSE
+                    IF CR-AGT-TYPE (S1) = 'K'
+                       IF CR-LCOM-L (S1) NOT = ZEROS
+                          COMPUTE WS-LF-OW-COMM = WS-LF-OW-COMM +
+                             (CR-LCOM-L (S1) * +1000)
+                       END-IF
+                       IF CR-LCOM-AH (S1) NOT = ZEROS
+                          COMPUTE WS-AH-OW-COMM = WS-AH-OW-COMM +
+                             (CR-LCOM-AH (S1) * +1000)
+                       END-IF
+                    END-IF
+                 END-IF
+              END-IF
+           END-PERFORM
+
+           MOVE +0                     TO WS-LF-REFUND
+                                          WS-AH-REFUND
+
+           IF CR-LF-CANCEL-EXIT-DATE > 0
+              COMPUTE WS-FACT = CR-LF-NSP-PRM / CR-LFPRM
+              COMPUTE WS-LF-REFUND = CR-LFRFND * WS-FACT
+           END-IF
+
+           IF CR-AH-CANCEL-EXIT-DATE > 0
+              COMPUTE WS-FACT = CR-AH-NSP-PRM / CR-AHPRM
+              COMPUTE WS-AH-REFUND = CR-AHRFND * WS-FACT
+           END-IF
+
+      *    IF CR-ENTRY-DATE <= 20061231
+      *       MOVE ZEROS               TO CR-LF-NSP-PRM
+      *                                   CR-AH-NSP-PRM
+      *    END-IF
+
+           COMPUTE EXT-NSP-PREM = CR-LF-NSP-PRM + CR-AH-NSP-PRM
+           COMPUTE EXT-GROSS-PREM = CR-LFPRM + CR-LFPRM-ALT + CR-AHPRM
+           COMPUTE EXT-REFUNDS = WS-LF-REFUND + WS-AH-REFUND
+           COMPUTE EXT-BASE-COMM = WS-LF-DW-COMM + WS-AH-DW-COMM
+           COMPUTE EXT-COMM-AMT = WS-LF-OW-COMM + WS-AH-OW-COMM
+           IF (WS-LF-REFUND > ZEROS)
+              OR (WS-AH-REFUND > ZEROS)
+              MOVE ZEROS               TO EXT-COMM-AMT
+           END-IF
+           COMPUTE EXT-PREM-WRIT = ((CR-LFPRM + CR-LFPRM-ALT + CR-AHPRM)
+              - (CR-LFRFND + CR-AHRFND))
+              - (WS-LF-DW-COMM + WS-AH-DW-COMM)
+
+           MOVE 'E'                    TO EXT-EOR
+
+           PERFORM 0100-WRITE-EXTRACT  THRU 0100-EXIT
+
+           .
+       0090-EXIT.
+           EXIT.
+
+       0100-WRITE-EXTRACT.
+
+           INSPECT EXTRACT-RECORD REPLACING
+              ALL ';'         BY ' '
+              ALL X'00'       BY ' '
+              ALL X'01'       BY ' '
+              ALL X'02'       BY ' '
+              ALL X'03'       BY ' '
+              ALL X'04'       BY ' '
+              ALL X'05'       BY ' '
+              ALL X'06'       BY ' '
+              ALL X'07'       BY ' '
+              ALL X'08'       BY ' '
+              ALL X'0C'       BY ' '
+              ALL X'14'       BY ' '
+              ALL X'1B'       BY ' '
+              ALL X'1C'       BY ' '
+              ALL X'1E'       BY ' '
+              ALL X'9C'       BY ' '
+              ALL X'09'       BY ';'
+           WRITE EXTRACT-RECORD-OUT    FROM EXTRACT-RECORD
+           ADD 1 TO EXTR-OUT-CNT
+
+           .
+       0100-EXIT.
+           EXIT.
+
+       8510-DATE-CONVERSION.
+
+           CALL 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+       8590-EXIT.
+           EXIT.
+
+       ABEND-PGM.
+                                       COPY ELCABEND.

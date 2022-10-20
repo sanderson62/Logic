@@ -1,0 +1,47 @@
+################################################################################
+#                       
+#     JOB: cpsbal331
+#       This job checks the totals from job cilg331 step EL331.
+#                      
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+# 
+# PERL1 Checks EL331 Against Totals from cilgm15 ECS010     
+#
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/cpschkbal2.pl $SEQFILES/cilgm15.ECS010.ME50.BAL.AMTS $SEQFILES/cilg331.EL331.ME50.BAL.AMTS $SEQFILES/after50.@YYYYMMDD.txt $HOME/cpschkbal2.$$.msgs
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+################################################################################
+LABEL name=FTPPUT1
+################################################################################
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < $JCLLIB/ftp-cpsbal331
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTPPUT1' parm='SH'
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "smtp -f slunikix -t tpta,pema -s 'Results of CPS Post50 Balancing' -mf /apps/prod/cid1p/emails/cpsbal331.txt"
+else
+    echo " Job aborted, print not released "
+    echo " Balancing may be outside of tolerance"
+    echo " Results file is after50.@YYYYMMDD.txt"
+    "ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-cpsbal331"
+endif
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 061704   2004050700001 SMVA   NEW MONTHLY JOB FOR AUTOMATION OF BALANCING

@@ -1,0 +1,883 @@
+       IDENTIFICATION DIVISION.                                         
+       PROGRAM-ID.                 ELCLMI.                              
+      *                            VMOD=2.001
+      *AUTHOR.     CSO
+      *            OMAHA, NEBRASKA                                      
+      *DATE-COMPILED.                                                   
+      *SECURITY.   *****************************************************
+      *            *                                                   *
+      *            *   THIS PROGRAM IS THE PROPERTY OF CSO             *
+      *            *                                                   *
+      *            *   USE OF THIS PROGRAM BY OTHER THAN THE EMPLOYEES *
+      *            *   OF CSO         IS EXPRESSLY PROHIBITED WITHOUT  *
+      *            *   THE PRIOR WRITTEN PERMISSION OF CSO.            *
+      *            *                                                   *
+      *            *****************************************************
+      ******************************************************************
+      *  REMARKS   *                                                   *
+      *            *    THIS 'SUBROUTINE' WILL, CALCULATE THE LIFE     *
+      *            *    CLAIM INTEREST DUE DEPENDING ON THE STATE      *
+060608******************************************************************
+060608*                   C H A N G E   L O G
+060608*
+060608* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+060608*-----------------------------------------------------------------
+060608*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+060608* EFFECTIVE    NUMBER
+060608*-----------------------------------------------------------------
+060608* 060608    2008040300002  PEMA  ADD SPEC CALC FOR UT AND WA
+060608******************************************************************
+
+       ENVIRONMENT DIVISION.                                            
+       DATA DIVISION.                                                   
+           EJECT                                                        
+       WORKING-STORAGE SECTION.                                         
+       77  FILLER   PIC X(32) VALUE '********************************'. 
+       77  FILLER   PIC X(32) VALUE '**  ELCLMI  WORKING STORAGE   **'. 
+       77  FILLER   PIC X(32) VALUE '***********VMOD 2.001 **********'. 
+       77  SAVE-DATE                   PIC X(8)     VALUE SPACES.
+       77  SAVE-BIN-DATE               PIC X(2)     VALUE SPACES.
+       77  WS-SELECT-DATE              PIC XX VALUE LOW-VALUES.
+       77  WS-REQ-FROM-DT              PIC XX VALUE LOW-VALUES.
+       77  WS-REQ-END-DT               PIC XX VALUE LOW-VALUES.
+       77  WS-PAY-FROM-DT              PIC XX VALUE LOW-VALUES.
+       77  WS-PAY-TO-DT                PIC XX VALUE LOW-VALUES.
+       77  WS-SUB-FROM-DT              PIC XX VALUE LOW-VALUES.
+       77  WS-SUB-TO-DT                PIC XX VALUE LOW-VALUES.
+       77  WS-CALC-START-DT            PIC XX VALUE LOW-VALUES.
+       77  WS-CALC-END-DT              PIC XX VALUE LOW-VALUES.
+       77  WS-INTEREST                 PIC S9(7)V99 COMP-3 VALUE +0.
+       77  WS-TOTAL-INTEREST           PIC S9(7)V99 COMP-3 VALUE +0.
+       77  WS-DAYS                     PIC S9(5)    COMP-3 VALUE +0.
+       77  WS-TOTAL-DAYS               PIC S9(5)    COMP-3 VALUE +0.
+       77  WS-ELCISC-BROWSE-SW         PIC X  VALUE SPACES.
+           88  ELCISC-BROWSE-STARTED          VALUE 'Y'.
+       77  WS-ELCISC-SW                PIC X  VALUE SPACES.
+           88  ELCISC-FOUND                   VALUE 'Y'.
+       77  WS-ELCISB-SW                PIC X  VALUE SPACES.
+           88  END-OF-BREAKOUT                VALUE 'Y'.
+       77  WS-ELCIST-SW                PIC X  VALUE SPACES.
+           88  END-OF-SCHED-TABLE             VALUE 'Y'.
+       77  WS-CO-HLD-DAYS              PIC S9(5) COMP-3 VALUE +0.
+       77  WS-CO-TOTAL-DAYS            PIC S9(5) COMP-3 VALUE +0.
+       77  WS-CO-SW                    PIC X VALUE SPACES.
+           88  CO-CHECKED                    VALUE 'Y'.
+       77  WS-WA-DAYSA                 PIC S9(5) COMP-3 VALUE +0.
+       77  WS-WA-DAYSB                 PIC S9(5) COMP-3 VALUE +0.
+       
+       01  WS-RESPONSE                 PIC S9(8)   COMP.
+           88  RESP-NORMAL                  VALUE +00.
+           88  RESP-ERROR                   VALUE +01.
+           88  RESP-NOTFND                  VALUE +13.
+           88  RESP-NOTOPEN                 VALUE +19.
+           88  RESP-ENDFILE                 VALUE +20.
+
+       01  WS-HOLD-ELCISC              PIC X(100) VALUE SPACES.
+       01  WS-SC-SAVE-KEY              PIC X(10)  VALUE LOW-VALUES.
+       01  WS-SB-SAVE-KEY              PIC X(12)  VALUE LOW-VALUES.
+       01  WS-ST-SAVE-KEY              PIC X(6)   VALUE LOW-VALUES.
+
+       01  WS-SC-CONTROL-PRIMARY.
+           10  WS-SC-COMPANY-CD        PIC X      VALUE SPACES.
+           10  WS-SC-STATE             PIC XX     VALUE SPACES.
+           10  WS-SC-PRODUCT           PIC XX     VALUE SPACES.
+           10  WS-SC-COVERAGE          PIC XX     VALUE SPACES.
+           10  WS-SC-EXCESS-DAYS       PIC 999    VALUE ZEROS.
+
+       01  WS-SB-CONTROL-PRIMARY.
+           10  WS-SB-COMPANY-CD        PIC X      VALUE SPACES.
+           10  WS-SB-STATE             PIC XX     VALUE SPACES.
+           10  WS-SB-PRODUCT           PIC XX     VALUE SPACES.
+           10  WS-SB-COVERAGE          PIC XX     VALUE SPACES.
+           10  WS-SB-BREAKOUT-CODE     PIC XX     VALUE SPACES.
+           10  WS-SB-CALC-END          PIC 999    VALUE ZEROS.
+
+       01  WS-ST-CONTROL-PRIMARY.
+           10  WS-ST-COMPANY-CD        PIC X      VALUE SPACES.
+           10  WS-ST-SCHED-CODE        PIC XXX    VALUE SPACES.
+           10  WS-ST-END-DT            PIC XX     VALUE LOW-VALUES.
+
+       01  WS-IR-CONTROL-PRIMARY.
+           10  WS-IR-COMPANY-CD        PIC X      VALUE SPACES.
+           10  WS-IR-INT-RATE-CODE     PIC XXX    VALUE SPACES.
+
+                                       COPY ELCDATE.
+                                       COPY ELCICALC.
+                                                                        
+       LINKAGE SECTION.                                                 
+       01  DFHCOMMAREA                 PIC X(100).
+
+                                       COPY ELCCISC.
+                                       COPY ELCCISB.
+                                       COPY ELCCIST.
+                                       COPY ELCCIIR.
+       PROCEDURE DIVISION.
+                                                                        
+           MOVE DFHCOMMAREA            TO CLAIM-INT-PASS-AREA
+                                                                        
+           MOVE EIBDATE                TO DC-JULIAN-YYDDD
+           MOVE '5'                    TO DC-OPTION-CODE
+           PERFORM 9100-CONVERT-DATE   THRU 9100-EXIT
+           MOVE DC-GREG-DATE-1-EDIT    TO  SAVE-DATE
+           MOVE DC-BIN-DATE-1          TO  SAVE-BIN-DATE
+
+           .
+       0000-START-INTEREST-CALC.
+
+           MOVE ZERO                   TO CI-RETURN-CODE                
+                                          CP-CLM-INT-AMT
+                                          CP-CLM-INT-RATE
+                                          CP-CLM-INT-NODAYS
+                                          WS-INTEREST
+                                          WS-TOTAL-INTEREST
+                                          WS-TOTAL-DAYS
+                                                                        
+      *****************************************************************
+      *
+      * IF THEY HAVEN'T MADE A PAYMENT YET THEN USE THE CURRENT DATE
+      *
+      *****************************************************************
+           IF CP-LSTPD-DT = ZEROS OR SPACES OR LOW-VALUES
+              MOVE SAVE-BIN-DATE       TO CP-LSTPD-DT
+           END-IF
+      *****************************************************************
+           
+           MOVE 'Y'                    TO CP-CLM-INT-SW
+           MOVE CP-COMPANY-CD          TO WS-SC-COMPANY-CD
+           MOVE CP-STATE               TO WS-SC-STATE
+           MOVE CP-PRODUCT             TO WS-SC-PRODUCT
+           MOVE CP-COVERAGE            TO WS-SC-COVERAGE
+           MOVE ZEROS                  TO WS-SC-EXCESS-DAYS
+           MOVE WS-SC-CONTROL-PRIMARY  TO WS-SC-SAVE-KEY
+           
+           PERFORM 0005-FIND-ELCISC    THRU 0005-EXIT
+
+           IF (NOT RESP-NORMAL)
+                    OR
+              (WS-SC-SAVE-KEY (1:7) NOT =
+                                       WS-SC-CONTROL-PRIMARY (1:7))
+              MOVE WS-SC-SAVE-KEY      TO WS-SC-CONTROL-PRIMARY
+              MOVE '**'                TO WS-SC-PRODUCT
+                                          CP-PRODUCT
+              MOVE WS-SC-CONTROL-PRIMARY
+                                       TO WS-SC-SAVE-KEY
+              PERFORM 0010-FIND-ELCISC THRU 0010-EXIT
+           END-IF
+
+           IF (RESP-NORMAL)
+              AND (WS-SC-SAVE-KEY (1:7) =
+                           WS-SC-CONTROL-PRIMARY (1:7))
+              PERFORM 0030-CALC-CLM-INT THRU 0030-EXIT
+              MOVE WS-TOTAL-INTEREST   TO CP-CLM-INT-AMT
+              MOVE IR-INT-RATE         TO CP-CLM-INT-RATE
+              MOVE WS-TOTAL-DAYS       TO CP-CLM-INT-NODAYS
+           ELSE
+              MOVE '1'                 TO CI-RETURN-CODE
+              MOVE 'N'                 TO CP-CLM-INT-SW
+           END-IF
+
+           MOVE CLAIM-INT-PASS-AREA    TO DFHCOMMAREA
+           EXEC CICS RETURN
+           END-EXEC           
+           
+      *****************************************************************
+      *
+      * FIND THE SELECTION CRITERIA RECORD FOR THE CLAIM
+      * IF NOT FOUND THE FIRST TIME THEN TRY USING THE WILD KEY **
+      *
+      *****************************************************************
+           .
+       0005-FIND-ELCISC.
+       
+           PERFORM 0012-ELCISC-STARTBR THRU 0012-EXIT
+
+           IF RESP-NORMAL
+              PERFORM 0020-ELCISC-READNEXT
+                                       THRU 0020-EXIT
+           END-IF
+
+           .
+       0005-EXIT.
+           EXIT.
+
+       0010-FIND-ELCISC.
+       
+           IF ELCISC-BROWSE-STARTED
+              PERFORM 0015-ELCISC-RESETBR
+                                       THRU 0015-EXIT
+           ELSE
+              PERFORM 0012-ELCISC-STARTBR
+                                       THRU 0012-EXIT
+           END-IF
+
+           IF RESP-NORMAL
+              PERFORM 0020-ELCISC-READNEXT
+                                       THRU 0020-EXIT
+           END-IF
+
+           .
+       0010-EXIT.
+           EXIT.
+
+       0012-ELCISC-STARTBR.
+
+           EXEC CICS STARTBR                                            
+               DATASET   ('ELCISC')
+               RIDFLD    (WS-SC-CONTROL-PRIMARY)
+               GTEQ
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           IF RESP-NORMAL
+              SET ELCISC-BROWSE-STARTED
+                                       TO TRUE
+           END-IF
+
+           .
+       0012-EXIT.
+           EXIT.
+
+       0015-ELCISC-RESETBR.
+
+           EXEC CICS RESETBR                                            
+               DATASET   ('ELCISC')
+               RIDFLD    (WS-SC-CONTROL-PRIMARY)
+               GTEQ
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           IF RESP-NORMAL
+              SET ELCISC-BROWSE-STARTED
+                                       TO TRUE
+           END-IF
+
+           .
+       0015-EXIT.
+           EXIT.
+
+       0017-ELCISC-ENDBR.
+
+           EXEC CICS ENDBR
+               DATASET   ('ELCISC')
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           .
+       0017-EXIT.
+           EXIT.
+
+       0020-ELCISC-READNEXT.
+       
+           EXEC CICS READNEXT
+               DATASET  ('ELCISC')
+               SET      (ADDRESS OF CLAIM-INTEREST-SC)
+               RIDFLD   (WS-SC-CONTROL-PRIMARY)
+               RESP     (WS-RESPONSE)
+           END-EXEC
+
+           .
+       0020-EXIT.
+           EXIT.
+
+      *****************************************************************
+      *
+      * FIND OUT IF THE INCURRED DATE OR THE ESTABLISH DATE IS BEYOND
+      * THE SELECT DATE, IF NOT THEN THERE IS NO REQUIREMENT TO
+      * CALCULATE THE INTEREST
+      *
+      *****************************************************************
+
+       0030-CALC-CLM-INT.
+
+           IF SC-S-TYPE = 'I'
+              MOVE CP-INC-DT           TO WS-SELECT-DATE
+           ELSE
+              IF SC-S-TYPE = 'R'
+                 MOVE CP-RPT-DT        TO WS-SELECT-DATE
+              ELSE
+                 MOVE CP-PRF-DT        TO WS-SELECT-DATE
+              END-IF
+           END-IF
+
+           IF WS-SELECT-DATE >= SC-SA-DATE
+              PERFORM 0040-INT-TYPE    THRU 0040-EXIT
+           ELSE
+              MOVE 'N'                 TO CP-CLM-INT-SW
+              MOVE '2'                 TO CI-RETURN-CODE
+           END-IF
+
+           .
+       0030-EXIT.
+           EXIT.
+
+      *****************************************************************
+      *
+      * ESTABLISH THE EARLIEST REQUIRED DATE BASED ON THE REQUIRE TYPE
+      * I = INCURRED DATE, R = REPORTED DATE.
+      * ESTABLISH THE LATEST REQUIRE DATE USING THE PAID DATE.
+      * CALCULATE THE DURATION BETWEEN THE EARLIEST DATE AND THE 
+      * LATEST.  IF THE DURATION IS LESS THAN THE PLUS DAYS
+      * THEN THE CLAIM IS NOT REQUIRED TO CALCULATE INTEREST
+      *
+      *****************************************************************
+
+       0040-INT-TYPE.
+           
+           IF SC-R-TYPE = 'I'
+              MOVE CP-INC-DT           TO WS-REQ-FROM-DT
+           ELSE
+              IF SC-R-TYPE = 'R'
+                 MOVE CP-RPT-DT        TO WS-REQ-FROM-DT
+              ELSE
+                 MOVE CP-PRF-DT        TO WS-REQ-FROM-DT
+              END-IF
+           END-IF
+           MOVE CP-LSTPD-DT            TO WS-REQ-END-DT
+           
+           MOVE WS-REQ-FROM-DT         TO DC-BIN-DATE-1
+           MOVE WS-REQ-END-DT          TO DC-BIN-DATE-2
+           MOVE '1'                    TO DC-OPTION-CODE
+           PERFORM 9100-CONVERT-DATE   THRU 9100-EXIT
+           IF NO-CONVERSION-ERROR
+              IF (DC-ELAPSED-DAYS > SC-P-DAYS)
+                             OR
+                 ((SC-STATE = 'UT')
+                  AND (CP-EFF-DT >= X'A285'))
+                 CONTINUE
+              ELSE
+                 MOVE 'N'              TO CP-CLM-INT-SW
+                 MOVE '3'              TO CI-RETURN-CODE
+                 GO TO 0040-EXIT
+              END-IF
+           END-IF
+
+      *****************************************************************
+      *
+      * FIGURE OUT IF I NEED TO READ ANOTHER ELCISC RECORD.
+      * I NEED TO READ ANOTHER ONE IF THE STATE IS LA.
+      * I ALSO NEED TO READ ANOTHER ONE IF THE STATE IS ID, MD,
+      *        ND OR PA
+      *
+      *****************************************************************
+           IF SC-STATE = 'MS'
+              IF CP-CLAIM-AMT < 5000
+                 MOVE 'N'              TO CP-CLM-INT-SW
+                 MOVE '4'              TO CI-RETURN-CODE
+                 GO TO 0040-EXIT
+              END-IF
+           END-IF
+
+           IF (SC-STATE = 'UT')
+              AND (CP-EFF-DT >= X'A285')
+              PERFORM 0070-UT-SPEC     THRU 0070-EXIT
+              GO TO 0040-EXIT
+           END-IF
+
+           IF SC-STATE = 'WA'
+              MOVE DC-ELAPSED-DAYS     TO WS-WA-DAYSA
+              MOVE +0                  TO WS-WA-DAYSB
+              MOVE CP-INC-DT           TO DC-BIN-DATE-1
+              MOVE CP-LSTPD-DT         TO DC-BIN-DATE-2
+              MOVE '1'                 TO DC-OPTION-CODE
+              PERFORM 9100-CONVERT-DATE
+                                       THRU 9100-EXIT
+              IF NO-CONVERSION-ERROR
+                 MOVE DC-ELAPSED-DAYS  TO WS-WA-DAYSB
+              ELSE
+                 MOVE 'N'              TO CP-CLM-INT-SW
+                 MOVE '3'              TO CI-RETURN-CODE
+                 GO TO 0040-EXIT
+              END-IF
+           END-IF
+
+           IF SC-STATE = 'CO'
+              MOVE ' '                 TO WS-CO-SW
+              MOVE +0                  TO WS-CO-HLD-DAYS
+              MOVE CP-PRF-DT           TO DC-BIN-DATE-1
+              MOVE CP-LSTPD-DT         TO DC-BIN-DATE-2
+              MOVE '1'                 TO DC-OPTION-CODE
+              PERFORM 9100-CONVERT-DATE
+                                       THRU 9100-EXIT
+              IF NO-CONVERSION-ERROR
+                 IF DC-ELAPSED-DAYS > +30
+                    COMPUTE WS-CO-HLD-DAYS = DC-ELAPSED-DAYS - +30
+                 ELSE
+                    MOVE +99999        TO WS-CO-HLD-DAYS
+                 END-IF
+              END-IF
+           END-IF
+
+           IF SC-STATE = 'LA' OR 'MN'
+              MOVE CLAIM-INTEREST-SC   TO WS-HOLD-ELCISC
+              PERFORM 0020-ELCISC-READNEXT
+                                       THRU 0020-EXIT
+              IF (RESP-NORMAL)
+                 AND (WS-SC-SAVE-KEY (1:7) =
+                           WS-SC-CONTROL-PRIMARY (1:7))
+                 IF DC-ELAPSED-DAYS > SC-P-DAYS
+                    CONTINUE
+                 ELSE
+                    MOVE WS-HOLD-ELCISC
+                                       TO CLAIM-INTEREST-SC
+                    MOVE SC-CONTROL-PRIMARY
+                                       TO WS-SC-CONTROL-PRIMARY
+                 END-IF
+              ELSE
+                 MOVE WS-HOLD-ELCISC   TO CLAIM-INTEREST-SC
+                 MOVE SC-CONTROL-PRIMARY
+                                       TO WS-SC-CONTROL-PRIMARY
+              END-IF
+           ELSE
+              IF SC-STATE = 'ID' OR 'MD' OR 'ND' OR 'PA'
+                 MOVE CP-INC-DT        TO DC-BIN-DATE-1
+                 MOVE CP-PRF-DT        TO DC-BIN-DATE-2
+                 MOVE '1'              TO DC-OPTION-CODE
+                 PERFORM 9100-CONVERT-DATE
+                                       THRU 9100-EXIT
+                 IF NO-CONVERSION-ERROR
+                    IF DC-ELAPSED-DAYS < SC-EXCESS-DAYS
+                       CONTINUE
+                    ELSE
+                       MOVE CLAIM-INTEREST-SC
+                                       TO WS-HOLD-ELCISC
+                       PERFORM 0020-ELCISC-READNEXT
+                                       THRU 0020-EXIT
+                       IF (RESP-NORMAL)
+                          AND (WS-SC-SAVE-KEY (1:7) =
+                                  WS-SC-CONTROL-PRIMARY (1:7))
+                          CONTINUE
+                       ELSE
+                          MOVE WS-HOLD-ELCISC
+                                       TO CLAIM-INTEREST-SC
+                          MOVE SC-CONTROL-PRIMARY
+                                       TO WS-SC-CONTROL-PRIMARY
+                       END-IF
+                    END-IF
+                 END-IF
+              END-IF
+           END-IF
+
+      *****************************************************************
+      *
+      * DETERMINE THE PAY FROM DATE BY THE CALC START TYPE,
+      * I = INCURRED DATE, R = REPORTED DATE.
+      * NEXT, ADD THE CALC START DAYS ONTO THE PAY FROM  DATE.
+      * AS OF 12/15/2005 THE ONLY VALID CALC END TYPE IS 'P' SO
+      * USE THE PAID DATE AS THE PAY TO DATE.
+      *
+      *****************************************************************
+
+           IF SC-CS-TYPE = 'I'
+              MOVE CP-INC-DT           TO WS-PAY-FROM-DT
+           ELSE
+              IF SC-CS-TYPE = 'R'
+                 MOVE CP-RPT-DT        TO WS-PAY-FROM-DT
+              ELSE
+                 MOVE CP-PRF-DT        TO WS-PAY-FROM-DT
+              END-IF
+           END-IF
+
+           IF SC-CS-DAYS > ZEROS
+              MOVE WS-PAY-FROM-DT      TO DC-BIN-DATE-1
+              MOVE SC-CS-DAYS          TO DC-ELAPSED-DAYS
+              MOVE ZEROS               TO DC-ELAPSED-MONTHS
+              MOVE '6'                 TO DC-OPTION-CODE
+              PERFORM 9100-CONVERT-DATE
+                                       THRU 9100-EXIT
+              IF NO-CONVERSION-ERROR
+                 MOVE DC-BIN-DATE-2    TO WS-PAY-FROM-DT
+              ELSE
+                 MOVE '5'              TO CI-RETURN-CODE
+                 GO TO 0040-EXIT
+              END-IF
+           END-IF
+           
+           MOVE CP-LSTPD-DT            TO WS-PAY-TO-DT
+
+      *****************************************************************
+      *
+      * BROWSE ALL THE STATE BREAKOUT RECORDS FOR THE STATE.
+      * WHEN FINISHED BROWSING SET END OF BREAKOUT TO TRUE.
+      *
+      *****************************************************************
+
+      ********************************************************************
+           IF SC-STATE = 'CO'
+              MOVE WS-PAY-FROM-DT      TO DC-BIN-DATE-1
+              MOVE WS-PAY-TO-DT        TO DC-BIN-DATE-2
+              MOVE '1'                 TO DC-OPTION-CODE
+              PERFORM 9100-CONVERT-DATE
+                                       THRU 9100-EXIT
+              IF NO-CONVERSION-ERROR
+                 MOVE DC-ELAPSED-DAYS  TO WS-CO-TOTAL-DAYS
+              END-IF
+              COMPUTE WS-CO-HLD-DAYS = WS-CO-TOTAL-DAYS - WS-CO-HLD-DAYS
+           END-IF
+      ********************************************************************
+
+           MOVE WS-SC-CONTROL-PRIMARY (1:7)
+                                       TO WS-SB-CONTROL-PRIMARY (1:7)
+           MOVE SC-BREAKOUT-CODE       TO WS-SB-BREAKOUT-CODE
+           MOVE ZEROS                  TO WS-SB-CALC-END
+           MOVE WS-SB-CONTROL-PRIMARY  TO WS-SB-SAVE-KEY
+
+           PERFORM 0100-ELCISB-STARTBR THRU 0100-EXIT
+
+           IF NOT RESP-NORMAL
+              MOVE 'N'                 TO CP-CLM-INT-SW
+              MOVE '6'                 TO CI-RETURN-CODE
+              GO TO 0040-EXIT
+           END-IF
+
+           PERFORM UNTIL END-OF-BREAKOUT
+              PERFORM 0110-ELCISB-READNEXT
+                                       THRU 0110-EXIT
+              IF RESP-NORMAL
+                 IF (SB-CONTROL-PRIMARY (1:9) = WS-SB-SAVE-KEY (1:9))
+                    PERFORM 0050-PROCESS-BREAKOUT
+                                       THRU 0050-EXIT
+                 ELSE
+                    SET END-OF-BREAKOUT TO TRUE
+                 END-IF
+              ELSE
+                 SET END-OF-BREAKOUT   TO TRUE
+              END-IF
+           END-PERFORM
+
+           .
+       0040-EXIT.
+           EXIT.
+
+                                       
+      *****************************************************************
+      *
+      * THIS IS A PAIN. HERE WE GO... IF THE CALC START IS 001 AND THE
+      * CALC END IS 999 THEN IT IS A PIECE OF CAKE. OTHERWISE WE HAVE 
+      * TO SPLIT THE PAYMENTS APART BY THE NUMBER OF DAYS IN THE CALC
+      * END, THEN READ THE NEXT RECORD AND IF THE END IS 999 THEN THAT
+      * IS THE LAST ONE.
+      * NEXT, ADD THE CALC START DAYS ONTO THE CALC START DATE.
+      * AS OF 12/15/2005 THE ONLY VALID CALC END TYPE IS 'P' SO
+      * USE THE PAID DATE AS THE CALC END DATE.
+      *
+      *****************************************************************
+       0050-PROCESS-BREAKOUT.
+                                              
+           IF SB-STATE = 'CO'
+              IF CO-CHECKED
+                 COMPUTE SB-CALC-START = WS-CO-HLD-DAYS + +1
+              ELSE
+                 MOVE WS-CO-HLD-DAYS   TO SB-CALC-END
+                 SET CO-CHECKED        TO TRUE
+              END-IF
+           END-IF
+
+           IF SB-CALC-START = 001
+              MOVE WS-PAY-FROM-DT      TO WS-SUB-FROM-DT
+              IF (SC-STATE = 'WA')
+                 AND (WS-WA-DAYSA < SB-CALC-END)
+                 SET END-OF-BREAKOUT   TO TRUE
+              END-IF
+           ELSE
+              IF SC-STATE = 'WA'
+                 MOVE CP-PRF-DT        TO WS-PAY-FROM-DT
+              END-IF
+              MOVE WS-PAY-FROM-DT      TO DC-BIN-DATE-1
+              IF SB-CALC-START > 1
+                 COMPUTE DC-ELAPSED-DAYS = SB-CALC-START - 1
+              ELSE
+                 MOVE 1                TO DC-ELAPSED-DAYS
+              END-IF
+              MOVE +0                  TO DC-ELAPSED-MONTHS
+              MOVE '6'                 TO DC-OPTION-CODE
+              PERFORM 9100-CONVERT-DATE
+                                       THRU 9100-EXIT
+              IF NO-CONVERSION-ERROR
+                 MOVE DC-BIN-DATE-2    TO WS-SUB-FROM-DT
+              ELSE
+                 MOVE '5'              TO CI-RETURN-CODE
+                 GO TO 0050-EXIT
+              END-IF
+           END-IF
+
+           IF SB-CALC-END = 999
+              SET END-OF-BREAKOUT TO TRUE
+              MOVE WS-PAY-TO-DT        TO WS-SUB-TO-DT
+           ELSE
+              IF (SC-STATE = 'WA')
+                 AND (END-OF-BREAKOUT)
+                 MOVE WS-WA-DAYSB      TO SB-CALC-END
+              ELSE
+                 IF SC-STATE = 'WA'
+                    COMPUTE SB-CALC-END = WS-WA-DAYSB -
+                       (WS-WA-DAYSA - 90)
+                 END-IF
+              END-IF
+              MOVE WS-PAY-FROM-DT      TO DC-BIN-DATE-1
+              MOVE SB-CALC-END         TO DC-ELAPSED-DAYS
+              MOVE +0                  TO DC-ELAPSED-MONTHS
+              MOVE '6'                 TO DC-OPTION-CODE
+              PERFORM 9100-CONVERT-DATE
+                                       THRU 9100-EXIT
+              IF NO-CONVERSION-ERROR
+                 MOVE DC-BIN-DATE-2    TO WS-SUB-TO-DT
+                 IF WS-PAY-TO-DT < WS-SUB-TO-DT
+                    MOVE WS-PAY-TO-DT  TO WS-SUB-TO-DT
+PEMTST              SET END-OF-BREAKOUT TO TRUE
+                 END-IF
+              ELSE
+                 MOVE '5'              TO CI-RETURN-CODE
+                 GO TO 0050-EXIT
+              END-IF
+           END-IF
+
+           MOVE CP-COMPANY-CD          TO WS-ST-COMPANY-CD
+           MOVE SB-SCHED-CODE          TO WS-ST-SCHED-CODE
+           MOVE LOW-VALUES             TO WS-ST-END-DT
+           
+           PERFORM 0200-ELCIST-STARTBR THRU 0200-EXIT
+
+           IF NOT RESP-NORMAL
+              MOVE 'N'                 TO CP-CLM-INT-SW
+              MOVE '7'                 TO CI-RETURN-CODE
+              GO TO 0050-EXIT
+           END-IF
+
+           MOVE WS-ST-CONTROL-PRIMARY  TO WS-ST-SAVE-KEY
+           MOVE SPACES                 TO WS-ELCIST-SW
+
+           PERFORM UNTIL END-OF-SCHED-TABLE
+              PERFORM 0210-ELCIST-READNEXT
+                                       THRU 0210-EXIT
+              IF RESP-NORMAL
+                 IF ST-CONTROL-PRIMARY (1:4) = WS-ST-SAVE-KEY (1:4)
+                    PERFORM 0060-ACCUMULATE THRU 0060-EXIT
+                 ELSE
+                    SET END-OF-SCHED-TABLE TO TRUE
+                 END-IF
+              ELSE
+                 SET END-OF-SCHED-TABLE TO TRUE
+              END-IF
+           END-PERFORM
+
+           EXEC CICS ENDBR
+              DATASET ('ELCIST')
+           END-EXEC
+
+           .
+       0050-EXIT.
+           EXIT.
+
+       0060-ACCUMULATE.
+
+           IF WS-SUB-TO-DT < ST-START-DATE
+              SET END-OF-SCHED-TABLE   TO TRUE
+              GO TO 0060-EXIT
+           ELSE
+              IF WS-SUB-FROM-DT > ST-END-DATE
+                 GO TO 0060-EXIT
+              END-IF
+           END-IF
+
+           IF (WS-SUB-FROM-DT >= ST-START-DATE)
+              AND (WS-SUB-FROM-DT <= ST-END-DATE)
+              MOVE WS-SUB-FROM-DT      TO WS-CALC-START-DT
+              IF (WS-SUB-TO-DT >= ST-START-DATE)
+                 AND (WS-SUB-TO-DT <= ST-END-DATE)
+                 MOVE WS-SUB-TO-DT     TO WS-CALC-END-DT
+                 SET END-OF-SCHED-TABLE TO TRUE
+              ELSE
+                 MOVE ST-END-DATE        TO WS-CALC-END-DT
+              END-IF
+           ELSE
+              MOVE ST-START-DATE        TO WS-CALC-START-DT
+              IF (WS-SUB-TO-DT >= ST-START-DATE)
+                 AND (WS-SUB-TO-DT <= ST-END-DATE)
+                 MOVE WS-SUB-TO-DT     TO WS-CALC-END-DT
+                 SET END-OF-SCHED-TABLE TO TRUE
+              ELSE
+                 MOVE ST-END-DATE        TO WS-CALC-END-DT
+              END-IF
+           END-IF
+           IF WS-CALC-START-DT >= WS-CALC-END-DT
+              GO TO 0060-EXIT
+           END-IF 
+           MOVE WS-CALC-START-DT       TO DC-BIN-DATE-1
+           MOVE WS-CALC-END-DT         TO DC-BIN-DATE-2
+           MOVE '1'                    TO DC-OPTION-CODE
+           PERFORM 9100-CONVERT-DATE   THRU 9100-EXIT
+           IF NO-CONVERSION-ERROR
+              MOVE DC-ELAPSED-DAYS     TO WS-DAYS
+           ELSE
+              MOVE 'N'                 TO CP-CLM-INT-SW
+              MOVE '5'                 TO CI-RETURN-CODE
+              GO TO 0060-EXIT
+           END-IF
+
+           MOVE CP-COMPANY-CD          TO WS-IR-COMPANY-CD
+           MOVE ST-INT-RATE-CODE       TO WS-IR-INT-RATE-CODE
+           PERFORM 0300-ELCIIR-READ    THRU 0300-EXIT
+           IF RESP-NORMAL
+              IF IR-INT-RATE-CODE = 'ZZZ'
+                 IF CP-INT-RATE = ZEROS
+                    MOVE 'N'           TO CP-CLM-INT-SW
+                    MOVE '8'           TO CI-RETURN-CODE
+                    GO TO 0060-EXIT
+                 ELSE
+                    MOVE CP-INT-RATE   TO IR-INT-RATE
+                 END-IF
+              END-IF
+              COMPUTE WS-TOTAL-DAYS = WS-TOTAL-DAYS + WS-DAYS
+              COMPUTE WS-INTEREST ROUNDED = (CP-CLAIM-AMT * 
+                 ((1 + IR-INT-RATE) ** (WS-DAYS / 365) - 1))
+
+              ADD WS-INTEREST          TO WS-TOTAL-INTEREST
+           END-IF
+
+           .
+       0060-EXIT.
+           EXIT.
+                 
+       0070-UT-SPEC.
+
+      *    X'A285' = 05/05/2008   USED FOR UT ONLY
+      *    FOR UT ONLY THE CP-RPT-DT IS REALLY THE EFF DATE
+
+           MOVE CP-INC-DT              TO DC-BIN-DATE-1
+           MOVE CP-LSTPD-DT            TO DC-BIN-DATE-2
+           MOVE '1'                    TO DC-OPTION-CODE
+           PERFORM 9100-CONVERT-DATE   THRU 9100-EXIT
+           IF NO-CONVERSION-ERROR
+              MOVE DC-ELAPSED-DAYS     TO WS-WA-DAYSA
+           ELSE
+              MOVE 'N'                 TO CP-CLM-INT-SW
+              MOVE '5'                 TO CI-RETURN-CODE
+              GO TO 0070-EXIT
+           END-IF
+
+           MOVE CP-PRF-DT              TO DC-BIN-DATE-1
+           MOVE CP-LSTPD-DT            TO DC-BIN-DATE-2
+           MOVE '1'                    TO DC-OPTION-CODE
+           PERFORM 9100-CONVERT-DATE   THRU 9100-EXIT
+           IF NO-CONVERSION-ERROR
+              MOVE DC-ELAPSED-DAYS     TO WS-WA-DAYSB
+           ELSE
+              MOVE 'N'                 TO CP-CLM-INT-SW
+              MOVE '5'                 TO CI-RETURN-CODE
+              GO TO 0070-EXIT
+           END-IF
+
+           IF WS-WA-DAYSB < 31
+              COMPUTE WS-TOTAL-INTEREST ROUNDED = (CP-CLAIM-AMT *
+              ((1.035) ** (WS-WA-DAYSA / 365) - 1))
+              MOVE .035                TO IR-INT-RATE
+              MOVE WS-WA-DAYSA         TO WS-TOTAL-DAYS
+           ELSE
+              MOVE CP-INC-DT           TO DC-BIN-DATE-1
+              MOVE CP-PRF-DT           TO DC-BIN-DATE-2
+              MOVE '1'                 TO DC-OPTION-CODE
+              PERFORM 9100-CONVERT-DATE
+                                       THRU 9100-EXIT
+              IF NO-CONVERSION-ERROR
+                 COMPUTE WS-DAYS = DC-ELAPSED-DAYS + 30
+              ELSE
+                 MOVE 'N'              TO CP-CLM-INT-SW
+                 MOVE '5'              TO CI-RETURN-CODE
+                 GO TO 0070-EXIT
+              END-IF
+              COMPUTE WS-INTEREST ROUNDED = (CP-CLAIM-AMT *
+                 ((1.035) ** (WS-DAYS / 365) - 1))
+              MOVE .035                TO IR-INT-RATE
+              MOVE WS-DAYS             TO WS-TOTAL-DAYS
+              SUBTRACT +30             FROM WS-WA-DAYSB
+              IF WS-WA-DAYSB > +0
+                 COMPUTE WS-TOTAL-INTEREST ROUNDED = (CP-CLAIM-AMT *
+                    ((1.135) ** (WS-WA-DAYSB / 365) - 1))
+                 COMPUTE WS-TOTAL-INTEREST = WS-TOTAL-INTEREST +
+                    WS-INTEREST
+                 MOVE .135                TO IR-INT-RATE
+                 COMPUTE WS-TOTAL-DAYS = WS-TOTAL-DAYS + WS-WA-DAYSB
+              END-IF
+           END-IF
+           
+           .
+       0070-EXIT.
+           EXIT.
+
+       0100-ELCISB-STARTBR.
+
+           EXEC CICS STARTBR                                            
+               DATASET   ('ELCISB')
+               RIDFLD    (WS-SB-CONTROL-PRIMARY)
+               GTEQ
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           .
+       0100-EXIT.
+           EXIT.
+
+
+       0110-ELCISB-READNEXT.
+       
+           EXEC CICS READNEXT
+               DATASET  ('ELCISB')
+               SET      (ADDRESS OF CLAIM-INTEREST-SB)
+               RIDFLD   (WS-SB-CONTROL-PRIMARY)
+               RESP     (WS-RESPONSE)
+           END-EXEC
+
+           .
+       0110-EXIT.
+           EXIT.
+
+       0200-ELCIST-STARTBR.
+
+           EXEC CICS STARTBR                                            
+               DATASET   ('ELCIST')
+               RIDFLD    (WS-ST-CONTROL-PRIMARY)
+               GTEQ
+               RESP      (WS-RESPONSE)
+           END-EXEC
+
+           .
+       0200-EXIT.
+           EXIT.
+
+       0210-ELCIST-READNEXT.
+       
+           EXEC CICS READNEXT
+               DATASET  ('ELCIST')
+               SET      (ADDRESS OF CLAIM-INTEREST-ST)
+               RIDFLD   (WS-ST-CONTROL-PRIMARY)
+               RESP     (WS-RESPONSE)
+           END-EXEC
+
+           .
+       0210-EXIT.
+           EXIT.
+
+       0300-ELCIIR-READ.
+       
+           EXEC CICS READ
+               DATASET  ('ELCIIR')
+               SET      (ADDRESS OF CLAIM-INTEREST-IR)
+               RIDFLD   (WS-IR-CONTROL-PRIMARY)
+               RESP     (WS-RESPONSE)
+           END-EXEC
+
+           .
+       0300-EXIT.
+           EXIT.
+
+       9100-CONVERT-DATE.                                               
+           EXEC CICS LINK                                               
+               PROGRAM  ('ELDATCV')                                     
+               COMMAREA (DATE-CONVERSION-DATA)                          
+               LENGTH   (DC-COMM-LENGTH)                                
+           END-EXEC.                                                    
+                                                                        
+       9100-EXIT.                                                       
+           EXIT.                                                        
+
+       99999-DUMMY-STOP-RUN.

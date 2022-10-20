@@ -1,0 +1,166 @@
+################################################################################
+#                                                                              #
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#                                                                              #
+#     JOB: CIPAR00               Translated  : Wed Aug 23 12:33:38 2000        #
+#                                                                              #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+ONRETCODE GT 8 GOTO END_JOB 
+
+#  * 
+SETPRINT printid='OUT1' scope='JOB' groupid='CI' 
+
+#LIBDEF scope='JOB' type='PGM' dataset='IS.DD.PRD1.LOADLIB' lib='\${SEQFILES}/IS.DD.PRD1.LOADLIB' 
+
+#LIBDEF scope='JOB' type='PGM' concat='Y' dataset='SYS1.COB2LIB' lib='\${SEQFILES}/SYS1.COB2LIB' 
+
+e:/cid1p/jcl/ish/convert_pace.bat
+
+################################################################################
+LABEL name=CIDPACPY 
+################################################################################
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYS010' filename='\e:/peer_logic/user_area/tapeuploads/pacesetter/new_central.txt' disp='i-o' 
+#ASSGNDD ddname='SYS011' filename='\${SEQFILES}/pace_copy.txt' disp='o' normal='k' recsize='800' recfmt='F' 
+ASSGNDD ddname='SYS011' dataset='CI.XX.PACESETR.TAPE' gdg='+1' filename='\${SEQFILES}/CI.XX.PACESETR.TAPE' disp='o' normal='k' abend='d' recsize='800' recfmt='F' 
+
+EXECPGM pgmname='CIDPACPY' stepname='CIDPACPY' 
+
+################################################################################
+LABEL name=SORTIT 
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTOUT' dataset='CI.DD.PACESETR.SORTED' filename='\${SEQFILES}/CI.DD.PACESETR.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='800' 
+ASSGNDD ddname='SORTIN' dataset='CI.XX.PACESETR.TAPE' gdg='+1' filename='\${SEQFILES}/CI.XX.PACESETR.TAPE' disp='i-o' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+ASSGNDD ddname='SORTWK06' type='TEMP' 
+
+# SORT FIELDS=(4,10,A,2,2,A),
+# FORMAT=CH
+#  END
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(4 10) (2 2)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTIT' parm='SIZE=4096K' 
+
+unikixbld -i -dCFCNTL
+
+################################################################################
+
+##  The following backs up ELCNTL  to cfcntl.txt (flat file) then copies it to
+##  CFCNTL  The following will run even if you restart after this
+
+unikixbld -t s -d ELCNTL -s cfcntl.txt
+
+unikixbld -t v -d CFCNTL -s cfcntl.txt
+
+################################################################################
+LABEL name=CIPA511 
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYS010' dataset='CI.DD.PACESETR.SORTED' filename='\${SEQFILES}/CI.DD.PACESETR.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS012' dataset='CI.DD.PACESETR.LOGIC' filename='\${SEQFILES}/CI.DD.PACESETR.LOGIC' disp='o' normal='k' abend='d' recsize='90' recfmt='F' 
+
+#  ***//SYS014   DD DSN=CI.DD.PACESETR.PPA.OUT,                          
+#  ***//            DISP=(NEW,CATLG,DELETE),                             
+#  ***//            DCB=(LRECL=115,BLKSIZE=0,RECFM=FB),                  
+#  ***//            SPACE=(CYL,(25,1),RLSE)                              
+SETPRINT ddname='SYS013' forms='STD1' 
+ASSGNDD  ddname='SYS013' type='SYSOUT' class='A' printid='OUT1' 
+SETPRINT ddname='SYS008' forms='STD1' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' printid='OUT1' 
+
+EXECPGM pgmname='CIPA511' stepname='CIPA511' 
+
+################################################################################
+LABEL name=SORTCNV 
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTOUT' dataset='CI.WW.PACESETR.LOGIC.SORT' filename='\${SEQFILES}/CI.WW.PACESETR.LOGIC.SORT' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SORTIN' dataset='CI.DD.PACESETR.LOGIC' filename='\${SEQFILES}/CI.DD.PACESETR.LOGIC' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+#  *                                                                     
+# SORT FIELDS=(81,10,A,1,10,A,78,2,A),FORMAT=CH                          00560010
+# RECORD TYPE=F                                                          00570010
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 10)(1 10)(78 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTCNV' 
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+#ASSGNDD ddname='SYS006' type='DUMMY' 
+
+SETPRINT ddname='SYS008' forms='STD1' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' printid='OUT1' 
+ASSGNDD ddname='SYS010' dataset='CI.WW.PACESETR.LOGIC.SORT' filename='\${SEQFILES}/CI.WW.PACESETR.LOGIC.SORT' disp='i-o' 
+ASSGNDD ddname='SYS011' dataset='CI.WW.PACESETR.EL512' filename='\${SEQFILES}/CI.WW.PACESETR.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.LG.VENDOR.DATECARD' filename='\${SEQFILES}/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.CFED.ELCNTL' type='VS' filename='CFCNTL' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='\e:/cid1p/sysout/sysoutdir/cipar00/el512/sys008_\${jon}' disp='i'
+ASSGNDD ddname='SYS011' filename='\${USEQFILES}/CI.DL.CIADM.FICH512.pace' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009l' stepname='CPY512' parm='ALL' 
+
+
+if ($jobstatus == 0) then
+	"pdpr -p IS_OPS -X e:/cid1p/jcl/l133std.parms -x department-text=CI e:/cid1p/sysout/sysoutdir/cipar00/cipa511/sys008_$jon"
+	"pdpr -p IS_OPS -X e:/cid1p/jcl/l133std.parms -x department-text=CI e:/cid1p/sysout/sysoutdir/cipar00/cipa511/sys013_$jon"
+	"pdpr -p IS_OPS -X e:/cid1p/jcl/l133std.parms -x department-text=CI e:/cid1p/sysout/sysoutdir/cipar00/el512/sys008_$jon"
+	"c:/pmail/winpm-32.exe -J e:/cid1p/pmails/cipar00.txt"
+else
+	echo " Job aborted, print not released"
+endif
+
+ENDJOB 
+
+

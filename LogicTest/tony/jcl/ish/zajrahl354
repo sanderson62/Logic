@@ -1,0 +1,110 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: delmicr               Translated  : Wed Aug 23 16:05:33 2000        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' 
+
+if ($EBMSYS != 'paul') then
+   echo "Job Aborting, not paul"
+   exit 1
+endif
+
+################################################################################
+LABEL name=IDCAMS01 
+################################################################################
+ASSGNDD ddname='SYSUT1' type='VS' filename='MICRDRFT' disp='i-o' 
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/ZH.XX.LG.MICRDRFT' disp='o' normal='k' abend='d' recsize='3000' recfmt='V' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='IDCAMS01' 
+
+################################################################################
+
+unikixbld -i -d MICRDRFT
+
+################################################################################
+
+
+################################################################################
+LABEL name=TRLRBKP 
+################################################################################
+ASSGNDD ddname='IN1' type='VS' filename='ELTRLR' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='OUT1' filename='$SEQFILES/ZH.XX.LG.ELTRLR.EL354A' disp='o' normal='k' abend='d' recfmt='F' recsize='200' 
+
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(IN1)  -
+         OFILE(OUT1)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='TRLRBKP' 
+
+################################################################################
+LABEL name=CHKQBKP 
+################################################################################
+ONRETCODE MAXRC GT '7' BYPASS scope='STEP'  
+ASSGNDD ddname='IN1' type='VS' filename='ELCHKQ' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='OUT1' filename='$SEQFILES/ZH.XX.LG.ELCHKQ.EL354A' disp='o' normal='k' abend='d' recfmt='F' recsize='100' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(IN1)  -
+         OFILE(OUT1)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='CHKQBKP' 
+
+################################################################################
+LABEL name=ACTQBKP 
+################################################################################
+ONRETCODE MAXRC GT '7' BYPASS scope='STEP'  
+ASSGNDD ddname='IN1' type='VS' filename='ELACTQ' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='OUT1' filename='$SEQFILES/ZH.XX.LG.ELACTQ.EL354A' disp='o' normal='k' abend='d' recfmt='F' recsize='60' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(IN1)  -
+         OFILE(OUT1)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='ACTQBKP' 
+
+################################################################################
+LABEL name=DLYACTBKP 
+################################################################################
+ONRETCODE MAXRC GT '7' BYPASS scope='STEP'  
+ASSGNDD ddname='IN1' type='VS' filename='DLYACTV' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='OUT1' filename='$SEQFILES/ZH.XX.LG.DLYACTV.EL354A' disp='o' normal='k' abend='d' recfmt='F' recsize='60' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(IN1)  -
+         OFILE(OUT1)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='DLYACTBKP' 
+
+################################################################################
+LABEL name=EL354
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/ahltst/exe/bat'
+ASSGNDD ddname='ELCHKQ' type='VS' filename='ELCHKQ' DISP='i-o'
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' DISP='i-o'
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' DISP='i-o' 
+ASSGNDD ddname='ERACTQ' type='VS' filename='ERACTQ' DISP='i-o' 
+ASSGNDD ddname='DLYACTV' type='VS' filename='DLYACTV' DISP='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/AH.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+
+EXECPGM PGMNAME='EL354' STEPNAME='EL354'
+
+
+################################################################################
+LABEL name=CPY354
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL354/SYS008_\${JON}' disp='i'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZH.DL.CIADM.FICH354' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY354' parm='ALL'
+
+################################################################################
+
+ENDJOB 

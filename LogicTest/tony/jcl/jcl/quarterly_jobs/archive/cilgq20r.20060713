@@ -1,0 +1,104 @@
+################################################################################
+#                                                                              #
+#     JOB: cilgq20r              Translated  : Wed Aug 23 12:32:23 2000        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' 
+
+################################################################################
+LABEL name=ECS022R
+################################################################################
+#  ** * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *    
+#  **                                                                    
+#  ****   RUNS QUARTERLY ONLY - MAR, JUNE, SEPT & DEC MONTH ENDS.        
+#  **          --------- ====                                            
+#  ** * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *    
+#  ********************************************************************  
+#  ***--       BUILD RISK DISTRIBUTION REPORT RECORDS             --***  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' dataset='CI.XX.DET010' gdg='0' filename='\${SEQFILES}/CI.XX.DET010' disp='i' normal='k' abend='k' 
+ASSGNDD ddname='SYS012' dataset='CI.XX.CERT' gdg='0' filename='\${SEQFILES}/CI.XX.CERT' disp='i' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='SYS011A' filename='/tmp/CILGQ20_INPUT023' disp='o' normal='k' abend='d' recfmt='F' recsize='1362' 
+ASSGNDD ddname='SYS013' filename='/tmp/CILGQ20_TEMPEXTR' disp='o' normal='k' abend='d' recfmt='F' recsize='510' 
+ASSGNDD ddname='SYS020' dataset='CI.EX.FICH022' filename='\${SEQFILES}/CI.EX.FICH022' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+#  ****************************************************  WORK FILES      
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS022R' stepname='ECS022R' 
+
+################################################################################
+LABEL name=ECS023R
+################################################################################
+#  ********************************************************************  
+#  ******--                                                    --******  
+#  ***--              RISK DISTRIBUTION REPORT                    --***  
+#  ***--       SEE RESTART INSTRUCTIONS BEFORE RESTARTING         --***  
+#  ******--                                                    --******  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS011' filename='/tmp/CILGQ20_INPUT023' disp='i-o' normal='d' abend='d' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+#ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'
+ASSGNDD ddname='SYS008' filename='\${SEQFILES}/ECS023R.PRT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS020' dataset='CI.EX.FICH023' filename='\${SEQFILES}/CI.EX.FICH023' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+#  ****************************************************  WORK FILES      
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS023R' stepname='ECS023R' 
+
+################################################################################
+LABEL name=CPY023
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.EX.FICH023' filename='\${SEQFILES}/CI.EX.FICH023' disp='i'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.CIADM.FICH023.RPTCDE1.ACTIVE' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY023' parm='ALL' 
+
+################################################################################
+LABEL name=RDS023
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.EX.FICH023' disp='i'
+ASSGNDD ddname='SYS011' filename='$RDSFILES/CI.RDS.FICHE.ECS023.ACTIVE' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='RDS023' parm='ALL' 
+
+LABEL name=FILTER1
+
+EXECPGM pgmname='BPXBATCH' stepname='FILTER1' parm='SH_perl_/export/home/mtpadmin/bin/addcrlf.pl_/$SEQFILES/ECS023R.PRT_/tmp/ecs023ra_133'
+################################################################################
+
+LABEL name=FILTER2
+
+EXECPGM pgmname='BPXBATCH' stepname='FILTER2' parm='SH_perl_/export/home/mtpadmin/bin/filterecs023r.pl_/tmp/ecs023ra_/export/home/mtpadmin/bin/ecs023rfilter.txt_/tmp/ecs023rb'
+################################################################################
+
+LABEL name=REMOVECR
+
+EXECPGM pgmname='BPXBATCH' stepname='REMOVECR' parm='SH_perl_/export/home/mtpadmin/bin/removecrlf.pl_/tmp/ecs023rb_/$SEQFILES/ecs023rc_133'
+################################################################################
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+   "exelpr.sh p60w1s.parms '-ode=CI' $SEQFILES/ecs023rc"
+else
+   echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################

@@ -1,0 +1,106 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+"smtp -f slunikix -t cycle,pema -s 'issue year extract has started'"
+################################################################################
+LABEL name=EL547A
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.XX.CERT_00' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS013' filename='$SEQFILES/CI.XX.CLMS_00' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERRATE' type='VS' filename='ERRATE' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.XX.EXTR547E.FULL' disp='o' normal='k' abend='d' recsize='310' recfmt='V' 
+SETPRINT ddname='SYS008' forms='STD1' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'
+
+EXECPGM pgmname='EL547E' stepname='EL547A'
+
+################################################################################
+LABEL name=SORT1
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.XX.CLMS_00' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.XX.CLMS.SAL' disp='o' normal='k' abend='d' recfmt='F' recsize='510'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+     INCLUDE=(4 1 NE 'R') AND (12 7 EQ 'MN00010')
+     KEYS=(5 36 CHAR)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT1' 
+
+################################################################################
+#LABEL name=SORT2
+################################################################################
+#
+#ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+#ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+#ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.XX.CERT_00' disp='i-o' 
+#ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.XX.CERT.SAL' disp='o' normal='k' abend='d' recfmt='F' recsize='1056'
+#ASSGNDD ddname='SORTWK01' type='TEMP' 
+#ASSGNDD ddname='SORTWK02' type='TEMP' 
+#ASSGNDD ddname='SORTWK03' type='TEMP' 
+#ASSGNDD ddname='SORTWK04' type='TEMP' 
+#ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+#RECORD:
+#	 INCLUDE=(11 7 EQ 'MN00010')
+#       KEYS=(4 36 CHAR)
+#ENDSORT:
+#!
+#
+#EXECPGM pgmname='SORT' stepname='SORT2' 
+
+################################################################################
+LABEL name=PEMCRC1B
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='CERTIN' filename='$SEQFILES/CI.XX.CERT_00' disp='i-o' 
+ASSGNDD ddname='CERTOT' filename='$SEQFILES/CI.XX.CERT.SAL' disp='o' normal='k' abend='d' recsize='1056' recfmt='F' 
+
+EXECPGM pgmname='PEMCRC1B' stepname='PEMCRC1B' 
+
+################################################################################
+LABEL name=EL547B
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.XX.CERT.SAL' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS013' filename='$SEQFILES/CI.XX.CLMS.SAL' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERRATE' type='VS' filename='ERRATE' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.XX.EXTR547E.SAL' disp='o' normal='k' abend='d' recsize='310' recfmt='V' 
+SETPRINT ddname='SYS008' forms='STD1' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'
+
+EXECPGM pgmname='EL547E' stepname='EL547B'
+
+if ($JOBSTATUS == 0) then
+	ftp -n ntcso1 < $JCLLIB/ftp-cilgm547e
+	"smtp -f slunikix -t cilg547e -s 'issue year extract is complete' -mf /apps/prod/cid1p/emails/cilg547e.txt"
+else
+	echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOB
+# 052914 2014042300003   TANA   CHANGE SMTP TO USE DIST GROUP

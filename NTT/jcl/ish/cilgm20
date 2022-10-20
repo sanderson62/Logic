@@ -1,0 +1,127 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#                                                                              #
+#     JOB: CILGM20               Translated  : Wed Aug 23 12:31:34 2000        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+
+#*******************************************************************************
+#*****
+#* This job is submitted via a job script <cidmth...> that may also submit other
+#* jobs. Files beginning with CI.DL.CIADM... are ftp'd at the start of the next
+#* job script.  Other files being transferred should be noted below.
+#*****
+#*******************************************************************************
+
+################################################################################
+LABEL name=ECS032 
+################################################################################
+#  ********************************************************************  
+#  ******--                                                    --******  
+#  ***--                 CLAIM RESERVES REPORT                    --***  
+#  ******--                                                    --******  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+#  (TEMP COPY OF CI.XX.DET010 CART)00000029
+ASSGNDD ddname='SYS018' dataset='CI.DD.DET010.TEMP' filename='\${SEQFILES}/CI.DD.DET010.TEMP' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS020' dataset='CI.EX.FICH032' gdg='+1' filename='\${SEQFILES}/CI.EX.FICH032' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+#  ****************************************************  WORK FILES      
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+
+EXECPGM pgmname='ECS032' stepname='ECS032' 
+
+################################################################################
+LABEL name=RDS032
+################################################################################
+ASSGNDD ddname='SYS010' filename='/$SYSOUTDIR/$JOBNAME/ECS032/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='/$RDSFILES/CI.RDS.PAPER.ECS032R' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='RDS032' parm='ECS032R'
+
+################################################################################
+LABEL name=CPY032
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.EX.FICH032' gdg='+1' filename='\${SEQFILES}/CI.EX.FICH032' disp='i-o'
+ASSGNDD ddname='SYS011' dataset='CI.DL.CIADM.FICH032' filename='\${SEQFILES}/CI.DL.CIADM.FICH032' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY032' parm='ALL' 
+
+################################################################################
+LABEL name=BLDDISK 
+################################################################################
+#  ********************************************************************  
+#  **                                                                    
+#  **  BUILD A DISK FILE FOR CID TO USE FOR FOR SPECIAL REPORTING.       
+#  **                                                                    
+#  ********************************************************************  
+ASSGNDD ddname='SYSUT1' dataset='CI.EX.FICH032' gdg='+1' filename='\${SEQFILES}/CI.EX.FICH032' disp='i-o' 
+ASSGNDD ddname='SYSUT2' dataset='CI.DD.FICH032.DISK' filename='\${SEQFILES}/CI.DD.FICH032.DISK' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='BLDDISK' 
+
+################################################################################
+LABEL name=CPY032S
+################################################################################
+
+#*******************************************************************************
+#* SYS011 is an onbase file that is ftp'd to //ntcso1/userdata/crp_grp/onbase
+#*******************************************************************************
+
+ASSGNDD ddname='SYS010' dataset='CI.DD.FICH032.DISK' filename='\${SEQFILES}/CI.DD.FICH032.DISK' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.FICH032.CIDTXT' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY032S' parm='ALL' 
+
+################################################################################
+LABEL name=CPY032A
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.DD.FICH032.DISK' filename='\${SEQFILES}/CI.DD.FICH032.DISK' disp='i-o'
+ASSGNDD ddname='SYS011' dataset='CI.DL.CIADM.FICH032A' filename='\${SEQFILES}/CI.DL.CIADM.FICH032A' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY032A' parm='ECS032A' 
+
+################################################################################
+LABEL name=CPY032R
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.DD.FICH032.DISK' filename='\${SEQFILES}/CI.DD.FICH032.DISK' disp='i-o'
+ASSGNDD ddname='SYS011' dataset='CI.DL.CIADM.FICH032R' filename='\${SEQFILES}/CI.DL.CIADM.FICH032R' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY032R' parm='ECS032R' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "ftp -n ntis1.cso.local < $JCLLIB/ftp-cilgm20"
+#     "exelpr.sh l133std.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/ECS032/SYS008_$JON"
+      echo " Nothing to print "
+else
+	echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 072402   2002061900012 SMVA   REPLACE ERMEBL DUMMY WITH NEW DATASET
+# 091902                 SMVA   ADD SMTP COMMAND FOR EMAIL
+# 101102                 SMVA   REMOVE FTP COMMAND AND PLACE IN CIDMTH5 SCRIPT 
+# 101802                 SMVA   MOVE SMTP COMMAND TO CIDMTH5 SCRIPT 
+# 022503   2003022000009 SMVA   REMOVE CI HARDCOPY OF ECS018           
+# 071703                 SMVA   REMOVE PRT CMD ECS031 & 034; SET FOR FICH ONLY
+# 060304 IR2004052900006 SMVA   REMOVE FIRST DELETE STEP FOR CI.DL.CIADM...FILES
+# 042705                 PEMA   RDS PROJECT
+# 031607                 PEMA   REMOVE ECS032 FROM PRINT PER JJVA

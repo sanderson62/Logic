@@ -1,0 +1,266 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: CILGMCON              Translated  : Wed Aug 23 12:31:58 2000        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' 
+ONRETCODE GT 11 GOTO END_JOB 
+################################################################################
+LABEL name=FTP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntis1.cso.local < $JCLLIB/ftp-getcilgmcon
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+################################################################################
+LABEL name=COPY
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cp /export/home/cidftp/data/iss_can.txt /export/home/cidftp/data/save_iss_can.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='COPY' parm='SH'
+
+################################################################################
+LABEL name=FMTCONLY 
+################################################################################
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS010' filename='$CIDFTPDATA/iss_can.txt' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS012' filename='$TAPELDFILES/CI.WW.CON.REFMTED' disp='o' normal='k' abend='d' recfmt='F' recsize='316'
+
+EXECPGM pgmname='CICOFMT' stepname='FMTCONLY' 
+
+################################################################################
+LABEL name=SRTCNLY1 
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$TAPELDFILES/CI.WW.CON.REFMTED' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTOUT' dataset='CI.XX.CONLEY.BACKUP' gdg='+1' filename='$TAPELDFILES/CI.XX.CONLEY.BACKUP' disp='o' normal='k' abend='d' recfmt='F' recsize='316'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(123 2) (3 6) (18 10) (1 2) (15 2) (10 2) (13 2)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SRTCNLY1' parm='SIZE=4096K' 
+
+################################################################################
+LABEL name=BLDSTFIL 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                     
+#  *  STEP BLDSTFIL                                                      
+#  *  BUILD CONLEY STATE CODE FILE FROM PRELIMINARY TEST FILE            
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='INPUT' filename='$SEQFILES/conley_st.txt' disp='i-o' 
+ASSGNDD ddname='OUTPUT' filename='$TAPELDFILES/CI.DD.CONLEY.STATE.FILE' disp='o' normal='k' abend='d' recsize='80' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ REPRO IFILE(INPUT)  -
+       OFILE(OUTPUT)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='BLDSTFIL' 
+
+################################################################################
+LABEL name=CICONLEY 
+################################################################################
+#  ********************************************************************* 
+#  *   STEP "CICONLEY"                                                   
+#  *   CONVERT CREDIT INSURANCE ASSOCIATE (CONLEY) INPUT RECORDS TO A    
+#  *      FORMAT THAT CAN BE INPUT TO LOGIC PROGRAM 'EL512'.             
+#  *                                                                     
+#  *   "CICONLEY" IS A CSO VERSION OF LOGIC PGM "EL511".                 
+#  *                   ==============            =====                   
+#  ********************************************************************* 
+ASSGNDD ddname='SYS006' filename='$TAPELDFILES/CI.DD.CONLEY.STATE.FILE' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='SYS010' dataset='CI.XX.CONLEY.BACKUP' gdg='+1' filename='$TAPELDFILES/CI.XX.CONLEY.BACKUP' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS012' filename='$TAPELDFILES/CI.WW.CONLEY2' disp='o' normal='k' abend='d' recfmt='F' recsize='101'
+ASSGNDD  ddname='SYS013' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='CICO511' stepname='CICONLEY' 
+
+################################################################################
+LABEL name=SRTCNLY2 
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$TAPELDFILES/CI.WW.CONLEY2' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTOUT' filename='$TAPELDFILES/CI.WW.CONLEY2.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 10) (91 11) (79 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SRTCNLY2'
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+#  ********************************************************************  
+#  *                                                                     
+#  *   PREPARE CONLEY ISSUES TO LOAD TO PEND. BUS. FILE                  
+#  *                                                                     
+#  ********************************************************************  
+ASSGNDD ddname='SYS006' type='DUMMY' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS010' filename='$TAPELDFILES/CI.WW.CONLEY2.SORTED' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='$TAPELDFILES/CI.WW.CONLEY.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELREPT' dataset='CI.DD.LG.ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL512/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$TAPELDFILES/CI.DL.CIADM.FICH512.CONLEY' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL'
+
+################################################################################
+LABEL name=PNDBBKP 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                     
+#  *    BACKUP PENDING FILE PRIOR TO UPDATING WITH CONLEY INPUT          
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='ERPNDB' dataset='CI.DD.LG.ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='OUTPUT' dataset='CI.XX.ERPNDB' gdg='+1' filename='$TAPELDFILES/CI.XX.ERPNDB' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(ERPNDB)  -
+        OFILE(OUTPUT)
+!
+EXECPGM pgmname='IDCAMS' stepname='PNDBBKP' 
+
+################################################################################
+LABEL name=EL513 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                     
+#  *    LOAD CONLEY ISSUES INTO PEND. BUS. FILE                          
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='SYS006' type='DUMMY' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD  ddname='SYS009' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS010' filename='$TAPELDFILES/CI.WW.CONLEY.EL512' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERPNDB' dataset='CI.DD.LG.ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='SYS024' type='DUMMY' 
+ASSGNDD ddname='SYS025' type='DUMMY' 
+ASSGNDD ddname='SYS026' type='DUMMY' 
+ASSGNDD ddname='SYS027' type='DUMMY' 
+ASSGNDD ddname='SYS011' type='DUMMY' 
+
+EXECPGM pgmname='EL513' stepname='EL513' 
+
+################################################################################
+LABEL name=EL517 
+################################################################################
+#  ********************************************************************* 
+#  *  DOES A BATCH EDIT ON THE PENDING FILE AFTER THE LOAD               
+#  ********************************************************************* 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELERRS' dataset='CI.DD.LG.ELERRS' type='VS' filename='ELERRS' disp='i-o' 
+ASSGNDD ddname='ERREIN' dataset='CI.DD.LG.ERREIN' type='VS' filename='ERREIN' disp='i-o' 
+ASSGNDD ddname='ERPLAN' dataset='CI.DD.LG.ERPLAN' type='VS' filename='ERPLAN' disp='i-o' 
+ASSGNDD ddname='ERFORM' type='DUMMY' 
+ASSGNDD ddname='ELCERT' dataset='CI.DD.LG.ELCERT' type='VS' filename='ELCERT' disp='i-o' 
+ASSGNDD ddname='ERPNDB' dataset='CI.DD.LG.ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='ERPNDB1' dataset='CI.DD.LG.ERPNDB2' type='VS' filename='ERPNDB2' disp='i-o' 
+ASSGNDD ddname='ERPNDB5' type='VS' filename='ERPNDB2' disp='i-o' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ERPNDM' dataset='CI.DD.LG.ERPNDM' type='VS' filename='ERPNDM' disp='i-o' 
+ASSGNDD ddname='ERMAIL' dataset='CI.DD.LG.ERMAIL' type='VS' filename='ERMAIL' disp='i-o' 
+ASSGNDD ddname='ERRATE' dataset='CI.DD.LG.ERRATE' type='VS' filename='ERRATE' disp='i-o' 
+ASSGNDD ddname='ERCTBL' dataset='CI.DD.LG.ERCTBL' type='VS' filename='ERCTBL' disp='i-o' 
+ASSGNDD ddname='ELREPT' dataset='CI.DD.LG.ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='ELCRTT' dataset='CI.DD.LG.ELCRTT' type='VS' filename='ELCRTT' disp='i-o'
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='DUMMY' 
+
+EXECPGM pgmname='EL517' stepname='EL517' 
+
+################################################################################
+LABEL name=EL515 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                     
+#  *   PRINTS THE 'EDIT LISTING'                                         
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='ERPNDC' dataset='CI.DD.LG.ERPNDC' type='VS' filename='ERPNDC' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELERRS' dataset='CI.DD.LG.ELERRS' type='VS' filename='ELERRS' disp='i-o' 
+ASSGNDD ddname='ERCRTC' dataset='CI.DD.LG.ERCRTC' type='VS' filename='ERCRTC' disp='i-o' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ERPNDB' dataset='CI.DD.LG.ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='ELREPT' dataset='CI.DD.LG.ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+ASSGNDD ddname='SYS008' type='DUMMY' 
+
+EXECPGM pgmname='EL515' stepname='EL515' 
+
+################################################################################
+
+ftp -n ntis1.cso.local < $JCLLIB/ftp-cilgmcon
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+#  "exelpr.sh l133std.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/CICONLEY/SYS013_$JON"
+  "exelpr.sh cit522.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/EL513/SYS008_$JON"
+  "exelpr.sh cit522.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/EL513/SYS009_$JON"
+else
+  echo "job aborted reports not released"
+endif
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 102202                 SMVA   REMOVE EXELPR CMD FOR CICONLEY SYS008 - HAD BEEN
+#                               COMMENTED OUT IN CICO511 PROGRAM AND ADD EXELPR 
+#                               FOR EL513 SYS009 ERROR REPORT 
+# 103002                 SMVA   CHG OUTFILE DIR TO TAPELDFILES
+# 110402                 SMVA   CHG LOCATION OF conley_st.txt FILE TO SEQFILES
+#                               FROM CIDFTPDATA
+# 042203                 SMVA   ADD CPY512 STEP AND FTP COMMAND                
+#                               REMOVE EL512 PRINT; WILL USE EL512 TEXT FILE    
+#                               CHG DEST OF EL513 RPTS FROM OPS TO PRN9         
+# 071403  2003040800007  SMVA   CHG NORMAL DISP TO DELETE FOR ISS_CAN.TXT
+#                               ADD COPY CMD PRIOR TO FIRST STEP
+# 111903  2003111900002  SMVA   CHG ISS_CAN.TXT TO LOWER CASE
+# 081506                 PEMA   CHG LRECL TO 258 ON I/P FILE
+# 060107                 PEMA   REMOVE 511 PRINT PER KAREN H.
+# 050409  2009031600001  AJRA   ADD ELCRTT TO EL517
+# 052914  2014042300003  TANA   CHANGE SMTP TO USE DIST GROUP

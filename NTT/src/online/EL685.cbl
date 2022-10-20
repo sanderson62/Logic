@@ -1,0 +1,7853 @@
+      *((program: EL685.cl2))
+000001 IDENTIFICATION DIVISION.
+000002
+000003 PROGRAM-ID. EL685 .
+000004*              PROGRAM CONVERTED BY
+000005*              COBOL CONVERSION AID PO 5785-ABJ
+000006*              CONVERSION DATE 07/20/95 07:57:46.
+000007*                            VMOD=2.018
+000008*
+000009*AUTHOR.    LOGIC, INC.
+000010*           DALLAS, TEXAS.
+000011
+000012*DATE-COMPILED.
+000013
+000014*SECURITY.   *****************************************************
+000015*            *                                                   *
+000016*            *   THIS PROGRAM IS THE PROPERTY OF LOGIC, INC.     *
+000017*            *                                                   *
+000018*            *   USE OF THIS PROGRAM BY OTHER THAN THE EMPLOYEES *
+000019*            *   OF LOGIC, INC. IS EXPRESSLY PROHIBITED WITHOUT  *
+000020*            *   THE PRIOR WRITTEN PERMISSION OF LOGIC INC.      *
+000021*            *                                                   *
+000022*            *****************************************************
+000023
+000024*    SKIP3
+000025*REMARKS.    TRANSACTION -  EXG1
+000026
+000027*        THIS PROGRAM PRODUCES A REPORT SHOWING ALL CHECKS THAT
+000028*    ARE WAITING TO BE PRINTED.
+000029
+000030*        THIS PROGRAM MAY BE ENTERED INTO THRU THE CREDIT OR
+000031*                   ACCOUNTS RECEIVABLE SYSTEMS.
+000032
+000033*    SCREENS     - EL685A - CHECKS TO BE PRINTED
+000034*                  EL685B - A/R CHECKS TO BE PRINTED
+000035*                  EL850C - CHECKS PRINTED
+000036*                  EL685D - A/R CHECKS PRINTED
+000037
+000038*    ENTERED BY  - EL671  - REPORT MENU
+000039*                    OR
+000040*                  EL850  - ACCOUNTS RECEIVABLE MENU
+000041
+000042*    EXIT TO     - EL671  - RESULT OF CLEAR OR END OF JOB
+000043*                    OR
+000044*                  EL850  - RESULT OF CLEAR OR END OF JOB
+000045******************************************************************
+000046*                   C H A N G E   L O G
+000047*
+000048* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+000049*-----------------------------------------------------------------
+000050*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+000051* EFFECTIVE    NUMBER
+000052*-----------------------------------------------------------------
+000053* 030612  CR2011120900003  AJRA  ADD AHL COMPANY CODE
+000054* 062121  CR2021021600001  PEMA  ADD PROCESSING FOR NEW COMP FNL
+000055******************************************************************
+000056
+000057
+000058     EJECT
+000059 ENVIRONMENT DIVISION.
+000060
+000061 DATA DIVISION.
+000062
+000063 WORKING-STORAGE SECTION.
+       01  DFH-START PIC X(04).
+000064
+000065 77  FILLER  PIC X(32)  VALUE '********************************'.
+000066 77  FILLER  PIC X(32)  VALUE '*   EL685  WORKING STORAGE     *'.
+000067 77  FILLER  PIC X(32)  VALUE '*********** VMOD=2.018 *********'.
+000068
+000069 01  FILLER                          COMP-3.
+000070     05  WS-READNEXT-SW              PIC S9          VALUE ZERO.
+000071
+000072     05  WS-TIME-WORK                PIC S9(7)       VALUE ZERO.
+000073     05  WS-TIME                     REDEFINES
+000074         WS-TIME-WORK                PIC S9(3)V9(4).
+000075
+000076 01  FILLER                          COMP SYNC.
+000077     05  WS-TS-LENGTH                PIC S9(4)       VALUE +1920.
+000078
+000079 01  FILLER.
+000080     05  CNTL-KEY.
+000081         10  CNTL-CO                 PIC X(3).
+000082         10  CNTL-RECORD-TYPE        PIC X           VALUE '1'.
+000083         10  CNTL-GENL               PIC X(4).
+000084         10  CNTL-SEQ                PIC S9(4) VALUE +0      COMP.
+000085
+000086     05  WS-START-CNTLNO             PIC S9(8)   VALUE +0    COMP.
+000087
+000088     05  WS-MAPSET-NAME              PIC X(8)      VALUE 'EL685S'.
+000089     05  WS-MAP-NAME                 PIC X(8)      VALUE 'EL685A'.
+000090
+000091     05  FILLER                      REDEFINES
+000092         WS-MAP-NAME.
+000093         20  FILLER                  PIC XX.
+000094         20  WS-MAP-NUMBER           PIC X(6).
+000095
+000096     05  WS-PROGRAM-ID               PIC X(8)      VALUE 'EL685'.
+000097
+000098     05  WS-CHECK-QUEUE-DSID         PIC X(8) VALUE 'ERCHKQ'.
+000099     05  WS-COMCK-QUEUE-DSID         PIC X(8) VALUE 'ERCMKQ'.
+000100     05  WS-CONTROL-DSID             PIC X(8) VALUE 'ELCNTL'.
+000101
+000102     05  WS-TRANS-ID                 PIC X(4) VALUE 'EXG1'.
+000103     05  WS-PRINT-TRAN-ID            PIC X(4) VALUE 'EXG9'.
+000104     05  WS-PRINTER-ID               PIC X(4).
+000105
+000106     05  WS-TEXT-MESSAGE-LENGTH      PIC S9(4)       VALUE +70
+000107                                     COMP
+000108                                     SYNCHRONIZED.
+000109
+000110     05  WS-TEXT-MESSAGE             PIC X(70)       VALUE SPACES.
+000111
+000112     05  WS-SUCCESSFUL-MESSAGE       PIC X(79)       VALUE
+000113         '0000 TRANSACTION SUCCESSFUL'.
+000114
+000115     05  WS-PAYEE-DESC               PIC X(08)       VALUE
+000116         'PAYEE   '.
+000117
+000118     05  WS-PAYEE-SEQ-DESC           PIC X(07)       VALUE
+000119         'SEQ    '.
+000120
+000121     05  WS-FINRESP-DESC             PIC X(08)       VALUE
+000122         'FIN.RESP'.
+000123
+000124     05  WS-ACCOUNT-DESC             PIC X(07)       VALUE
+000125         'ACCOUNT'.
+000126
+000127     05  WS-TO-BE-PRINTED-DESC       PIC X(28)       VALUE
+000128         '-   CHECKS TO BE PRINTED   -'.
+000129
+000130     05  WS-CHECKS-PRINTED-DESC      PIC X(28)       VALUE
+000131         '-      PRINTED CHECKS      -'.
+000132
+000133     05  WS-AR-TO-BE-PRINTED-DESC    PIC X(28)       VALUE
+000134         '- A/R CHECKS TO BE PRINTED -'.
+000135
+000136     05  WS-AR-CHECKS-PRINTED-DESC   PIC X(28)       VALUE
+000137         '-    A/R PRINTED CHECKS    -'.
+000138
+000139     05  WS-TO-BE-PRINTED-PFDESC     PIC X(29)       VALUE
+000140         'PF4=LIST PRINTED CHECKS      '.
+000141
+000142     05  WS-CHECKS-PRINTED-PFDESC    PIC X(29)       VALUE
+000143         'PF4=LIST TO BE PRINTED CHECKS'.
+000144
+000145     05  WS-SAVE-CHECK-MODE          PIC X           VALUE SPACE.
+000146
+000147     05  WS-SAVE-AR-MODE             PIC X           VALUE SPACE.
+000148
+000149     05  WS-TEMP-STORAGE-KEY.
+000150         10  WS-TS-TERM-ID           PIC X(4).
+000151         10  FILLER                  PIC X(4)        VALUE '685'.
+000152
+000153     05  WS-TEMP-STORAGE-ITEM        PIC S9(4)       VALUE ZERO
+000154                                     COMP
+000155                                     SYNCHRONIZED.
+000156
+000157 01  HOLD-CHECK-RECORD.
+000158     12  HOLD-RECORD-ID              PIC XX.
+000159         88  VALID-HOLD-ID                   VALUE 'MQ'.
+000160
+000161     12  HOLD-CONTROL-PRIMARY.
+000162         16  HOLD-COMPANY-CD         PIC X.
+000163         16  HOLD-CONTROL-NUMBER     PIC S9(8)   COMP VALUE ZEROS.
+000164         16  HOLD-SEQUENCE-NUMBER    PIC S9(4)   COMP VALUE ZEROS.
+000165
+000166     12  HOLD-CONTROL-BY-PAYEE.
+000167         16  HOLD-COMPANY-CD-A1      PIC X.
+000168         16  HOLD-CSR-A1             PIC X(4).
+000169         16  HOLD-CARRIER-A1         PIC X.
+000170         16  HOLD-GROUPING-A1        PIC X(6).
+000171         16  HOLD-PAYEE-A1           PIC X(10).
+000172         16  HOLD-PAYEE-SEQ-A1       PIC S9(4)   COMP VALUE ZEROS.
+000173         16  HOLD-CONTROL-NUMBER-A1  PIC S9(8)   COMP VALUE ZEROS.
+000174         16  HOLD-SEQUENCE-NUMBER-A1 PIC S9(4)   COMP VALUE ZEROS.
+000175
+000176     12  HOLD-ENTRY-TYPE             PIC X.
+000177
+000178     12  FILLER                      PIC X(10).
+000179
+000180     12  HOLD-CREDIT-CHEK-CNTL.
+000181         16  HOLD-CHEK-CSR           PIC X(4).
+000182         16  HOLD-CHEK-CARRIER       PIC X.
+000183         16  HOLD-CHEK-GROUPING      PIC X(6).
+000184         16  HOLD-CHEK-PAYEE         PIC X(10).
+000185         16  HOLD-CHEK-PAYEE-SEQ     PIC S9(4)   COMP VALUE ZEROS.
+000186         16  HOLD-CHEK-SEQ-NO        PIC S9(4)   COMP VALUE ZEROS.
+000187
+000188     12  FILLER                      PIC X(10).
+000189
+000190     12  HOLD-PAYEE-INFO.
+000191         16  HOLD-PAYEE-NAME         PIC X(30).
+000192         16  HOLD-PAYEE-ADDRESS-1    PIC X(30).
+000193         16  HOLD-PAYEE-ADDRESS-2    PIC X(30).
+000194         16  HOLD-PAYEE-CITY-ST      PIC X(30).
+000195         16  HOLD-PAYEE-ZIP-CODE.
+000196             20  HOLD-PAYEE-ZIP.
+000197                 24  FILLER          PIC X(1).
+000198                 24  FILLER          PIC X(4).
+000199             20  HOLD-PAYEE-ZIP-EXT  PIC X(4).
+000200
+000201     12  HOLD-CREDIT-PYAJ-CNTL.
+000202         16  HOLD-PYAJ-CARRIER       PIC X.
+000203         16  HOLD-PYAJ-GROUPING      PIC X(6).
+000204         16  HOLD-PYAJ-FIN-RESP      PIC X(10).
+000205         16  FILLER                  PIC X(6).
+000206
+000207     12  HOLD-CHECK-NUMBER           PIC X(6).
+000208     12  HOLD-CHECK-AMOUNT           PIC S9(7)V99
+000209                                               COMP-3 VALUE ZEROS.
+000210     12  HOLD-NUMBER-OF-CK-STUBS     PIC S9(3)
+000211                                               COMP-3 VALUE ZEROS.
+000212     12  HOLD-VOID-DT                PIC XX.
+000213     12  HOLD-TIMES-PRINTED          PIC S9(4)   COMP VALUE ZEROS.
+000214     12  HOLD-PRINT-AT-HHMM          PIC S9(4)   COMP VALUE ZEROS.
+000215     12  HOLD-CHECK-BY-USER          PIC X(4).
+000216     12  HOLD-PRE-NUMBERING-SW       PIC X.
+000217
+000218     12  HOLD-CHECK-WRITTEN-DT       PIC XX.
+000219     12  HOLD-LAST-MAINT-BY          PIC X(4).
+000220     12  HOLD-LAST-MAINT-HHMMSS      PIC S9(6) COMP-3 VALUE ZEROS.
+000221     12  HOLD-LAST-MAINT-DT          PIC XX.
+000222     12  HOLD-CHECK-RELEASE-DT       PIC XX.
+000223     12  HOLD-RECORD-TYPE            PIC X.
+000224
+000225     12  HOLD-DETAIL-INFORMATION.
+000226         16  HOLD-DETAIL-INFO      OCCURS 15 TIMES.
+000227             20  HOLD-CHECK-STUB-LINE.
+000228                 24  HOLD-STUB-COMMENT      PIC X(23).
+000229                 24  HOLD-ACCT-AGENT        PIC X(10).
+000230                 24  HOLD-INVOICE           PIC X(6).
+000231                 24  HOLD-REFERENCE         PIC X(12).
+000232                 24  HOLD-LEDGER-NO         PIC X(14).
+000233                 24  HOLD-PYAJ-AMT          PIC S9(7)V99
+000234                                               COMP-3 VALUE ZEROS.
+000235                 24  HOLD-PYAJ-REC-TYPE     PIC X.
+000236                 24  HOLD-PYAJ-SEQ          PIC S9(8)
+000237                                               COMP VALUE ZEROS.
+000238                 24  HOLD-PAYMENT-TYPE      PIC X.
+000239                 24  HOLD-PYAJ-PMT-APPLIED  PIC X.
+000240                 24  HOLD-LAST-MAINT-APPLIED PIC X.
+000241                 24  HOLD-NON-AR-ITEM       PIC X.
+000242                 24  FILLER                 PIC X(19).
+000243
+000244     12  HOLD-CHECK-STUB-TEXT REDEFINES HOLD-DETAIL-INFORMATION.
+000245         16  HOLD-CHECK-TEXT-ITEMS OCCURS 3 TIMES.
+000246             20  HOLD-STUB-TEXT      PIC X(70).
+000247         16  HOLD-STUB-FILLER        PIC X(1260).
+000248
+000249     12  HOLD-CREDIT-SELECT-DATE     PIC XX.
+000250     12  HOLD-CREDIT-ACCEPT-DATE     PIC XX.
+000251
+000252     12  HOLD-AR-STATEMENT-DT        PIC XX.
+000253     12  HOLD-CO-TYPE                PIC X.
+000254
+000255     12  HOLD-STARTING-CHECK-NUMBER  PIC X(06).
+000256     12  FILLER                      PIC X(41).
+000257******************************************************************
+000258
+000259     EJECT
+000260*                            COPY ELCINTF.
+      *>>((file: ELCINTF))
+000001******************************************************************
+000002*                                                                *
+000003*                                                                *
+000004*                            ELCINTF.                            *
+000005*                            VMOD=2.017                          *
+000006*                                                                *
+000007*   FILE DESCRIPTION = C.I.C.S. COMMON DATA AREA                 *
+000008*                                                                *
+000009*       LENGTH = 1024                                            *
+000010*                                                                *
+000011******************************************************************
+000012*                   C H A N G E   L O G
+000013*
+000014* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+000015*-----------------------------------------------------------------
+000016*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+000017* EFFECTIVE    NUMBER
+000018*-----------------------------------------------------------------
+000019* 011812    2011022800001  AJRA  ADD CSR IND TO USER SECURITY
+000020******************************************************************
+000021 01  PROGRAM-INTERFACE-BLOCK.
+000022     12  PI-COMM-LENGTH                PIC S9(4) COMP VALUE +1024.
+000023     12  PI-CALLING-PROGRAM              PIC X(8).
+000024     12  PI-SAVED-PROGRAM-1              PIC X(8).
+000025     12  PI-SAVED-PROGRAM-2              PIC X(8).
+000026     12  PI-SAVED-PROGRAM-3              PIC X(8).
+000027     12  PI-SAVED-PROGRAM-4              PIC X(8).
+000028     12  PI-SAVED-PROGRAM-5              PIC X(8).
+000029     12  PI-SAVED-PROGRAM-6              PIC X(8).
+000030     12  PI-RETURN-TO-PROGRAM            PIC X(8).
+000031     12  PI-COMPANY-ID                   PIC XXX.
+000032     12  PI-COMPANY-CD                   PIC X.
+000033
+000034     12  PI-COMPANY-PASSWORD             PIC X(8).
+000035
+000036     12  PI-JOURNAL-FILE-ID              PIC S9(4) COMP.
+000037
+000038     12  PI-CONTROL-IN-PROGRESS.
+000039         16  PI-CARRIER                  PIC X.
+000040         16  PI-GROUPING                 PIC X(6).
+000041         16  PI-STATE                    PIC XX.
+000042         16  PI-ACCOUNT                  PIC X(10).
+000043         16  PI-PRODUCER REDEFINES PI-ACCOUNT
+000044                                         PIC X(10).
+000045         16  PI-CLAIM-CERT-GRP.
+000046             20  PI-CLAIM-NO             PIC X(7).
+000047             20  PI-CERT-NO.
+000048                 25  PI-CERT-PRIME       PIC X(10).
+000049                 25  PI-CERT-SFX         PIC X.
+000050             20  PI-CERT-EFF-DT          PIC XX.
+000051         16  PI-PLAN-DATA REDEFINES PI-CLAIM-CERT-GRP.
+000052             20  PI-PLAN-CODE            PIC X(2).
+000053             20  PI-REVISION-NUMBER      PIC X(3).
+000054             20  PI-PLAN-EFF-DT          PIC X(2).
+000055             20  PI-PLAN-EXP-DT          PIC X(2).
+000056             20  FILLER                  PIC X(11).
+000057         16  PI-OE-REFERENCE-1 REDEFINES PI-CLAIM-CERT-GRP.
+000058             20  PI-OE-REFERENCE-1.
+000059                 25  PI-OE-REF-1-PRIME   PIC X(18).
+000060                 25  PI-OE-REF-1-SUFF    PIC XX.
+000061
+000062     12  PI-SESSION-IN-PROGRESS          PIC X.
+000063         88  CLAIM-SESSION                   VALUE '1'.
+000064         88  CREDIT-SESSION                  VALUE '2'.
+000065         88  WARRANTY-SESSION                VALUE '3'.
+000066         88  MORTGAGE-SESSION                VALUE '4'.
+000067         88  GENERAL-LEDGER-SESSION          VALUE '5'.
+000068
+000069
+000070*THE FOLLOWING TWO FIELDS ARE USED ONLY WITH MULTI COMPANY CLIENTS
+000071
+000072     12  PI-ORIGINAL-COMPANY-ID          PIC X(3).
+000073     12  PI-ORIGINAL-COMPANY-CD          PIC X.
+000074
+000075     12  PI-CREDIT-USER                  PIC X.
+000076         88  PI-NOT-CREDIT-USER              VALUE 'N'.
+000077         88  PI-HAS-CLAS-IC-CREDIT           VALUE 'Y'.
+000078
+000079     12  PI-CLAIM-USER                   PIC X.
+000080         88  PI-NOT-CLAIM-USER               VALUE 'N'.
+000081         88  PI-HAS-CLAS-IC-CLAIM            VALUE 'Y'.
+000082
+000083     12  PI-PROCESSOR-SYS-ACCESS         PIC X.
+000084         88  PI-ACCESS-TO-BOTH-SYSTEMS       VALUE ' '.
+000085         88  PI-ACCESS-TO-ALL-SYSTEMS        VALUE ' '.
+000086         88  PI-ACCESS-TO-CLAIM-ONLY         VALUE '1'.
+000087         88  PI-ACCESS-TO-CREDIT-ONLY        VALUE '2'.
+000088         88  PI-ACCESS-TO-MORTGAGE-ONLY      VALUE '3'.
+000089
+000090     12  PI-PROCESSOR-ID                 PIC X(4).
+000091
+000092     12  PI-PROCESSOR-PASSWORD           PIC X(11).
+000093
+000094     12  PI-MEMBER-CAPTION               PIC X(10).
+000095
+000096     12  PI-PROCESSOR-USER-ALMIGHTY      PIC X.
+000097         88  PI-USER-ALMIGHTY-YES            VALUE 'Y'.
+000098
+000099     12  PI-LIFE-OVERRIDE-L1             PIC X.
+000100     12  PI-LIFE-OVERRIDE-L2             PIC XX.
+000101     12  PI-LIFE-OVERRIDE-L6             PIC X(6).
+000102     12  PI-LIFE-OVERRIDE-L12            PIC X(12).
+000103
+000104     12  PI-AH-OVERRIDE-L1               PIC X.
+000105     12  PI-AH-OVERRIDE-L2               PIC XX.
+000106     12  PI-AH-OVERRIDE-L6               PIC X(6).
+000107     12  PI-AH-OVERRIDE-L12              PIC X(12).
+000108
+000109     12  PI-NEW-SYSTEM                   PIC X(2).
+000110
+000111     12  PI-PRIMARY-CERT-NO              PIC X(11).
+000112     12  PI-CLAIM-PAID-THRU-TO           PIC X(01).
+000113         88  PI-USES-PAID-TO                 VALUE '1'.
+000114     12  PI-CRDTCRD-SYSTEM.
+000115         16  PI-CRDTCRD-USER             PIC X.
+000116             88  PI-NOT-CRDTCRD-USER         VALUE 'N'.
+000117             88  PI-HAS-CLAS-IC-CRDTCRD      VALUE 'Y'.
+000118         16  PI-CC-MONTH-END-DT          PIC XX.
+000119     12  PI-PROCESSOR-PRINTER            PIC X(4).
+000120
+000121     12  PI-OE-REFERENCE-2.
+000122         16  PI-OE-REF-2-PRIME           PIC X(10).
+000123         16  PI-OE-REF-2-SUFF            PIC X.
+000124
+000125     12  PI-REM-TRM-CALC-OPTION          PIC X.
+000126
+000127     12  PI-LANGUAGE-TYPE                PIC X.
+000128             88  PI-LANGUAGE-IS-ENG          VALUE 'E'.
+000129             88  PI-LANGUAGE-IS-FR           VALUE 'F'.
+000130             88  PI-LANGUAGE-IS-SPAN         VALUE 'S'.
+000131
+000132     12  PI-POLICY-LINKAGE-IND           PIC X.
+000133         88  PI-USE-POLICY-LINKAGE           VALUE 'Y'.
+000134         88  PI-POLICY-LINKAGE-NOT-USED      VALUE 'N'
+000135                                                   LOW-VALUES.
+000136
+000137     12  PI-ALT-DMD-PRT-ID               PIC X(4).
+000138     12  PI-CLAIM-PW-SESSION             PIC X(1).
+000139         88  PI-CLAIM-CREDIT                 VALUE '1'.
+000140         88  PI-CLAIM-CONVEN                 VALUE '2'.
+000141
+000142     12  PI-PROCESSOR-CSR-IND            PIC X.
+000143         88  PI-PROCESSOR-IS-CSR             VALUE 'Y' 'S'.
+000144         88  PI-PROCESSOR-IS-CSR-SUPER       VALUE 'S'.
+000145
+000146     12  FILLER                          PIC X(3).
+000147
+000148     12  PI-SYSTEM-LEVEL                 PIC X(145).
+000149
+000150     12  PI-CLAIMS-CREDIT-LEVEL          REDEFINES
+000151         PI-SYSTEM-LEVEL.
+000152
+000153         16  PI-ENTRY-CODES.
+000154             20  PI-ENTRY-CD-1           PIC X.
+000155             20  PI-ENTRY-CD-2           PIC X.
+000156
+000157         16  PI-RETURN-CODES.
+000158             20  PI-RETURN-CD-1          PIC X.
+000159             20  PI-RETURN-CD-2          PIC X.
+000160
+000161         16  PI-UPDATE-STATUS-SAVE.
+000162             20  PI-UPDATE-BY            PIC X(4).
+000163             20  PI-UPDATE-HHMMSS        PIC S9(7)     COMP-3.
+000164
+000165         16  PI-LOWER-CASE-LETTERS       PIC X.
+000166             88  LOWER-CASE-LETTERS-USED     VALUE 'Y'.
+000167
+000168*        16  PI-CLAIM-ACCESS-CONTROL     PIC X.
+000169*            88  CLAIM-NO-UNIQUE             VALUE '1'.
+000170*            88  CARRIER-CLM-CNTL            VALUE '2'.
+000171
+000172         16  PI-CERT-ACCESS-CONTROL      PIC X.
+000173             88  ST-ACCNT-CNTL               VALUE ' '.
+000174             88  CARR-GROUP-ST-ACCNT-CNTL    VALUE '1'.
+000175             88  CARR-ST-ACCNT-CNTL          VALUE '2'.
+000176             88  ACCNT-CNTL                  VALUE '3'.
+000177             88  CARR-ACCNT-CNTL             VALUE '4'.
+000178
+000179         16  PI-PROCESSOR-CAP-LIST.
+000180             20  PI-SYSTEM-CONTROLS.
+000181                24 PI-SYSTEM-DISPLAY     PIC X.
+000182                 88  SYSTEM-DISPLAY-CAP      VALUE 'Y'.
+000183                24 PI-SYSTEM-MODIFY      PIC X.
+000184                 88  SYSTEM-MODIFY-CAP       VALUE 'Y'.
+000185             20  FILLER                  PIC XX.
+000186             20  PI-DISPLAY-CAP          PIC X.
+000187                 88  DISPLAY-CAP             VALUE 'Y'.
+000188             20  PI-MODIFY-CAP           PIC X.
+000189                 88  MODIFY-CAP              VALUE 'Y'.
+000190             20  PI-MSG-AT-LOGON-CAP     PIC X.
+000191                 88  MSG-AT-LOGON-CAP        VALUE 'Y'.
+000192             20  PI-FORCE-CAP            PIC X.
+000193                 88  FORCE-CAP               VALUE 'Y'.
+000194
+000195         16  PI-PROGRAM-CONTROLS.
+000196             20  PI-PGM-PRINT-OPT        PIC X.
+000197             20  PI-PGM-FORMAT-OPT       PIC X.
+000198             20  PI-PGM-PROCESS-OPT      PIC X.
+000199             20  PI-PGM-TOTALS-OPT       PIC X.
+000200
+000201         16  PI-HELP-INTERFACE.
+000202             20  PI-LAST-ERROR-NO        PIC X(4).
+000203             20  PI-CURRENT-SCREEN-NO    PIC X(4).
+000204
+000205         16  PI-CARRIER-CONTROL-LEVEL    PIC X.
+000206             88  CONTROL-IS-ACTUAL-CARRIER   VALUE SPACE.
+000207
+000208         16  PI-CR-CONTROL-IN-PROGRESS.
+000209             20  PI-CR-CARRIER           PIC X.
+000210             20  PI-CR-GROUPING          PIC X(6).
+000211             20  PI-CR-STATE             PIC XX.
+000212             20  PI-CR-ACCOUNT           PIC X(10).
+000213             20  PI-CR-FIN-RESP          PIC X(10).
+000214             20  PI-CR-TYPE              PIC X.
+000215
+000216         16  PI-CR-BATCH-NUMBER          PIC X(6).
+000217
+000218         16  PI-CR-MONTH-END-DT          PIC XX.
+000219
+000220         16  PI-CAR-GROUP-ACCESS-CNTL    PIC X.
+000221             88  PI-USE-ACTUAL-CARRIER       VALUE ' '.
+000222             88  PI-ZERO-CARRIER             VALUE '1'.
+000223             88  PI-ZERO-GROUPING            VALUE '2'.
+000224             88  PI-ZERO-CAR-GROUP           VALUE '3'.
+000225
+000226         16  PI-CARRIER-SECURITY         PIC X.
+000227             88  PI-NO-CARRIER-SECURITY      VALUE ' '.
+000228
+000229         16  PI-ACCOUNT-SECURITY         PIC X(10).
+000230             88  PI-NO-ACCOUNT-SECURITY      VALUE SPACES.
+000231             88  PI-NO-PRODUCER-SECURITY     VALUE SPACES.
+000232
+000233         16  PI-CODE-SECURITY REDEFINES PI-ACCOUNT-SECURITY.
+000234             20  PI-ACCESS-CODE          OCCURS 10 TIMES
+000235                                         INDEXED BY PI-ACCESS-NDX
+000236                                         PIC X.
+000237
+000238         16  PI-GA-BILLING-CONTROL       PIC X.
+000239             88  PI-GA-BILLING               VALUE '1'.
+000240
+000241         16  PI-MAIL-PROCESSING          PIC X.
+000242             88  PI-MAIL-YES                 VALUE 'Y'.
+000243
+000244         16  PI-SECURITY-TEMP-STORE-ID   PIC X(8).
+000245
+000246         16  PI-AR-SYSTEM.
+000247             20  PI-AR-PROCESSING-CNTL   PIC X.
+000248                 88  PI-AR-PROCESSING        VALUE 'Y'.
+000249             20  PI-AR-SUMMARY-CODE      PIC X(6).
+000250             20  PI-AR-MONTH-END-DT      PIC XX.
+000251
+000252         16  PI-MP-SYSTEM.
+000253             20  PI-MORTGAGE-USER            PIC X.
+000254                 88  PI-NOT-MORTGAGE-USER            VALUE 'N'.
+000255                 88  PI-HAS-CLAS-IC-MORTGAGE         VALUE 'Y'.
+000256             20  PI-MORTGAGE-ACCESS-CONTROL  PIC X.
+000257                 88  PI-MP-ST-PROD-CNTL              VALUE ' '.
+000258                 88  PI-MP-CARR-GRP-ST-PROD-CNTL     VALUE '1'.
+000259                 88  PI-MP-CARR-ST-PROD-CNTL         VALUE '2'.
+000260                 88  PI-MP-PROD-CNTL                 VALUE '3'.
+000261                 88  PI-MP-CARR-PROD-CNTL            VALUE '4'.
+000262             20  PI-MP-MONTH-END-DT          PIC XX.
+000263             20  PI-MP-REFERENCE-NO.
+000264                 24  PI-MP-REFERENCE-PRIME   PIC X(18).
+000265                 24  PI-MP-REFERENCE-SFX     PIC XX.
+000266
+000267         16  PI-LABEL-CONTROL            PIC X(01).
+000268             88  PI-CREATE-LABELS                    VALUE 'Y'.
+000269             88  PI-BYPASS-LABELS                    VALUE 'N'.
+000270
+000271         16  PI-BILL-GROUPING-CODE       PIC X(01).
+000272             88  PI-CO-HAS-BILL-GROUPING             VALUE 'Y'.
+000273
+000274         16  PI-RATE-DEV-AUTHORIZATION   PIC X(01).
+000275             88  PI-RATE-DEV-AUTHORIZED              VALUE 'Y'.
+000276             88  PI-RATE-DEV-NOT-AUTHORIZED          VALUE 'N'.
+000277
+000278         16  FILLER                      PIC X(14).
+000279
+000280     12  PI-PROGRAM-WORK-AREA            PIC X(640).
+000281******************************************************************
+      *<<((file: ELCINTF))
+000261
+000262     12  FILLER                      REDEFINES
+000263         PI-PROGRAM-WORK-AREA.
+000264         16  PI-CHECK-QUE-KEY.
+000265             20  PI-CK-COMPANY-CODE  PIC X.
+000266             20  PI-CK-CONTROL-NO    PIC S9(8)          COMP.
+000267             20  PI-CK-SEQUENCE-NO   PIC S9(4)          COMP.
+000268
+000269         16  PI-PREV-CHECK-QUE-KEY.
+000270             20  PI-PREV-CK-COMPANY-CODE     PIC X.
+000271             20  PI-PREV-CK-CONTROL-NO       PIC S9(8) COMP.
+000272             20  PI-PREV-CK-SEQUENCE-NO      PIC S9(4) COMP.
+000273
+000274
+000275         16  PI-TEMP-STORAGE-ITEM    PIC S9(4)
+000276                                     COMP
+000277                                     SYNCHRONIZED.
+000278
+000279         16  PI-END-OF-FILE          PIC S9
+000280                                     COMP-3.
+000281
+000282         16 PI-CONTROL-TOTALS.
+000283            20 PI-CONTROL-TOT        PIC S9(7)V99 COMP-3.
+000284            20 PI-CONTROL-GRAND-TOT  PIC S9(7)V99 COMP-3.
+000285            20 PI-CONTROL-SAVE-CONTROL
+000286                                     PIC S9(8) COMP.
+000287         16 PI-FIRST-TIME-SW         PIC X.
+000288            88 PI-FIRST-TIME         VALUE 'Y'.
+000289            88 PI-NOT-FIRST-TIME     VALUE 'N'.
+000290         16 PI-EOF-SWT               PIC X.
+000291            88 PI-EOF                VALUE 'Y'.
+000292            88 PI-NOT-EOF            VALUE 'N'.
+000293         16 PI-SEND-TOT-SWT          PIC X.
+000294            88 PI-SEND-TOT           VALUE 'Y'.
+000295            88 PI-NOT-SEND-TOT       VALUE 'N'.
+000296         16 PI-CHECK-MODE            PIC X.
+000297            88  CHECKS-PRINTED       VALUE 'Y'.
+000298            88  CHECKS-TO-BE-PRINTED VALUE SPACE.
+000299         16 PI-CURRENT-DATE-BIN      PIC XX.
+000300         16 PI-CURRENT-DATE          PIC X(8).
+000301         16 PI-AR-MODE               PIC X.
+000302            88 PI-CALLED-FROM-AR-MENU VALUE 'A'.
+000303         16 PI-PREV-DISPLAY-SWT      PIC X.
+000304            88 PI-TOTAL-SCREEN       VALUE 'T'.
+000305         16 PI-START-CONTROL-NO      PIC S9(08)  COMP.
+000306         16 PI-FIRST-TOTAL-SW        PIC X.
+000307            88 PI-FIRST-TOTAL        VALUE 'Y'.
+000308         16 PI-PAGING-SW             PIC X.
+000309            88 PI-PAGE-FORWARD       VALUE 'Y'.
+000310         16 FILLER                   PIC X(587).
+000311     EJECT
+000312*            COPY EL685S.
+      *>>((file: EL685S))
+000001 01  EL685BI.
+000002     05  FILLER            PIC  X(0012).
+000003*    -------------------------------
+000004     05  BDATEL PIC S9(0004) COMP.
+000005     05  BDATEF PIC  X(0001).
+000006     05  FILLER REDEFINES BDATEF.
+000007         10  BDATEA PIC  X(0001).
+000008     05  BDATEI PIC  X(0008).
+000009*    -------------------------------
+000010     05  BTIMEL PIC S9(0004) COMP.
+000011     05  BTIMEF PIC  X(0001).
+000012     05  FILLER REDEFINES BTIMEF.
+000013         10  BTIMEA PIC  X(0001).
+000014     05  BTIMEI PIC  X(0005).
+000015*    -------------------------------
+000016     05  BTITLEL PIC S9(0004) COMP.
+000017     05  BTITLEF PIC  X(0001).
+000018     05  FILLER REDEFINES BTITLEF.
+000019         10  BTITLEA PIC  X(0001).
+000020     05  BTITLEI PIC  X(0028).
+000021*    -------------------------------
+000022     05  BSCREENL PIC S9(0004) COMP.
+000023     05  BSCREENF PIC  X(0001).
+000024     05  FILLER REDEFINES BSCREENF.
+000025         10  BSCREENA PIC  X(0001).
+000026     05  BSCREENI PIC  X(0006).
+000027*    -------------------------------
+000028     05  BPAGEL PIC S9(0004) COMP.
+000029     05  BPAGEF PIC  X(0001).
+000030     05  FILLER REDEFINES BPAGEF.
+000031         10  BPAGEA PIC  X(0001).
+000032     05  BPAGEI PIC  S9(4).
+000033*    -------------------------------
+000034     05  BCTRL01L PIC S9(0004) COMP.
+000035     05  BCTRL01F PIC  X(0001).
+000036     05  FILLER REDEFINES BCTRL01F.
+000037         10  BCTRL01A PIC  X(0001).
+000038     05  BCTRL01I PIC  X(0007).
+000039*    -------------------------------
+000040     05  BCKNO01L PIC S9(0004) COMP.
+000041     05  BCKNO01F PIC  X(0001).
+000042     05  FILLER REDEFINES BCKNO01F.
+000043         10  BCKNO01A PIC  X(0001).
+000044     05  BCKNO01I PIC  X(0006).
+000045*    -------------------------------
+000046     05  BCKDT01L PIC S9(0004) COMP.
+000047     05  BCKDT01F PIC  X(0001).
+000048     05  FILLER REDEFINES BCKDT01F.
+000049         10  BCKDT01A PIC  X(0001).
+000050     05  BCKDT01I PIC  X(0008).
+000051*    -------------------------------
+000052     05  BCARR01L PIC S9(0004) COMP.
+000053     05  BCARR01F PIC  X(0001).
+000054     05  FILLER REDEFINES BCARR01F.
+000055         10  BCARR01A PIC  X(0001).
+000056     05  BCARR01I PIC  X(0001).
+000057*    -------------------------------
+000058     05  BGRUP01L PIC S9(0004) COMP.
+000059     05  BGRUP01F PIC  X(0001).
+000060     05  FILLER REDEFINES BGRUP01F.
+000061         10  BGRUP01A PIC  X(0001).
+000062     05  BGRUP01I PIC  X(0006).
+000063*    -------------------------------
+000064     05  BPYEE01L PIC S9(0004) COMP.
+000065     05  BPYEE01F PIC  X(0001).
+000066     05  FILLER REDEFINES BPYEE01F.
+000067         10  BPYEE01A PIC  X(0001).
+000068     05  BPYEE01I PIC  X(0010).
+000069*    -------------------------------
+000070     05  BSEQN01L PIC S9(0004) COMP.
+000071     05  BSEQN01F PIC  X(0001).
+000072     05  FILLER REDEFINES BSEQN01F.
+000073         10  BSEQN01A PIC  X(0001).
+000074     05  BSEQN01I PIC  X(0004).
+000075*    -------------------------------
+000076     05  BPYNM01L PIC S9(0004) COMP.
+000077     05  BPYNM01F PIC  X(0001).
+000078     05  FILLER REDEFINES BPYNM01F.
+000079         10  BPYNM01A PIC  X(0001).
+000080     05  BPYNM01I PIC  X(0012).
+000081*    -------------------------------
+000082     05  BPAMT01L PIC S9(0004) COMP.
+000083     05  BPAMT01F PIC  X(0001).
+000084     05  FILLER REDEFINES BPAMT01F.
+000085         10  BPAMT01A PIC  X(0001).
+000086     05  BPAMT01I PIC  X(0013).
+000087*    -------------------------------
+000088     05  BCTRL02L PIC S9(0004) COMP.
+000089     05  BCTRL02F PIC  X(0001).
+000090     05  FILLER REDEFINES BCTRL02F.
+000091         10  BCTRL02A PIC  X(0001).
+000092     05  BCTRL02I PIC  X(0007).
+000093*    -------------------------------
+000094     05  BCKNO02L PIC S9(0004) COMP.
+000095     05  BCKNO02F PIC  X(0001).
+000096     05  FILLER REDEFINES BCKNO02F.
+000097         10  BCKNO02A PIC  X(0001).
+000098     05  BCKNO02I PIC  X(0006).
+000099*    -------------------------------
+000100     05  BCKDT02L PIC S9(0004) COMP.
+000101     05  BCKDT02F PIC  X(0001).
+000102     05  FILLER REDEFINES BCKDT02F.
+000103         10  BCKDT02A PIC  X(0001).
+000104     05  BCKDT02I PIC  X(0008).
+000105*    -------------------------------
+000106     05  BCARR02L PIC S9(0004) COMP.
+000107     05  BCARR02F PIC  X(0001).
+000108     05  FILLER REDEFINES BCARR02F.
+000109         10  BCARR02A PIC  X(0001).
+000110     05  BCARR02I PIC  X(0001).
+000111*    -------------------------------
+000112     05  BGRUP02L PIC S9(0004) COMP.
+000113     05  BGRUP02F PIC  X(0001).
+000114     05  FILLER REDEFINES BGRUP02F.
+000115         10  BGRUP02A PIC  X(0001).
+000116     05  BGRUP02I PIC  X(0006).
+000117*    -------------------------------
+000118     05  BPYEE02L PIC S9(0004) COMP.
+000119     05  BPYEE02F PIC  X(0001).
+000120     05  FILLER REDEFINES BPYEE02F.
+000121         10  BPYEE02A PIC  X(0001).
+000122     05  BPYEE02I PIC  X(0010).
+000123*    -------------------------------
+000124     05  BSEQN02L PIC S9(0004) COMP.
+000125     05  BSEQN02F PIC  X(0001).
+000126     05  FILLER REDEFINES BSEQN02F.
+000127         10  BSEQN02A PIC  X(0001).
+000128     05  BSEQN02I PIC  X(0004).
+000129*    -------------------------------
+000130     05  BPYNM02L PIC S9(0004) COMP.
+000131     05  BPYNM02F PIC  X(0001).
+000132     05  FILLER REDEFINES BPYNM02F.
+000133         10  BPYNM02A PIC  X(0001).
+000134     05  BPYNM02I PIC  X(0012).
+000135*    -------------------------------
+000136     05  BPAMT02L PIC S9(0004) COMP.
+000137     05  BPAMT02F PIC  X(0001).
+000138     05  FILLER REDEFINES BPAMT02F.
+000139         10  BPAMT02A PIC  X(0001).
+000140     05  BPAMT02I PIC  X(0013).
+000141*    -------------------------------
+000142     05  BCTRL03L PIC S9(0004) COMP.
+000143     05  BCTRL03F PIC  X(0001).
+000144     05  FILLER REDEFINES BCTRL03F.
+000145         10  BCTRL03A PIC  X(0001).
+000146     05  BCTRL03I PIC  X(0007).
+000147*    -------------------------------
+000148     05  BCKNO03L PIC S9(0004) COMP.
+000149     05  BCKNO03F PIC  X(0001).
+000150     05  FILLER REDEFINES BCKNO03F.
+000151         10  BCKNO03A PIC  X(0001).
+000152     05  BCKNO03I PIC  X(0006).
+000153*    -------------------------------
+000154     05  BCKDT03L PIC S9(0004) COMP.
+000155     05  BCKDT03F PIC  X(0001).
+000156     05  FILLER REDEFINES BCKDT03F.
+000157         10  BCKDT03A PIC  X(0001).
+000158     05  BCKDT03I PIC  X(0008).
+000159*    -------------------------------
+000160     05  BCARR03L PIC S9(0004) COMP.
+000161     05  BCARR03F PIC  X(0001).
+000162     05  FILLER REDEFINES BCARR03F.
+000163         10  BCARR03A PIC  X(0001).
+000164     05  BCARR03I PIC  X(0001).
+000165*    -------------------------------
+000166     05  BGRUP03L PIC S9(0004) COMP.
+000167     05  BGRUP03F PIC  X(0001).
+000168     05  FILLER REDEFINES BGRUP03F.
+000169         10  BGRUP03A PIC  X(0001).
+000170     05  BGRUP03I PIC  X(0006).
+000171*    -------------------------------
+000172     05  BPYEE03L PIC S9(0004) COMP.
+000173     05  BPYEE03F PIC  X(0001).
+000174     05  FILLER REDEFINES BPYEE03F.
+000175         10  BPYEE03A PIC  X(0001).
+000176     05  BPYEE03I PIC  X(0010).
+000177*    -------------------------------
+000178     05  BSEQN03L PIC S9(0004) COMP.
+000179     05  BSEQN03F PIC  X(0001).
+000180     05  FILLER REDEFINES BSEQN03F.
+000181         10  BSEQN03A PIC  X(0001).
+000182     05  BSEQN03I PIC  X(0004).
+000183*    -------------------------------
+000184     05  BPYNM03L PIC S9(0004) COMP.
+000185     05  BPYNM03F PIC  X(0001).
+000186     05  FILLER REDEFINES BPYNM03F.
+000187         10  BPYNM03A PIC  X(0001).
+000188     05  BPYNM03I PIC  X(0012).
+000189*    -------------------------------
+000190     05  BPAMT03L PIC S9(0004) COMP.
+000191     05  BPAMT03F PIC  X(0001).
+000192     05  FILLER REDEFINES BPAMT03F.
+000193         10  BPAMT03A PIC  X(0001).
+000194     05  BPAMT03I PIC  X(0013).
+000195*    -------------------------------
+000196     05  BCTRL04L PIC S9(0004) COMP.
+000197     05  BCTRL04F PIC  X(0001).
+000198     05  FILLER REDEFINES BCTRL04F.
+000199         10  BCTRL04A PIC  X(0001).
+000200     05  BCTRL04I PIC  X(0007).
+000201*    -------------------------------
+000202     05  BCKNO04L PIC S9(0004) COMP.
+000203     05  BCKNO04F PIC  X(0001).
+000204     05  FILLER REDEFINES BCKNO04F.
+000205         10  BCKNO04A PIC  X(0001).
+000206     05  BCKNO04I PIC  X(0006).
+000207*    -------------------------------
+000208     05  BCKDT04L PIC S9(0004) COMP.
+000209     05  BCKDT04F PIC  X(0001).
+000210     05  FILLER REDEFINES BCKDT04F.
+000211         10  BCKDT04A PIC  X(0001).
+000212     05  BCKDT04I PIC  X(0008).
+000213*    -------------------------------
+000214     05  BCARR04L PIC S9(0004) COMP.
+000215     05  BCARR04F PIC  X(0001).
+000216     05  FILLER REDEFINES BCARR04F.
+000217         10  BCARR04A PIC  X(0001).
+000218     05  BCARR04I PIC  X(0001).
+000219*    -------------------------------
+000220     05  BGRUP04L PIC S9(0004) COMP.
+000221     05  BGRUP04F PIC  X(0001).
+000222     05  FILLER REDEFINES BGRUP04F.
+000223         10  BGRUP04A PIC  X(0001).
+000224     05  BGRUP04I PIC  X(0006).
+000225*    -------------------------------
+000226     05  BPYEE04L PIC S9(0004) COMP.
+000227     05  BPYEE04F PIC  X(0001).
+000228     05  FILLER REDEFINES BPYEE04F.
+000229         10  BPYEE04A PIC  X(0001).
+000230     05  BPYEE04I PIC  X(0010).
+000231*    -------------------------------
+000232     05  BSEQN04L PIC S9(0004) COMP.
+000233     05  BSEQN04F PIC  X(0001).
+000234     05  FILLER REDEFINES BSEQN04F.
+000235         10  BSEQN04A PIC  X(0001).
+000236     05  BSEQN04I PIC  X(0004).
+000237*    -------------------------------
+000238     05  BPYNM04L PIC S9(0004) COMP.
+000239     05  BPYNM04F PIC  X(0001).
+000240     05  FILLER REDEFINES BPYNM04F.
+000241         10  BPYNM04A PIC  X(0001).
+000242     05  BPYNM04I PIC  X(0012).
+000243*    -------------------------------
+000244     05  BPAMT04L PIC S9(0004) COMP.
+000245     05  BPAMT04F PIC  X(0001).
+000246     05  FILLER REDEFINES BPAMT04F.
+000247         10  BPAMT04A PIC  X(0001).
+000248     05  BPAMT04I PIC  X(0013).
+000249*    -------------------------------
+000250     05  BCTRL05L PIC S9(0004) COMP.
+000251     05  BCTRL05F PIC  X(0001).
+000252     05  FILLER REDEFINES BCTRL05F.
+000253         10  BCTRL05A PIC  X(0001).
+000254     05  BCTRL05I PIC  X(0007).
+000255*    -------------------------------
+000256     05  BCKNO05L PIC S9(0004) COMP.
+000257     05  BCKNO05F PIC  X(0001).
+000258     05  FILLER REDEFINES BCKNO05F.
+000259         10  BCKNO05A PIC  X(0001).
+000260     05  BCKNO05I PIC  X(0006).
+000261*    -------------------------------
+000262     05  BCKDT05L PIC S9(0004) COMP.
+000263     05  BCKDT05F PIC  X(0001).
+000264     05  FILLER REDEFINES BCKDT05F.
+000265         10  BCKDT05A PIC  X(0001).
+000266     05  BCKDT05I PIC  X(0008).
+000267*    -------------------------------
+000268     05  BCARR05L PIC S9(0004) COMP.
+000269     05  BCARR05F PIC  X(0001).
+000270     05  FILLER REDEFINES BCARR05F.
+000271         10  BCARR05A PIC  X(0001).
+000272     05  BCARR05I PIC  X(0001).
+000273*    -------------------------------
+000274     05  BGRUP05L PIC S9(0004) COMP.
+000275     05  BGRUP05F PIC  X(0001).
+000276     05  FILLER REDEFINES BGRUP05F.
+000277         10  BGRUP05A PIC  X(0001).
+000278     05  BGRUP05I PIC  X(0006).
+000279*    -------------------------------
+000280     05  BPYEE05L PIC S9(0004) COMP.
+000281     05  BPYEE05F PIC  X(0001).
+000282     05  FILLER REDEFINES BPYEE05F.
+000283         10  BPYEE05A PIC  X(0001).
+000284     05  BPYEE05I PIC  X(0010).
+000285*    -------------------------------
+000286     05  BSEQN05L PIC S9(0004) COMP.
+000287     05  BSEQN05F PIC  X(0001).
+000288     05  FILLER REDEFINES BSEQN05F.
+000289         10  BSEQN05A PIC  X(0001).
+000290     05  BSEQN05I PIC  X(0004).
+000291*    -------------------------------
+000292     05  BPYNM05L PIC S9(0004) COMP.
+000293     05  BPYNM05F PIC  X(0001).
+000294     05  FILLER REDEFINES BPYNM05F.
+000295         10  BPYNM05A PIC  X(0001).
+000296     05  BPYNM05I PIC  X(0012).
+000297*    -------------------------------
+000298     05  BPAMT05L PIC S9(0004) COMP.
+000299     05  BPAMT05F PIC  X(0001).
+000300     05  FILLER REDEFINES BPAMT05F.
+000301         10  BPAMT05A PIC  X(0001).
+000302     05  BPAMT05I PIC  X(0013).
+000303*    -------------------------------
+000304     05  BCTRL06L PIC S9(0004) COMP.
+000305     05  BCTRL06F PIC  X(0001).
+000306     05  FILLER REDEFINES BCTRL06F.
+000307         10  BCTRL06A PIC  X(0001).
+000308     05  BCTRL06I PIC  X(0007).
+000309*    -------------------------------
+000310     05  BCKNO06L PIC S9(0004) COMP.
+000311     05  BCKNO06F PIC  X(0001).
+000312     05  FILLER REDEFINES BCKNO06F.
+000313         10  BCKNO06A PIC  X(0001).
+000314     05  BCKNO06I PIC  X(0006).
+000315*    -------------------------------
+000316     05  BCKDT06L PIC S9(0004) COMP.
+000317     05  BCKDT06F PIC  X(0001).
+000318     05  FILLER REDEFINES BCKDT06F.
+000319         10  BCKDT06A PIC  X(0001).
+000320     05  BCKDT06I PIC  X(0008).
+000321*    -------------------------------
+000322     05  BCARR06L PIC S9(0004) COMP.
+000323     05  BCARR06F PIC  X(0001).
+000324     05  FILLER REDEFINES BCARR06F.
+000325         10  BCARR06A PIC  X(0001).
+000326     05  BCARR06I PIC  X(0001).
+000327*    -------------------------------
+000328     05  BGRUP06L PIC S9(0004) COMP.
+000329     05  BGRUP06F PIC  X(0001).
+000330     05  FILLER REDEFINES BGRUP06F.
+000331         10  BGRUP06A PIC  X(0001).
+000332     05  BGRUP06I PIC  X(0006).
+000333*    -------------------------------
+000334     05  BPYEE06L PIC S9(0004) COMP.
+000335     05  BPYEE06F PIC  X(0001).
+000336     05  FILLER REDEFINES BPYEE06F.
+000337         10  BPYEE06A PIC  X(0001).
+000338     05  BPYEE06I PIC  X(0010).
+000339*    -------------------------------
+000340     05  BSEQN06L PIC S9(0004) COMP.
+000341     05  BSEQN06F PIC  X(0001).
+000342     05  FILLER REDEFINES BSEQN06F.
+000343         10  BSEQN06A PIC  X(0001).
+000344     05  BSEQN06I PIC  X(0004).
+000345*    -------------------------------
+000346     05  BPYNM06L PIC S9(0004) COMP.
+000347     05  BPYNM06F PIC  X(0001).
+000348     05  FILLER REDEFINES BPYNM06F.
+000349         10  BPYNM06A PIC  X(0001).
+000350     05  BPYNM06I PIC  X(0012).
+000351*    -------------------------------
+000352     05  BPAMT06L PIC S9(0004) COMP.
+000353     05  BPAMT06F PIC  X(0001).
+000354     05  FILLER REDEFINES BPAMT06F.
+000355         10  BPAMT06A PIC  X(0001).
+000356     05  BPAMT06I PIC  X(0013).
+000357*    -------------------------------
+000358     05  BCTRL07L PIC S9(0004) COMP.
+000359     05  BCTRL07F PIC  X(0001).
+000360     05  FILLER REDEFINES BCTRL07F.
+000361         10  BCTRL07A PIC  X(0001).
+000362     05  BCTRL07I PIC  X(0007).
+000363*    -------------------------------
+000364     05  BCKNO07L PIC S9(0004) COMP.
+000365     05  BCKNO07F PIC  X(0001).
+000366     05  FILLER REDEFINES BCKNO07F.
+000367         10  BCKNO07A PIC  X(0001).
+000368     05  BCKNO07I PIC  X(0006).
+000369*    -------------------------------
+000370     05  BCKDT07L PIC S9(0004) COMP.
+000371     05  BCKDT07F PIC  X(0001).
+000372     05  FILLER REDEFINES BCKDT07F.
+000373         10  BCKDT07A PIC  X(0001).
+000374     05  BCKDT07I PIC  X(0008).
+000375*    -------------------------------
+000376     05  BCARR07L PIC S9(0004) COMP.
+000377     05  BCARR07F PIC  X(0001).
+000378     05  FILLER REDEFINES BCARR07F.
+000379         10  BCARR07A PIC  X(0001).
+000380     05  BCARR07I PIC  X(0001).
+000381*    -------------------------------
+000382     05  BGRUP07L PIC S9(0004) COMP.
+000383     05  BGRUP07F PIC  X(0001).
+000384     05  FILLER REDEFINES BGRUP07F.
+000385         10  BGRUP07A PIC  X(0001).
+000386     05  BGRUP07I PIC  X(0006).
+000387*    -------------------------------
+000388     05  BPYEE07L PIC S9(0004) COMP.
+000389     05  BPYEE07F PIC  X(0001).
+000390     05  FILLER REDEFINES BPYEE07F.
+000391         10  BPYEE07A PIC  X(0001).
+000392     05  BPYEE07I PIC  X(0010).
+000393*    -------------------------------
+000394     05  BSEQN07L PIC S9(0004) COMP.
+000395     05  BSEQN07F PIC  X(0001).
+000396     05  FILLER REDEFINES BSEQN07F.
+000397         10  BSEQN07A PIC  X(0001).
+000398     05  BSEQN07I PIC  X(0004).
+000399*    -------------------------------
+000400     05  BPYNM07L PIC S9(0004) COMP.
+000401     05  BPYNM07F PIC  X(0001).
+000402     05  FILLER REDEFINES BPYNM07F.
+000403         10  BPYNM07A PIC  X(0001).
+000404     05  BPYNM07I PIC  X(0012).
+000405*    -------------------------------
+000406     05  BPAMT07L PIC S9(0004) COMP.
+000407     05  BPAMT07F PIC  X(0001).
+000408     05  FILLER REDEFINES BPAMT07F.
+000409         10  BPAMT07A PIC  X(0001).
+000410     05  BPAMT07I PIC  X(0013).
+000411*    -------------------------------
+000412     05  BCTRL08L PIC S9(0004) COMP.
+000413     05  BCTRL08F PIC  X(0001).
+000414     05  FILLER REDEFINES BCTRL08F.
+000415         10  BCTRL08A PIC  X(0001).
+000416     05  BCTRL08I PIC  X(0007).
+000417*    -------------------------------
+000418     05  BCKNO08L PIC S9(0004) COMP.
+000419     05  BCKNO08F PIC  X(0001).
+000420     05  FILLER REDEFINES BCKNO08F.
+000421         10  BCKNO08A PIC  X(0001).
+000422     05  BCKNO08I PIC  X(0006).
+000423*    -------------------------------
+000424     05  BCKDT08L PIC S9(0004) COMP.
+000425     05  BCKDT08F PIC  X(0001).
+000426     05  FILLER REDEFINES BCKDT08F.
+000427         10  BCKDT08A PIC  X(0001).
+000428     05  BCKDT08I PIC  X(0008).
+000429*    -------------------------------
+000430     05  BCARR08L PIC S9(0004) COMP.
+000431     05  BCARR08F PIC  X(0001).
+000432     05  FILLER REDEFINES BCARR08F.
+000433         10  BCARR08A PIC  X(0001).
+000434     05  BCARR08I PIC  X(0001).
+000435*    -------------------------------
+000436     05  BGRUP08L PIC S9(0004) COMP.
+000437     05  BGRUP08F PIC  X(0001).
+000438     05  FILLER REDEFINES BGRUP08F.
+000439         10  BGRUP08A PIC  X(0001).
+000440     05  BGRUP08I PIC  X(0006).
+000441*    -------------------------------
+000442     05  BPYEE08L PIC S9(0004) COMP.
+000443     05  BPYEE08F PIC  X(0001).
+000444     05  FILLER REDEFINES BPYEE08F.
+000445         10  BPYEE08A PIC  X(0001).
+000446     05  BPYEE08I PIC  X(0010).
+000447*    -------------------------------
+000448     05  BSEQN08L PIC S9(0004) COMP.
+000449     05  BSEQN08F PIC  X(0001).
+000450     05  FILLER REDEFINES BSEQN08F.
+000451         10  BSEQN08A PIC  X(0001).
+000452     05  BSEQN08I PIC  X(0004).
+000453*    -------------------------------
+000454     05  BPYNM08L PIC S9(0004) COMP.
+000455     05  BPYNM08F PIC  X(0001).
+000456     05  FILLER REDEFINES BPYNM08F.
+000457         10  BPYNM08A PIC  X(0001).
+000458     05  BPYNM08I PIC  X(0012).
+000459*    -------------------------------
+000460     05  BPAMT08L PIC S9(0004) COMP.
+000461     05  BPAMT08F PIC  X(0001).
+000462     05  FILLER REDEFINES BPAMT08F.
+000463         10  BPAMT08A PIC  X(0001).
+000464     05  BPAMT08I PIC  X(0013).
+000465*    -------------------------------
+000466     05  BCTRL09L PIC S9(0004) COMP.
+000467     05  BCTRL09F PIC  X(0001).
+000468     05  FILLER REDEFINES BCTRL09F.
+000469         10  BCTRL09A PIC  X(0001).
+000470     05  BCTRL09I PIC  X(0007).
+000471*    -------------------------------
+000472     05  BCKNO09L PIC S9(0004) COMP.
+000473     05  BCKNO09F PIC  X(0001).
+000474     05  FILLER REDEFINES BCKNO09F.
+000475         10  BCKNO09A PIC  X(0001).
+000476     05  BCKNO09I PIC  X(0006).
+000477*    -------------------------------
+000478     05  BCKDT09L PIC S9(0004) COMP.
+000479     05  BCKDT09F PIC  X(0001).
+000480     05  FILLER REDEFINES BCKDT09F.
+000481         10  BCKDT09A PIC  X(0001).
+000482     05  BCKDT09I PIC  X(0008).
+000483*    -------------------------------
+000484     05  BCARR09L PIC S9(0004) COMP.
+000485     05  BCARR09F PIC  X(0001).
+000486     05  FILLER REDEFINES BCARR09F.
+000487         10  BCARR09A PIC  X(0001).
+000488     05  BCARR09I PIC  X(0001).
+000489*    -------------------------------
+000490     05  BGRUP09L PIC S9(0004) COMP.
+000491     05  BGRUP09F PIC  X(0001).
+000492     05  FILLER REDEFINES BGRUP09F.
+000493         10  BGRUP09A PIC  X(0001).
+000494     05  BGRUP09I PIC  X(0006).
+000495*    -------------------------------
+000496     05  BPYEE09L PIC S9(0004) COMP.
+000497     05  BPYEE09F PIC  X(0001).
+000498     05  FILLER REDEFINES BPYEE09F.
+000499         10  BPYEE09A PIC  X(0001).
+000500     05  BPYEE09I PIC  X(0010).
+000501*    -------------------------------
+000502     05  BSEQN09L PIC S9(0004) COMP.
+000503     05  BSEQN09F PIC  X(0001).
+000504     05  FILLER REDEFINES BSEQN09F.
+000505         10  BSEQN09A PIC  X(0001).
+000506     05  BSEQN09I PIC  X(0004).
+000507*    -------------------------------
+000508     05  BPYNM09L PIC S9(0004) COMP.
+000509     05  BPYNM09F PIC  X(0001).
+000510     05  FILLER REDEFINES BPYNM09F.
+000511         10  BPYNM09A PIC  X(0001).
+000512     05  BPYNM09I PIC  X(0012).
+000513*    -------------------------------
+000514     05  BPAMT09L PIC S9(0004) COMP.
+000515     05  BPAMT09F PIC  X(0001).
+000516     05  FILLER REDEFINES BPAMT09F.
+000517         10  BPAMT09A PIC  X(0001).
+000518     05  BPAMT09I PIC  X(0013).
+000519*    -------------------------------
+000520     05  BCTRL10L PIC S9(0004) COMP.
+000521     05  BCTRL10F PIC  X(0001).
+000522     05  FILLER REDEFINES BCTRL10F.
+000523         10  BCTRL10A PIC  X(0001).
+000524     05  BCTRL10I PIC  X(0007).
+000525*    -------------------------------
+000526     05  BCKNO10L PIC S9(0004) COMP.
+000527     05  BCKNO10F PIC  X(0001).
+000528     05  FILLER REDEFINES BCKNO10F.
+000529         10  BCKNO10A PIC  X(0001).
+000530     05  BCKNO10I PIC  X(0006).
+000531*    -------------------------------
+000532     05  BCKDT10L PIC S9(0004) COMP.
+000533     05  BCKDT10F PIC  X(0001).
+000534     05  FILLER REDEFINES BCKDT10F.
+000535         10  BCKDT10A PIC  X(0001).
+000536     05  BCKDT10I PIC  X(0008).
+000537*    -------------------------------
+000538     05  BCARR10L PIC S9(0004) COMP.
+000539     05  BCARR10F PIC  X(0001).
+000540     05  FILLER REDEFINES BCARR10F.
+000541         10  BCARR10A PIC  X(0001).
+000542     05  BCARR10I PIC  X(0001).
+000543*    -------------------------------
+000544     05  BGRUP10L PIC S9(0004) COMP.
+000545     05  BGRUP10F PIC  X(0001).
+000546     05  FILLER REDEFINES BGRUP10F.
+000547         10  BGRUP10A PIC  X(0001).
+000548     05  BGRUP10I PIC  X(0006).
+000549*    -------------------------------
+000550     05  BPYEE10L PIC S9(0004) COMP.
+000551     05  BPYEE10F PIC  X(0001).
+000552     05  FILLER REDEFINES BPYEE10F.
+000553         10  BPYEE10A PIC  X(0001).
+000554     05  BPYEE10I PIC  X(0010).
+000555*    -------------------------------
+000556     05  BSEQN10L PIC S9(0004) COMP.
+000557     05  BSEQN10F PIC  X(0001).
+000558     05  FILLER REDEFINES BSEQN10F.
+000559         10  BSEQN10A PIC  X(0001).
+000560     05  BSEQN10I PIC  X(0004).
+000561*    -------------------------------
+000562     05  BPYNM10L PIC S9(0004) COMP.
+000563     05  BPYNM10F PIC  X(0001).
+000564     05  FILLER REDEFINES BPYNM10F.
+000565         10  BPYNM10A PIC  X(0001).
+000566     05  BPYNM10I PIC  X(0012).
+000567*    -------------------------------
+000568     05  BPAMT10L PIC S9(0004) COMP.
+000569     05  BPAMT10F PIC  X(0001).
+000570     05  FILLER REDEFINES BPAMT10F.
+000571         10  BPAMT10A PIC  X(0001).
+000572     05  BPAMT10I PIC  X(0013).
+000573*    -------------------------------
+000574     05  BCTRL11L PIC S9(0004) COMP.
+000575     05  BCTRL11F PIC  X(0001).
+000576     05  FILLER REDEFINES BCTRL11F.
+000577         10  BCTRL11A PIC  X(0001).
+000578     05  BCTRL11I PIC  X(0007).
+000579*    -------------------------------
+000580     05  BCKNO11L PIC S9(0004) COMP.
+000581     05  BCKNO11F PIC  X(0001).
+000582     05  FILLER REDEFINES BCKNO11F.
+000583         10  BCKNO11A PIC  X(0001).
+000584     05  BCKNO11I PIC  X(0006).
+000585*    -------------------------------
+000586     05  BCKDT11L PIC S9(0004) COMP.
+000587     05  BCKDT11F PIC  X(0001).
+000588     05  FILLER REDEFINES BCKDT11F.
+000589         10  BCKDT11A PIC  X(0001).
+000590     05  BCKDT11I PIC  X(0008).
+000591*    -------------------------------
+000592     05  BCARR11L PIC S9(0004) COMP.
+000593     05  BCARR11F PIC  X(0001).
+000594     05  FILLER REDEFINES BCARR11F.
+000595         10  BCARR11A PIC  X(0001).
+000596     05  BCARR11I PIC  X(0001).
+000597*    -------------------------------
+000598     05  BGRUP11L PIC S9(0004) COMP.
+000599     05  BGRUP11F PIC  X(0001).
+000600     05  FILLER REDEFINES BGRUP11F.
+000601         10  BGRUP11A PIC  X(0001).
+000602     05  BGRUP11I PIC  X(0006).
+000603*    -------------------------------
+000604     05  BPYEE11L PIC S9(0004) COMP.
+000605     05  BPYEE11F PIC  X(0001).
+000606     05  FILLER REDEFINES BPYEE11F.
+000607         10  BPYEE11A PIC  X(0001).
+000608     05  BPYEE11I PIC  X(0010).
+000609*    -------------------------------
+000610     05  BSEQN11L PIC S9(0004) COMP.
+000611     05  BSEQN11F PIC  X(0001).
+000612     05  FILLER REDEFINES BSEQN11F.
+000613         10  BSEQN11A PIC  X(0001).
+000614     05  BSEQN11I PIC  X(0004).
+000615*    -------------------------------
+000616     05  BPYNM11L PIC S9(0004) COMP.
+000617     05  BPYNM11F PIC  X(0001).
+000618     05  FILLER REDEFINES BPYNM11F.
+000619         10  BPYNM11A PIC  X(0001).
+000620     05  BPYNM11I PIC  X(0012).
+000621*    -------------------------------
+000622     05  BPAMT11L PIC S9(0004) COMP.
+000623     05  BPAMT11F PIC  X(0001).
+000624     05  FILLER REDEFINES BPAMT11F.
+000625         10  BPAMT11A PIC  X(0001).
+000626     05  BPAMT11I PIC  X(0013).
+000627*    -------------------------------
+000628     05  BCTRL12L PIC S9(0004) COMP.
+000629     05  BCTRL12F PIC  X(0001).
+000630     05  FILLER REDEFINES BCTRL12F.
+000631         10  BCTRL12A PIC  X(0001).
+000632     05  BCTRL12I PIC  X(0007).
+000633*    -------------------------------
+000634     05  BCKNO12L PIC S9(0004) COMP.
+000635     05  BCKNO12F PIC  X(0001).
+000636     05  FILLER REDEFINES BCKNO12F.
+000637         10  BCKNO12A PIC  X(0001).
+000638     05  BCKNO12I PIC  X(0006).
+000639*    -------------------------------
+000640     05  BCKDT12L PIC S9(0004) COMP.
+000641     05  BCKDT12F PIC  X(0001).
+000642     05  FILLER REDEFINES BCKDT12F.
+000643         10  BCKDT12A PIC  X(0001).
+000644     05  BCKDT12I PIC  X(0008).
+000645*    -------------------------------
+000646     05  BCARR12L PIC S9(0004) COMP.
+000647     05  BCARR12F PIC  X(0001).
+000648     05  FILLER REDEFINES BCARR12F.
+000649         10  BCARR12A PIC  X(0001).
+000650     05  BCARR12I PIC  X(0001).
+000651*    -------------------------------
+000652     05  BGRUP12L PIC S9(0004) COMP.
+000653     05  BGRUP12F PIC  X(0001).
+000654     05  FILLER REDEFINES BGRUP12F.
+000655         10  BGRUP12A PIC  X(0001).
+000656     05  BGRUP12I PIC  X(0006).
+000657*    -------------------------------
+000658     05  BPYEE12L PIC S9(0004) COMP.
+000659     05  BPYEE12F PIC  X(0001).
+000660     05  FILLER REDEFINES BPYEE12F.
+000661         10  BPYEE12A PIC  X(0001).
+000662     05  BPYEE12I PIC  X(0010).
+000663*    -------------------------------
+000664     05  BSEQN12L PIC S9(0004) COMP.
+000665     05  BSEQN12F PIC  X(0001).
+000666     05  FILLER REDEFINES BSEQN12F.
+000667         10  BSEQN12A PIC  X(0001).
+000668     05  BSEQN12I PIC  X(0004).
+000669*    -------------------------------
+000670     05  BPYNM12L PIC S9(0004) COMP.
+000671     05  BPYNM12F PIC  X(0001).
+000672     05  FILLER REDEFINES BPYNM12F.
+000673         10  BPYNM12A PIC  X(0001).
+000674     05  BPYNM12I PIC  X(0012).
+000675*    -------------------------------
+000676     05  BPAMT12L PIC S9(0004) COMP.
+000677     05  BPAMT12F PIC  X(0001).
+000678     05  FILLER REDEFINES BPAMT12F.
+000679         10  BPAMT12A PIC  X(0001).
+000680     05  BPAMT12I PIC  X(0013).
+000681*    -------------------------------
+000682     05  BCTRL13L PIC S9(0004) COMP.
+000683     05  BCTRL13F PIC  X(0001).
+000684     05  FILLER REDEFINES BCTRL13F.
+000685         10  BCTRL13A PIC  X(0001).
+000686     05  BCTRL13I PIC  X(0007).
+000687*    -------------------------------
+000688     05  BCKNO13L PIC S9(0004) COMP.
+000689     05  BCKNO13F PIC  X(0001).
+000690     05  FILLER REDEFINES BCKNO13F.
+000691         10  BCKNO13A PIC  X(0001).
+000692     05  BCKNO13I PIC  X(0006).
+000693*    -------------------------------
+000694     05  BCKDT13L PIC S9(0004) COMP.
+000695     05  BCKDT13F PIC  X(0001).
+000696     05  FILLER REDEFINES BCKDT13F.
+000697         10  BCKDT13A PIC  X(0001).
+000698     05  BCKDT13I PIC  X(0008).
+000699*    -------------------------------
+000700     05  BCARR13L PIC S9(0004) COMP.
+000701     05  BCARR13F PIC  X(0001).
+000702     05  FILLER REDEFINES BCARR13F.
+000703         10  BCARR13A PIC  X(0001).
+000704     05  BCARR13I PIC  X(0001).
+000705*    -------------------------------
+000706     05  BGRUP13L PIC S9(0004) COMP.
+000707     05  BGRUP13F PIC  X(0001).
+000708     05  FILLER REDEFINES BGRUP13F.
+000709         10  BGRUP13A PIC  X(0001).
+000710     05  BGRUP13I PIC  X(0006).
+000711*    -------------------------------
+000712     05  BPYEE13L PIC S9(0004) COMP.
+000713     05  BPYEE13F PIC  X(0001).
+000714     05  FILLER REDEFINES BPYEE13F.
+000715         10  BPYEE13A PIC  X(0001).
+000716     05  BPYEE13I PIC  X(0010).
+000717*    -------------------------------
+000718     05  BSEQN13L PIC S9(0004) COMP.
+000719     05  BSEQN13F PIC  X(0001).
+000720     05  FILLER REDEFINES BSEQN13F.
+000721         10  BSEQN13A PIC  X(0001).
+000722     05  BSEQN13I PIC  X(0004).
+000723*    -------------------------------
+000724     05  BPYNM13L PIC S9(0004) COMP.
+000725     05  BPYNM13F PIC  X(0001).
+000726     05  FILLER REDEFINES BPYNM13F.
+000727         10  BPYNM13A PIC  X(0001).
+000728     05  BPYNM13I PIC  X(0012).
+000729*    -------------------------------
+000730     05  BPAMT13L PIC S9(0004) COMP.
+000731     05  BPAMT13F PIC  X(0001).
+000732     05  FILLER REDEFINES BPAMT13F.
+000733         10  BPAMT13A PIC  X(0001).
+000734     05  BPAMT13I PIC  X(0013).
+000735*    -------------------------------
+000736     05  BCTRL14L PIC S9(0004) COMP.
+000737     05  BCTRL14F PIC  X(0001).
+000738     05  FILLER REDEFINES BCTRL14F.
+000739         10  BCTRL14A PIC  X(0001).
+000740     05  BCTRL14I PIC  X(0007).
+000741*    -------------------------------
+000742     05  BCKNO14L PIC S9(0004) COMP.
+000743     05  BCKNO14F PIC  X(0001).
+000744     05  FILLER REDEFINES BCKNO14F.
+000745         10  BCKNO14A PIC  X(0001).
+000746     05  BCKNO14I PIC  X(0006).
+000747*    -------------------------------
+000748     05  BCKDT14L PIC S9(0004) COMP.
+000749     05  BCKDT14F PIC  X(0001).
+000750     05  FILLER REDEFINES BCKDT14F.
+000751         10  BCKDT14A PIC  X(0001).
+000752     05  BCKDT14I PIC  X(0008).
+000753*    -------------------------------
+000754     05  BCARR14L PIC S9(0004) COMP.
+000755     05  BCARR14F PIC  X(0001).
+000756     05  FILLER REDEFINES BCARR14F.
+000757         10  BCARR14A PIC  X(0001).
+000758     05  BCARR14I PIC  X(0001).
+000759*    -------------------------------
+000760     05  BGRUP14L PIC S9(0004) COMP.
+000761     05  BGRUP14F PIC  X(0001).
+000762     05  FILLER REDEFINES BGRUP14F.
+000763         10  BGRUP14A PIC  X(0001).
+000764     05  BGRUP14I PIC  X(0006).
+000765*    -------------------------------
+000766     05  BPYEE14L PIC S9(0004) COMP.
+000767     05  BPYEE14F PIC  X(0001).
+000768     05  FILLER REDEFINES BPYEE14F.
+000769         10  BPYEE14A PIC  X(0001).
+000770     05  BPYEE14I PIC  X(0010).
+000771*    -------------------------------
+000772     05  BSEQN14L PIC S9(0004) COMP.
+000773     05  BSEQN14F PIC  X(0001).
+000774     05  FILLER REDEFINES BSEQN14F.
+000775         10  BSEQN14A PIC  X(0001).
+000776     05  BSEQN14I PIC  X(0004).
+000777*    -------------------------------
+000778     05  BPYNM14L PIC S9(0004) COMP.
+000779     05  BPYNM14F PIC  X(0001).
+000780     05  FILLER REDEFINES BPYNM14F.
+000781         10  BPYNM14A PIC  X(0001).
+000782     05  BPYNM14I PIC  X(0012).
+000783*    -------------------------------
+000784     05  BPAMT14L PIC S9(0004) COMP.
+000785     05  BPAMT14F PIC  X(0001).
+000786     05  FILLER REDEFINES BPAMT14F.
+000787         10  BPAMT14A PIC  X(0001).
+000788     05  BPAMT14I PIC  X(0013).
+000789*    -------------------------------
+000790     05  BCTRL15L PIC S9(0004) COMP.
+000791     05  BCTRL15F PIC  X(0001).
+000792     05  FILLER REDEFINES BCTRL15F.
+000793         10  BCTRL15A PIC  X(0001).
+000794     05  BCTRL15I PIC  X(0007).
+000795*    -------------------------------
+000796     05  BCKNO15L PIC S9(0004) COMP.
+000797     05  BCKNO15F PIC  X(0001).
+000798     05  FILLER REDEFINES BCKNO15F.
+000799         10  BCKNO15A PIC  X(0001).
+000800     05  BCKNO15I PIC  X(0006).
+000801*    -------------------------------
+000802     05  BCKDT15L PIC S9(0004) COMP.
+000803     05  BCKDT15F PIC  X(0001).
+000804     05  FILLER REDEFINES BCKDT15F.
+000805         10  BCKDT15A PIC  X(0001).
+000806     05  BCKDT15I PIC  X(0008).
+000807*    -------------------------------
+000808     05  BCARR15L PIC S9(0004) COMP.
+000809     05  BCARR15F PIC  X(0001).
+000810     05  FILLER REDEFINES BCARR15F.
+000811         10  BCARR15A PIC  X(0001).
+000812     05  BCARR15I PIC  X(0001).
+000813*    -------------------------------
+000814     05  BGRUP15L PIC S9(0004) COMP.
+000815     05  BGRUP15F PIC  X(0001).
+000816     05  FILLER REDEFINES BGRUP15F.
+000817         10  BGRUP15A PIC  X(0001).
+000818     05  BGRUP15I PIC  X(0006).
+000819*    -------------------------------
+000820     05  BPYEE15L PIC S9(0004) COMP.
+000821     05  BPYEE15F PIC  X(0001).
+000822     05  FILLER REDEFINES BPYEE15F.
+000823         10  BPYEE15A PIC  X(0001).
+000824     05  BPYEE15I PIC  X(0010).
+000825*    -------------------------------
+000826     05  BSEQN15L PIC S9(0004) COMP.
+000827     05  BSEQN15F PIC  X(0001).
+000828     05  FILLER REDEFINES BSEQN15F.
+000829         10  BSEQN15A PIC  X(0001).
+000830     05  BSEQN15I PIC  X(0004).
+000831*    -------------------------------
+000832     05  BPYNM15L PIC S9(0004) COMP.
+000833     05  BPYNM15F PIC  X(0001).
+000834     05  FILLER REDEFINES BPYNM15F.
+000835         10  BPYNM15A PIC  X(0001).
+000836     05  BPYNM15I PIC  X(0012).
+000837*    -------------------------------
+000838     05  BPAMT15L PIC S9(0004) COMP.
+000839     05  BPAMT15F PIC  X(0001).
+000840     05  FILLER REDEFINES BPAMT15F.
+000841         10  BPAMT15A PIC  X(0001).
+000842     05  BPAMT15I PIC  X(0013).
+000843*    -------------------------------
+000844     05  BCTRL16L PIC S9(0004) COMP.
+000845     05  BCTRL16F PIC  X(0001).
+000846     05  FILLER REDEFINES BCTRL16F.
+000847         10  BCTRL16A PIC  X(0001).
+000848     05  BCTRL16I PIC  X(0007).
+000849*    -------------------------------
+000850     05  BCKNO16L PIC S9(0004) COMP.
+000851     05  BCKNO16F PIC  X(0001).
+000852     05  FILLER REDEFINES BCKNO16F.
+000853         10  BCKNO16A PIC  X(0001).
+000854     05  BCKNO16I PIC  X(0006).
+000855*    -------------------------------
+000856     05  BCKDT16L PIC S9(0004) COMP.
+000857     05  BCKDT16F PIC  X(0001).
+000858     05  FILLER REDEFINES BCKDT16F.
+000859         10  BCKDT16A PIC  X(0001).
+000860     05  BCKDT16I PIC  X(0008).
+000861*    -------------------------------
+000862     05  BCARR16L PIC S9(0004) COMP.
+000863     05  BCARR16F PIC  X(0001).
+000864     05  FILLER REDEFINES BCARR16F.
+000865         10  BCARR16A PIC  X(0001).
+000866     05  BCARR16I PIC  X(0001).
+000867*    -------------------------------
+000868     05  BGRUP16L PIC S9(0004) COMP.
+000869     05  BGRUP16F PIC  X(0001).
+000870     05  FILLER REDEFINES BGRUP16F.
+000871         10  BGRUP16A PIC  X(0001).
+000872     05  BGRUP16I PIC  X(0006).
+000873*    -------------------------------
+000874     05  BPYEE16L PIC S9(0004) COMP.
+000875     05  BPYEE16F PIC  X(0001).
+000876     05  FILLER REDEFINES BPYEE16F.
+000877         10  BPYEE16A PIC  X(0001).
+000878     05  BPYEE16I PIC  X(0010).
+000879*    -------------------------------
+000880     05  BSEQN16L PIC S9(0004) COMP.
+000881     05  BSEQN16F PIC  X(0001).
+000882     05  FILLER REDEFINES BSEQN16F.
+000883         10  BSEQN16A PIC  X(0001).
+000884     05  BSEQN16I PIC  X(0004).
+000885*    -------------------------------
+000886     05  BPYNM16L PIC S9(0004) COMP.
+000887     05  BPYNM16F PIC  X(0001).
+000888     05  FILLER REDEFINES BPYNM16F.
+000889         10  BPYNM16A PIC  X(0001).
+000890     05  BPYNM16I PIC  X(0012).
+000891*    -------------------------------
+000892     05  BPAMT16L PIC S9(0004) COMP.
+000893     05  BPAMT16F PIC  X(0001).
+000894     05  FILLER REDEFINES BPAMT16F.
+000895         10  BPAMT16A PIC  X(0001).
+000896     05  BPAMT16I PIC  X(0013).
+000897*    -------------------------------
+000898     05  BCTRL17L PIC S9(0004) COMP.
+000899     05  BCTRL17F PIC  X(0001).
+000900     05  FILLER REDEFINES BCTRL17F.
+000901         10  BCTRL17A PIC  X(0001).
+000902     05  BCTRL17I PIC  X(0007).
+000903*    -------------------------------
+000904     05  BCKNO17L PIC S9(0004) COMP.
+000905     05  BCKNO17F PIC  X(0001).
+000906     05  FILLER REDEFINES BCKNO17F.
+000907         10  BCKNO17A PIC  X(0001).
+000908     05  BCKNO17I PIC  X(0006).
+000909*    -------------------------------
+000910     05  BCKDT17L PIC S9(0004) COMP.
+000911     05  BCKDT17F PIC  X(0001).
+000912     05  FILLER REDEFINES BCKDT17F.
+000913         10  BCKDT17A PIC  X(0001).
+000914     05  BCKDT17I PIC  X(0008).
+000915*    -------------------------------
+000916     05  BCARR17L PIC S9(0004) COMP.
+000917     05  BCARR17F PIC  X(0001).
+000918     05  FILLER REDEFINES BCARR17F.
+000919         10  BCARR17A PIC  X(0001).
+000920     05  BCARR17I PIC  X(0001).
+000921*    -------------------------------
+000922     05  BGRUP17L PIC S9(0004) COMP.
+000923     05  BGRUP17F PIC  X(0001).
+000924     05  FILLER REDEFINES BGRUP17F.
+000925         10  BGRUP17A PIC  X(0001).
+000926     05  BGRUP17I PIC  X(0006).
+000927*    -------------------------------
+000928     05  BPYEE17L PIC S9(0004) COMP.
+000929     05  BPYEE17F PIC  X(0001).
+000930     05  FILLER REDEFINES BPYEE17F.
+000931         10  BPYEE17A PIC  X(0001).
+000932     05  BPYEE17I PIC  X(0010).
+000933*    -------------------------------
+000934     05  BSEQN17L PIC S9(0004) COMP.
+000935     05  BSEQN17F PIC  X(0001).
+000936     05  FILLER REDEFINES BSEQN17F.
+000937         10  BSEQN17A PIC  X(0001).
+000938     05  BSEQN17I PIC  X(0004).
+000939*    -------------------------------
+000940     05  BPYNM17L PIC S9(0004) COMP.
+000941     05  BPYNM17F PIC  X(0001).
+000942     05  FILLER REDEFINES BPYNM17F.
+000943         10  BPYNM17A PIC  X(0001).
+000944     05  BPYNM17I PIC  X(0012).
+000945*    -------------------------------
+000946     05  BPAMT17L PIC S9(0004) COMP.
+000947     05  BPAMT17F PIC  X(0001).
+000948     05  FILLER REDEFINES BPAMT17F.
+000949         10  BPAMT17A PIC  X(0001).
+000950     05  BPAMT17I PIC  X(0013).
+000951*    -------------------------------
+000952     05  BCTRL18L PIC S9(0004) COMP.
+000953     05  BCTRL18F PIC  X(0001).
+000954     05  FILLER REDEFINES BCTRL18F.
+000955         10  BCTRL18A PIC  X(0001).
+000956     05  BCTRL18I PIC  X(0007).
+000957*    -------------------------------
+000958     05  BCKNO18L PIC S9(0004) COMP.
+000959     05  BCKNO18F PIC  X(0001).
+000960     05  FILLER REDEFINES BCKNO18F.
+000961         10  BCKNO18A PIC  X(0001).
+000962     05  BCKNO18I PIC  X(0006).
+000963*    -------------------------------
+000964     05  BCKDT18L PIC S9(0004) COMP.
+000965     05  BCKDT18F PIC  X(0001).
+000966     05  FILLER REDEFINES BCKDT18F.
+000967         10  BCKDT18A PIC  X(0001).
+000968     05  BCKDT18I PIC  X(0008).
+000969*    -------------------------------
+000970     05  BCARR18L PIC S9(0004) COMP.
+000971     05  BCARR18F PIC  X(0001).
+000972     05  FILLER REDEFINES BCARR18F.
+000973         10  BCARR18A PIC  X(0001).
+000974     05  BCARR18I PIC  X(0001).
+000975*    -------------------------------
+000976     05  BGRUP18L PIC S9(0004) COMP.
+000977     05  BGRUP18F PIC  X(0001).
+000978     05  FILLER REDEFINES BGRUP18F.
+000979         10  BGRUP18A PIC  X(0001).
+000980     05  BGRUP18I PIC  X(0006).
+000981*    -------------------------------
+000982     05  BPYEE18L PIC S9(0004) COMP.
+000983     05  BPYEE18F PIC  X(0001).
+000984     05  FILLER REDEFINES BPYEE18F.
+000985         10  BPYEE18A PIC  X(0001).
+000986     05  BPYEE18I PIC  X(0010).
+000987*    -------------------------------
+000988     05  BSEQN18L PIC S9(0004) COMP.
+000989     05  BSEQN18F PIC  X(0001).
+000990     05  FILLER REDEFINES BSEQN18F.
+000991         10  BSEQN18A PIC  X(0001).
+000992     05  BSEQN18I PIC  X(0004).
+000993*    -------------------------------
+000994     05  BPYNM18L PIC S9(0004) COMP.
+000995     05  BPYNM18F PIC  X(0001).
+000996     05  FILLER REDEFINES BPYNM18F.
+000997         10  BPYNM18A PIC  X(0001).
+000998     05  BPYNM18I PIC  X(0012).
+000999*    -------------------------------
+001000     05  BPAMT18L PIC S9(0004) COMP.
+001001     05  BPAMT18F PIC  X(0001).
+001002     05  FILLER REDEFINES BPAMT18F.
+001003         10  BPAMT18A PIC  X(0001).
+001004     05  BPAMT18I PIC  X(0013).
+001005*    -------------------------------
+001006     05  BEMSG1L PIC S9(0004) COMP.
+001007     05  BEMSG1F PIC  X(0001).
+001008     05  FILLER REDEFINES BEMSG1F.
+001009         10  BEMSG1A PIC  X(0001).
+001010     05  BEMSG1I PIC  X(0079).
+001011*    -------------------------------
+001012     05  BPFKL PIC S9(0004) COMP.
+001013     05  BPFKF PIC  X(0001).
+001014     05  FILLER REDEFINES BPFKF.
+001015         10  BPFKA PIC  X(0001).
+001016     05  BPFKI PIC  9(2).
+001017*    -------------------------------
+001018     05  BPRINTRL PIC S9(0004) COMP.
+001019     05  BPRINTRF PIC  X(0001).
+001020     05  FILLER REDEFINES BPRINTRF.
+001021         10  BPRINTRA PIC  X(0001).
+001022     05  BPRINTRI PIC  X(0004).
+001023*    -------------------------------
+001024     05  BPFDESCL PIC S9(0004) COMP.
+001025     05  BPFDESCF PIC  X(0001).
+001026     05  FILLER REDEFINES BPFDESCF.
+001027         10  BPFDESCA PIC  X(0001).
+001028     05  BPFDESCI PIC  X(0029).
+001029*    -------------------------------
+001030     05  BCNTLNDL PIC S9(0004) COMP.
+001031     05  BCNTLNDF PIC  X(0001).
+001032     05  FILLER REDEFINES BCNTLNDF.
+001033         10  BCNTLNDA PIC  X(0001).
+001034     05  BCNTLNDI PIC  X(0011).
+001035*    -------------------------------
+001036     05  BCNTLNOL PIC S9(0004) COMP.
+001037     05  BCNTLNOF PIC  X(0001).
+001038     05  FILLER REDEFINES BCNTLNOF.
+001039         10  BCNTLNOA PIC  X(0001).
+001040     05  BCNTLNOI PIC  X(0007).
+001041 01  EL685BO REDEFINES EL685BI.
+001042     05  FILLER            PIC  X(0012).
+001043*    -------------------------------
+001044     05  FILLER            PIC  X(0003).
+001045     05  BDATEO PIC  X(0008).
+001046*    -------------------------------
+001047     05  FILLER            PIC  X(0003).
+001048     05  BTIMEO PIC  99.99.
+001049*    -------------------------------
+001050     05  FILLER            PIC  X(0003).
+001051     05  BTITLEO PIC  X(0028).
+001052*    -------------------------------
+001053     05  FILLER            PIC  X(0003).
+001054     05  BSCREENO PIC  X(0006).
+001055*    -------------------------------
+001056     05  FILLER            PIC  X(0003).
+001057     05  BPAGEO PIC  9999.
+001058*    -------------------------------
+001059     05  FILLER            PIC  X(0003).
+001060     05  BCTRL01O PIC  X(0007).
+001061*    -------------------------------
+001062     05  FILLER            PIC  X(0003).
+001063     05  BCKNO01O PIC  X(0006).
+001064*    -------------------------------
+001065     05  FILLER            PIC  X(0003).
+001066     05  BCKDT01O PIC  X(0008).
+001067*    -------------------------------
+001068     05  FILLER            PIC  X(0003).
+001069     05  BCARR01O PIC  X(0001).
+001070*    -------------------------------
+001071     05  FILLER            PIC  X(0003).
+001072     05  BGRUP01O PIC  X(0006).
+001073*    -------------------------------
+001074     05  FILLER            PIC  X(0003).
+001075     05  BPYEE01O PIC  X(0010).
+001076*    -------------------------------
+001077     05  FILLER            PIC  X(0003).
+001078     05  BSEQN01O PIC  X(0004).
+001079*    -------------------------------
+001080     05  FILLER            PIC  X(0003).
+001081     05  BPYNM01O PIC  X(0012).
+001082*    -------------------------------
+001083     05  FILLER            PIC  X(0003).
+001084     05  BPAMT01O PIC  X(0013).
+001085*    -------------------------------
+001086     05  FILLER            PIC  X(0003).
+001087     05  BCTRL02O PIC  X(0007).
+001088*    -------------------------------
+001089     05  FILLER            PIC  X(0003).
+001090     05  BCKNO02O PIC  X(0006).
+001091*    -------------------------------
+001092     05  FILLER            PIC  X(0003).
+001093     05  BCKDT02O PIC  X(0008).
+001094*    -------------------------------
+001095     05  FILLER            PIC  X(0003).
+001096     05  BCARR02O PIC  X(0001).
+001097*    -------------------------------
+001098     05  FILLER            PIC  X(0003).
+001099     05  BGRUP02O PIC  X(0006).
+001100*    -------------------------------
+001101     05  FILLER            PIC  X(0003).
+001102     05  BPYEE02O PIC  X(0010).
+001103*    -------------------------------
+001104     05  FILLER            PIC  X(0003).
+001105     05  BSEQN02O PIC  X(0004).
+001106*    -------------------------------
+001107     05  FILLER            PIC  X(0003).
+001108     05  BPYNM02O PIC  X(0012).
+001109*    -------------------------------
+001110     05  FILLER            PIC  X(0003).
+001111     05  BPAMT02O PIC  X(0013).
+001112*    -------------------------------
+001113     05  FILLER            PIC  X(0003).
+001114     05  BCTRL03O PIC  X(0007).
+001115*    -------------------------------
+001116     05  FILLER            PIC  X(0003).
+001117     05  BCKNO03O PIC  X(0006).
+001118*    -------------------------------
+001119     05  FILLER            PIC  X(0003).
+001120     05  BCKDT03O PIC  X(0008).
+001121*    -------------------------------
+001122     05  FILLER            PIC  X(0003).
+001123     05  BCARR03O PIC  X(0001).
+001124*    -------------------------------
+001125     05  FILLER            PIC  X(0003).
+001126     05  BGRUP03O PIC  X(0006).
+001127*    -------------------------------
+001128     05  FILLER            PIC  X(0003).
+001129     05  BPYEE03O PIC  X(0010).
+001130*    -------------------------------
+001131     05  FILLER            PIC  X(0003).
+001132     05  BSEQN03O PIC  X(0004).
+001133*    -------------------------------
+001134     05  FILLER            PIC  X(0003).
+001135     05  BPYNM03O PIC  X(0012).
+001136*    -------------------------------
+001137     05  FILLER            PIC  X(0003).
+001138     05  BPAMT03O PIC  X(0013).
+001139*    -------------------------------
+001140     05  FILLER            PIC  X(0003).
+001141     05  BCTRL04O PIC  X(0007).
+001142*    -------------------------------
+001143     05  FILLER            PIC  X(0003).
+001144     05  BCKNO04O PIC  X(0006).
+001145*    -------------------------------
+001146     05  FILLER            PIC  X(0003).
+001147     05  BCKDT04O PIC  X(0008).
+001148*    -------------------------------
+001149     05  FILLER            PIC  X(0003).
+001150     05  BCARR04O PIC  X(0001).
+001151*    -------------------------------
+001152     05  FILLER            PIC  X(0003).
+001153     05  BGRUP04O PIC  X(0006).
+001154*    -------------------------------
+001155     05  FILLER            PIC  X(0003).
+001156     05  BPYEE04O PIC  X(0010).
+001157*    -------------------------------
+001158     05  FILLER            PIC  X(0003).
+001159     05  BSEQN04O PIC  X(0004).
+001160*    -------------------------------
+001161     05  FILLER            PIC  X(0003).
+001162     05  BPYNM04O PIC  X(0012).
+001163*    -------------------------------
+001164     05  FILLER            PIC  X(0003).
+001165     05  BPAMT04O PIC  X(0013).
+001166*    -------------------------------
+001167     05  FILLER            PIC  X(0003).
+001168     05  BCTRL05O PIC  X(0007).
+001169*    -------------------------------
+001170     05  FILLER            PIC  X(0003).
+001171     05  BCKNO05O PIC  X(0006).
+001172*    -------------------------------
+001173     05  FILLER            PIC  X(0003).
+001174     05  BCKDT05O PIC  X(0008).
+001175*    -------------------------------
+001176     05  FILLER            PIC  X(0003).
+001177     05  BCARR05O PIC  X(0001).
+001178*    -------------------------------
+001179     05  FILLER            PIC  X(0003).
+001180     05  BGRUP05O PIC  X(0006).
+001181*    -------------------------------
+001182     05  FILLER            PIC  X(0003).
+001183     05  BPYEE05O PIC  X(0010).
+001184*    -------------------------------
+001185     05  FILLER            PIC  X(0003).
+001186     05  BSEQN05O PIC  X(0004).
+001187*    -------------------------------
+001188     05  FILLER            PIC  X(0003).
+001189     05  BPYNM05O PIC  X(0012).
+001190*    -------------------------------
+001191     05  FILLER            PIC  X(0003).
+001192     05  BPAMT05O PIC  X(0013).
+001193*    -------------------------------
+001194     05  FILLER            PIC  X(0003).
+001195     05  BCTRL06O PIC  X(0007).
+001196*    -------------------------------
+001197     05  FILLER            PIC  X(0003).
+001198     05  BCKNO06O PIC  X(0006).
+001199*    -------------------------------
+001200     05  FILLER            PIC  X(0003).
+001201     05  BCKDT06O PIC  X(0008).
+001202*    -------------------------------
+001203     05  FILLER            PIC  X(0003).
+001204     05  BCARR06O PIC  X(0001).
+001205*    -------------------------------
+001206     05  FILLER            PIC  X(0003).
+001207     05  BGRUP06O PIC  X(0006).
+001208*    -------------------------------
+001209     05  FILLER            PIC  X(0003).
+001210     05  BPYEE06O PIC  X(0010).
+001211*    -------------------------------
+001212     05  FILLER            PIC  X(0003).
+001213     05  BSEQN06O PIC  X(0004).
+001214*    -------------------------------
+001215     05  FILLER            PIC  X(0003).
+001216     05  BPYNM06O PIC  X(0012).
+001217*    -------------------------------
+001218     05  FILLER            PIC  X(0003).
+001219     05  BPAMT06O PIC  X(0013).
+001220*    -------------------------------
+001221     05  FILLER            PIC  X(0003).
+001222     05  BCTRL07O PIC  X(0007).
+001223*    -------------------------------
+001224     05  FILLER            PIC  X(0003).
+001225     05  BCKNO07O PIC  X(0006).
+001226*    -------------------------------
+001227     05  FILLER            PIC  X(0003).
+001228     05  BCKDT07O PIC  X(0008).
+001229*    -------------------------------
+001230     05  FILLER            PIC  X(0003).
+001231     05  BCARR07O PIC  X(0001).
+001232*    -------------------------------
+001233     05  FILLER            PIC  X(0003).
+001234     05  BGRUP07O PIC  X(0006).
+001235*    -------------------------------
+001236     05  FILLER            PIC  X(0003).
+001237     05  BPYEE07O PIC  X(0010).
+001238*    -------------------------------
+001239     05  FILLER            PIC  X(0003).
+001240     05  BSEQN07O PIC  X(0004).
+001241*    -------------------------------
+001242     05  FILLER            PIC  X(0003).
+001243     05  BPYNM07O PIC  X(0012).
+001244*    -------------------------------
+001245     05  FILLER            PIC  X(0003).
+001246     05  BPAMT07O PIC  X(0013).
+001247*    -------------------------------
+001248     05  FILLER            PIC  X(0003).
+001249     05  BCTRL08O PIC  X(0007).
+001250*    -------------------------------
+001251     05  FILLER            PIC  X(0003).
+001252     05  BCKNO08O PIC  X(0006).
+001253*    -------------------------------
+001254     05  FILLER            PIC  X(0003).
+001255     05  BCKDT08O PIC  X(0008).
+001256*    -------------------------------
+001257     05  FILLER            PIC  X(0003).
+001258     05  BCARR08O PIC  X(0001).
+001259*    -------------------------------
+001260     05  FILLER            PIC  X(0003).
+001261     05  BGRUP08O PIC  X(0006).
+001262*    -------------------------------
+001263     05  FILLER            PIC  X(0003).
+001264     05  BPYEE08O PIC  X(0010).
+001265*    -------------------------------
+001266     05  FILLER            PIC  X(0003).
+001267     05  BSEQN08O PIC  X(0004).
+001268*    -------------------------------
+001269     05  FILLER            PIC  X(0003).
+001270     05  BPYNM08O PIC  X(0012).
+001271*    -------------------------------
+001272     05  FILLER            PIC  X(0003).
+001273     05  BPAMT08O PIC  X(0013).
+001274*    -------------------------------
+001275     05  FILLER            PIC  X(0003).
+001276     05  BCTRL09O PIC  X(0007).
+001277*    -------------------------------
+001278     05  FILLER            PIC  X(0003).
+001279     05  BCKNO09O PIC  X(0006).
+001280*    -------------------------------
+001281     05  FILLER            PIC  X(0003).
+001282     05  BCKDT09O PIC  X(0008).
+001283*    -------------------------------
+001284     05  FILLER            PIC  X(0003).
+001285     05  BCARR09O PIC  X(0001).
+001286*    -------------------------------
+001287     05  FILLER            PIC  X(0003).
+001288     05  BGRUP09O PIC  X(0006).
+001289*    -------------------------------
+001290     05  FILLER            PIC  X(0003).
+001291     05  BPYEE09O PIC  X(0010).
+001292*    -------------------------------
+001293     05  FILLER            PIC  X(0003).
+001294     05  BSEQN09O PIC  X(0004).
+001295*    -------------------------------
+001296     05  FILLER            PIC  X(0003).
+001297     05  BPYNM09O PIC  X(0012).
+001298*    -------------------------------
+001299     05  FILLER            PIC  X(0003).
+001300     05  BPAMT09O PIC  X(0013).
+001301*    -------------------------------
+001302     05  FILLER            PIC  X(0003).
+001303     05  BCTRL10O PIC  X(0007).
+001304*    -------------------------------
+001305     05  FILLER            PIC  X(0003).
+001306     05  BCKNO10O PIC  X(0006).
+001307*    -------------------------------
+001308     05  FILLER            PIC  X(0003).
+001309     05  BCKDT10O PIC  X(0008).
+001310*    -------------------------------
+001311     05  FILLER            PIC  X(0003).
+001312     05  BCARR10O PIC  X(0001).
+001313*    -------------------------------
+001314     05  FILLER            PIC  X(0003).
+001315     05  BGRUP10O PIC  X(0006).
+001316*    -------------------------------
+001317     05  FILLER            PIC  X(0003).
+001318     05  BPYEE10O PIC  X(0010).
+001319*    -------------------------------
+001320     05  FILLER            PIC  X(0003).
+001321     05  BSEQN10O PIC  X(0004).
+001322*    -------------------------------
+001323     05  FILLER            PIC  X(0003).
+001324     05  BPYNM10O PIC  X(0012).
+001325*    -------------------------------
+001326     05  FILLER            PIC  X(0003).
+001327     05  BPAMT10O PIC  X(0013).
+001328*    -------------------------------
+001329     05  FILLER            PIC  X(0003).
+001330     05  BCTRL11O PIC  X(0007).
+001331*    -------------------------------
+001332     05  FILLER            PIC  X(0003).
+001333     05  BCKNO11O PIC  X(0006).
+001334*    -------------------------------
+001335     05  FILLER            PIC  X(0003).
+001336     05  BCKDT11O PIC  X(0008).
+001337*    -------------------------------
+001338     05  FILLER            PIC  X(0003).
+001339     05  BCARR11O PIC  X(0001).
+001340*    -------------------------------
+001341     05  FILLER            PIC  X(0003).
+001342     05  BGRUP11O PIC  X(0006).
+001343*    -------------------------------
+001344     05  FILLER            PIC  X(0003).
+001345     05  BPYEE11O PIC  X(0010).
+001346*    -------------------------------
+001347     05  FILLER            PIC  X(0003).
+001348     05  BSEQN11O PIC  X(0004).
+001349*    -------------------------------
+001350     05  FILLER            PIC  X(0003).
+001351     05  BPYNM11O PIC  X(0012).
+001352*    -------------------------------
+001353     05  FILLER            PIC  X(0003).
+001354     05  BPAMT11O PIC  X(0013).
+001355*    -------------------------------
+001356     05  FILLER            PIC  X(0003).
+001357     05  BCTRL12O PIC  X(0007).
+001358*    -------------------------------
+001359     05  FILLER            PIC  X(0003).
+001360     05  BCKNO12O PIC  X(0006).
+001361*    -------------------------------
+001362     05  FILLER            PIC  X(0003).
+001363     05  BCKDT12O PIC  X(0008).
+001364*    -------------------------------
+001365     05  FILLER            PIC  X(0003).
+001366     05  BCARR12O PIC  X(0001).
+001367*    -------------------------------
+001368     05  FILLER            PIC  X(0003).
+001369     05  BGRUP12O PIC  X(0006).
+001370*    -------------------------------
+001371     05  FILLER            PIC  X(0003).
+001372     05  BPYEE12O PIC  X(0010).
+001373*    -------------------------------
+001374     05  FILLER            PIC  X(0003).
+001375     05  BSEQN12O PIC  X(0004).
+001376*    -------------------------------
+001377     05  FILLER            PIC  X(0003).
+001378     05  BPYNM12O PIC  X(0012).
+001379*    -------------------------------
+001380     05  FILLER            PIC  X(0003).
+001381     05  BPAMT12O PIC  X(0013).
+001382*    -------------------------------
+001383     05  FILLER            PIC  X(0003).
+001384     05  BCTRL13O PIC  X(0007).
+001385*    -------------------------------
+001386     05  FILLER            PIC  X(0003).
+001387     05  BCKNO13O PIC  X(0006).
+001388*    -------------------------------
+001389     05  FILLER            PIC  X(0003).
+001390     05  BCKDT13O PIC  X(0008).
+001391*    -------------------------------
+001392     05  FILLER            PIC  X(0003).
+001393     05  BCARR13O PIC  X(0001).
+001394*    -------------------------------
+001395     05  FILLER            PIC  X(0003).
+001396     05  BGRUP13O PIC  X(0006).
+001397*    -------------------------------
+001398     05  FILLER            PIC  X(0003).
+001399     05  BPYEE13O PIC  X(0010).
+001400*    -------------------------------
+001401     05  FILLER            PIC  X(0003).
+001402     05  BSEQN13O PIC  X(0004).
+001403*    -------------------------------
+001404     05  FILLER            PIC  X(0003).
+001405     05  BPYNM13O PIC  X(0012).
+001406*    -------------------------------
+001407     05  FILLER            PIC  X(0003).
+001408     05  BPAMT13O PIC  X(0013).
+001409*    -------------------------------
+001410     05  FILLER            PIC  X(0003).
+001411     05  BCTRL14O PIC  X(0007).
+001412*    -------------------------------
+001413     05  FILLER            PIC  X(0003).
+001414     05  BCKNO14O PIC  X(0006).
+001415*    -------------------------------
+001416     05  FILLER            PIC  X(0003).
+001417     05  BCKDT14O PIC  X(0008).
+001418*    -------------------------------
+001419     05  FILLER            PIC  X(0003).
+001420     05  BCARR14O PIC  X(0001).
+001421*    -------------------------------
+001422     05  FILLER            PIC  X(0003).
+001423     05  BGRUP14O PIC  X(0006).
+001424*    -------------------------------
+001425     05  FILLER            PIC  X(0003).
+001426     05  BPYEE14O PIC  X(0010).
+001427*    -------------------------------
+001428     05  FILLER            PIC  X(0003).
+001429     05  BSEQN14O PIC  X(0004).
+001430*    -------------------------------
+001431     05  FILLER            PIC  X(0003).
+001432     05  BPYNM14O PIC  X(0012).
+001433*    -------------------------------
+001434     05  FILLER            PIC  X(0003).
+001435     05  BPAMT14O PIC  X(0013).
+001436*    -------------------------------
+001437     05  FILLER            PIC  X(0003).
+001438     05  BCTRL15O PIC  X(0007).
+001439*    -------------------------------
+001440     05  FILLER            PIC  X(0003).
+001441     05  BCKNO15O PIC  X(0006).
+001442*    -------------------------------
+001443     05  FILLER            PIC  X(0003).
+001444     05  BCKDT15O PIC  X(0008).
+001445*    -------------------------------
+001446     05  FILLER            PIC  X(0003).
+001447     05  BCARR15O PIC  X(0001).
+001448*    -------------------------------
+001449     05  FILLER            PIC  X(0003).
+001450     05  BGRUP15O PIC  X(0006).
+001451*    -------------------------------
+001452     05  FILLER            PIC  X(0003).
+001453     05  BPYEE15O PIC  X(0010).
+001454*    -------------------------------
+001455     05  FILLER            PIC  X(0003).
+001456     05  BSEQN15O PIC  X(0004).
+001457*    -------------------------------
+001458     05  FILLER            PIC  X(0003).
+001459     05  BPYNM15O PIC  X(0012).
+001460*    -------------------------------
+001461     05  FILLER            PIC  X(0003).
+001462     05  BPAMT15O PIC  X(0013).
+001463*    -------------------------------
+001464     05  FILLER            PIC  X(0003).
+001465     05  BCTRL16O PIC  X(0007).
+001466*    -------------------------------
+001467     05  FILLER            PIC  X(0003).
+001468     05  BCKNO16O PIC  X(0006).
+001469*    -------------------------------
+001470     05  FILLER            PIC  X(0003).
+001471     05  BCKDT16O PIC  X(0008).
+001472*    -------------------------------
+001473     05  FILLER            PIC  X(0003).
+001474     05  BCARR16O PIC  X(0001).
+001475*    -------------------------------
+001476     05  FILLER            PIC  X(0003).
+001477     05  BGRUP16O PIC  X(0006).
+001478*    -------------------------------
+001479     05  FILLER            PIC  X(0003).
+001480     05  BPYEE16O PIC  X(0010).
+001481*    -------------------------------
+001482     05  FILLER            PIC  X(0003).
+001483     05  BSEQN16O PIC  X(0004).
+001484*    -------------------------------
+001485     05  FILLER            PIC  X(0003).
+001486     05  BPYNM16O PIC  X(0012).
+001487*    -------------------------------
+001488     05  FILLER            PIC  X(0003).
+001489     05  BPAMT16O PIC  X(0013).
+001490*    -------------------------------
+001491     05  FILLER            PIC  X(0003).
+001492     05  BCTRL17O PIC  X(0007).
+001493*    -------------------------------
+001494     05  FILLER            PIC  X(0003).
+001495     05  BCKNO17O PIC  X(0006).
+001496*    -------------------------------
+001497     05  FILLER            PIC  X(0003).
+001498     05  BCKDT17O PIC  X(0008).
+001499*    -------------------------------
+001500     05  FILLER            PIC  X(0003).
+001501     05  BCARR17O PIC  X(0001).
+001502*    -------------------------------
+001503     05  FILLER            PIC  X(0003).
+001504     05  BGRUP17O PIC  X(0006).
+001505*    -------------------------------
+001506     05  FILLER            PIC  X(0003).
+001507     05  BPYEE17O PIC  X(0010).
+001508*    -------------------------------
+001509     05  FILLER            PIC  X(0003).
+001510     05  BSEQN17O PIC  X(0004).
+001511*    -------------------------------
+001512     05  FILLER            PIC  X(0003).
+001513     05  BPYNM17O PIC  X(0012).
+001514*    -------------------------------
+001515     05  FILLER            PIC  X(0003).
+001516     05  BPAMT17O PIC  X(0013).
+001517*    -------------------------------
+001518     05  FILLER            PIC  X(0003).
+001519     05  BCTRL18O PIC  X(0007).
+001520*    -------------------------------
+001521     05  FILLER            PIC  X(0003).
+001522     05  BCKNO18O PIC  X(0006).
+001523*    -------------------------------
+001524     05  FILLER            PIC  X(0003).
+001525     05  BCKDT18O PIC  X(0008).
+001526*    -------------------------------
+001527     05  FILLER            PIC  X(0003).
+001528     05  BCARR18O PIC  X(0001).
+001529*    -------------------------------
+001530     05  FILLER            PIC  X(0003).
+001531     05  BGRUP18O PIC  X(0006).
+001532*    -------------------------------
+001533     05  FILLER            PIC  X(0003).
+001534     05  BPYEE18O PIC  X(0010).
+001535*    -------------------------------
+001536     05  FILLER            PIC  X(0003).
+001537     05  BSEQN18O PIC  X(0004).
+001538*    -------------------------------
+001539     05  FILLER            PIC  X(0003).
+001540     05  BPYNM18O PIC  X(0012).
+001541*    -------------------------------
+001542     05  FILLER            PIC  X(0003).
+001543     05  BPAMT18O PIC  X(0013).
+001544*    -------------------------------
+001545     05  FILLER            PIC  X(0003).
+001546     05  BEMSG1O PIC  X(0079).
+001547*    -------------------------------
+001548     05  FILLER            PIC  X(0003).
+001549     05  BPFKO PIC  99.
+001550*    -------------------------------
+001551     05  FILLER            PIC  X(0003).
+001552     05  BPRINTRO PIC  X(0004).
+001553*    -------------------------------
+001554     05  FILLER            PIC  X(0003).
+001555     05  BPFDESCO PIC  X(0029).
+001556*    -------------------------------
+001557     05  FILLER            PIC  X(0003).
+001558     05  BCNTLNDO PIC  X(0011).
+001559*    -------------------------------
+001560     05  FILLER            PIC  X(0003).
+001561     05  BCNTLNOO PIC  X(0007).
+001562*    -------------------------------
+001563 01  EL685AI REDEFINES EL685BI.
+001564     05  FILLER            PIC  X(0012).
+001565*    -------------------------------
+001566     05  ADATEL PIC S9(0004) COMP.
+001567     05  ADATEF PIC  X(0001).
+001568     05  FILLER REDEFINES ADATEF.
+001569         10  ADATEA PIC  X(0001).
+001570     05  ADATEI PIC  X(0008).
+001571*    -------------------------------
+001572     05  ATIMEL PIC S9(0004) COMP.
+001573     05  ATIMEF PIC  X(0001).
+001574     05  FILLER REDEFINES ATIMEF.
+001575         10  ATIMEA PIC  X(0001).
+001576     05  ATIMEI PIC  X(0005).
+001577*    -------------------------------
+001578     05  ATITLEL PIC S9(0004) COMP.
+001579     05  ATITLEF PIC  X(0001).
+001580     05  FILLER REDEFINES ATITLEF.
+001581         10  ATITLEA PIC  X(0001).
+001582     05  ATITLEI PIC  X(0028).
+001583*    -------------------------------
+001584     05  ASCREENL PIC S9(0004) COMP.
+001585     05  ASCREENF PIC  X(0001).
+001586     05  FILLER REDEFINES ASCREENF.
+001587         10  ASCREENA PIC  X(0001).
+001588     05  ASCREENI PIC  X(0006).
+001589*    -------------------------------
+001590     05  APAGEL PIC S9(0004) COMP.
+001591     05  APAGEF PIC  X(0001).
+001592     05  FILLER REDEFINES APAGEF.
+001593         10  APAGEA PIC  X(0001).
+001594     05  APAGEI PIC  S9(4).
+001595*    -------------------------------
+001596     05  ADESC1L PIC S9(0004) COMP.
+001597     05  ADESC1F PIC  X(0001).
+001598     05  FILLER REDEFINES ADESC1F.
+001599         10  ADESC1A PIC  X(0001).
+001600     05  ADESC1I PIC  X(0008).
+001601*    -------------------------------
+001602     05  ADESC2L PIC S9(0004) COMP.
+001603     05  ADESC2F PIC  X(0001).
+001604     05  FILLER REDEFINES ADESC2F.
+001605         10  ADESC2A PIC  X(0001).
+001606     05  ADESC2I PIC  X(0008).
+001607*    -------------------------------
+001608     05  ACTRL01L PIC S9(0004) COMP.
+001609     05  ACTRL01F PIC  X(0001).
+001610     05  FILLER REDEFINES ACTRL01F.
+001611         10  ACTRL01A PIC  X(0001).
+001612     05  ACTRL01I PIC  X(0007).
+001613*    -------------------------------
+001614     05  ACKNO01L PIC S9(0004) COMP.
+001615     05  ACKNO01F PIC  X(0001).
+001616     05  FILLER REDEFINES ACKNO01F.
+001617         10  ACKNO01A PIC  X(0001).
+001618     05  ACKNO01I PIC  X(0007).
+001619*    -------------------------------
+001620     05  ATYPE01L PIC S9(0004) COMP.
+001621     05  ATYPE01F PIC  X(0001).
+001622     05  FILLER REDEFINES ATYPE01F.
+001623         10  ATYPE01A PIC  X(0001).
+001624     05  ATYPE01I PIC  X(0011).
+001625*    -------------------------------
+001626     05  ACARR01L PIC S9(0004) COMP.
+001627     05  ACARR01F PIC  X(0001).
+001628     05  FILLER REDEFINES ACARR01F.
+001629         10  ACARR01A PIC  X(0001).
+001630     05  ACARR01I PIC  X(0001).
+001631*    -------------------------------
+001632     05  AGRUP01L PIC S9(0004) COMP.
+001633     05  AGRUP01F PIC  X(0001).
+001634     05  FILLER REDEFINES AGRUP01F.
+001635         10  AGRUP01A PIC  X(0001).
+001636     05  AGRUP01I PIC  X(0006).
+001637*    -------------------------------
+001638     05  AFINR01L PIC S9(0004) COMP.
+001639     05  AFINR01F PIC  X(0001).
+001640     05  FILLER REDEFINES AFINR01F.
+001641         10  AFINR01A PIC  X(0001).
+001642     05  AFINR01I PIC  X(0010).
+001643*    -------------------------------
+001644     05  AACCT01L PIC S9(0004) COMP.
+001645     05  AACCT01F PIC  X(0001).
+001646     05  FILLER REDEFINES AACCT01F.
+001647         10  AACCT01A PIC  X(0001).
+001648     05  AACCT01I PIC  X(0010).
+001649*    -------------------------------
+001650     05  APAMT01L PIC S9(0004) COMP.
+001651     05  APAMT01F PIC  X(0001).
+001652     05  FILLER REDEFINES APAMT01F.
+001653         10  APAMT01A PIC  X(0001).
+001654     05  APAMT01I PIC  X(0013).
+001655*    -------------------------------
+001656     05  ACTRL02L PIC S9(0004) COMP.
+001657     05  ACTRL02F PIC  X(0001).
+001658     05  FILLER REDEFINES ACTRL02F.
+001659         10  ACTRL02A PIC  X(0001).
+001660     05  ACTRL02I PIC  X(0007).
+001661*    -------------------------------
+001662     05  ACKNO02L PIC S9(0004) COMP.
+001663     05  ACKNO02F PIC  X(0001).
+001664     05  FILLER REDEFINES ACKNO02F.
+001665         10  ACKNO02A PIC  X(0001).
+001666     05  ACKNO02I PIC  X(0007).
+001667*    -------------------------------
+001668     05  ATYPE02L PIC S9(0004) COMP.
+001669     05  ATYPE02F PIC  X(0001).
+001670     05  FILLER REDEFINES ATYPE02F.
+001671         10  ATYPE02A PIC  X(0001).
+001672     05  ATYPE02I PIC  X(0011).
+001673*    -------------------------------
+001674     05  ACARR02L PIC S9(0004) COMP.
+001675     05  ACARR02F PIC  X(0001).
+001676     05  FILLER REDEFINES ACARR02F.
+001677         10  ACARR02A PIC  X(0001).
+001678     05  ACARR02I PIC  X(0001).
+001679*    -------------------------------
+001680     05  AGRUP02L PIC S9(0004) COMP.
+001681     05  AGRUP02F PIC  X(0001).
+001682     05  FILLER REDEFINES AGRUP02F.
+001683         10  AGRUP02A PIC  X(0001).
+001684     05  AGRUP02I PIC  X(0006).
+001685*    -------------------------------
+001686     05  AFINR02L PIC S9(0004) COMP.
+001687     05  AFINR02F PIC  X(0001).
+001688     05  FILLER REDEFINES AFINR02F.
+001689         10  AFINR02A PIC  X(0001).
+001690     05  AFINR02I PIC  X(0010).
+001691*    -------------------------------
+001692     05  AACCT02L PIC S9(0004) COMP.
+001693     05  AACCT02F PIC  X(0001).
+001694     05  FILLER REDEFINES AACCT02F.
+001695         10  AACCT02A PIC  X(0001).
+001696     05  AACCT02I PIC  X(0010).
+001697*    -------------------------------
+001698     05  APAMT02L PIC S9(0004) COMP.
+001699     05  APAMT02F PIC  X(0001).
+001700     05  FILLER REDEFINES APAMT02F.
+001701         10  APAMT02A PIC  X(0001).
+001702     05  APAMT02I PIC  X(0013).
+001703*    -------------------------------
+001704     05  ACTRL03L PIC S9(0004) COMP.
+001705     05  ACTRL03F PIC  X(0001).
+001706     05  FILLER REDEFINES ACTRL03F.
+001707         10  ACTRL03A PIC  X(0001).
+001708     05  ACTRL03I PIC  X(0007).
+001709*    -------------------------------
+001710     05  ACKNO03L PIC S9(0004) COMP.
+001711     05  ACKNO03F PIC  X(0001).
+001712     05  FILLER REDEFINES ACKNO03F.
+001713         10  ACKNO03A PIC  X(0001).
+001714     05  ACKNO03I PIC  X(0007).
+001715*    -------------------------------
+001716     05  ATYPE03L PIC S9(0004) COMP.
+001717     05  ATYPE03F PIC  X(0001).
+001718     05  FILLER REDEFINES ATYPE03F.
+001719         10  ATYPE03A PIC  X(0001).
+001720     05  ATYPE03I PIC  X(0011).
+001721*    -------------------------------
+001722     05  ACARR03L PIC S9(0004) COMP.
+001723     05  ACARR03F PIC  X(0001).
+001724     05  FILLER REDEFINES ACARR03F.
+001725         10  ACARR03A PIC  X(0001).
+001726     05  ACARR03I PIC  X(0001).
+001727*    -------------------------------
+001728     05  AGRUP03L PIC S9(0004) COMP.
+001729     05  AGRUP03F PIC  X(0001).
+001730     05  FILLER REDEFINES AGRUP03F.
+001731         10  AGRUP03A PIC  X(0001).
+001732     05  AGRUP03I PIC  X(0006).
+001733*    -------------------------------
+001734     05  AFINR03L PIC S9(0004) COMP.
+001735     05  AFINR03F PIC  X(0001).
+001736     05  FILLER REDEFINES AFINR03F.
+001737         10  AFINR03A PIC  X(0001).
+001738     05  AFINR03I PIC  X(0010).
+001739*    -------------------------------
+001740     05  AACCT03L PIC S9(0004) COMP.
+001741     05  AACCT03F PIC  X(0001).
+001742     05  FILLER REDEFINES AACCT03F.
+001743         10  AACCT03A PIC  X(0001).
+001744     05  AACCT03I PIC  X(0010).
+001745*    -------------------------------
+001746     05  APAMT03L PIC S9(0004) COMP.
+001747     05  APAMT03F PIC  X(0001).
+001748     05  FILLER REDEFINES APAMT03F.
+001749         10  APAMT03A PIC  X(0001).
+001750     05  APAMT03I PIC  X(0013).
+001751*    -------------------------------
+001752     05  ACTRL04L PIC S9(0004) COMP.
+001753     05  ACTRL04F PIC  X(0001).
+001754     05  FILLER REDEFINES ACTRL04F.
+001755         10  ACTRL04A PIC  X(0001).
+001756     05  ACTRL04I PIC  X(0007).
+001757*    -------------------------------
+001758     05  ACKNO04L PIC S9(0004) COMP.
+001759     05  ACKNO04F PIC  X(0001).
+001760     05  FILLER REDEFINES ACKNO04F.
+001761         10  ACKNO04A PIC  X(0001).
+001762     05  ACKNO04I PIC  X(0007).
+001763*    -------------------------------
+001764     05  ATYPE04L PIC S9(0004) COMP.
+001765     05  ATYPE04F PIC  X(0001).
+001766     05  FILLER REDEFINES ATYPE04F.
+001767         10  ATYPE04A PIC  X(0001).
+001768     05  ATYPE04I PIC  X(0011).
+001769*    -------------------------------
+001770     05  ACARR04L PIC S9(0004) COMP.
+001771     05  ACARR04F PIC  X(0001).
+001772     05  FILLER REDEFINES ACARR04F.
+001773         10  ACARR04A PIC  X(0001).
+001774     05  ACARR04I PIC  X(0001).
+001775*    -------------------------------
+001776     05  AGRUP04L PIC S9(0004) COMP.
+001777     05  AGRUP04F PIC  X(0001).
+001778     05  FILLER REDEFINES AGRUP04F.
+001779         10  AGRUP04A PIC  X(0001).
+001780     05  AGRUP04I PIC  X(0006).
+001781*    -------------------------------
+001782     05  AFINR04L PIC S9(0004) COMP.
+001783     05  AFINR04F PIC  X(0001).
+001784     05  FILLER REDEFINES AFINR04F.
+001785         10  AFINR04A PIC  X(0001).
+001786     05  AFINR04I PIC  X(0010).
+001787*    -------------------------------
+001788     05  AACCT04L PIC S9(0004) COMP.
+001789     05  AACCT04F PIC  X(0001).
+001790     05  FILLER REDEFINES AACCT04F.
+001791         10  AACCT04A PIC  X(0001).
+001792     05  AACCT04I PIC  X(0010).
+001793*    -------------------------------
+001794     05  APAMT04L PIC S9(0004) COMP.
+001795     05  APAMT04F PIC  X(0001).
+001796     05  FILLER REDEFINES APAMT04F.
+001797         10  APAMT04A PIC  X(0001).
+001798     05  APAMT04I PIC  X(0013).
+001799*    -------------------------------
+001800     05  ACTRL05L PIC S9(0004) COMP.
+001801     05  ACTRL05F PIC  X(0001).
+001802     05  FILLER REDEFINES ACTRL05F.
+001803         10  ACTRL05A PIC  X(0001).
+001804     05  ACTRL05I PIC  X(0007).
+001805*    -------------------------------
+001806     05  ACKNO05L PIC S9(0004) COMP.
+001807     05  ACKNO05F PIC  X(0001).
+001808     05  FILLER REDEFINES ACKNO05F.
+001809         10  ACKNO05A PIC  X(0001).
+001810     05  ACKNO05I PIC  X(0007).
+001811*    -------------------------------
+001812     05  ATYPE05L PIC S9(0004) COMP.
+001813     05  ATYPE05F PIC  X(0001).
+001814     05  FILLER REDEFINES ATYPE05F.
+001815         10  ATYPE05A PIC  X(0001).
+001816     05  ATYPE05I PIC  X(0011).
+001817*    -------------------------------
+001818     05  ACARR05L PIC S9(0004) COMP.
+001819     05  ACARR05F PIC  X(0001).
+001820     05  FILLER REDEFINES ACARR05F.
+001821         10  ACARR05A PIC  X(0001).
+001822     05  ACARR05I PIC  X(0001).
+001823*    -------------------------------
+001824     05  AGRUP05L PIC S9(0004) COMP.
+001825     05  AGRUP05F PIC  X(0001).
+001826     05  FILLER REDEFINES AGRUP05F.
+001827         10  AGRUP05A PIC  X(0001).
+001828     05  AGRUP05I PIC  X(0006).
+001829*    -------------------------------
+001830     05  AFINR05L PIC S9(0004) COMP.
+001831     05  AFINR05F PIC  X(0001).
+001832     05  FILLER REDEFINES AFINR05F.
+001833         10  AFINR05A PIC  X(0001).
+001834     05  AFINR05I PIC  X(0010).
+001835*    -------------------------------
+001836     05  AACCT05L PIC S9(0004) COMP.
+001837     05  AACCT05F PIC  X(0001).
+001838     05  FILLER REDEFINES AACCT05F.
+001839         10  AACCT05A PIC  X(0001).
+001840     05  AACCT05I PIC  X(0010).
+001841*    -------------------------------
+001842     05  APAMT05L PIC S9(0004) COMP.
+001843     05  APAMT05F PIC  X(0001).
+001844     05  FILLER REDEFINES APAMT05F.
+001845         10  APAMT05A PIC  X(0001).
+001846     05  APAMT05I PIC  X(0013).
+001847*    -------------------------------
+001848     05  ACTRL06L PIC S9(0004) COMP.
+001849     05  ACTRL06F PIC  X(0001).
+001850     05  FILLER REDEFINES ACTRL06F.
+001851         10  ACTRL06A PIC  X(0001).
+001852     05  ACTRL06I PIC  X(0007).
+001853*    -------------------------------
+001854     05  ACKNO06L PIC S9(0004) COMP.
+001855     05  ACKNO06F PIC  X(0001).
+001856     05  FILLER REDEFINES ACKNO06F.
+001857         10  ACKNO06A PIC  X(0001).
+001858     05  ACKNO06I PIC  X(0007).
+001859*    -------------------------------
+001860     05  ATYPE06L PIC S9(0004) COMP.
+001861     05  ATYPE06F PIC  X(0001).
+001862     05  FILLER REDEFINES ATYPE06F.
+001863         10  ATYPE06A PIC  X(0001).
+001864     05  ATYPE06I PIC  X(0011).
+001865*    -------------------------------
+001866     05  ACARR06L PIC S9(0004) COMP.
+001867     05  ACARR06F PIC  X(0001).
+001868     05  FILLER REDEFINES ACARR06F.
+001869         10  ACARR06A PIC  X(0001).
+001870     05  ACARR06I PIC  X(0001).
+001871*    -------------------------------
+001872     05  AGRUP06L PIC S9(0004) COMP.
+001873     05  AGRUP06F PIC  X(0001).
+001874     05  FILLER REDEFINES AGRUP06F.
+001875         10  AGRUP06A PIC  X(0001).
+001876     05  AGRUP06I PIC  X(0006).
+001877*    -------------------------------
+001878     05  AFINR06L PIC S9(0004) COMP.
+001879     05  AFINR06F PIC  X(0001).
+001880     05  FILLER REDEFINES AFINR06F.
+001881         10  AFINR06A PIC  X(0001).
+001882     05  AFINR06I PIC  X(0010).
+001883*    -------------------------------
+001884     05  AACCT06L PIC S9(0004) COMP.
+001885     05  AACCT06F PIC  X(0001).
+001886     05  FILLER REDEFINES AACCT06F.
+001887         10  AACCT06A PIC  X(0001).
+001888     05  AACCT06I PIC  X(0010).
+001889*    -------------------------------
+001890     05  APAMT06L PIC S9(0004) COMP.
+001891     05  APAMT06F PIC  X(0001).
+001892     05  FILLER REDEFINES APAMT06F.
+001893         10  APAMT06A PIC  X(0001).
+001894     05  APAMT06I PIC  X(0013).
+001895*    -------------------------------
+001896     05  ACTRL07L PIC S9(0004) COMP.
+001897     05  ACTRL07F PIC  X(0001).
+001898     05  FILLER REDEFINES ACTRL07F.
+001899         10  ACTRL07A PIC  X(0001).
+001900     05  ACTRL07I PIC  X(0007).
+001901*    -------------------------------
+001902     05  ACKNO07L PIC S9(0004) COMP.
+001903     05  ACKNO07F PIC  X(0001).
+001904     05  FILLER REDEFINES ACKNO07F.
+001905         10  ACKNO07A PIC  X(0001).
+001906     05  ACKNO07I PIC  X(0007).
+001907*    -------------------------------
+001908     05  ATYPE07L PIC S9(0004) COMP.
+001909     05  ATYPE07F PIC  X(0001).
+001910     05  FILLER REDEFINES ATYPE07F.
+001911         10  ATYPE07A PIC  X(0001).
+001912     05  ATYPE07I PIC  X(0011).
+001913*    -------------------------------
+001914     05  ACARR07L PIC S9(0004) COMP.
+001915     05  ACARR07F PIC  X(0001).
+001916     05  FILLER REDEFINES ACARR07F.
+001917         10  ACARR07A PIC  X(0001).
+001918     05  ACARR07I PIC  X(0001).
+001919*    -------------------------------
+001920     05  AGRUP07L PIC S9(0004) COMP.
+001921     05  AGRUP07F PIC  X(0001).
+001922     05  FILLER REDEFINES AGRUP07F.
+001923         10  AGRUP07A PIC  X(0001).
+001924     05  AGRUP07I PIC  X(0006).
+001925*    -------------------------------
+001926     05  AFINR07L PIC S9(0004) COMP.
+001927     05  AFINR07F PIC  X(0001).
+001928     05  FILLER REDEFINES AFINR07F.
+001929         10  AFINR07A PIC  X(0001).
+001930     05  AFINR07I PIC  X(0010).
+001931*    -------------------------------
+001932     05  AACCT07L PIC S9(0004) COMP.
+001933     05  AACCT07F PIC  X(0001).
+001934     05  FILLER REDEFINES AACCT07F.
+001935         10  AACCT07A PIC  X(0001).
+001936     05  AACCT07I PIC  X(0010).
+001937*    -------------------------------
+001938     05  APAMT07L PIC S9(0004) COMP.
+001939     05  APAMT07F PIC  X(0001).
+001940     05  FILLER REDEFINES APAMT07F.
+001941         10  APAMT07A PIC  X(0001).
+001942     05  APAMT07I PIC  X(0013).
+001943*    -------------------------------
+001944     05  ACTRL08L PIC S9(0004) COMP.
+001945     05  ACTRL08F PIC  X(0001).
+001946     05  FILLER REDEFINES ACTRL08F.
+001947         10  ACTRL08A PIC  X(0001).
+001948     05  ACTRL08I PIC  X(0007).
+001949*    -------------------------------
+001950     05  ACKNO08L PIC S9(0004) COMP.
+001951     05  ACKNO08F PIC  X(0001).
+001952     05  FILLER REDEFINES ACKNO08F.
+001953         10  ACKNO08A PIC  X(0001).
+001954     05  ACKNO08I PIC  X(0007).
+001955*    -------------------------------
+001956     05  ATYPE08L PIC S9(0004) COMP.
+001957     05  ATYPE08F PIC  X(0001).
+001958     05  FILLER REDEFINES ATYPE08F.
+001959         10  ATYPE08A PIC  X(0001).
+001960     05  ATYPE08I PIC  X(0011).
+001961*    -------------------------------
+001962     05  ACARR08L PIC S9(0004) COMP.
+001963     05  ACARR08F PIC  X(0001).
+001964     05  FILLER REDEFINES ACARR08F.
+001965         10  ACARR08A PIC  X(0001).
+001966     05  ACARR08I PIC  X(0001).
+001967*    -------------------------------
+001968     05  AGRUP08L PIC S9(0004) COMP.
+001969     05  AGRUP08F PIC  X(0001).
+001970     05  FILLER REDEFINES AGRUP08F.
+001971         10  AGRUP08A PIC  X(0001).
+001972     05  AGRUP08I PIC  X(0006).
+001973*    -------------------------------
+001974     05  AFINR08L PIC S9(0004) COMP.
+001975     05  AFINR08F PIC  X(0001).
+001976     05  FILLER REDEFINES AFINR08F.
+001977         10  AFINR08A PIC  X(0001).
+001978     05  AFINR08I PIC  X(0010).
+001979*    -------------------------------
+001980     05  AACCT08L PIC S9(0004) COMP.
+001981     05  AACCT08F PIC  X(0001).
+001982     05  FILLER REDEFINES AACCT08F.
+001983         10  AACCT08A PIC  X(0001).
+001984     05  AACCT08I PIC  X(0010).
+001985*    -------------------------------
+001986     05  APAMT08L PIC S9(0004) COMP.
+001987     05  APAMT08F PIC  X(0001).
+001988     05  FILLER REDEFINES APAMT08F.
+001989         10  APAMT08A PIC  X(0001).
+001990     05  APAMT08I PIC  X(0013).
+001991*    -------------------------------
+001992     05  ACTRL09L PIC S9(0004) COMP.
+001993     05  ACTRL09F PIC  X(0001).
+001994     05  FILLER REDEFINES ACTRL09F.
+001995         10  ACTRL09A PIC  X(0001).
+001996     05  ACTRL09I PIC  X(0007).
+001997*    -------------------------------
+001998     05  ACKNO09L PIC S9(0004) COMP.
+001999     05  ACKNO09F PIC  X(0001).
+002000     05  FILLER REDEFINES ACKNO09F.
+002001         10  ACKNO09A PIC  X(0001).
+002002     05  ACKNO09I PIC  X(0007).
+002003*    -------------------------------
+002004     05  ATYPE09L PIC S9(0004) COMP.
+002005     05  ATYPE09F PIC  X(0001).
+002006     05  FILLER REDEFINES ATYPE09F.
+002007         10  ATYPE09A PIC  X(0001).
+002008     05  ATYPE09I PIC  X(0011).
+002009*    -------------------------------
+002010     05  ACARR09L PIC S9(0004) COMP.
+002011     05  ACARR09F PIC  X(0001).
+002012     05  FILLER REDEFINES ACARR09F.
+002013         10  ACARR09A PIC  X(0001).
+002014     05  ACARR09I PIC  X(0001).
+002015*    -------------------------------
+002016     05  AGRUP09L PIC S9(0004) COMP.
+002017     05  AGRUP09F PIC  X(0001).
+002018     05  FILLER REDEFINES AGRUP09F.
+002019         10  AGRUP09A PIC  X(0001).
+002020     05  AGRUP09I PIC  X(0006).
+002021*    -------------------------------
+002022     05  AFINR09L PIC S9(0004) COMP.
+002023     05  AFINR09F PIC  X(0001).
+002024     05  FILLER REDEFINES AFINR09F.
+002025         10  AFINR09A PIC  X(0001).
+002026     05  AFINR09I PIC  X(0010).
+002027*    -------------------------------
+002028     05  AACCT09L PIC S9(0004) COMP.
+002029     05  AACCT09F PIC  X(0001).
+002030     05  FILLER REDEFINES AACCT09F.
+002031         10  AACCT09A PIC  X(0001).
+002032     05  AACCT09I PIC  X(0010).
+002033*    -------------------------------
+002034     05  APAMT09L PIC S9(0004) COMP.
+002035     05  APAMT09F PIC  X(0001).
+002036     05  FILLER REDEFINES APAMT09F.
+002037         10  APAMT09A PIC  X(0001).
+002038     05  APAMT09I PIC  X(0013).
+002039*    -------------------------------
+002040     05  ACTRL10L PIC S9(0004) COMP.
+002041     05  ACTRL10F PIC  X(0001).
+002042     05  FILLER REDEFINES ACTRL10F.
+002043         10  ACTRL10A PIC  X(0001).
+002044     05  ACTRL10I PIC  X(0007).
+002045*    -------------------------------
+002046     05  ACKNO10L PIC S9(0004) COMP.
+002047     05  ACKNO10F PIC  X(0001).
+002048     05  FILLER REDEFINES ACKNO10F.
+002049         10  ACKNO10A PIC  X(0001).
+002050     05  ACKNO10I PIC  X(0007).
+002051*    -------------------------------
+002052     05  ATYPE10L PIC S9(0004) COMP.
+002053     05  ATYPE10F PIC  X(0001).
+002054     05  FILLER REDEFINES ATYPE10F.
+002055         10  ATYPE10A PIC  X(0001).
+002056     05  ATYPE10I PIC  X(0011).
+002057*    -------------------------------
+002058     05  ACARR10L PIC S9(0004) COMP.
+002059     05  ACARR10F PIC  X(0001).
+002060     05  FILLER REDEFINES ACARR10F.
+002061         10  ACARR10A PIC  X(0001).
+002062     05  ACARR10I PIC  X(0001).
+002063*    -------------------------------
+002064     05  AGRUP10L PIC S9(0004) COMP.
+002065     05  AGRUP10F PIC  X(0001).
+002066     05  FILLER REDEFINES AGRUP10F.
+002067         10  AGRUP10A PIC  X(0001).
+002068     05  AGRUP10I PIC  X(0006).
+002069*    -------------------------------
+002070     05  AFINR10L PIC S9(0004) COMP.
+002071     05  AFINR10F PIC  X(0001).
+002072     05  FILLER REDEFINES AFINR10F.
+002073         10  AFINR10A PIC  X(0001).
+002074     05  AFINR10I PIC  X(0010).
+002075*    -------------------------------
+002076     05  AACCT10L PIC S9(0004) COMP.
+002077     05  AACCT10F PIC  X(0001).
+002078     05  FILLER REDEFINES AACCT10F.
+002079         10  AACCT10A PIC  X(0001).
+002080     05  AACCT10I PIC  X(0010).
+002081*    -------------------------------
+002082     05  APAMT10L PIC S9(0004) COMP.
+002083     05  APAMT10F PIC  X(0001).
+002084     05  FILLER REDEFINES APAMT10F.
+002085         10  APAMT10A PIC  X(0001).
+002086     05  APAMT10I PIC  X(0013).
+002087*    -------------------------------
+002088     05  ACTRL11L PIC S9(0004) COMP.
+002089     05  ACTRL11F PIC  X(0001).
+002090     05  FILLER REDEFINES ACTRL11F.
+002091         10  ACTRL11A PIC  X(0001).
+002092     05  ACTRL11I PIC  X(0007).
+002093*    -------------------------------
+002094     05  ACKNO11L PIC S9(0004) COMP.
+002095     05  ACKNO11F PIC  X(0001).
+002096     05  FILLER REDEFINES ACKNO11F.
+002097         10  ACKNO11A PIC  X(0001).
+002098     05  ACKNO11I PIC  X(0007).
+002099*    -------------------------------
+002100     05  ATYPE11L PIC S9(0004) COMP.
+002101     05  ATYPE11F PIC  X(0001).
+002102     05  FILLER REDEFINES ATYPE11F.
+002103         10  ATYPE11A PIC  X(0001).
+002104     05  ATYPE11I PIC  X(0011).
+002105*    -------------------------------
+002106     05  ACARR11L PIC S9(0004) COMP.
+002107     05  ACARR11F PIC  X(0001).
+002108     05  FILLER REDEFINES ACARR11F.
+002109         10  ACARR11A PIC  X(0001).
+002110     05  ACARR11I PIC  X(0001).
+002111*    -------------------------------
+002112     05  AGRUP11L PIC S9(0004) COMP.
+002113     05  AGRUP11F PIC  X(0001).
+002114     05  FILLER REDEFINES AGRUP11F.
+002115         10  AGRUP11A PIC  X(0001).
+002116     05  AGRUP11I PIC  X(0006).
+002117*    -------------------------------
+002118     05  AFINR11L PIC S9(0004) COMP.
+002119     05  AFINR11F PIC  X(0001).
+002120     05  FILLER REDEFINES AFINR11F.
+002121         10  AFINR11A PIC  X(0001).
+002122     05  AFINR11I PIC  X(0010).
+002123*    -------------------------------
+002124     05  AACCT11L PIC S9(0004) COMP.
+002125     05  AACCT11F PIC  X(0001).
+002126     05  FILLER REDEFINES AACCT11F.
+002127         10  AACCT11A PIC  X(0001).
+002128     05  AACCT11I PIC  X(0010).
+002129*    -------------------------------
+002130     05  APAMT11L PIC S9(0004) COMP.
+002131     05  APAMT11F PIC  X(0001).
+002132     05  FILLER REDEFINES APAMT11F.
+002133         10  APAMT11A PIC  X(0001).
+002134     05  APAMT11I PIC  X(0013).
+002135*    -------------------------------
+002136     05  ACTRL12L PIC S9(0004) COMP.
+002137     05  ACTRL12F PIC  X(0001).
+002138     05  FILLER REDEFINES ACTRL12F.
+002139         10  ACTRL12A PIC  X(0001).
+002140     05  ACTRL12I PIC  X(0007).
+002141*    -------------------------------
+002142     05  ACKNO12L PIC S9(0004) COMP.
+002143     05  ACKNO12F PIC  X(0001).
+002144     05  FILLER REDEFINES ACKNO12F.
+002145         10  ACKNO12A PIC  X(0001).
+002146     05  ACKNO12I PIC  X(0007).
+002147*    -------------------------------
+002148     05  ATYPE12L PIC S9(0004) COMP.
+002149     05  ATYPE12F PIC  X(0001).
+002150     05  FILLER REDEFINES ATYPE12F.
+002151         10  ATYPE12A PIC  X(0001).
+002152     05  ATYPE12I PIC  X(0011).
+002153*    -------------------------------
+002154     05  ACARR12L PIC S9(0004) COMP.
+002155     05  ACARR12F PIC  X(0001).
+002156     05  FILLER REDEFINES ACARR12F.
+002157         10  ACARR12A PIC  X(0001).
+002158     05  ACARR12I PIC  X(0001).
+002159*    -------------------------------
+002160     05  AGRUP12L PIC S9(0004) COMP.
+002161     05  AGRUP12F PIC  X(0001).
+002162     05  FILLER REDEFINES AGRUP12F.
+002163         10  AGRUP12A PIC  X(0001).
+002164     05  AGRUP12I PIC  X(0006).
+002165*    -------------------------------
+002166     05  AFINR12L PIC S9(0004) COMP.
+002167     05  AFINR12F PIC  X(0001).
+002168     05  FILLER REDEFINES AFINR12F.
+002169         10  AFINR12A PIC  X(0001).
+002170     05  AFINR12I PIC  X(0010).
+002171*    -------------------------------
+002172     05  AACCT12L PIC S9(0004) COMP.
+002173     05  AACCT12F PIC  X(0001).
+002174     05  FILLER REDEFINES AACCT12F.
+002175         10  AACCT12A PIC  X(0001).
+002176     05  AACCT12I PIC  X(0010).
+002177*    -------------------------------
+002178     05  APAMT12L PIC S9(0004) COMP.
+002179     05  APAMT12F PIC  X(0001).
+002180     05  FILLER REDEFINES APAMT12F.
+002181         10  APAMT12A PIC  X(0001).
+002182     05  APAMT12I PIC  X(0013).
+002183*    -------------------------------
+002184     05  ACTRL13L PIC S9(0004) COMP.
+002185     05  ACTRL13F PIC  X(0001).
+002186     05  FILLER REDEFINES ACTRL13F.
+002187         10  ACTRL13A PIC  X(0001).
+002188     05  ACTRL13I PIC  X(0007).
+002189*    -------------------------------
+002190     05  ACKNO13L PIC S9(0004) COMP.
+002191     05  ACKNO13F PIC  X(0001).
+002192     05  FILLER REDEFINES ACKNO13F.
+002193         10  ACKNO13A PIC  X(0001).
+002194     05  ACKNO13I PIC  X(0007).
+002195*    -------------------------------
+002196     05  ATYPE13L PIC S9(0004) COMP.
+002197     05  ATYPE13F PIC  X(0001).
+002198     05  FILLER REDEFINES ATYPE13F.
+002199         10  ATYPE13A PIC  X(0001).
+002200     05  ATYPE13I PIC  X(0011).
+002201*    -------------------------------
+002202     05  ACARR13L PIC S9(0004) COMP.
+002203     05  ACARR13F PIC  X(0001).
+002204     05  FILLER REDEFINES ACARR13F.
+002205         10  ACARR13A PIC  X(0001).
+002206     05  ACARR13I PIC  X(0001).
+002207*    -------------------------------
+002208     05  AGRUP13L PIC S9(0004) COMP.
+002209     05  AGRUP13F PIC  X(0001).
+002210     05  FILLER REDEFINES AGRUP13F.
+002211         10  AGRUP13A PIC  X(0001).
+002212     05  AGRUP13I PIC  X(0006).
+002213*    -------------------------------
+002214     05  AFINR13L PIC S9(0004) COMP.
+002215     05  AFINR13F PIC  X(0001).
+002216     05  FILLER REDEFINES AFINR13F.
+002217         10  AFINR13A PIC  X(0001).
+002218     05  AFINR13I PIC  X(0010).
+002219*    -------------------------------
+002220     05  AACCT13L PIC S9(0004) COMP.
+002221     05  AACCT13F PIC  X(0001).
+002222     05  FILLER REDEFINES AACCT13F.
+002223         10  AACCT13A PIC  X(0001).
+002224     05  AACCT13I PIC  X(0010).
+002225*    -------------------------------
+002226     05  APAMT13L PIC S9(0004) COMP.
+002227     05  APAMT13F PIC  X(0001).
+002228     05  FILLER REDEFINES APAMT13F.
+002229         10  APAMT13A PIC  X(0001).
+002230     05  APAMT13I PIC  X(0013).
+002231*    -------------------------------
+002232     05  ACTRL14L PIC S9(0004) COMP.
+002233     05  ACTRL14F PIC  X(0001).
+002234     05  FILLER REDEFINES ACTRL14F.
+002235         10  ACTRL14A PIC  X(0001).
+002236     05  ACTRL14I PIC  X(0007).
+002237*    -------------------------------
+002238     05  ACKNO14L PIC S9(0004) COMP.
+002239     05  ACKNO14F PIC  X(0001).
+002240     05  FILLER REDEFINES ACKNO14F.
+002241         10  ACKNO14A PIC  X(0001).
+002242     05  ACKNO14I PIC  X(0007).
+002243*    -------------------------------
+002244     05  ATYPE14L PIC S9(0004) COMP.
+002245     05  ATYPE14F PIC  X(0001).
+002246     05  FILLER REDEFINES ATYPE14F.
+002247         10  ATYPE14A PIC  X(0001).
+002248     05  ATYPE14I PIC  X(0011).
+002249*    -------------------------------
+002250     05  ACARR14L PIC S9(0004) COMP.
+002251     05  ACARR14F PIC  X(0001).
+002252     05  FILLER REDEFINES ACARR14F.
+002253         10  ACARR14A PIC  X(0001).
+002254     05  ACARR14I PIC  X(0001).
+002255*    -------------------------------
+002256     05  AGRUP14L PIC S9(0004) COMP.
+002257     05  AGRUP14F PIC  X(0001).
+002258     05  FILLER REDEFINES AGRUP14F.
+002259         10  AGRUP14A PIC  X(0001).
+002260     05  AGRUP14I PIC  X(0006).
+002261*    -------------------------------
+002262     05  AFINR14L PIC S9(0004) COMP.
+002263     05  AFINR14F PIC  X(0001).
+002264     05  FILLER REDEFINES AFINR14F.
+002265         10  AFINR14A PIC  X(0001).
+002266     05  AFINR14I PIC  X(0010).
+002267*    -------------------------------
+002268     05  AACCT14L PIC S9(0004) COMP.
+002269     05  AACCT14F PIC  X(0001).
+002270     05  FILLER REDEFINES AACCT14F.
+002271         10  AACCT14A PIC  X(0001).
+002272     05  AACCT14I PIC  X(0010).
+002273*    -------------------------------
+002274     05  APAMT14L PIC S9(0004) COMP.
+002275     05  APAMT14F PIC  X(0001).
+002276     05  FILLER REDEFINES APAMT14F.
+002277         10  APAMT14A PIC  X(0001).
+002278     05  APAMT14I PIC  X(0013).
+002279*    -------------------------------
+002280     05  ACTRL15L PIC S9(0004) COMP.
+002281     05  ACTRL15F PIC  X(0001).
+002282     05  FILLER REDEFINES ACTRL15F.
+002283         10  ACTRL15A PIC  X(0001).
+002284     05  ACTRL15I PIC  X(0007).
+002285*    -------------------------------
+002286     05  ACKNO15L PIC S9(0004) COMP.
+002287     05  ACKNO15F PIC  X(0001).
+002288     05  FILLER REDEFINES ACKNO15F.
+002289         10  ACKNO15A PIC  X(0001).
+002290     05  ACKNO15I PIC  X(0007).
+002291*    -------------------------------
+002292     05  ATYPE15L PIC S9(0004) COMP.
+002293     05  ATYPE15F PIC  X(0001).
+002294     05  FILLER REDEFINES ATYPE15F.
+002295         10  ATYPE15A PIC  X(0001).
+002296     05  ATYPE15I PIC  X(0011).
+002297*    -------------------------------
+002298     05  ACARR15L PIC S9(0004) COMP.
+002299     05  ACARR15F PIC  X(0001).
+002300     05  FILLER REDEFINES ACARR15F.
+002301         10  ACARR15A PIC  X(0001).
+002302     05  ACARR15I PIC  X(0001).
+002303*    -------------------------------
+002304     05  AGRUP15L PIC S9(0004) COMP.
+002305     05  AGRUP15F PIC  X(0001).
+002306     05  FILLER REDEFINES AGRUP15F.
+002307         10  AGRUP15A PIC  X(0001).
+002308     05  AGRUP15I PIC  X(0006).
+002309*    -------------------------------
+002310     05  AFINR15L PIC S9(0004) COMP.
+002311     05  AFINR15F PIC  X(0001).
+002312     05  FILLER REDEFINES AFINR15F.
+002313         10  AFINR15A PIC  X(0001).
+002314     05  AFINR15I PIC  X(0010).
+002315*    -------------------------------
+002316     05  AACCT15L PIC S9(0004) COMP.
+002317     05  AACCT15F PIC  X(0001).
+002318     05  FILLER REDEFINES AACCT15F.
+002319         10  AACCT15A PIC  X(0001).
+002320     05  AACCT15I PIC  X(0010).
+002321*    -------------------------------
+002322     05  APAMT15L PIC S9(0004) COMP.
+002323     05  APAMT15F PIC  X(0001).
+002324     05  FILLER REDEFINES APAMT15F.
+002325         10  APAMT15A PIC  X(0001).
+002326     05  APAMT15I PIC  X(0013).
+002327*    -------------------------------
+002328     05  ACTRL16L PIC S9(0004) COMP.
+002329     05  ACTRL16F PIC  X(0001).
+002330     05  FILLER REDEFINES ACTRL16F.
+002331         10  ACTRL16A PIC  X(0001).
+002332     05  ACTRL16I PIC  X(0007).
+002333*    -------------------------------
+002334     05  ACKNO16L PIC S9(0004) COMP.
+002335     05  ACKNO16F PIC  X(0001).
+002336     05  FILLER REDEFINES ACKNO16F.
+002337         10  ACKNO16A PIC  X(0001).
+002338     05  ACKNO16I PIC  X(0007).
+002339*    -------------------------------
+002340     05  ATYPE16L PIC S9(0004) COMP.
+002341     05  ATYPE16F PIC  X(0001).
+002342     05  FILLER REDEFINES ATYPE16F.
+002343         10  ATYPE16A PIC  X(0001).
+002344     05  ATYPE16I PIC  X(0011).
+002345*    -------------------------------
+002346     05  ACARR16L PIC S9(0004) COMP.
+002347     05  ACARR16F PIC  X(0001).
+002348     05  FILLER REDEFINES ACARR16F.
+002349         10  ACARR16A PIC  X(0001).
+002350     05  ACARR16I PIC  X(0001).
+002351*    -------------------------------
+002352     05  AGRUP16L PIC S9(0004) COMP.
+002353     05  AGRUP16F PIC  X(0001).
+002354     05  FILLER REDEFINES AGRUP16F.
+002355         10  AGRUP16A PIC  X(0001).
+002356     05  AGRUP16I PIC  X(0006).
+002357*    -------------------------------
+002358     05  AFINR16L PIC S9(0004) COMP.
+002359     05  AFINR16F PIC  X(0001).
+002360     05  FILLER REDEFINES AFINR16F.
+002361         10  AFINR16A PIC  X(0001).
+002362     05  AFINR16I PIC  X(0010).
+002363*    -------------------------------
+002364     05  AACCT16L PIC S9(0004) COMP.
+002365     05  AACCT16F PIC  X(0001).
+002366     05  FILLER REDEFINES AACCT16F.
+002367         10  AACCT16A PIC  X(0001).
+002368     05  AACCT16I PIC  X(0010).
+002369*    -------------------------------
+002370     05  APAMT16L PIC S9(0004) COMP.
+002371     05  APAMT16F PIC  X(0001).
+002372     05  FILLER REDEFINES APAMT16F.
+002373         10  APAMT16A PIC  X(0001).
+002374     05  APAMT16I PIC  X(0013).
+002375*    -------------------------------
+002376     05  AVYTL17L PIC S9(0004) COMP.
+002377     05  AVYTL17F PIC  X(0001).
+002378     05  FILLER REDEFINES AVYTL17F.
+002379         10  AVYTL17A PIC  X(0001).
+002380     05  AVYTL17I PIC  X(0007).
+002381*    -------------------------------
+002382     05  ACKNO17L PIC S9(0004) COMP.
+002383     05  ACKNO17F PIC  X(0001).
+002384     05  FILLER REDEFINES ACKNO17F.
+002385         10  ACKNO17A PIC  X(0001).
+002386     05  ACKNO17I PIC  X(0007).
+002387*    -------------------------------
+002388     05  ATYPE17L PIC S9(0004) COMP.
+002389     05  ATYPE17F PIC  X(0001).
+002390     05  FILLER REDEFINES ATYPE17F.
+002391         10  ATYPE17A PIC  X(0001).
+002392     05  ATYPE17I PIC  X(0011).
+002393*    -------------------------------
+002394     05  ACARR17L PIC S9(0004) COMP.
+002395     05  ACARR17F PIC  X(0001).
+002396     05  FILLER REDEFINES ACARR17F.
+002397         10  ACARR17A PIC  X(0001).
+002398     05  ACARR17I PIC  X(0001).
+002399*    -------------------------------
+002400     05  AGRUP17L PIC S9(0004) COMP.
+002401     05  AGRUP17F PIC  X(0001).
+002402     05  FILLER REDEFINES AGRUP17F.
+002403         10  AGRUP17A PIC  X(0001).
+002404     05  AGRUP17I PIC  X(0006).
+002405*    -------------------------------
+002406     05  AFINR17L PIC S9(0004) COMP.
+002407     05  AFINR17F PIC  X(0001).
+002408     05  FILLER REDEFINES AFINR17F.
+002409         10  AFINR17A PIC  X(0001).
+002410     05  AFINR17I PIC  X(0010).
+002411*    -------------------------------
+002412     05  AACCT17L PIC S9(0004) COMP.
+002413     05  AACCT17F PIC  X(0001).
+002414     05  FILLER REDEFINES AACCT17F.
+002415         10  AACCT17A PIC  X(0001).
+002416     05  AACCT17I PIC  X(0010).
+002417*    -------------------------------
+002418     05  APAMT17L PIC S9(0004) COMP.
+002419     05  APAMT17F PIC  X(0001).
+002420     05  FILLER REDEFINES APAMT17F.
+002421         10  APAMT17A PIC  X(0001).
+002422     05  APAMT17I PIC  X(0013).
+002423*    -------------------------------
+002424     05  ACTRL18L PIC S9(0004) COMP.
+002425     05  ACTRL18F PIC  X(0001).
+002426     05  FILLER REDEFINES ACTRL18F.
+002427         10  ACTRL18A PIC  X(0001).
+002428     05  ACTRL18I PIC  X(0007).
+002429*    -------------------------------
+002430     05  ACKNO18L PIC S9(0004) COMP.
+002431     05  ACKNO18F PIC  X(0001).
+002432     05  FILLER REDEFINES ACKNO18F.
+002433         10  ACKNO18A PIC  X(0001).
+002434     05  ACKNO18I PIC  X(0007).
+002435*    -------------------------------
+002436     05  ATYPE18L PIC S9(0004) COMP.
+002437     05  ATYPE18F PIC  X(0001).
+002438     05  FILLER REDEFINES ATYPE18F.
+002439         10  ATYPE18A PIC  X(0001).
+002440     05  ATYPE18I PIC  X(0011).
+002441*    -------------------------------
+002442     05  ACARR18L PIC S9(0004) COMP.
+002443     05  ACARR18F PIC  X(0001).
+002444     05  FILLER REDEFINES ACARR18F.
+002445         10  ACARR18A PIC  X(0001).
+002446     05  ACARR18I PIC  X(0001).
+002447*    -------------------------------
+002448     05  AGRUP18L PIC S9(0004) COMP.
+002449     05  AGRUP18F PIC  X(0001).
+002450     05  FILLER REDEFINES AGRUP18F.
+002451         10  AGRUP18A PIC  X(0001).
+002452     05  AGRUP18I PIC  X(0006).
+002453*    -------------------------------
+002454     05  AFINR18L PIC S9(0004) COMP.
+002455     05  AFINR18F PIC  X(0001).
+002456     05  FILLER REDEFINES AFINR18F.
+002457         10  AFINR18A PIC  X(0001).
+002458     05  AFINR18I PIC  X(0010).
+002459*    -------------------------------
+002460     05  AACCT18L PIC S9(0004) COMP.
+002461     05  AACCT18F PIC  X(0001).
+002462     05  FILLER REDEFINES AACCT18F.
+002463         10  AACCT18A PIC  X(0001).
+002464     05  AACCT18I PIC  X(0010).
+002465*    -------------------------------
+002466     05  APAMT18L PIC S9(0004) COMP.
+002467     05  APAMT18F PIC  X(0001).
+002468     05  FILLER REDEFINES APAMT18F.
+002469         10  APAMT18A PIC  X(0001).
+002470     05  APAMT18I PIC  X(0013).
+002471*    -------------------------------
+002472     05  AEMSG1L PIC S9(0004) COMP.
+002473     05  AEMSG1F PIC  X(0001).
+002474     05  FILLER REDEFINES AEMSG1F.
+002475         10  AEMSG1A PIC  X(0001).
+002476     05  AEMSG1I PIC  X(0079).
+002477*    -------------------------------
+002478     05  APFKL PIC S9(0004) COMP.
+002479     05  APFKF PIC  X(0001).
+002480     05  FILLER REDEFINES APFKF.
+002481         10  APFKA PIC  X(0001).
+002482     05  APFKI PIC  9(2).
+002483*    -------------------------------
+002484     05  PRINTERL PIC S9(0004) COMP.
+002485     05  PRINTERF PIC  X(0001).
+002486     05  FILLER REDEFINES PRINTERF.
+002487         10  PRINTERA PIC  X(0001).
+002488     05  PRINTERI PIC  X(0004).
+002489*    -------------------------------
+002490     05  APFDESCL PIC S9(0004) COMP.
+002491     05  APFDESCF PIC  X(0001).
+002492     05  FILLER REDEFINES APFDESCF.
+002493         10  APFDESCA PIC  X(0001).
+002494     05  APFDESCI PIC  X(0029).
+002495*    -------------------------------
+002496     05  CNTLNODL PIC S9(0004) COMP.
+002497     05  CNTLNODF PIC  X(0001).
+002498     05  FILLER REDEFINES CNTLNODF.
+002499         10  CNTLNODA PIC  X(0001).
+002500     05  CNTLNODI PIC  X(0011).
+002501*    -------------------------------
+002502     05  CNTLNOL PIC S9(0004) COMP.
+002503     05  CNTLNOF PIC  X(0001).
+002504     05  FILLER REDEFINES CNTLNOF.
+002505         10  CNTLNOA PIC  X(0001).
+002506     05  CNTLNOI PIC  X(0007).
+002507 01  EL685AO REDEFINES EL685BI.
+002508     05  FILLER            PIC  X(0012).
+002509*    -------------------------------
+002510     05  FILLER            PIC  X(0003).
+002511     05  ADATEO PIC  X(0008).
+002512*    -------------------------------
+002513     05  FILLER            PIC  X(0003).
+002514     05  ATIMEO PIC  99.99.
+002515*    -------------------------------
+002516     05  FILLER            PIC  X(0003).
+002517     05  ATITLEO PIC  X(0028).
+002518*    -------------------------------
+002519     05  FILLER            PIC  X(0003).
+002520     05  ASCREENO PIC  X(0006).
+002521*    -------------------------------
+002522     05  FILLER            PIC  X(0003).
+002523     05  APAGEO PIC  9999.
+002524*    -------------------------------
+002525     05  FILLER            PIC  X(0003).
+002526     05  ADESC1O PIC  X(0008).
+002527*    -------------------------------
+002528     05  FILLER            PIC  X(0003).
+002529     05  ADESC2O PIC  X(0008).
+002530*    -------------------------------
+002531     05  FILLER            PIC  X(0003).
+002532     05  ACTRL01O PIC  X(0007).
+002533*    -------------------------------
+002534     05  FILLER            PIC  X(0003).
+002535     05  ACKNO01O PIC  X(0007).
+002536*    -------------------------------
+002537     05  FILLER            PIC  X(0003).
+002538     05  ATYPE01O PIC  X(0011).
+002539*    -------------------------------
+002540     05  FILLER            PIC  X(0003).
+002541     05  ACARR01O PIC  X(0001).
+002542*    -------------------------------
+002543     05  FILLER            PIC  X(0003).
+002544     05  AGRUP01O PIC  X(0006).
+002545*    -------------------------------
+002546     05  FILLER            PIC  X(0003).
+002547     05  AFINR01O PIC  X(0010).
+002548*    -------------------------------
+002549     05  FILLER            PIC  X(0003).
+002550     05  AACCT01O PIC  X(0010).
+002551*    -------------------------------
+002552     05  FILLER            PIC  X(0003).
+002553     05  APAMT01O PIC  X(0013).
+002554*    -------------------------------
+002555     05  FILLER            PIC  X(0003).
+002556     05  ACTRL02O PIC  X(0007).
+002557*    -------------------------------
+002558     05  FILLER            PIC  X(0003).
+002559     05  ACKNO02O PIC  X(0007).
+002560*    -------------------------------
+002561     05  FILLER            PIC  X(0003).
+002562     05  ATYPE02O PIC  X(0011).
+002563*    -------------------------------
+002564     05  FILLER            PIC  X(0003).
+002565     05  ACARR02O PIC  X(0001).
+002566*    -------------------------------
+002567     05  FILLER            PIC  X(0003).
+002568     05  AGRUP02O PIC  X(0006).
+002569*    -------------------------------
+002570     05  FILLER            PIC  X(0003).
+002571     05  AFINR02O PIC  X(0010).
+002572*    -------------------------------
+002573     05  FILLER            PIC  X(0003).
+002574     05  AACCT02O PIC  X(0010).
+002575*    -------------------------------
+002576     05  FILLER            PIC  X(0003).
+002577     05  APAMT02O PIC  X(0013).
+002578*    -------------------------------
+002579     05  FILLER            PIC  X(0003).
+002580     05  ACTRL03O PIC  X(0007).
+002581*    -------------------------------
+002582     05  FILLER            PIC  X(0003).
+002583     05  ACKNO03O PIC  X(0007).
+002584*    -------------------------------
+002585     05  FILLER            PIC  X(0003).
+002586     05  ATYPE03O PIC  X(0011).
+002587*    -------------------------------
+002588     05  FILLER            PIC  X(0003).
+002589     05  ACARR03O PIC  X(0001).
+002590*    -------------------------------
+002591     05  FILLER            PIC  X(0003).
+002592     05  AGRUP03O PIC  X(0006).
+002593*    -------------------------------
+002594     05  FILLER            PIC  X(0003).
+002595     05  AFINR03O PIC  X(0010).
+002596*    -------------------------------
+002597     05  FILLER            PIC  X(0003).
+002598     05  AACCT03O PIC  X(0010).
+002599*    -------------------------------
+002600     05  FILLER            PIC  X(0003).
+002601     05  APAMT03O PIC  X(0013).
+002602*    -------------------------------
+002603     05  FILLER            PIC  X(0003).
+002604     05  ACTRL04O PIC  X(0007).
+002605*    -------------------------------
+002606     05  FILLER            PIC  X(0003).
+002607     05  ACKNO04O PIC  X(0007).
+002608*    -------------------------------
+002609     05  FILLER            PIC  X(0003).
+002610     05  ATYPE04O PIC  X(0011).
+002611*    -------------------------------
+002612     05  FILLER            PIC  X(0003).
+002613     05  ACARR04O PIC  X(0001).
+002614*    -------------------------------
+002615     05  FILLER            PIC  X(0003).
+002616     05  AGRUP04O PIC  X(0006).
+002617*    -------------------------------
+002618     05  FILLER            PIC  X(0003).
+002619     05  AFINR04O PIC  X(0010).
+002620*    -------------------------------
+002621     05  FILLER            PIC  X(0003).
+002622     05  AACCT04O PIC  X(0010).
+002623*    -------------------------------
+002624     05  FILLER            PIC  X(0003).
+002625     05  APAMT04O PIC  X(0013).
+002626*    -------------------------------
+002627     05  FILLER            PIC  X(0003).
+002628     05  ACTRL05O PIC  X(0007).
+002629*    -------------------------------
+002630     05  FILLER            PIC  X(0003).
+002631     05  ACKNO05O PIC  X(0007).
+002632*    -------------------------------
+002633     05  FILLER            PIC  X(0003).
+002634     05  ATYPE05O PIC  X(0011).
+002635*    -------------------------------
+002636     05  FILLER            PIC  X(0003).
+002637     05  ACARR05O PIC  X(0001).
+002638*    -------------------------------
+002639     05  FILLER            PIC  X(0003).
+002640     05  AGRUP05O PIC  X(0006).
+002641*    -------------------------------
+002642     05  FILLER            PIC  X(0003).
+002643     05  AFINR05O PIC  X(0010).
+002644*    -------------------------------
+002645     05  FILLER            PIC  X(0003).
+002646     05  AACCT05O PIC  X(0010).
+002647*    -------------------------------
+002648     05  FILLER            PIC  X(0003).
+002649     05  APAMT05O PIC  X(0013).
+002650*    -------------------------------
+002651     05  FILLER            PIC  X(0003).
+002652     05  ACTRL06O PIC  X(0007).
+002653*    -------------------------------
+002654     05  FILLER            PIC  X(0003).
+002655     05  ACKNO06O PIC  X(0007).
+002656*    -------------------------------
+002657     05  FILLER            PIC  X(0003).
+002658     05  ATYPE06O PIC  X(0011).
+002659*    -------------------------------
+002660     05  FILLER            PIC  X(0003).
+002661     05  ACARR06O PIC  X(0001).
+002662*    -------------------------------
+002663     05  FILLER            PIC  X(0003).
+002664     05  AGRUP06O PIC  X(0006).
+002665*    -------------------------------
+002666     05  FILLER            PIC  X(0003).
+002667     05  AFINR06O PIC  X(0010).
+002668*    -------------------------------
+002669     05  FILLER            PIC  X(0003).
+002670     05  AACCT06O PIC  X(0010).
+002671*    -------------------------------
+002672     05  FILLER            PIC  X(0003).
+002673     05  APAMT06O PIC  X(0013).
+002674*    -------------------------------
+002675     05  FILLER            PIC  X(0003).
+002676     05  ACTRL07O PIC  X(0007).
+002677*    -------------------------------
+002678     05  FILLER            PIC  X(0003).
+002679     05  ACKNO07O PIC  X(0007).
+002680*    -------------------------------
+002681     05  FILLER            PIC  X(0003).
+002682     05  ATYPE07O PIC  X(0011).
+002683*    -------------------------------
+002684     05  FILLER            PIC  X(0003).
+002685     05  ACARR07O PIC  X(0001).
+002686*    -------------------------------
+002687     05  FILLER            PIC  X(0003).
+002688     05  AGRUP07O PIC  X(0006).
+002689*    -------------------------------
+002690     05  FILLER            PIC  X(0003).
+002691     05  AFINR07O PIC  X(0010).
+002692*    -------------------------------
+002693     05  FILLER            PIC  X(0003).
+002694     05  AACCT07O PIC  X(0010).
+002695*    -------------------------------
+002696     05  FILLER            PIC  X(0003).
+002697     05  APAMT07O PIC  X(0013).
+002698*    -------------------------------
+002699     05  FILLER            PIC  X(0003).
+002700     05  ACTRL08O PIC  X(0007).
+002701*    -------------------------------
+002702     05  FILLER            PIC  X(0003).
+002703     05  ACKNO08O PIC  X(0007).
+002704*    -------------------------------
+002705     05  FILLER            PIC  X(0003).
+002706     05  ATYPE08O PIC  X(0011).
+002707*    -------------------------------
+002708     05  FILLER            PIC  X(0003).
+002709     05  ACARR08O PIC  X(0001).
+002710*    -------------------------------
+002711     05  FILLER            PIC  X(0003).
+002712     05  AGRUP08O PIC  X(0006).
+002713*    -------------------------------
+002714     05  FILLER            PIC  X(0003).
+002715     05  AFINR08O PIC  X(0010).
+002716*    -------------------------------
+002717     05  FILLER            PIC  X(0003).
+002718     05  AACCT08O PIC  X(0010).
+002719*    -------------------------------
+002720     05  FILLER            PIC  X(0003).
+002721     05  APAMT08O PIC  X(0013).
+002722*    -------------------------------
+002723     05  FILLER            PIC  X(0003).
+002724     05  ACTRL09O PIC  X(0007).
+002725*    -------------------------------
+002726     05  FILLER            PIC  X(0003).
+002727     05  ACKNO09O PIC  X(0007).
+002728*    -------------------------------
+002729     05  FILLER            PIC  X(0003).
+002730     05  ATYPE09O PIC  X(0011).
+002731*    -------------------------------
+002732     05  FILLER            PIC  X(0003).
+002733     05  ACARR09O PIC  X(0001).
+002734*    -------------------------------
+002735     05  FILLER            PIC  X(0003).
+002736     05  AGRUP09O PIC  X(0006).
+002737*    -------------------------------
+002738     05  FILLER            PIC  X(0003).
+002739     05  AFINR09O PIC  X(0010).
+002740*    -------------------------------
+002741     05  FILLER            PIC  X(0003).
+002742     05  AACCT09O PIC  X(0010).
+002743*    -------------------------------
+002744     05  FILLER            PIC  X(0003).
+002745     05  APAMT09O PIC  X(0013).
+002746*    -------------------------------
+002747     05  FILLER            PIC  X(0003).
+002748     05  ACTRL10O PIC  X(0007).
+002749*    -------------------------------
+002750     05  FILLER            PIC  X(0003).
+002751     05  ACKNO10O PIC  X(0007).
+002752*    -------------------------------
+002753     05  FILLER            PIC  X(0003).
+002754     05  ATYPE10O PIC  X(0011).
+002755*    -------------------------------
+002756     05  FILLER            PIC  X(0003).
+002757     05  ACARR10O PIC  X(0001).
+002758*    -------------------------------
+002759     05  FILLER            PIC  X(0003).
+002760     05  AGRUP10O PIC  X(0006).
+002761*    -------------------------------
+002762     05  FILLER            PIC  X(0003).
+002763     05  AFINR10O PIC  X(0010).
+002764*    -------------------------------
+002765     05  FILLER            PIC  X(0003).
+002766     05  AACCT10O PIC  X(0010).
+002767*    -------------------------------
+002768     05  FILLER            PIC  X(0003).
+002769     05  APAMT10O PIC  X(0013).
+002770*    -------------------------------
+002771     05  FILLER            PIC  X(0003).
+002772     05  ACTRL11O PIC  X(0007).
+002773*    -------------------------------
+002774     05  FILLER            PIC  X(0003).
+002775     05  ACKNO11O PIC  X(0007).
+002776*    -------------------------------
+002777     05  FILLER            PIC  X(0003).
+002778     05  ATYPE11O PIC  X(0011).
+002779*    -------------------------------
+002780     05  FILLER            PIC  X(0003).
+002781     05  ACARR11O PIC  X(0001).
+002782*    -------------------------------
+002783     05  FILLER            PIC  X(0003).
+002784     05  AGRUP11O PIC  X(0006).
+002785*    -------------------------------
+002786     05  FILLER            PIC  X(0003).
+002787     05  AFINR11O PIC  X(0010).
+002788*    -------------------------------
+002789     05  FILLER            PIC  X(0003).
+002790     05  AACCT11O PIC  X(0010).
+002791*    -------------------------------
+002792     05  FILLER            PIC  X(0003).
+002793     05  APAMT11O PIC  X(0013).
+002794*    -------------------------------
+002795     05  FILLER            PIC  X(0003).
+002796     05  ACTRL12O PIC  X(0007).
+002797*    -------------------------------
+002798     05  FILLER            PIC  X(0003).
+002799     05  ACKNO12O PIC  X(0007).
+002800*    -------------------------------
+002801     05  FILLER            PIC  X(0003).
+002802     05  ATYPE12O PIC  X(0011).
+002803*    -------------------------------
+002804     05  FILLER            PIC  X(0003).
+002805     05  ACARR12O PIC  X(0001).
+002806*    -------------------------------
+002807     05  FILLER            PIC  X(0003).
+002808     05  AGRUP12O PIC  X(0006).
+002809*    -------------------------------
+002810     05  FILLER            PIC  X(0003).
+002811     05  AFINR12O PIC  X(0010).
+002812*    -------------------------------
+002813     05  FILLER            PIC  X(0003).
+002814     05  AACCT12O PIC  X(0010).
+002815*    -------------------------------
+002816     05  FILLER            PIC  X(0003).
+002817     05  APAMT12O PIC  X(0013).
+002818*    -------------------------------
+002819     05  FILLER            PIC  X(0003).
+002820     05  ACTRL13O PIC  X(0007).
+002821*    -------------------------------
+002822     05  FILLER            PIC  X(0003).
+002823     05  ACKNO13O PIC  X(0007).
+002824*    -------------------------------
+002825     05  FILLER            PIC  X(0003).
+002826     05  ATYPE13O PIC  X(0011).
+002827*    -------------------------------
+002828     05  FILLER            PIC  X(0003).
+002829     05  ACARR13O PIC  X(0001).
+002830*    -------------------------------
+002831     05  FILLER            PIC  X(0003).
+002832     05  AGRUP13O PIC  X(0006).
+002833*    -------------------------------
+002834     05  FILLER            PIC  X(0003).
+002835     05  AFINR13O PIC  X(0010).
+002836*    -------------------------------
+002837     05  FILLER            PIC  X(0003).
+002838     05  AACCT13O PIC  X(0010).
+002839*    -------------------------------
+002840     05  FILLER            PIC  X(0003).
+002841     05  APAMT13O PIC  X(0013).
+002842*    -------------------------------
+002843     05  FILLER            PIC  X(0003).
+002844     05  ACTRL14O PIC  X(0007).
+002845*    -------------------------------
+002846     05  FILLER            PIC  X(0003).
+002847     05  ACKNO14O PIC  X(0007).
+002848*    -------------------------------
+002849     05  FILLER            PIC  X(0003).
+002850     05  ATYPE14O PIC  X(0011).
+002851*    -------------------------------
+002852     05  FILLER            PIC  X(0003).
+002853     05  ACARR14O PIC  X(0001).
+002854*    -------------------------------
+002855     05  FILLER            PIC  X(0003).
+002856     05  AGRUP14O PIC  X(0006).
+002857*    -------------------------------
+002858     05  FILLER            PIC  X(0003).
+002859     05  AFINR14O PIC  X(0010).
+002860*    -------------------------------
+002861     05  FILLER            PIC  X(0003).
+002862     05  AACCT14O PIC  X(0010).
+002863*    -------------------------------
+002864     05  FILLER            PIC  X(0003).
+002865     05  APAMT14O PIC  X(0013).
+002866*    -------------------------------
+002867     05  FILLER            PIC  X(0003).
+002868     05  ACTRL15O PIC  X(0007).
+002869*    -------------------------------
+002870     05  FILLER            PIC  X(0003).
+002871     05  ACKNO15O PIC  X(0007).
+002872*    -------------------------------
+002873     05  FILLER            PIC  X(0003).
+002874     05  ATYPE15O PIC  X(0011).
+002875*    -------------------------------
+002876     05  FILLER            PIC  X(0003).
+002877     05  ACARR15O PIC  X(0001).
+002878*    -------------------------------
+002879     05  FILLER            PIC  X(0003).
+002880     05  AGRUP15O PIC  X(0006).
+002881*    -------------------------------
+002882     05  FILLER            PIC  X(0003).
+002883     05  AFINR15O PIC  X(0010).
+002884*    -------------------------------
+002885     05  FILLER            PIC  X(0003).
+002886     05  AACCT15O PIC  X(0010).
+002887*    -------------------------------
+002888     05  FILLER            PIC  X(0003).
+002889     05  APAMT15O PIC  X(0013).
+002890*    -------------------------------
+002891     05  FILLER            PIC  X(0003).
+002892     05  ACTRL16O PIC  X(0007).
+002893*    -------------------------------
+002894     05  FILLER            PIC  X(0003).
+002895     05  ACKNO16O PIC  X(0007).
+002896*    -------------------------------
+002897     05  FILLER            PIC  X(0003).
+002898     05  ATYPE16O PIC  X(0011).
+002899*    -------------------------------
+002900     05  FILLER            PIC  X(0003).
+002901     05  ACARR16O PIC  X(0001).
+002902*    -------------------------------
+002903     05  FILLER            PIC  X(0003).
+002904     05  AGRUP16O PIC  X(0006).
+002905*    -------------------------------
+002906     05  FILLER            PIC  X(0003).
+002907     05  AFINR16O PIC  X(0010).
+002908*    -------------------------------
+002909     05  FILLER            PIC  X(0003).
+002910     05  AACCT16O PIC  X(0010).
+002911*    -------------------------------
+002912     05  FILLER            PIC  X(0003).
+002913     05  APAMT16O PIC  X(0013).
+002914*    -------------------------------
+002915     05  FILLER            PIC  X(0003).
+002916     05  AVYTL17O PIC  X(0007).
+002917*    -------------------------------
+002918     05  FILLER            PIC  X(0003).
+002919     05  ACKNO17O PIC  X(0007).
+002920*    -------------------------------
+002921     05  FILLER            PIC  X(0003).
+002922     05  ATYPE17O PIC  X(0011).
+002923*    -------------------------------
+002924     05  FILLER            PIC  X(0003).
+002925     05  ACARR17O PIC  X(0001).
+002926*    -------------------------------
+002927     05  FILLER            PIC  X(0003).
+002928     05  AGRUP17O PIC  X(0006).
+002929*    -------------------------------
+002930     05  FILLER            PIC  X(0003).
+002931     05  AFINR17O PIC  X(0010).
+002932*    -------------------------------
+002933     05  FILLER            PIC  X(0003).
+002934     05  AACCT17O PIC  X(0010).
+002935*    -------------------------------
+002936     05  FILLER            PIC  X(0003).
+002937     05  APAMT17O PIC  X(0013).
+002938*    -------------------------------
+002939     05  FILLER            PIC  X(0003).
+002940     05  ACTRL18O PIC  X(0007).
+002941*    -------------------------------
+002942     05  FILLER            PIC  X(0003).
+002943     05  ACKNO18O PIC  X(0007).
+002944*    -------------------------------
+002945     05  FILLER            PIC  X(0003).
+002946     05  ATYPE18O PIC  X(0011).
+002947*    -------------------------------
+002948     05  FILLER            PIC  X(0003).
+002949     05  ACARR18O PIC  X(0001).
+002950*    -------------------------------
+002951     05  FILLER            PIC  X(0003).
+002952     05  AGRUP18O PIC  X(0006).
+002953*    -------------------------------
+002954     05  FILLER            PIC  X(0003).
+002955     05  AFINR18O PIC  X(0010).
+002956*    -------------------------------
+002957     05  FILLER            PIC  X(0003).
+002958     05  AACCT18O PIC  X(0010).
+002959*    -------------------------------
+002960     05  FILLER            PIC  X(0003).
+002961     05  APAMT18O PIC  X(0013).
+002962*    -------------------------------
+002963     05  FILLER            PIC  X(0003).
+002964     05  AEMSG1O PIC  X(0079).
+002965*    -------------------------------
+002966     05  FILLER            PIC  X(0003).
+002967     05  APFKO PIC  99.
+002968*    -------------------------------
+002969     05  FILLER            PIC  X(0003).
+002970     05  PRINTERO PIC  X(0004).
+002971*    -------------------------------
+002972     05  FILLER            PIC  X(0003).
+002973     05  APFDESCO PIC  X(0029).
+002974*    -------------------------------
+002975     05  FILLER            PIC  X(0003).
+002976     05  CNTLNODO PIC  X(0011).
+002977*    -------------------------------
+002978     05  FILLER            PIC  X(0003).
+002979     05  CNTLNOO PIC  X(0007).
+002980*    -------------------------------
+      *<<((file: EL685S))
+000313
+000314 01  FILLER                          REDEFINES
+000315     EL685BI.
+000316
+000317     05  FILLER                      PIC X(78).
+000318
+000319     05  FILLER                      OCCURS 18 TIMES
+000320                                     INDEXED BY EL685B-INDEX.
+000321
+000322         15  EL685B-CONTROL-LENGTH   PIC S9(4)
+000323                                     COMP.
+000324         15  EL685B-CONTROL-ATTRB    PIC X.
+000325         15  EL685B-CONTROL          PIC 9(7).
+000326
+000327         15  EL685B-CHECK-NO-LENGTH  PIC S9(4)
+000328                                     COMP.
+000329         15  EL685B-CHECK-NO-ATTRB   PIC X.
+000330         15  EL685B-CHECK-NO         PIC X(6).
+000331
+000332         15  EL685B-CHK-DT-LENGTH    PIC S9(4)
+000333                                     COMP.
+000334         15  EL685B-CHK-DT-ATTRB     PIC X.
+000335         15  EL685B-CHK-DT           PIC X(08).
+000336
+000337         15  EL685B-CARRIER-LENGTH   PIC S9(4)
+000338                                     COMP.
+000339         15  EL685B-CARRIER-ATTRB    PIC X.
+000340         15  EL685B-CARRIER          PIC X.
+000341
+000342         15  EL685B-GROUPING-LENGTH  PIC S9(4)
+000343                                     COMP.
+000344         15  EL685B-GROUPING-ATTRB   PIC X.
+000345         15  EL685B-GROUPING         PIC X(6).
+000346         15  EL685B-GROUPING-RDF
+000347             REDEFINES EL685B-GROUPING.
+000348             20  EL685B-DESC-ONE     PIC X(6).
+000349
+000350         15  EL685B-PAYEE-LENGTH     PIC S9(4)
+000351                                     COMP.
+000352         15  EL685B-PAYEE-ATTRB      PIC X.
+000353         15  EL685B-PAYEE            PIC X(10).
+000354         15  EL685B-PAYEE-RDF
+000355             REDEFINES EL685B-PAYEE.
+000356             20  EL685B-RDF-AREA.
+000357                 25  EL685B-DESC-TWO PIC X(5).
+000358                 25  FILLER          PIC X(5).
+000359
+000360         15  EL685B-PAYEE-SEQ-LENGTH PIC S9(4)
+000361                                     COMP.
+000362         15  EL685B-PAYEE-SEQ-ATTRB  PIC X.
+000363         15  EL685B-PAYEE-SEQ        PIC ZZZ9.
+000364
+000365         15  EL685B-PAYEE-NA-LENGTH  PIC S9(4)
+000366                                     COMP.
+000367         15  EL685B-PAYEE-NA-ATTRB   PIC X.
+000368         15  EL685B-PAYEE-NA         PIC X(12).
+000369
+000370         15  EL685B-AMT-LENGTH       PIC S9(4)
+000371                                     COMP.
+000372         15  EL685B-AMT-ATTRB        PIC X.
+000373         15  EL685B-AMT              PIC Z,ZZZ,ZZ9.99-.
+000374
+000375 01  FILLER                          REDEFINES
+000376     EL685AI.
+000377
+000378     05  FILLER                      PIC X(100).
+000379
+000380     05  FILLER                      OCCURS 18 TIMES
+000381                                     INDEXED BY EL685A-INDEX.
+000382
+000383         15  EL685A-CONTROL-LENGTH   PIC S9(4)
+000384                                     COMP.
+000385         15  EL685A-CONTROL-ATTRB    PIC X.
+000386         15  EL685A-CONTROL          PIC 9(7).
+000387
+000388         15  EL685A-CHECK-NO-LENGTH  PIC S9(4)
+000389                                     COMP.
+000390         15  EL685A-CHECK-NO-ATTRB   PIC X.
+000391         15  EL685A-CHECK-NO         PIC X(7).
+000392
+000393         15  EL685A-PMT-TYPE-LENGTH  PIC S9(4)
+000394                                     COMP.
+000395         15  EL685A-PMT-TYPE-ATTRB   PIC X.
+000396         15  EL685A-PMT-TYPE         PIC X(11).
+000397
+000398         15  EL685A-CARRIER-LENGTH   PIC S9(4)
+000399                                     COMP.
+000400         15  EL685A-CARRIER-ATTRB    PIC X.
+000401         15  EL685A-CARRIER          PIC X.
+000402
+000403         15  EL685A-GROUPING-LENGTH  PIC S9(4)
+000404                                     COMP.
+000405         15  EL685A-GROUPING-ATTRB   PIC X.
+000406         15  EL685A-GROUPING         PIC X(6).
+000407
+000408         15  EL685A-FIN-RESP-LENGTH  PIC S9(4)
+000409                                     COMP.
+000410         15  EL685A-FIN-RESP-ATTRB   PIC X.
+000411         15  EL685A-FIN-RESP         PIC X(10).
+000412         15  EL685A-FIN-RESP-RDF
+000413             REDEFINES EL685A-FIN-RESP.
+000414             20  EL685A-PAYEE        PIC X(10).
+000415
+000416         15  EL685A-ACCOUNT-LENGTH   PIC S9(4)
+000417                                     COMP.
+000418         15  EL685A-ACCOUNT-ATTRB    PIC X.
+000419         15  EL685A-ACCOUNT          PIC X(10).
+000420         15  EL685A-ACCOUNT-RDF
+000421             REDEFINES EL685A-ACCOUNT.
+000422             20  EL685A-PAYEE-SEQ    PIC ZZZ9-.
+000423             20  FILLER              PIC X(05).
+000424         15  EL685A-AMT-LENGTH       PIC S9(4)
+000425                                     COMP.
+000426         15  EL685A-AMT-ATTRB        PIC X.
+000427         15  EL685A-AMT              PIC Z,ZZZ,ZZ9.99-.
+000428
+000429     EJECT
+000430*                                COPY ELCEMIB.
+      *>>((file: ELCEMIB))
+000001******************************************************************
+000002*                                                                *
+000003*                                                                *
+000004*                            ELCEMIB.                            *
+000005*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+000006*                            VMOD=2.005                          *
+000007*                                                                *
+000008*    STANDARD CLAS-IC ERROR MESSAGE COMMUNICATIONS AREA          *
+000009*                                                                *
+000010******************************************************************
+000011 01  ERROR-MESSAGE-INTERFACE-BLOCK.
+000012     12  EMI-COMM-LENGTH         PIC S9(4)    VALUE +400 COMP.
+000013     12  EMI-NUMBER-OF-LINES     PIC 9        VALUE 1.
+000014     12  EMI-ERROR               PIC 9(4)     VALUE ZEROS.
+000015     12  EMI-SUB                 PIC 99       VALUE 1 COMP-3.
+000016     12  EMI-NOTE-CTR            PIC 999      VALUE 0 COMP-3.
+000017     12  EMI-WARNING-CTR         PIC 999      VALUE 0 COMP-3.
+000018     12  EMI-FORCABLE-CTR        PIC 999      VALUE 0 COMP-3.
+000019     12  EMI-FATAL-CTR           PIC 999      VALUE 0 COMP-3.
+000020     12  EMI-SWITCH1             PIC X        VALUE '1'.
+000021         88  EMI-NO-ERRORS                    VALUE '1'.
+000022         88  EMI-ERRORS-NOT-COMPLETE          VALUE '2'.
+000023         88  EMI-ERRORS-COMPLETE              VALUE '3'.
+000024     12  EMI-SWITCH2             PIC X        VALUE '1'.
+000025         88  EMI-FORMAT-CODES-ONLY            VALUE '2'.
+000026     12  EMI-SWITCH-AREA-1       PIC X        VALUE '1'.
+000027         88  EMI-AREA1-EMPTY                  VALUE '1'.
+000028         88  EMI-AREA1-FULL                   VALUE '2'.
+000029     12  EMI-SWITCH-AREA-2       PIC X        VALUE '1'.
+000030         88  EMI-AREA2-EMPTY                  VALUE '1'.
+000031         88  EMI-AREA2-FULL                   VALUE '2'.
+000032     12  EMI-ACTION-SWITCH       PIC X        VALUE ' '.
+000033         88  EMI-PROCESS-ALL-ERRORS           VALUE ' '.
+000034         88  EMI-BYPASS-NOTES                 VALUE 'N'.
+000035         88  EMI-BYPASS-WARNINGS              VALUE 'W'.
+000036         88  EMI-BYPASS-FORCABLES             VALUE 'F'.
+000037         88  EMI-BYPASS-FATALS                VALUE 'X'.
+000038     12  EMI-ERROR-LINES.
+000039         16  EMI-LINE1           PIC X(72)   VALUE SPACES.
+000040         16  EMI-LINE2           PIC X(72)   VALUE SPACES.
+000041         16  EMI-LINE3           PIC X(72)   VALUE SPACES.
+000042         16  EMI-CODE-LINE REDEFINES EMI-LINE3.
+000043             20  EMI-ERR-CODES OCCURS 10 TIMES.
+000044                 24  EMI-ERR-NUM         PIC X(4).
+000045                 24  EMI-FILLER          PIC X.
+000046                 24  EMI-SEV             PIC X.
+000047                 24  FILLER              PIC X.
+000048             20  FILLER                  PIC X(02).
+000049     12  EMI-ERR-LINES REDEFINES EMI-ERROR-LINES.
+000050         16  EMI-MESSAGE-AREA OCCURS 3 TIMES INDEXED BY EMI-INDX.
+000051             20  EMI-ERROR-NUMBER    PIC X(4).
+000052             20  EMI-FILL            PIC X.
+000053             20  EMI-SEVERITY        PIC X.
+000054             20  FILLER              PIC X.
+000055             20  EMI-ERROR-TEXT.
+000056                 24  EMI-TEXT-VARIABLE   PIC X(10).
+000057                 24  FILLER          PIC X(55).
+000058     12  EMI-SEVERITY-SAVE           PIC X.
+000059         88  EMI-NOTE                    VALUE 'N'.
+000060         88  EMI-WARNING                 VALUE 'W'.
+000061         88  EMI-FORCABLE                VALUE 'F'.
+000062         88  EMI-FATAL                   VALUE 'X'.
+000063     12  EMI-MESSAGE-FLAG            PIC X.
+000064         88  EMI-MESSAGE-FORMATTED       VALUE 'Y'.
+000065         88  EMI-NO-MESSAGE-FORMATTED    VALUE 'N'.
+000066     12  EMI-ROLL-SWITCH             PIC X       VALUE SPACES.
+000067     12  EMI-LANGUAGE-IND            PIC X       VALUE SPACES.
+000068         88  EMI-LANGUAGE-IS-FR                  VALUE 'F'.
+000069         88  EMI-LANGUAGE-IS-ENG                 VALUE 'E'.
+000070         88  EMI-LANGUAGE-IS-SPAN                VALUE 'S'.
+000071     12  emi-claim-no                pic x(7).
+000072     12  emi-claim-type              pic x(6).
+000073     12  FILLER                      PIC X(124)  VALUE SPACES.
+000074     12  EMI-DATE-FIELD              PIC X(06)   VALUE SPACES.
+000075     12  EMI-CLIENT-ID               PIC X(3)    VALUE SPACES.
+000076     12  EMI-LIFE-OVERRIDE-L6        PIC X(6).
+000077     12  EMI-AH-OVERRIDE-L6          PIC X(6).
+      *<<((file: ELCEMIB))
+000431     EJECT
+000432*                                COPY ELCDATE.
+      *>>((file: ELCDATE))
+000001******************************************************************
+000002*                                                                *
+000003*                                                                *
+000004*                            ELCDATE.                            *
+000005*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+000006*                            VMOD=2.003
+000007*                                                                *
+000008*                                                                *
+000009*   DESCRIPTION:  DATA PASSED TO DATE CONVERSION ROUTINE.        *
+000010*                 LENGTH = 200                                   *
+000011******************************************************************
+000012
+000013 01  DATE-CONVERSION-DATA.
+000014     12  DC-COMM-LENGTH                PIC S9(4) COMP VALUE +200.
+000015     12  DC-OPTION-CODE                PIC X.
+000016         88  BIN-TO-GREG                VALUE ' '.
+000017         88  ELAPSED-BETWEEN-BIN        VALUE '1'.
+000018         88  EDIT-GREG-TO-BIN           VALUE '2'.
+000019         88  YMD-GREG-TO-BIN            VALUE '3'.
+000020         88  MDY-GREG-TO-BIN            VALUE '4'.
+000021         88  JULIAN-TO-BIN              VALUE '5'.
+000022         88  BIN-PLUS-ELAPSED           VALUE '6'.
+000023         88  FIND-CENTURY               VALUE '7'.
+000024         88  ELAPSED-BETWEEN-BIN-3      VALUE '8'.
+000025         88  EDIT-GREG-TO-BIN-3         VALUE '9'.
+000026         88  YMD-GREG-TO-BIN-3          VALUE 'A'.
+000027         88  MDY-GREG-TO-BIN-3          VALUE 'B'.
+000028         88  JULIAN-TO-BIN-3            VALUE 'C'.
+000029         88  BIN-PLUS-ELAPSED-3         VALUE 'D'.
+000030         88  JULIAN-EXPANDED-TO-BIN     VALUE 'E'.
+000031         88  JULIAN-EXPANDED-TO-BIN-3   VALUE 'F'.
+000032         88  BIN-TO-JULIAN-EXPANDED     VALUE 'G'.
+000033         88  JULIAN-EXPANDED            VALUE 'E', 'F', 'G'.
+000034         88  CHECK-LEAP-YEAR            VALUE 'H'.
+000035         88  BIN-3-TO-GREG              VALUE 'I'.
+000036         88  CYMD-GREG-TO-BIN-3         VALUE 'J'.
+000037         88  MDCY-GREG-TO-BIN-3         VALUE 'K'.
+000038         88  CYMD-GREG-TO-BIN           VALUE 'L'.
+000039         88  MDCY-GREG-TO-BIN           VALUE 'M'.
+000040         88  MDY-GREG-TO-JULIAN         VALUE 'N'.
+000041         88  MDCY-GREG-TO-JULIAN        VALUE 'O'.
+000042         88  YMD-GREG-TO-JULIAN         VALUE 'P'.
+000043         88  CYMD-GREG-TO-JULIAN        VALUE 'Q'.
+000044         88  THREE-CHARACTER-BIN
+000045                  VALUES  '8' '9' 'A' 'B' 'C' 'D' 'I' 'J' 'K'.
+000046         88  GREGORIAN-TO-BIN
+000047                  VALUES '2' '3' '4' '9' 'A' 'B' 'J' 'K' 'L' 'M'.
+000048         88  BIN-TO-GREGORIAN
+000049                  VALUES ' ' '1' 'I' '8' 'G'.
+000050         88  JULIAN-TO-BINARY
+000051                  VALUES '5' 'C' 'E' 'F'.
+000052     12  DC-ERROR-CODE                 PIC X.
+000053         88  NO-CONVERSION-ERROR        VALUE ' '.
+000054         88  DATE-CONVERSION-ERROR
+000055                  VALUES '1' '2' '3' '4' '5' '9' 'A' 'B' 'C'.
+000056         88  DATE-IS-ZERO               VALUE '1'.
+000057         88  DATE-IS-NON-NUMERIC        VALUE '2'.
+000058         88  DATE-IS-INVALID            VALUE '3'.
+000059         88  DATE1-GREATER-DATE2        VALUE '4'.
+000060         88  ELAPSED-PLUS-NEGATIVE      VALUE '5'.
+000061         88  DATE-INVALID-OPTION        VALUE '9'.
+000062         88  INVALID-CENTURY            VALUE 'A'.
+000063         88  ONLY-CENTURY               VALUE 'B'.
+000064         88  ONLY-LEAP-YEAR             VALUE 'C'.
+000065         88  VALID-CENTURY-LEAP-YEAR    VALUE 'B', 'C'.
+000066     12  DC-END-OF-MONTH               PIC X.
+000067         88  CALCULATE-END-OF-MONTH     VALUE '1'.
+000068     12  DC-CENTURY-ADJUSTMENT         PIC X   VALUE SPACES.
+000069         88  USE-NORMAL-PROCESS         VALUE ' '.
+000070         88  ADJUST-DOWN-100-YRS        VALUE '1'.
+000071         88  ADJUST-UP-100-YRS          VALUE '2'.
+000072     12  FILLER                        PIC X.
+000073     12  DC-CONVERSION-DATES.
+000074         16  DC-BIN-DATE-1             PIC XX.
+000075         16  DC-BIN-DATE-2             PIC XX.
+000076         16  DC-GREG-DATE-1-EDIT       PIC X(08).
+000077         16  DC-GREG-DATE-1-EDIT-R REDEFINES
+000078                       DC-GREG-DATE-1-EDIT.
+000079             20  DC-EDIT1-MONTH        PIC 99.
+000080             20  SLASH1-1              PIC X.
+000081             20  DC-EDIT1-DAY          PIC 99.
+000082             20  SLASH1-2              PIC X.
+000083             20  DC-EDIT1-YEAR         PIC 99.
+000084         16  DC-GREG-DATE-2-EDIT       PIC X(08).
+000085         16  DC-GREG-DATE-2-EDIT-R REDEFINES
+000086                     DC-GREG-DATE-2-EDIT.
+000087             20  DC-EDIT2-MONTH        PIC 99.
+000088             20  SLASH2-1              PIC X.
+000089             20  DC-EDIT2-DAY          PIC 99.
+000090             20  SLASH2-2              PIC X.
+000091             20  DC-EDIT2-YEAR         PIC 99.
+000092         16  DC-GREG-DATE-1-YMD        PIC 9(06).
+000093         16  DC-GREG-DATE-1-YMD-R  REDEFINES
+000094                     DC-GREG-DATE-1-YMD.
+000095             20  DC-YMD-YEAR           PIC 99.
+000096             20  DC-YMD-MONTH          PIC 99.
+000097             20  DC-YMD-DAY            PIC 99.
+000098         16  DC-GREG-DATE-1-MDY        PIC 9(06).
+000099         16  DC-GREG-DATE-1-MDY-R REDEFINES
+000100                      DC-GREG-DATE-1-MDY.
+000101             20  DC-MDY-MONTH          PIC 99.
+000102             20  DC-MDY-DAY            PIC 99.
+000103             20  DC-MDY-YEAR           PIC 99.
+000104         16  DC-GREG-DATE-1-ALPHA.
+000105             20  DC-ALPHA-MONTH        PIC X(10).
+000106             20  DC-ALPHA-DAY          PIC 99.
+000107             20  FILLER                PIC XX.
+000108             20  DC-ALPHA-CENTURY.
+000109                 24 DC-ALPHA-CEN-N     PIC 99.
+000110             20  DC-ALPHA-YEAR         PIC 99.
+000111         16  DC-ELAPSED-MONTHS         PIC S9(4)     COMP.
+000112         16  DC-ODD-DAYS-OVER          PIC S9(4)     COMP.
+000113         16  DC-ELAPSED-DAYS           PIC S9(4)     COMP.
+000114         16  DC-JULIAN-DATE            PIC 9(05).
+000115         16  DC-JULIAN-YYDDD REDEFINES DC-JULIAN-DATE
+000116                                       PIC 9(05).
+000117         16  DC-JULIAN-DT REDEFINES DC-JULIAN-DATE.
+000118             20  DC-JULIAN-YEAR        PIC 99.
+000119             20  DC-JULIAN-DAYS        PIC 999.
+000120         16  DC-DAYS-IN-MONTH          PIC S9(3)       COMP-3.
+000121         16  DC-DAY-OF-WEEK            PIC S9  VALUE ZERO COMP-3.
+000122         16  DC-DAY-OF-WEEK2           PIC S9  VALUE ZERO COMP-3.
+000123     12  DATE-CONVERSION-VARIBLES.
+000124         16  HOLD-CENTURY-1            PIC 9(11) VALUE 0.
+000125         16  HOLD-CENTURY-1-SPLIT REDEFINES HOLD-CENTURY-1.
+000126             20  FILLER                PIC 9(3).
+000127             20  HOLD-CEN-1-CCYY.
+000128                 24  HOLD-CEN-1-CC     PIC 99.
+000129                 24  HOLD-CEN-1-YY     PIC 99.
+000130             20  HOLD-CEN-1-MO         PIC 99.
+000131             20  HOLD-CEN-1-DA         PIC 99.
+000132         16  HOLD-CENTURY-1-R   REDEFINES HOLD-CENTURY-1.
+000133             20  HOLD-CEN-1-R-MO       PIC 99.
+000134             20  HOLD-CEN-1-R-DA       PIC 99.
+000135             20  HOLD-CEN-1-R-CCYY.
+000136                 24  HOLD-CEN-1-R-CC   PIC 99.
+000137                 24  HOLD-CEN-1-R-YY   PIC 99.
+000138             20  FILLER                PIC 9(3).
+000139         16  HOLD-CENTURY-1-X.
+000140             20  FILLER                PIC X(3)  VALUE SPACES.
+000141             20  HOLD-CEN-1-X-CCYY.
+000142                 24  HOLD-CEN-1-X-CC   PIC XX VALUE SPACES.
+000143                 24  HOLD-CEN-1-X-YY   PIC XX VALUE SPACES.
+000144             20  HOLD-CEN-1-X-MO       PIC XX VALUE SPACES.
+000145             20  HOLD-CEN-1-X-DA       PIC XX VALUE SPACES.
+000146         16  HOLD-CENTURY-1-R-X REDEFINES HOLD-CENTURY-1-X.
+000147             20  HOLD-CEN-1-R-X-MO     PIC XX.
+000148             20  HOLD-CEN-1-R-X-DA     PIC XX.
+000149             20  HOLD-CEN-1-R-X-CCYY.
+000150                 24  HOLD-CEN-1-R-X-CC PIC XX.
+000151                 24  HOLD-CEN-1-R-X-YY PIC XX.
+000152             20  FILLER                PIC XXX.
+000153         16  DC-BIN-DATE-EXPAND-1      PIC XXX.
+000154         16  DC-BIN-DATE-EXPAND-2      PIC XXX.
+000155         16  DC-JULIAN-DATE-1          PIC 9(07).
+000156         16  DC-JULIAN-DATE-1-R REDEFINES DC-JULIAN-DATE-1.
+000157             20  DC-JULIAN-1-CCYY.
+000158                 24  DC-JULIAN-1-CC    PIC 99.
+000159                 24  DC-JULIAN-1-YR    PIC 99.
+000160             20  DC-JULIAN-DA-1        PIC 999.
+000161         16  DC-JULIAN-DATE-2          PIC 9(07).
+000162         16  DC-JULIAN-DATE-2-R REDEFINES DC-JULIAN-DATE-2.
+000163             20  DC-JULIAN-2-CCYY.
+000164                 24  DC-JULIAN-2-CC    PIC 99.
+000165                 24  DC-JULIAN-2-YR    PIC 99.
+000166             20  DC-JULIAN-DA-2        PIC 999.
+000167         16  DC-GREG-DATE-A-EDIT.
+000168             20  DC-EDITA-MONTH        PIC 99.
+000169             20  SLASHA-1              PIC X VALUE '/'.
+000170             20  DC-EDITA-DAY          PIC 99.
+000171             20  SLASHA-2              PIC X VALUE '/'.
+000172             20  DC-EDITA-CCYY.
+000173                 24  DC-EDITA-CENT     PIC 99.
+000174                 24  DC-EDITA-YEAR     PIC 99.
+000175         16  DC-GREG-DATE-B-EDIT.
+000176             20  DC-EDITB-MONTH        PIC 99.
+000177             20  SLASHB-1              PIC X VALUE '/'.
+000178             20  DC-EDITB-DAY          PIC 99.
+000179             20  SLASHB-2              PIC X VALUE '/'.
+000180             20  DC-EDITB-CCYY.
+000181                 24  DC-EDITB-CENT     PIC 99.
+000182                 24  DC-EDITB-YEAR     PIC 99.
+000183         16  DC-GREG-DATE-CYMD         PIC 9(08).
+000184         16  DC-GREG-DATE-CYMD-R REDEFINES
+000185                              DC-GREG-DATE-CYMD.
+000186             20  DC-CYMD-CEN           PIC 99.
+000187             20  DC-CYMD-YEAR          PIC 99.
+000188             20  DC-CYMD-MONTH         PIC 99.
+000189             20  DC-CYMD-DAY           PIC 99.
+000190         16  DC-GREG-DATE-MDCY         PIC 9(08).
+000191         16  DC-GREG-DATE-MDCY-R REDEFINES
+000192                              DC-GREG-DATE-MDCY.
+000193             20  DC-MDCY-MONTH         PIC 99.
+000194             20  DC-MDCY-DAY           PIC 99.
+000195             20  DC-MDCY-CEN           PIC 99.
+000196             20  DC-MDCY-YEAR          PIC 99.
+000197    12  DC-FORCE-EL310-DATE-SW         PIC X    VALUE SPACE.
+000198        88  DC-FORCE-EL310-DATE                 VALUE 'Y'.
+000199    12  DC-EL310-DATE                  PIC X(21).
+000200    12  FILLER                         PIC X(28).
+      *<<((file: ELCDATE))
+000433     EJECT
+000434*                                COPY ELCLOGOF.
+      *>>((file: ELCLOGOF))
+000001******************************************************************
+000002*                                                                *
+000003*                                                                *
+000004*                            ELCLOGOF.                           *
+000005*                            VMOD=2.001                          *
+000006*                                                                *
+000007*             STANDARD CLAS-IC LOGOFF TEXT AREA                  *
+000008*                                                                *
+000009******************************************************************
+000010 01  CLASIC-LOGOFF.
+000011     12  LOGOFF-LENGTH       PIC S9(4)   VALUE +185   COMP.
+000012     12  LOGOFF-TEXT.
+000013         16  FILLER          PIC X(5)    VALUE SPACES.
+000014         16  LOGOFF-MSG.
+000015             20  LOGOFF-PGM  PIC X(8)    VALUE SPACES.
+000016             20  FILLER      PIC X       VALUE SPACES.
+000017             20  LOGOFF-FILL PIC X(66)   VALUE SPACES.
+000018         16  FILLER          PIC X(80)
+000019           VALUE '* YOU ARE NOW LOGGED OFF'.
+000020         16  FILLER          PIC X(7)    VALUE '* LOGIC'.
+000021         16  FILLER          PIC X       VALUE QUOTE.
+000022         16  LOGOFF-SYS-MSG  PIC X(17)
+000023           VALUE 'S CLAS-IC SYSTEM '.
+000024     12  TEXT-MESSAGES.
+000025         16  UNACCESS-MSG    PIC X(29)
+000026             VALUE  'UNAUTHORIZED ACCESS ATTEMPTED'.
+000027         16  PGMIDERR-MSG    PIC X(17)
+000028             VALUE 'PROGRAM NOT FOUND'.
+      *<<((file: ELCLOGOF))
+000435     EJECT
+000436*                                COPY ELCATTR.
+      *>>((file: ELCATTR))
+000001******************************************************************
+000002*                                                                *
+000003*                            ELCATTR.                            *
+000004*                            VMOD=2.001                          *
+000005*                                                                *
+000006*             LIST OF STANDARD ATTRIBUTE VALUES                  *
+000007*                                                                *
+000008*   THE DATA NAMES IN THIS COPY BOOK WERE ASSIGNED AS FOLLOWS:   *
+000009*                                                                *
+000010*                   POS 1   P=PROTECTED                          *
+000011*                           U=UNPROTECTED                        *
+000012*                           S=ASKIP                              *
+000013*                   POS 2   A=ALPHA/NUMERIC                      *
+000014*                           N=NUMERIC                            *
+000015*                   POS 3   N=NORMAL                             *
+000016*                           B=BRIGHT                             *
+000017*                           D=DARK                               *
+000018*                   POS 4-5 ON=MODIFIED DATA TAG ON              *
+000019*                           OF=MODIFIED DATA TAG OFF             *
+000020*                                                                *
+000021*  NO  CID  MODS  IN  COPYBOOK  ELCATTR                          *
+000022******************************************************************
+000023 01  ATTRIBUTE-LIST.
+000024     12  AL-PABOF            PIC X       VALUE 'Y'.
+000025     12  AL-PABON            PIC X       VALUE 'Z'.
+000026     12  AL-PADOF            PIC X       VALUE '%'.
+000027     12  AL-PADON            PIC X       VALUE '_'.
+000028     12  AL-PANOF            PIC X       VALUE '-'.
+000029     12  AL-PANON            PIC X       VALUE '/'.
+000030     12  AL-SABOF            PIC X       VALUE '8'.
+000031     12  AL-SABON            PIC X       VALUE '9'.
+000032     12  AL-SADOF            PIC X       VALUE '@'.
+000033     12  AL-SADON            PIC X       VALUE QUOTE.
+000034     12  AL-SANOF            PIC X       VALUE '0'.
+000035     12  AL-SANON            PIC X       VALUE '1'.
+000036     12  AL-UABOF            PIC X       VALUE 'H'.
+000037     12  AL-UABON            PIC X       VALUE 'I'.
+000038     12  AL-UADOF            PIC X       VALUE '<'.
+000039     12  AL-UADON            PIC X       VALUE '('.
+000040     12  AL-UANOF            PIC X       VALUE ' '.
+000041     12  AL-UANON            PIC X       VALUE 'A'.
+000042     12  AL-UNBOF            PIC X       VALUE 'Q'.
+000043     12  AL-UNBON            PIC X       VALUE 'R'.
+000044     12  AL-UNDOF            PIC X       VALUE '*'.
+000045     12  AL-UNDON            PIC X       VALUE ')'.
+000046     12  AL-UNNOF            PIC X       VALUE '&'.
+000047     12  AL-UNNON            PIC X       VALUE 'J'.
+      *<<((file: ELCATTR))
+000437     EJECT
+000438*                                COPY ELCAID.
+      *>>((file: ELCAID))
+000001******************************************************************
+000002*                                                                *
+000003*                            ELCAID.                             *
+000004*                            VMOD=2.001                          *
+000005*                                                                *
+000006*   DESCRIPTION:  ATTENTION IDENTIFER CHARACTERS.                *
+000007*                                                                *
+000008*  NO  CID  MODS  IN  COPYBOOK  ELCAID                           *
+000009*  051007  2007041300002 Change PF22 from x'D5' to x'5B'
+000010******************************************************************
+000011
+000012 01  DFHAID.
+000013   02  DFHNULL   PIC  X  VALUE  ' '.
+000014   02  DFHENTER  PIC  X  VALUE  QUOTE.
+000015   02  DFHCLEAR  PIC  X  VALUE  '_'.
+000016   02  DFHPEN    PIC  X  VALUE  '='.
+000017   02  DFHOPID   PIC  X  VALUE  'W'.
+000018   02  DFHPA1    PIC  X  VALUE  '%'.
+000019   02  DFHPA2    PIC  X  VALUE  '>'.
+000020   02  DFHPA3    PIC  X  VALUE  ','.
+000021   02  DFHPF1    PIC  X  VALUE  '1'.
+000022   02  DFHPF2    PIC  X  VALUE  '2'.
+000023   02  DFHPF3    PIC  X  VALUE  '3'.
+000024   02  DFHPF4    PIC  X  VALUE  '4'.
+000025   02  DFHPF5    PIC  X  VALUE  '5'.
+000026   02  DFHPF6    PIC  X  VALUE  '6'.
+000027   02  DFHPF7    PIC  X  VALUE  '7'.
+000028   02  DFHPF8    PIC  X  VALUE  '8'.
+000029   02  DFHPF9    PIC  X  VALUE  '9'.
+000030   02  DFHPF10   PIC  X  VALUE  ':'.
+000031   02  DFHPF11   PIC  X  VALUE  '#'.
+000032   02  DFHPF12   PIC  X  VALUE  '@'.
+000033   02  DFHPF13   PIC  X  VALUE  'A'.
+000034   02  DFHPF14   PIC  X  VALUE  'B'.
+000035   02  DFHPF15   PIC  X  VALUE  'C'.
+000036   02  DFHPF16   PIC  X  VALUE  'D'.
+000037   02  DFHPF17   PIC  X  VALUE  'E'.
+000038   02  DFHPF18   PIC  X  VALUE  'F'.
+000039   02  DFHPF19   PIC  X  VALUE  'G'.
+000040   02  DFHPF20   PIC  X  VALUE  'H'.
+000041   02  DFHPF21   PIC  X  VALUE  'I'.
+000042*00039    02  DFHPF22   PIC  X  VALUE  'Õ'.
+000043   02  DFHPF22   PIC  X  VALUE  '['.
+000044   02  DFHPF23   PIC  X  VALUE  '.'.
+000045   02  DFHPF24   PIC  X  VALUE  '<'.
+000046   02  DFHMSRE   PIC  X  VALUE  'X'.
+000047   02  DFHSTRF   PIC  X  VALUE  'h'.
+000048   02  DFHTRIG   PIC  X  VALUE  '"'.
+      *<<((file: ELCAID))
+000439
+000440 01  FILLER                      REDEFINES
+000441     DFHAID.
+000442
+000443     05  FILLER                      PIC X(8).
+000444
+000445     05  PF-VALUES                   PIC X
+000446         OCCURS 24 TIMES.
+000447     EJECT
+      ****************************************************************
+      *                                                               
+      * Copyright (c) 2016-2020 NTT DATA, Inc.                        
+      * All rights reserved.                                          
+      *                                                               
+      ****************************************************************
+       01  DFHEIV.                                                    
+         02  DFHEIV0               PIC X(35).                         
+         02  DFHEIV1               PIC X(08).                         
+         02  DFHEIV2               PIC X(08).                         
+         02  DFHEIV3               PIC X(08).                         
+         02  DFHEIV4               PIC X(06).                         
+         02  DFHEIV5               PIC X(04).                         
+         02  DFHEIV6               PIC X(04).                         
+         02  DFHEIV7               PIC X(02).                         
+         02  DFHEIV8               PIC X(02).                         
+         02  DFHEIV9               PIC X(01).                         
+         02  DFHEIV10              PIC S9(7) COMP-3.                  
+         02  DFHEIV11              PIC S9(4) COMP SYNC.               
+         02  DFHEIV12              PIC S9(4) COMP SYNC.               
+         02  DFHEIV13              PIC S9(4) COMP SYNC.               
+         02  DFHEIV14              PIC S9(4) COMP SYNC.               
+         02  DFHEIV15              PIC S9(4) COMP SYNC.               
+         02  DFHEIV16              PIC S9(9) COMP SYNC.               
+         02  DFHEIV17              PIC X(04).                         
+         02  DFHEIV18              PIC X(04).                         
+         02  DFHEIV19              PIC X(04).                         
+         02  DFHEIV20              USAGE IS POINTER.                  
+         02  DFHEIV21              USAGE IS POINTER.                  
+         02  DFHEIV22              USAGE IS POINTER.                  
+         02  DFHEIV23              USAGE IS POINTER.                  
+         02  DFHEIV24              USAGE IS POINTER.                  
+         02  DFHEIV25              PIC S9(9) COMP SYNC.               
+         02  DFHEIV26              PIC S9(9) COMP SYNC.               
+         02  DFHEIV27              PIC S9(9) COMP SYNC.               
+         02  DFHEIV28              PIC S9(9) COMP SYNC.               
+         02  DFHEIV29              PIC S9(9) COMP SYNC.               
+         02  DFHEIV30              PIC S9(9) COMP SYNC.               
+         02  DFHEIV31              PIC S9(9) COMP SYNC.               
+         02  DFHEIV32              PIC S9(4) COMP SYNC.               
+         02  DFHEIV33              PIC S9(4) COMP SYNC.               
+         02  DFHEIV34              PIC S9(4) COMP SYNC.               
+         02  DFHEIV35              PIC S9(4) COMP SYNC.               
+         02  DFHEIV97              PIC S9(7) COMP-3 VALUE ZERO.       
+         02  DFHEIV98              PIC S9(4) COMP SYNC VALUE ZERO.    
+         02  FILLER                PIC X(02).                         
+         02  DFHEIV99              PIC X(08) VALUE SPACE.             
+         02  DFHEIVL0              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL1              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL2              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL3              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL4              PIC X(255) VALUE SPACE.            
+         02  DFHEIVL5              PIC X(255) VALUE SPACE.            
+       LINKAGE  SECTION.
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2016-2020 NTT DATA, Inc.                        *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       01  dfheiblk.
+           02  eibtime          pic s9(7) comp-3.
+           02  eibdate          pic s9(7) comp-3.
+           02  eibtrnid         pic x(4).
+           02  eibtaskn         pic s9(7) comp-3.
+           02  eibtrmid         pic x(4).
+           02  dfheigdi         pic s9(4) comp.
+           02  eibcposn         pic s9(4) comp.
+           02  eibcalen         pic s9(4) comp.
+           02  eibaid           pic x(1).
+           02  eibfiller1       pic x(1).
+           02  eibfn            pic x(2).
+           02  eibfiller2       pic x(2).
+           02  eibrcode         pic x(6).
+           02  eibfiller3       pic x(2).
+           02  eibds            pic x(8).
+           02  eibreqid         pic x(8).
+           02  eibrsrce         pic x(8).
+           02  eibsync          pic x(1).
+           02  eibfree          pic x(1).
+           02  eibrecv          pic x(1).
+           02  eibsend          pic x(1).
+           02  eibatt           pic x(1).
+           02  eibeoc           pic x(1).
+           02  eibfmh           pic x(1).
+           02  eibcompl         pic x(1).
+           02  eibsig           pic x(1).
+           02  eibconf          pic x(1).
+           02  eiberr           pic x(1).
+           02  eibrldbk         pic x(1).
+           02  eiberrcd         pic x(4).
+           02  eibsynrb         pic x(1).
+           02  eibnodat         pic x(1).
+           02  eibfiller5       pic x(2).
+           02  eibresp          pic s9(8) comp.
+           02  eibresp2         pic s9(8) comp.
+           02  dfheigdj         pic s9(4) comp.
+           02  dfheigdk         pic s9(4) comp.
+000449
+000450 01  DFHCOMMAREA                     PIC X(1024).
+000451
+000452     EJECT
+000453*                                    COPY ERCCHKQ.
+      *>>((file: ERCCHKQ))
+000001******************************************************************
+000002*                                                                *
+000003*                                                                *
+000004*                            ERCCHKQ                             *
+000005*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+000006*                            VMOD=2.005                          *
+000007*                                                                *
+000008*   FILE DESCRIPTION = CHECK QUE FILE FOR THE CREDIT SYSTEM      *
+000009*                                                                *
+000010*   FILE TYPE = VSAM,KSDS                                        *
+000011*   RECORD SIZE = 100  RECFORM = FIXED                           *
+000012*                                                                *
+000013*   BASE CLUSTER = ERCHKQ                         RKP=2,LEN=7    *
+000014*       ALTERNATE PATH  = NONE                                   *
+000015*                                                                *
+000016*   LOG = YES                                                    *
+000017*   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+000018******************************************************************
+000019 01  CHECK-QUE.
+000020     12  CQ-RECORD-ID                PIC XX.
+000021         88  VALID-CQ-ID                     VALUE 'CQ'.
+000022
+000023     12  CQ-CONTROL-PRIMARY.
+000024         16  CQ-COMPANY-CD           PIC X.
+000025         16  CQ-CONTROL-NUMBER       PIC S9(8)       COMP.
+000026         16  CQ-SEQUENCE-NUMBER      PIC S9(4)       COMP.
+000027
+000028     12  CQ-ENTRY-TYPE               PIC X.
+000029             88  CHECK-ON-QUE           VALUE 'Q'.
+000030             88  ALIGNMENT-CHECK        VALUE 'A'.
+000031             88  MANUAL-CHECK           VALUE 'M'.
+000032             88  SPOILED-CHECK          VALUE 'S'.
+000033             88  VOIDED-CHECK           VALUE 'V'.
+000034             88  PAYMENT-ABORTED        VALUE 'X'.
+000035
+000036     12  CQ-CREDIT-MASTER-CNTL       PIC X(50).
+000037
+000038     12  CQ-CREDIT-PYAJ-CNTL         REDEFINES
+000039         CQ-CREDIT-MASTER-CNTL.
+000040         16  CQ-PYAJ-CARRIER         PIC X.
+000041         16  CQ-PYAJ-GROUPING        PIC X(6).
+000042         16  CQ-PYAJ-FIN-RESP        PIC X(10).
+000043         16  CQ-PYAJ-ACCOUNT         PIC X(10).
+000044         16  CQ-PYAJ-SEQ             PIC S9(8)  COMP.
+000045         16  CQ-PYAJ-REC-TYPE        PIC X.
+000046         16  FILLER                  PIC X(18).
+000047
+000048     12  CQ-CREDIT-CHEK-CNTL         REDEFINES
+000049         CQ-CREDIT-MASTER-CNTL.
+000050         16  CQ-CHEK-CARRIER         PIC X.
+000051         16  CQ-CHEK-GROUPING        PIC X(6).
+000052         16  CQ-CHEK-STATE           PIC XX.
+000053         16  CQ-CHEK-ACCOUNT         PIC X(10).
+000054         16  CQ-CHEK-CERT-EFF-DT     PIC XX.
+000055         16  CQ-CHEK-CERT-NO.
+000056             20  CQ-CHEK-CERT-PRIME  PIC X(10).
+000057             20  CQ-CHEK-CERT-SFX    PIC X.
+000058         16  CQ-CHEK-SEQ-NO          PIC S9(4)       COMP.
+000059         16  CQ-CHEK-FIN-RESP        PIC X(10).
+000060         16  FILLER                  PIC X(06).
+000061
+000062     12  CQ-CHECK-NUMBER             PIC X(7).
+000063     12  CQ-CHECK-AMOUNT             PIC S9(7)V99    COMP-3.
+000064     12  CQ-PAYMENT-TYPE             PIC X.
+000065             88  CQ-BILLING-CREDIT         VALUE '1'.
+000066             88  CQ-REFUND-PMT             VALUE '2'.
+000067             88  CQ-CHECK-MAINT-PMT        VALUE '3'.
+000068     12  CQ-VOID-INDICATOR           PIC X.
+000069             88  CHECK-IS-VOID             VALUE 'V'.
+000070     12  CQ-TIMES-PRINTED            PIC S9(4)       COMP.
+000071     12  CQ-PRINT-AT-HHMM            PIC S9(4)       COMP.
+000072     12  CQ-CHECK-BY-USER            PIC X(4).
+000073     12  CQ-PRE-NUMBERING-SW         PIC X.
+000074       88  CHECKS-WERE-NOT-PRE-NUMBERED    VALUE SPACE.
+000075       88  CHECKS-WERE-PRE-NUMBERED        VALUE '1'.
+000076
+000077     12  CQ-CHECK-WRITTEN-DT         PIC XX.
+000078     12  CQ-LAST-UPDATED-BY          PIC S9(4)       COMP.
+000079     12  CQ-ACCOUNT-AGENT            PIC X(10).
+000080     12  CQ-CHECK-VOIDED-DT          PIC XX.
+000081
+000082     12  CQ-LETTERS-IND              PIC X.
+000083         88  CQ-LETTERS-REQUIRED           VALUE 'Y'.
+000084
+000085******************************************************************
+      *<<((file: ERCCHKQ))
+000454     EJECT
+000455*                                    COPY ELCCNTL.
+      *>>((file: ELCCNTL))
+000001******************************************************************
+000002*                                                                *
+000003*                                                                *
+000004*                            ELCCNTL.                            *
+000005*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+000006*                            VMOD=2.059                          *
+000007*                                                                *
+000008*   FILE DESCRIPTION = SYSTEM CONTROL FILE                       *
+000009*                                                                *
+000010*   FILE TYPE = VSAM,KSDS                                        *
+000011*   RECORD SIZE = 750  RECFORM = FIXED                           *
+000012*                                                                *
+000013*   BASE CLUSTER = ELCNTL                        RKP=2,LEN=10    *
+000014*       ALTERNATE INDEX = NONE                                   *
+000015*                                                                *
+000016*   LOG = YES                                                    *
+000017*   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+000018******************************************************************
+000019*                   C H A N G E   L O G
+000020*
+000021* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+000022*-----------------------------------------------------------------
+000023*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+000024* EFFECTIVE    NUMBER
+000025*-----------------------------------------------------------------
+000026* 082503                   PEMA  ADD BENEFIT GROUP
+000027* 100703    2003080800002  PEMA  ADD SUPERGAP PROCESSING
+000028* 033104    2003080800002  PEMA  ADD GAP NON REFUNDABLE OPTION
+000029* 092705    2005050300006  PEMA  ADD SPP LEASES
+000030* 031808    2006032200004  AJRA  ADD APPROVAL LEVEL 4
+000031* 071508  CR2007110500003  PEMA  ADD NH INTEREST REFUND PROCESSING
+000032* 091808    2008022800002  AJRA  ADD CHECK NUMBER TO STATE CNTL FO
+000033* 011410    2009061500002  AJRA  ADD REFUND IND FOR AH AND DEATH C
+000034* 061511    2011042000002  AJRA  ADD IND TO VERIFY 2ND BENEFICIARY
+000035* 011812    2011022800001  AJRA  ADD CSR IND TO USER SECURITY
+000036* 012913    2012092400007  AJRA  ADD CAUSAL STATE IND
+000037* 032813    2011013100001  AJRA  ADD CLAIM REAUDIT FIELDS
+000038* 091813    2013082900001  AJRA  ADD APPROVAL LEVEL 5
+000039* 051414  CR2013021100002  PEMA  RECURRENT CLAIM CHANGES
+000040* 102717  CR2017062000003  PEMA  COMM CAP CHANGES
+000041******************************************************************
+000042*
+000043 01  CONTROL-FILE.
+000044     12  CF-RECORD-ID                       PIC XX.
+000045         88  VALID-CF-ID                        VALUE 'CF'.
+000046
+000047     12  CF-CONTROL-PRIMARY.
+000048         16  CF-COMPANY-ID                  PIC XXX.
+000049         16  CF-RECORD-TYPE                 PIC X.
+000050             88  CF-COMPANY-MASTER              VALUE '1'.
+000051             88  CF-PROCESSOR-MASTER            VALUE '2'.
+000052             88  CF-STATE-MASTER                VALUE '3'.
+000053             88  CF-LF-BENEFIT-MASTER           VALUE '4'.
+000054             88  CF-AH-BENEFIT-MASTER           VALUE '5'.
+000055             88  CF-CARRIER-MASTER              VALUE '6'.
+000056             88  CF-MORTALITY-MASTER            VALUE '7'.
+000057             88  CF-BUSINESS-TYPE-MASTER        VALUE '8'.
+000058             88  CF-TERMINAL-MASTER             VALUE '9'.
+000059             88  CF-AH-EDIT-MASTER              VALUE 'A'.
+000060             88  CF-CREDIBILITY-FACTOR-MASTER   VALUE 'B'.
+000061             88  CF-CUSTOM-REPORT-MASTER        VALUE 'C'.
+000062             88  CF-MORTGAGE-HT-WT-CHART        VALUE 'H'.
+000063             88  CF-LIFE-EDIT-MASTER            VALUE 'L'.
+000064             88  CF-MORTGAGE-PLAN-MASTER        VALUE 'M'.
+000065             88  CF-MORTGAGE-COMPANY-MASTER     VALUE 'N'.
+000066             88  CF-REMINDERS-MASTER            VALUE 'R'.
+000067             88  CF-AUTO-ACTIVITY-MASTER        VALUE 'T'.
+000068         16  CF-ACCESS-CD-GENL              PIC X(4).
+000069         16  CF-ACCESS-OF-PROCESSOR  REDEFINES CF-ACCESS-CD-GENL.
+000070             20  CF-PROCESSOR               PIC X(4).
+000071         16  CF-ACCESS-OF-STATE  REDEFINES  CF-ACCESS-CD-GENL.
+000072             20  CF-STATE-CODE              PIC XX.
+000073             20  FILLER                     PIC XX.
+000074         16  CF-ACCESS-OF-BENEFIT  REDEFINES  CF-ACCESS-CD-GENL.
+000075             20  FILLER                     PIC XX.
+000076             20  CF-HI-BEN-IN-REC           PIC XX.
+000077         16  CF-ACCESS-OF-CARRIER  REDEFINES  CF-ACCESS-CD-GENL.
+000078             20  FILLER                     PIC XXX.
+000079             20  CF-CARRIER-CNTL            PIC X.
+000080         16  CF-ACCESS-OF-BUS-TYPE REDEFINES  CF-ACCESS-CD-GENL.
+000081             20  FILLER                     PIC XX.
+000082             20  CF-HI-TYPE-IN-REC          PIC 99.
+000083         16  CF-ACCESS-OF-CRDB-TBL REDEFINES  CF-ACCESS-CD-GENL.
+000084             20  CF-CRDB-TABLE-INDICATOR    PIC X.
+000085                 88  CF-CRDB-NAIC-TABLE         VALUE '9'.
+000086             20  CF-CRDB-BENEFIT-TYPE       PIC X.
+000087             20  CF-CRDB-WAITING-PERIOD     PIC XX.
+000088         16  CF-ACCESS-OF-CUST-RPT REDEFINES  CF-ACCESS-CD-GENL.
+000089             20  FILLER                     PIC X.
+000090             20  CF-CUSTOM-REPORT-NO        PIC 999.
+000091         16  CF-ACCESS-OF-PLAN   REDEFINES  CF-ACCESS-CD-GENL.
+000092             20  FILLER                     PIC XX.
+000093             20  CF-MORTGAGE-PLAN           PIC XX.
+000094         16  CF-SEQUENCE-NO                 PIC S9(4)   COMP.
+000095
+000096     12  CF-LAST-MAINT-DT                   PIC XX.
+000097     12  CF-LAST-MAINT-BY                   PIC X(4).
+000098     12  CF-LAST-MAINT-HHMMSS               PIC S9(6)   COMP-3.
+000099
+000100     12  CF-RECORD-BODY                     PIC X(728).
+000101
+000102
+000103****************************************************************
+000104*             COMPANY MASTER RECORD                            *
+000105****************************************************************
+000106
+000107     12  CF-COMPANY-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+000108         16  CF-COMPANY-ADDRESS.
+000109             20  CF-CL-MAIL-TO-NAME         PIC X(30).
+000110             20  CF-CL-IN-CARE-OF           PIC X(30).
+000111             20  CF-CL-ADDR-LINE-1          PIC X(30).
+000112             20  CF-CL-ADDR-LINE-2          PIC X(30).
+000113             20  CF-CL-CITY-STATE           PIC X(30).
+000114             20  CF-CL-ZIP-CODE-NUM         PIC 9(9)    COMP-3.
+000115             20  CF-CL-PHONE-NO             PIC 9(11)   COMP-3.
+000116         16  CF-COMPANY-CD                  PIC X.
+000117         16  CF-COMPANY-PASSWORD            PIC X(8).
+000118         16  CF-SECURITY-OPTION             PIC X.
+000119             88  ALL-SECURITY                   VALUE '1'.
+000120             88  COMPANY-VERIFY                 VALUE '2'.
+000121             88  PROCESSOR-VERIFY               VALUE '3'.
+000122             88  NO-SECURITY                    VALUE '4'.
+000123             88  ALL-BUT-TERM                   VALUE '5'.
+000124         16  CF-CARRIER-CONTROL-LEVEL       PIC X.
+000125             88  USE-ACTUAL-CARRIER             VALUE SPACE.
+000126         16  CF-LGX-INTERFACE-CNTL          PIC X.
+000127             88  LGX-TIME-SHR-COMPANY           VALUE '1'.
+000128         16  CF-INFORCE-LOCATION            PIC X.
+000129             88  CERTS-ARE-ONLINE               VALUE '1'.
+000130             88  CERTS-ARE-OFFLINE              VALUE '2'.
+000131             88  NO-CERTS-AVAILABLE             VALUE '3'.
+000132         16  CF-LOWER-CASE-LETTERS          PIC X.
+000133         16  CF-CERT-ACCESS-CONTROL         PIC X.
+000134             88  CF-ST-ACCNT-CNTL               VALUE ' '.
+000135             88  CF-CARR-GROUP-ST-ACCNT-CNTL    VALUE '1'.
+000136             88  CF-CARR-ST-ACCNT-CNTL          VALUE '2'.
+000137             88  CF-ACCNT-CNTL                  VALUE '3'.
+000138             88  CF-CARR-ACCNT-CNTL             VALUE '4'.
+000139
+000140         16  CF-FORMS-PRINTER-ID            PIC X(4).
+000141         16  CF-CHECK-PRINTER-ID            PIC X(4).
+000142
+000143         16  CF-LGX-CREDIT-USER             PIC X.
+000144             88  CO-IS-NOT-USER                 VALUE 'N'.
+000145             88  CO-HAS-CLAS-IC-CREDIT          VALUE 'Y'.
+000146
+000147         16 CF-CREDIT-CALC-CODES.
+000148             20  CF-CR-REM-TERM-CALC PIC X.
+000149               88  CR-EARN-AFTER-15TH           VALUE '1'.
+000150               88  CR-EARN-ON-HALF-MO           VALUE '2'.
+000151               88  CR-EARN-ON-1ST-DAY           VALUE '3'.
+000152               88  CR-EARN-ON-FULL-MO           VALUE '4'.
+000153               88  CR-EARN-WITH-NO-DAYS         VALUE '5'.
+000154               88  CR-EARN-AFTER-14TH           VALUE '6'.
+000155               88  CR-EARN-AFTER-16TH           VALUE '7'.
+000156             20  CF-CR-R78-METHOD           PIC X.
+000157               88  USE-TERM-PLUS-ONE            VALUE SPACE.
+000158               88  DONT-USE-PLUS-ONE            VALUE '1'.
+000159
+000160         16  CF-CLAIM-CONTROL-COUNTS.
+000161             20  CF-CO-CLAIM-COUNTER        PIC S9(8)   COMP.
+000162                 88  CO-CLM-COUNT-RESET         VALUE +99999.
+000163
+000164             20  CF-CO-ARCHIVE-COUNTER      PIC S9(8)   COMP.
+000165                 88  CO-ARCHIVE-COUNT-RESET     VALUE +999999.
+000166
+000167             20  CF-CO-CHECK-COUNTER        PIC S9(8)   COMP.
+000168                 88  CO-CHECK-COUNT-RESET       VALUE +9999999.
+000169
+000170             20  CF-CO-CHECK-QUE-COUNTER    PIC S9(8)   COMP.
+000171                 88  CO-QUE-COUNT-RESET         VALUE +9999999.
+000172
+000173         16  CF-CURRENT-MONTH-END           PIC XX.
+000174
+000175         16  CF-CO-CALC-QUOTE-TOLERANCE.
+000176             20  CF-CO-TOL-CLAIM            PIC S999V99   COMP-3.
+000177             20  CF-CO-TOL-PREM             PIC S999V99   COMP-3.
+000178             20  CF-CO-TOL-REFUND           PIC S999V99   COMP-3.
+000179             20  CF-CO-CLAIM-REJECT-SW      PIC X.
+000180                 88 CO-WARN-IF-CLAIM-OUT        VALUE SPACE.
+000181                 88 CO-FORCE-IF-CLAIM-OUT       VALUE '1'.
+000182             20  CF-CO-PREM-REJECT-SW       PIC X.
+000183                 88 CO-WARN-IF-PREM-OUT         VALUE SPACE.
+000184                 88 CO-FORCE-IF-PREM-OUT        VALUE '1'.
+000185             20  CF-CO-REF-REJECT-SW        PIC X.
+000186                 88 CO-WARN-IF-REF-OUT          VALUE SPACE.
+000187                 88 CO-FORCE-IF-REF-OUT         VALUE '1'.
+000188
+000189         16  CF-CO-REPORTING-DT             PIC XX.
+000190         16  CF-CO-REPORTING-MONTH-DT       PIC XX.
+000191         16  CF-CO-REPORTING-MONTH-END-SW   PIC X.
+000192           88  CF-CO-NOT-MONTH-END              VALUE SPACES.
+000193           88  CF-CO-MONTH-END                  VALUE '1'.
+000194
+000195         16  CF-LGX-CLAIM-USER              PIC X.
+000196             88  CO-IS-NOT-CLAIM-USER           VALUE 'N'.
+000197             88  CO-HAS-CLAS-IC-CLAIM           VALUE 'Y'.
+000198
+000199         16  CF-CREDIT-EDIT-CONTROLS.
+000200             20  CF-MIN-PREMIUM             PIC S999V99   COMP-3.
+000201             20  CF-MIN-AGE                 PIC 99.
+000202             20  CF-DEFAULT-AGE             PIC 99.
+000203             20  CF-MIN-TERM                PIC S999      COMP-3.
+000204             20  CF-MAX-TERM                PIC S999      COMP-3.
+000205             20  CF-DEFAULT-SEX             PIC X.
+000206             20  CF-JOINT-AGE-INPUT         PIC X.
+000207                 88 CF-JOINT-AGE-IS-INPUT       VALUE '1'.
+000208             20  CF-BIRTH-DATE-INPUT        PIC X.
+000209                 88 CF-BIRTH-DATE-IS-INPUT      VALUE '1'.
+000210             20  CF-CAR-GROUP-ACCESS-CNTL   PIC X.
+000211                 88  CF-USE-ACTUAL-CARRIER      VALUE ' '.
+000212                 88  CF-ZERO-CARRIER            VALUE '1'.
+000213                 88  CF-ZERO-GROUPING           VALUE '2'.
+000214                 88  CF-ZERO-CAR-GROUP          VALUE '3'.
+000215             20  CF-EDIT-SW                 PIC X.
+000216                 88  CF-START-EDIT-TONIGHT      VALUE '1'.
+000217             20  CF-EDIT-RESTART-BATCH      PIC X(6).
+000218             20  CF-CR-PR-METHOD            PIC X.
+000219               88  USE-NORMAL-PR-METHOD         VALUE SPACE.
+000220               88  ADJUST-ORIG-TERM-BY-5        VALUE '1'.
+000221             20  FILLER                     PIC X.
+000222
+000223         16  CF-CREDIT-MISC-CONTROLS.
+000224             20  CF-REIN-TABLE-SW           PIC X.
+000225                 88 REIN-TABLES-ARE-USED        VALUE '1'.
+000226             20  CF-COMP-TABLE-SW           PIC X.
+000227                 88 COMP-TABLES-ARE-USED        VALUE '1'.
+000228             20  CF-EXPERIENCE-RETENTION-AGE
+000229                                            PIC S9        COMP-3.
+000230             20  CF-CONVERSION-DT           PIC XX.
+000231             20  CF-COMP-WRITE-OFF-AMT      PIC S999V99   COMP-3.
+000232             20  CF-RUN-FREQUENCY-SW        PIC X.
+000233                 88 CO-IS-PROCESSED-MONTHLY     VALUE SPACE.
+000234                 88 CO-IS-PROCESSED-ON-QTR      VALUE '1'.
+000235
+000236             20  CF-CR-CHECK-NO-CONTROL.
+000237                 24  CF-CR-CHECK-NO-METHOD    PIC X.
+000238                     88  CR-CHECK-NO-MANUAL       VALUE '1'.
+000239                     88  CR-CHECK-NO-AUTO-SEQ     VALUE '2'.
+000240                     88  CR-CHECK-NO-AT-PRINT     VALUE '4'.
+000241                 24  CF-CR-CHECK-COUNTER      PIC S9(8)   COMP.
+000242                     88  CR-CHECK-CNT-RESET-VALUE VALUE +999999.
+000243
+000244                 24  CF-CR-CHECK-COUNT       REDEFINES
+000245                     CF-CR-CHECK-COUNTER      PIC X(4).
+000246
+000247                 24  CF-CR-CHECK-QUE-COUNTER  PIC S9(8)  COMP.
+000248                     88  CR-QUE-COUNT-RESET      VALUE +9999999.
+000249
+000250                 24  CF-CR-CHECK-QUE-COUNT   REDEFINES
+000251                     CF-CR-CHECK-QUE-COUNTER  PIC X(4).
+000252                 24  CF-MAIL-PROCESSING       PIC X.
+000253                     88  MAIL-PROCESSING          VALUE 'Y'.
+000254
+000255         16  CF-MISC-SYSTEM-CONTROL.
+000256             20  CF-SYSTEM-C                 PIC X.
+000257                 88  CONFIRMATION-SYS-USED       VALUE '1'.
+000258             20  CF-SYSTEM-D                 PIC X.
+000259                 88  DAILY-BILL-SYS-USED         VALUE '1'.
+000260             20  CF-SOC-SEC-NO-SW            PIC X.
+000261                 88  SOC-SEC-NO-USED             VALUE '1'.
+000262             20  CF-MEMBER-NO-SW             PIC X.
+000263                 88  MEMBER-NO-USED              VALUE '1'.
+000264             20  CF-TAX-ID-NUMBER            PIC X(11).
+000265             20  CF-JOURNAL-FILE-ID          PIC S9(4) COMP.
+000266             20  CF-PAYMENT-APPROVAL-SW      PIC X.
+000267                 88  CF-PMT-APPROVAL-USED        VALUE 'Y' 'G'.
+000268                 88  CF-NO-APPROVAL              VALUE ' ' 'N'.
+000269                 88  CF-ALL-APPROVED             VALUE 'Y'.
+000270                 88  CF-GRADUATED-APPROVAL       VALUE 'G'.
+000271             20  CF-SYSTEM-E                 PIC X.
+000272                 88  CF-AR-SYSTEM-USED           VALUE 'Y'.
+000273
+000274         16  CF-LGX-LIFE-USER               PIC X.
+000275             88  CO-IS-NOT-LIFE-USER            VALUE 'N'.
+000276             88  CO-HAS-CLAS-IC-LIFE            VALUE 'Y'.
+000277
+000278         16  CF-CR-MONTH-END-DT             PIC XX.
+000279
+000280         16  CF-FILE-MAINT-DATES.
+000281             20  CF-LAST-BATCH-NO           PIC S9(8)   COMP.
+000282                 88  CF-LAST-BATCH-RESET        VALUE +999999.
+000283             20  CF-LAST-BATCH       REDEFINES
+000284                 CF-LAST-BATCH-NO               PIC X(4).
+000285             20  CF-RATES-FILE-MAINT-DT         PIC XX.
+000286             20  CF-RATES-FILE-CREATE-DT        PIC XX.
+000287             20  CF-COMMISSION-TAB-MAINT-DT     PIC XX.
+000288             20  CF-COMMISSION-TAB-CREATE-DT    PIC XX.
+000289             20  CF-ACCOUNT-MSTR-MAINT-DT       PIC XX.
+000290             20  CF-ACCOUNT-MSTR-CREATE-DT      PIC XX.
+000291             20  CF-REINSURANCE-TAB-MAINT-DT    PIC XX.
+000292             20  CF-REINSURANCE-TAB-CREATE-DT   PIC XX.
+000293             20  CF-COMPENSATION-MSTR-MAINT-DT  PIC XX.
+000294             20  CF-COMPENSATION-MSTR-CREATE-DT PIC XX.
+000295
+000296         16  CF-NEXT-COMPANY-ID             PIC XXX.
+000297         16  FILLER                         PIC X.
+000298
+000299         16  CF-ALT-MORT-CODE               PIC X(4).
+000300         16  CF-MEMBER-CAPTION              PIC X(10).
+000301
+000302         16  CF-LIFE-ACCESS-CONTROL         PIC X.
+000303             88  CF-LIFE-ST-ACCNT-CNTL          VALUE ' '.
+000304             88  CF-LIFE-CARR-GRP-ST-ACCNT-CNTL VALUE '1'.
+000305             88  CF-LIFE-CARR-ST-ACCNT-CNTL     VALUE '2'.
+000306             88  CF-LIFE-ACCNT-CNTL             VALUE '3'.
+000307             88  CF-LIFE-CARR-ACCNT-CNTL        VALUE '4'.
+000308
+000309         16  CF-STARTING-ARCH-NO            PIC S9(8) COMP.
+000310
+000311         16  CF-LIFE-OVERRIDE-L1            PIC X.
+000312         16  CF-LIFE-OVERRIDE-L2            PIC XX.
+000313         16  CF-LIFE-OVERRIDE-L6            PIC X(6).
+000314         16  CF-LIFE-OVERRIDE-L12           PIC X(12).
+000315
+000316         16  CF-AH-OVERRIDE-L1              PIC X.
+000317         16  CF-AH-OVERRIDE-L2              PIC XX.
+000318         16  CF-AH-OVERRIDE-L6              PIC X(6).
+000319         16  CF-AH-OVERRIDE-L12             PIC X(12).
+000320
+000321         16  CF-REPORT-CD1-CAPTION          PIC X(10).
+000322         16  CF-REPORT-CD2-CAPTION          PIC X(10).
+000323
+000324         16  CF-CLAIM-CUTOFF-DATE           PIC XX.
+000325         16  CF-AR-LAST-EL860-DT            PIC XX.
+000326         16  CF-MP-MONTH-END-DT             PIC XX.
+000327
+000328         16  CF-MAX-NUM-PMTS-CHECK          PIC 99.
+000329         16  CF-CLAIM-PAID-THRU-TO          PIC X.
+000330             88  CF-CLAIM-PAID-TO               VALUE '1'.
+000331
+000332         16  CF-AR-MONTH-END-DT             PIC XX.
+000333
+000334         16  CF-CRDTCRD-USER                PIC X.
+000335             88  CO-IS-NOT-CRDTCRD-USER         VALUE 'N'.
+000336             88  CO-HAS-CLAS-IC-CRDTCRD         VALUE 'Y'.
+000337
+000338         16  CF-CC-MONTH-END-DT             PIC XX.
+000339
+000340         16  CF-PRINT-ADDRESS-LABELS        PIC X.
+000341
+000342         16  CF-MORTALITY-AGE-CALC-METHOD   PIC X.
+000343             88  CF-USE-TABLE-ASSIGNED-METHOD   VALUE '1' ' '.
+000344             88  CF-USE-ALL-AGE-LAST            VALUE '2'.
+000345             88  CF-USE-ALL-AGE-NEAR            VALUE '3'.
+000346         16  CF-CO-TOL-PREM-PCT             PIC S9V9(4)   COMP-3.
+000347         16  CF-CO-TOL-REFUND-PCT           PIC S9V9(4)   COMP-3.
+000348         16  CF-CO-TOL-CAP                  PIC S9(3)V99  COMP-3.
+000349         16  CF-CO-RESERVE-OPTION-SWITCH    PIC  X.
+000350             88  OPTIONAL-RESERVE-METHOD-AUTH    VALUE 'Y'.
+000351             88  OPTIONAL-RESERVE-MTHD-NOT-AUTH  VALUE ' ' 'N'.
+000352         16  CF-CO-IBNR-LAG-MONTHS          PIC S9(3)     COMP-3.
+000353         16  CF-CO-CIDA-TABLE-DISCOUNT-PCT  PIC S9V9(4)   COMP-3.
+000354         16  CF-CO-CRDB-TABLE-SELECTION     PIC  X.
+000355             88  NIAC-CREDIBILITY-TABLE          VALUE '9'.
+000356         16  CF-CO-ST-CALL-RPT-CNTL         PIC  X.
+000357
+000358         16  CF-CL-ZIP-CODE.
+000359             20  CF-CL-ZIP-PRIME.
+000360                 24  CF-CL-ZIP-1ST          PIC X.
+000361                     88  CF-CL-CAN-POST-CODE  VALUE 'A' THRU 'Z'.
+000362                 24  FILLER                 PIC X(4).
+000363             20  CF-CL-ZIP-PLUS4            PIC X(4).
+000364         16  CF-CL-CANADIAN-POSTAL-CODE REDEFINES CF-CL-ZIP-CODE.
+000365             20  CF-CL-CAN-POSTAL-1         PIC XXX.
+000366             20  CF-CL-CAN-POSTAL-2         PIC XXX.
+000367             20  FILLER                     PIC XXX.
+000368
+000369         16  CF-CO-CALCULATION-INTEREST     PIC S9V9(4)  COMP-3.
+000370         16  CF-CO-IBNR-AH-FACTOR           PIC S9V9(4)  COMP-3.
+000371         16  CF-CO-IBNR-LIFE-FACTOR         PIC S9V9(4)  COMP-3.
+000372         16  CF-CO-OPTION-START-DATE        PIC XX.
+000373         16  CF-REM-TRM-CALC-OPTION         PIC X.
+000374           88  CF-VALID-REM-TRM-OPTION          VALUE '1' '2'
+000375                                                      '3' '4'.
+000376           88  CF-CONSIDER-EXTENSION            VALUE '3' '4'.
+000377           88  CF-30-DAY-MONTH                  VALUE '1' '3'.
+000378           88  CF-NO-EXT-30-DAY-MONTH           VALUE '1'.
+000379           88  CF-NO-EXT-ACTUAL-DAYS            VALUE '2'.
+000380           88  CF-EXT-30-DAY-MONTH              VALUE '3'.
+000381           88  CF-EXT-ACTUAL-DAYS               VALUE '4'.
+000382
+000383         16  CF-DEFAULT-APR                 PIC S999V9(4) COMP-3.
+000384
+000385         16  CF-PAYMENT-APPROVAL-LEVELS.
+000386             20  CF-LIFE-PAY-APP-LEVEL-1    PIC S9(7)   COMP-3.
+000387             20  CF-LIFE-PAY-APP-LEVEL-2    PIC S9(7)   COMP-3.
+000388             20  CF-LIFE-PAY-APP-LEVEL-3    PIC S9(7)   COMP-3.
+000389             20  CF-AH-PAY-APP-LEVEL-1      PIC S9(7)   COMP-3.
+000390             20  CF-AH-PAY-APP-LEVEL-2      PIC S9(7)   COMP-3.
+000391             20  CF-AH-PAY-APP-LEVEL-3      PIC S9(7)   COMP-3.
+000392
+000393         16  CF-END-USER-REPORTING-USER     PIC X.
+000394             88  CO-NO-END-USER-REPORTING       VALUE 'N'.
+000395             88  CO-USES-END-USER-REPORTING     VALUE 'Y'.
+000396
+000397         16  CF-CLAIMS-CHECK-RECON-USER     PIC X.
+000398             88  CO-NO-USE-CLAIMS-RECON         VALUE 'N'.
+000399             88  CO-USES-CLAIMS-RECON           VALUE 'Y'.
+000400
+000401         16  CF-CLAIMS-LAST-PROCESS-DT      PIC XX.
+000402
+000403         16  CF-CREDIT-REF-SSN-CNT          PIC S9(5)  COMP-3.
+000404         16  FILLER                         PIC X.
+000405
+000406         16  CF-CREDIT-ARCHIVE-CNTL.
+000407             20  CF-CREDIT-LAST-ARCH-NUM    PIC S9(9)  COMP-3.
+000408             20  CF-CREDIT-START-ARCH-NUM   PIC S9(9)  COMP-3.
+000409             20  CF-CREDIT-ARCH-PURGE-YR    PIC S9     COMP-3.
+000410
+000411         16  CF-CR-PRINT-ADDRESS-LABELS     PIC X.
+000412
+000413         16  CF-CLAIMS-AUDIT-CHANGES        PIC X.
+000414             88  CO-NO-USE-AUDIT-CHANGES        VALUE 'N'.
+000415             88  CO-USES-AUDIT-CHANGES          VALUE 'Y'.
+000416
+000417         16  CF-CLAIMS-CREDIT-CARD-INDEX    PIC X.
+000418             88  CO-NO-USE-CREDIT-CARD-INDEX    VALUE 'N'.
+000419             88  CO-USES-CREDIT-CARD-INDEX      VALUE 'Y'.
+000420
+000421         16  CF-CLAIMS-LETTER-MAINT-DAYS    PIC 99.
+000422
+000423         16  CF-CO-ACH-ID-CODE              PIC  X.
+000424             88  CF-CO-ACH-ICD-IRS-EIN          VALUE '1'.
+000425             88  CF-CO-ACH-ICD-DUNS             VALUE '2'.
+000426             88  CF-CO-ACH-ICD-USER-NO          VALUE '3'.
+000427         16  CF-CO-ACH-CLAIM-SEND-NAME      PIC X(23).
+000428         16  CF-CO-ACH-CLAIM-BK-NO          PIC X(09).
+000429         16  CF-CO-ACH-ADMIN-SEND-NAME      PIC X(23).
+000430         16  CF-CO-ACH-ADMIN-NO             PIC X(09).
+000431         16  CF-CO-ACH-RECV-NAME            PIC X(23).
+000432         16  CF-CO-ACH-RECV-NO              PIC X(08).
+000433         16  CF-CO-ACH-ORIGINATOR-NO        PIC X(08).
+000434         16  CF-CO-ACH-COMPANY-ID           PIC X(09).
+000435         16  CF-CO-ACH-TRACE-NO             PIC 9(07) COMP.
+000436                 88  CO-ACH-TRACE-NO-RESET      VALUE 9999999.
+000437         16  CF-CO-ACH-TRACE-SPACE REDEFINES
+000438                 CF-CO-ACH-TRACE-NO         PIC X(4).
+000439
+000440         16  CF-CO-OVER-SHORT.
+000441             20 CF-CO-OVR-SHT-AMT           PIC S999V99   COMP-3.
+000442             20 CF-CO-OVR-SHT-PCT           PIC S9V9(4)   COMP-3.
+000443
+000444*         16  FILLER                         PIC X(102).
+000445         16  CF-PAYMENT-APPROVAL-LEVELS-2.
+000446             20  CF-LIFE-PAY-APP-LEVEL-4    PIC S9(7)   COMP-3.
+000447             20  CF-AH-PAY-APP-LEVEL-4      PIC S9(7)   COMP-3.
+000448
+000449         16  CF-AH-APPROVAL-DAYS.
+000450             20  CF-AH-APP-DAY-LEVEL-1     PIC S9(5)   COMP-3.
+000451             20  CF-AH-APP-DAY-LEVEL-2     PIC S9(5)   COMP-3.
+000452             20  CF-AH-APP-DAY-LEVEL-3     PIC S9(5)   COMP-3.
+000453             20  CF-AH-APP-DAY-LEVEL-4     PIC S9(5)   COMP-3.
+000454
+000455         16  CF-CO-REAUDIT-INTERVAL        PIC S9(5)   COMP-3.
+000456
+000457         16  CF-APPROV-LEV-5.
+000458             20  CF-LIFE-PAY-APP-LEVEL-5    PIC S9(7)   COMP-3.
+000459             20  CF-AH-PAY-APP-LEVEL-5      PIC S9(7)   COMP-3.
+000460             20  CF-AH-APP-DAY-LEVEL-5      PIC S9(5)   COMP-3.
+000461
+000462         16  FILLER                         PIC X(68).
+000463****************************************************************
+000464*             PROCESSOR/USER RECORD                            *
+000465****************************************************************
+000466
+000467     12  CF-PROCESSOR-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+000468         16  CF-PROCESSOR-NAME              PIC X(30).
+000469         16  CF-PROCESSOR-PASSWORD          PIC X(11).
+000470         16  CF-PROCESSOR-TITLE             PIC X(26).
+000471         16  CF-MESSAGE-AT-LOGON-CAP        PIC X.
+000472                 88  MESSAGE-YES                VALUE 'Y'.
+000473                 88  MESSAGE-NO                 VALUE ' ' 'N'.
+000474
+000475*****************************************************
+000476****  OCCURRENCE (1) CREDIT APPLICATIONS         ****
+000477****  OCCURRENCE (2) CLAIMS APPLICATIONS         ****
+000478****  OCCURRENCE (3) CREDIT CARD APPLICATIONS    ****
+000479****  OCCURRENCE (4) ACCT RECV APPLICATIONS      ****
+000480*****************************************************
+000481
+000482         16  CF-SYSTEM-SECURITY  OCCURS  4 TIMES.
+000483             20  CF-ADMINISTRATION-CONTROLS PIC XX.
+000484             20  CF-APPLICATION-FORCE       PIC X.
+000485             20  CF-INDIVIDUAL-APP.
+000486                 24  CF-APP-SWITCHES  OCCURS  44 TIMES.
+000487                     28  CF-BROWSE-APP      PIC X.
+000488                     28  CF-UPDATE-APP      PIC X.
+000489
+000490         16  CF-CURRENT-TERM-ON             PIC X(4).
+000491         16  CF-PROCESSOR-LIMITS-CLAIMS.
+000492             20  CF-PROC-CALC-AMT-TOL       PIC S999V99   COMP-3.
+000493             20  CF-PROC-MAX-REG-PMT        PIC S9(7)V99  COMP-3.
+000494             20  CF-PROC-MAX-REG-DAYS       PIC S999      COMP-3.
+000495             20  CF-PROC-MAX-AUTO-PMT       PIC S9(7)V99  COMP-3.
+000496             20  CF-PROC-MAX-AUTO-MOS       PIC S999      COMP-3.
+000497             20  CF-PROC-CALC-DAYS-TOL      PIC S999      COMP-3.
+000498             20  CF-PROC-MAX-LF-PMT         PIC S9(7)V99  COMP-3.
+000499         16  CF-PROCESSOR-CARRIER           PIC X.
+000500             88  NO-CARRIER-SECURITY            VALUE ' '.
+000501         16  CF-PROCESSOR-ACCOUNT           PIC X(10).
+000502             88  NO-ACCOUNT-SECURITY            VALUE SPACES.
+000503         16  CF-PROCESSOR-LIFE-ACCESS       PIC X.
+000504             88  PROCESSOR-HAS-LIFE-ACCESS      VALUE 'Y'.
+000505         16  CF-PROCESSOR-USER-ALMIGHTY     PIC X.
+000506             88  PROCESSOR-USER-IS-ALMIGHTY     VALUE 'Y'.
+000507
+000508         16  CF-PROC-SYS-ACCESS-SW.
+000509             20  CF-PROC-CREDIT-CLAIMS-SW.
+000510                 24  CF-PROC-SYS-ACCESS-CREDIT  PIC X.
+000511                     88  ACCESS-TO-CREDIT           VALUE 'Y'.
+000512                 24  CF-PROC-SYS-ACCESS-CLAIMS  PIC X.
+000513                     88  ACCESS-TO-CLAIMS           VALUE 'Y'.
+000514             20  CF-PROC-CREDIT-CLAIMS   REDEFINES
+000515                 CF-PROC-CREDIT-CLAIMS-SW       PIC XX.
+000516                 88  ACCESS-TO-CLAIM-CREDIT         VALUE 'YY'.
+000517             20  CF-PROC-LIFE-GNRLDGR-SW.
+000518                 24  CF-PROC-SYS-ACCESS-LIFE    PIC X.
+000519                     88  ACCESS-TO-LIFE             VALUE 'Y'.
+000520                 24  CF-PROC-SYS-ACCESS-GNRLDGR PIC X.
+000521                     88  ACCESS-TO-GNRLDGR          VALUE 'Y'.
+000522             20  CF-PROC-LIFE-GNRLDGR    REDEFINES
+000523                 CF-PROC-LIFE-GNRLDGR-SW        PIC XX.
+000524                 88  ACCESS-TO-LIFE-GNRLDGR         VALUE 'YY'.
+000525         16  CF-PROC-SYS-ACCESS-ALL      REDEFINES
+000526             CF-PROC-SYS-ACCESS-SW              PIC X(4).
+000527             88  ACCESS-TO-ALL-SYSTEMS              VALUE 'YYYY'.
+000528         16  CF-PROCESSOR-PRINTER               PIC X(4).
+000529
+000530         16  CF-APPROVAL-LEVEL                  PIC X.
+000531             88  APPROVAL-LEVEL-1                   VALUE '1'.
+000532             88  APPROVAL-LEVEL-2                   VALUE '2'.
+000533             88  APPROVAL-LEVEL-3                   VALUE '3'.
+000534             88  APPROVAL-LEVEL-4                   VALUE '4'.
+000535             88  APPROVAL-LEVEL-5                   VALUE '5'.
+000536
+000537         16  CF-PROC-MAX-EXP-PMT            PIC S9(7)V99  COMP-3.
+000538
+000539         16  CF-LANGUAGE-TYPE                   PIC X.
+000540             88  CF-LANG-IS-ENG                     VALUE 'E'.
+000541             88  CF-LANG-IS-FR                      VALUE 'F'.
+000542
+000543         16  CF-CSR-IND                         PIC X.
+000544         16  FILLER                             PIC X(239).
+000545
+000546****************************************************************
+000547*             PROCESSOR/REMINDERS RECORD                       *
+000548****************************************************************
+000549
+000550     12  CF-PROCESSOR-REMINDER-REC  REDEFINES  CF-RECORD-BODY.
+000551         16  CF-PROCESSOR-REMINDERS  OCCURS 8 TIMES.
+000552             20  CF-START-REMIND-DT         PIC XX.
+000553             20  CF-END-REMIND-DT           PIC XX.
+000554             20  CF-REMINDER-TEXT           PIC X(50).
+000555         16  FILLER                         PIC X(296).
+000556
+000557
+000558****************************************************************
+000559*             STATE MASTER RECORD                              *
+000560****************************************************************
+000561
+000562     12  CF-STATE-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+000563         16  CF-STATE-ABBREVIATION          PIC XX.
+000564         16  CF-STATE-NAME                  PIC X(25).
+000565         16  CF-ST-CALC-INTEREST            PIC S9V9(4)   COMP-3.
+000566         16  CF-ST-CALC-QUOTE-TOLERANCE.
+000567             20  CF-ST-TOL-CLAIM            PIC S999V99   COMP-3.
+000568             20  CF-ST-TOL-PREM             PIC S999V99   COMP-3.
+000569             20  CF-ST-TOL-REFUND           PIC S999V99   COMP-3.
+000570             20  CF-ST-CLAIM-REJECT-SW      PIC X.
+000571                 88 ST-WARN-IF-CLAIM-OUT        VALUE SPACE.
+000572                 88 ST-FORCE-IF-CLAIM-OUT       VALUE '1'.
+000573             20  CF-ST-PREM-REJECT-SW       PIC X.
+000574                 88 ST-WARN-IF-PREM-OUT         VALUE SPACE.
+000575                 88 ST-FORCE-IF-PREM-OUT        VALUE '1'.
+000576             20  CF-ST-REF-REJECT-SW        PIC X.
+000577                 88 ST-WARN-IF-REF-OUT          VALUE SPACE.
+000578                 88 ST-FORCE-IF-REF-OUT         VALUE '1'.
+000579         16  CF-ST-LF-EXP-PCT               PIC S999V9(4) COMP-3.
+000580         16  CF-ST-AH-EXP-PCT               PIC S999V9(4) COMP-3.
+000581         16  CF-ST-REFUND-RULES.
+000582             20  CF-ST-REFUND-MIN           PIC S999V99    COMP-3.
+000583             20  CF-ST-REFUND-DAYS-FIRST    PIC 99.
+000584             20  CF-ST-REFUND-DAYS-SUBSEQ   PIC 99.
+000585         16  CF-ST-FST-PMT-EXTENSION.
+000586             20  CF-ST-FST-PMT-DAYS-MAX     PIC 999.
+000587             20  CF-ST-FST-PMT-DAYS-CHG     PIC X.
+000588                 88  CF-ST-EXT-NO-CHG           VALUE ' '.
+000589                 88  CF-ST-EXT-CHG-LF           VALUE '1'.
+000590                 88  CF-ST-EXT-CHG-AH           VALUE '2'.
+000591                 88  CF-ST-EXT-CHG-LF-AH        VALUE '3'.
+000592         16  CF-ST-STATE-CALL.
+000593             20  CF-ST-CALL-UNEARNED        PIC X.
+000594             20  CF-ST-CALL-RPT-CNTL        PIC X.
+000595             20  CF-ST-CALL-RATE-DEV        PIC XXX.
+000596         16  CF-REPLACEMENT-LAW-SW          PIC X.
+000597             88  CF-REPLACEMENT-LAW-APPLIES     VALUE 'Y'.
+000598             88  CF-REPL-LAW-NOT-APPLICABLE     VALUE 'N'.
+000599         16  CF-REPLACEMENT-LETTER          PIC X(4).
+000600         16  CF-ST-TOL-PREM-PCT             PIC S9V9999 COMP-3.
+000601         16  CF-ST-TOL-REF-PCT              PIC S9V9999 COMP-3.
+000602         16  CF-ST-TARGET-LOSS-RATIO        PIC S9V9(4) COMP-3.
+000603         16  CF-ST-SPLIT-PAYMENT            PIC X.
+000604         16  FILLER                         PIC X.
+000605         16  CF-STATE-BENEFIT-CNTL  OCCURS 50 TIMES.
+000606             20  CF-ST-BENEFIT-CD           PIC XX.
+000607             20  CF-ST-BENEFIT-KIND         PIC X.
+000608                 88  CF-ST-LIFE-KIND            VALUE 'L'.
+000609                 88  CF-ST-AH-KIND              VALUE 'A'.
+000610             20  CF-ST-REM-TERM-CALC        PIC X.
+000611                 88  ST-REM-TERM-NOT-USED       VALUE SPACE.
+000612                 88  ST-EARN-AFTER-15TH         VALUE '1'.
+000613                 88  ST-EARN-ON-HALF-MO         VALUE '2'.
+000614                 88  ST-EARN-ON-1ST-DAY         VALUE '3'.
+000615                 88  ST-EARN-ON-FULL-MO         VALUE '4'.
+000616                 88  ST-EARN-WITH-NO-DAYS       VALUE '5'.
+000617                 88  ST-EARN-AFTER-14TH         VALUE '6'.
+000618                 88  ST-EARN-AFTER-16TH         VALUE '7'.
+000619
+000620             20  CF-ST-REFUND-CALC          PIC X.
+000621                 88  ST-REFUND-NOT-USED         VALUE SPACE.
+000622                 88  ST-REFD-BY-R78             VALUE '1'.
+000623                 88  ST-REFD-BY-PRO-RATA        VALUE '2'.
+000624                 88  ST-REFD-AS-CALIF           VALUE '3'.
+000625                 88  ST-REFD-AS-TEXAS           VALUE '4'.
+000626                 88  ST-REFD-IS-NET-PAY         VALUE '5'.
+000627                 88  ST-REFD-ANTICIPATION       VALUE '6'.
+000628                 88  ST-REFD-UTAH               VALUE '7'.
+000629                 88  ST-REFD-SUM-OF-DIGITS      VALUE '9'.
+000630                 88  ST-REFD-REG-BALLOON        VALUE 'B'.
+000631                 88  ST-REFD-GAP-NON-REFUND     VALUE 'G'.
+000632
+000633             20  CF-ST-EARNING-CALC         PIC X.
+000634                 88  ST-EARNING-NOT-USED        VALUE SPACE.
+000635                 88  ST-EARN-BY-R78             VALUE '1'.
+000636                 88  ST-EARN-BY-PRO-RATA        VALUE '2'.
+000637                 88  ST-EARN-AS-CALIF           VALUE '3'.
+000638                 88  ST-EARN-AS-TEXAS           VALUE '4'.
+000639                 88  ST-EARN-IS-NET-PAY         VALUE '5'.
+000640                 88  ST-EARN-ANTICIPATION       VALUE '6'.
+000641                 88  ST-EARN-MEAN               VALUE '8'.
+000642                 88  ST-EARN-REG-BALLOON        VALUE 'B'.
+000643
+000644             20  CF-ST-OVRD-EARNINGS-CALC   PIC X.
+000645                 88  ST-OVERRIDE-NOT-USED       VALUE SPACE.
+000646                 88  ST-OVRD-BY-R78             VALUE '1'.
+000647                 88  ST-OVRD-BY-PRO-RATA        VALUE '2'.
+000648                 88  ST-OVRD-AS-CALIF           VALUE '3'.
+000649                 88  ST-OVRD-AS-TEXAS           VALUE '4'.
+000650                 88  ST-OVRD-IS-NET-PAY         VALUE '5'.
+000651                 88  ST-OVRD-ANTICIPATION       VALUE '6'.
+000652                 88  ST-OVRD-MEAN               VALUE '8'.
+000653                 88  ST-OVRD-REG-BALLOON        VALUE 'B'.
+000654             20  cf-st-extra-periods        pic 9.
+000655*            20  FILLER                     PIC X.
+000656
+000657         16  CF-ST-COMMISSION-CAPS.
+000658             20  CF-ST-COMM-CAP-SL          PIC S9V9(4) COMP-3.
+000659             20  CF-ST-COMM-CAP-JL          PIC S9V9(4) COMP-3.
+000660             20  CF-ST-COMM-CAP-SA          PIC S9V9(4) COMP-3.
+000661             20  CF-ST-COMM-CAP-JA          PIC S9V9(4) COMP-3.
+000662         16  CF-COMM-CAP-LIMIT-TO           PIC X.
+000663                 88  ST-LIMIT-TO-ACCOUNT        VALUE 'A'.
+000664                 88  ST-LIMIT-TO-GA             VALUE 'G'.
+000665                 88  ST-LIMIT-TO-BOTH           VALUE 'B'.
+000666
+000667         16  CF-ST-RES-TAX-PCT              PIC S9V9(4) COMP-3.
+000668
+000669         16  CF-ST-STATUTORY-INTEREST.
+000670             20  CF-ST-STAT-DATE-FROM       PIC X.
+000671                 88  ST-STAT-FROM-INCURRED      VALUE 'I'.
+000672                 88  ST-STAT-FROM-REPORTED      VALUE 'R'.
+000673             20  CF-ST-NO-DAYS-ELAPSED      PIC 99.
+000674             20  CF-ST-STAT-INTEREST        PIC S9V9(4) COMP-3.
+000675             20  CF-ST-STAT-INTEREST-1      PIC S9V9(4) COMP-3.
+000676             20  CF-ST-STAT-INTEREST-2      PIC S9V9(4) COMP-3.
+000677             20  CF-ST-STAT-INTEREST-3      PIC S9V9(4) COMP-3.
+000678
+000679         16  CF-ST-OVER-SHORT.
+000680             20 CF-ST-OVR-SHT-AMT           PIC S999V99 COMP-3.
+000681             20 CF-ST-OVR-SHT-PCT           PIC S9V9(4) COMP-3.
+000682
+000683         16  CF-ST-FREE-LOOK-PERIOD         PIC S9(3)   COMP-3.
+000684
+000685         16  CF-ST-RT-CALC                  PIC X.
+000686
+000687         16  CF-ST-LF-PREM-TAX              PIC S9V9(4) COMP-3.
+000688         16  CF-ST-AH-PREM-TAX-I            PIC S9V9(4) COMP-3.
+000689         16  CF-ST-AH-PREM-TAX-G            PIC S9V9(4) COMP-3.
+000690         16  CF-ST-RF-LR-CALC               PIC X.
+000691         16  CF-ST-RF-LL-CALC               PIC X.
+000692         16  CF-ST-RF-LN-CALC               PIC X.
+000693         16  CF-ST-RF-AH-CALC               PIC X.
+000694         16  CF-ST-RF-CP-CALC               PIC X.
+000695*        16  FILLER                         PIC X(206).
+000696*CIDMOD         16  FILLER                         PIC X(192).
+000697         16  CF-ST-CHECK-COUNTER            PIC S9(8)   COMP.
+000698             88  CF-ST-CHECK-CNT-RESET      VALUE +9999999.
+000699         16  CF-ST-REF-AH-DEATH-IND         PIC X.
+000700         16  CF-ST-VFY-2ND-BENE             PIC X.
+000701         16  CF-ST-CAUSAL-STATE             PIC X.
+000702         16  CF-ST-EXTRA-INTEREST-PERIODS   PIC 9.
+000703         16  CF-ST-EXTRA-PAYMENTS           PIC 9.
+000704         16  CF-ST-AGENT-SIG-EDIT           PIC X.
+000705             88  CF-ST-EDIT-FOR-SIG           VALUE 'Y'.
+000706         16  CF-ST-NET-ONLY-STATE           PIC X.
+000707             88  CF-ST-IS-NET-ONLY            VALUE 'Y'.
+000708         16  cf-commission-cap-required     pic x.
+000709         16  CF-ST-GA-COMMISSION-CAPS.
+000710             20  CF-ST-GA-COMM-CAP-SL       PIC S9V9(4) COMP-3.
+000711             20  CF-ST-GA-COMM-CAP-JL       PIC S9V9(4) COMP-3.
+000712             20  CF-ST-GA-COMM-CAP-SA       PIC S9V9(4) COMP-3.
+000713             20  CF-ST-GA-COMM-CAP-JA       PIC S9V9(4) COMP-3.
+000714         16  CF-ST-TOT-COMMISSION-CAPS.
+000715             20  CF-ST-TOT-COMM-CAP-SL      PIC S9V9(4) COMP-3.
+000716             20  CF-ST-TOT-COMM-CAP-JL      PIC S9V9(4) COMP-3.
+000717             20  CF-ST-TOT-COMM-CAP-SA      PIC S9V9(4) COMP-3.
+000718             20  CF-ST-TOT-COMM-CAP-JA      PIC S9V9(4) COMP-3.
+000719         16  FILLER                         PIC X(156).
+000720
+000721****************************************************************
+000722*             BENEFIT MASTER RECORD                            *
+000723****************************************************************
+000724
+000725     12  CF-BENEFIT-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+000726         16  CF-BENEFIT-CONTROLS  OCCURS 8 TIMES.
+000727             20  CF-BENEFIT-CODE            PIC XX.
+000728             20  CF-BENEFIT-NUMERIC  REDEFINES
+000729                 CF-BENEFIT-CODE            PIC XX.
+000730             20  CF-BENEFIT-ALPHA           PIC XXX.
+000731             20  CF-BENEFIT-DESCRIP         PIC X(10).
+000732             20  CF-BENEFIT-COMMENT         PIC X(10).
+000733
+000734             20  CF-LF-COVERAGE-TYPE        PIC X.
+000735                 88  CF-REDUCING                VALUE 'R'.
+000736                 88  CF-LEVEL                   VALUE 'L' 'P'.
+000737
+000738             20  CF-SPECIAL-CALC-CD         PIC X.
+000739                 88  CF-ALTERNATE-NET-PAY       VALUE 'A'.
+000740                 88  CF-NP-0-MO-INT             VALUE 'A'.
+000741                 88  CF-OB-OFFLINE-RESERVED     VALUE 'B'.
+000742                 88  CF-CRITICAL-PERIOD         VALUE 'C'.
+000743                 88  CF-TERM-IN-DAYS            VALUE 'D'.
+000744                 88  CF-USE-PREMIUM-AS-ENTERED  VALUE 'E'.
+000745                 88  CF-FARM-PLAN               VALUE 'F'.
+000746                 88  CF-RATE-AS-STANDARD        VALUE 'G'.
+000747                 88  CF-2-MTH-INTEREST          VALUE 'I'.
+000748                 88  CF-3-MTH-INTEREST          VALUE 'J'.
+000749                 88  CF-4-MTH-INTEREST          VALUE 'K'.
+000750                 88  CF-BALLOON-LAST-PMT        VALUE 'L'.
+000751                 88  CF-MORTGAGE-PROCESSING     VALUE 'M'.
+000752                 88  CF-PRUDENTIAL              VALUE 'P'.
+000753                 88  CF-OUTSTANDING-BAL         VALUE 'O'.
+000754                 88  CF-TRUNCATED-LIFE          VALUE 'T'.
+000755                 88  CF-TRUNCATED-LIFE-ONE      VALUE 'U'.
+000756                 88  CF-TRUNCATED-LIFE-TWO      VALUE 'V'.
+000757                 88  CF-NET-PAY-SIMPLE          VALUE 'S'.
+000758                 88  CF-SUMMARY-PROCESSING      VALUE 'Z'.
+000759
+000760             20  CF-JOINT-INDICATOR         PIC X.
+000761                 88  CF-JOINT-COVERAGE          VALUE 'J'.
+000762
+000763*            20  FILLER                     PIC X(12).
+000764             20  cf-maximum-benefits        pic s999 comp-3.
+000765             20  FILLER                     PIC X(09).
+000766             20  CF-BENEFIT-CATEGORY        PIC X.
+000767             20  CF-LOAN-TYPE               PIC X(8).
+000768
+000769             20  CF-CO-REM-TERM-CALC        PIC X.
+000770                 88  CO-EARN-AFTER-15TH         VALUE '1'.
+000771                 88  CO-EARN-ON-HALF-MO         VALUE '2'.
+000772                 88  CO-EARN-ON-1ST-DAY         VALUE '3'.
+000773                 88  CO-EARN-ON-FULL-MO         VALUE '4'.
+000774                 88  CO-EARN-WITH-NO-DAYS       VALUE '5'.
+000775
+000776             20  CF-CO-EARNINGS-CALC        PIC X.
+000777                 88  CO-EARN-BY-R78             VALUE '1'.
+000778                 88  CO-EARN-BY-PRO-RATA        VALUE '2'.
+000779                 88  CO-EARN-AS-CALIF           VALUE '3'.
+000780                 88  CO-EARN-AS-TEXAS           VALUE '4'.
+000781                 88  CO-EARN-IS-NET-PAY         VALUE '5'.
+000782                 88  CO-EARN-ANTICIPATION       VALUE '6'.
+000783                 88  CO-EARN-AS-MEAN            VALUE '8'.
+000784                 88  CO-EARN-AS-REG-BALLOON     VALUE 'B'.
+000785
+000786             20  CF-CO-REFUND-CALC          PIC X.
+000787                 88  CO-REFUND-NOT-USED         VALUE SPACE.
+000788                 88  CO-REFD-BY-R78             VALUE '1'.
+000789                 88  CO-REFD-BY-PRO-RATA        VALUE '2'.
+000790                 88  CO-REFD-AS-CALIF           VALUE '3'.
+000791                 88  CO-REFD-AS-TEXAS           VALUE '4'.
+000792                 88  CO-REFD-IS-NET-PAY         VALUE '5'.
+000793                 88  CO-REFD-ANTICIPATION       VALUE '6'.
+000794                 88  CO-REFD-MEAN               VALUE '8'.
+000795                 88  CO-REFD-SUM-OF-DIGITS      VALUE '9'.
+000796                 88  CO-REFD-AS-REG-BALLOON     VALUE 'B'.
+000797                 88  CO-REFD-GAP-NON-REFUND     VALUE 'G'.
+000798
+000799             20  CF-CO-OVRD-EARNINGS-CALC   PIC X.
+000800                 88  CO-OVERRIDE-NOT-USED       VALUE SPACE.
+000801                 88  CO-OVRD-BY-R78             VALUE '1'.
+000802                 88  CO-OVRD-BY-PRO-RATA        VALUE '2'.
+000803                 88  CO-OVRD-AS-CALIF           VALUE '3'.
+000804                 88  CO-OVRD-AS-TEXAS           VALUE '4'.
+000805                 88  CO-OVRD-IS-NET-PAY         VALUE '5'.
+000806                 88  CO-OVRD-ANTICIPATION       VALUE '6'.
+000807                 88  CO-OVRD-MEAN               VALUE '8'.
+000808                 88  CO-OVRD-AS-REG-BALLOON     VALUE 'B'.
+000809
+000810             20  CF-CO-BEN-I-G-CD           PIC X.
+000811                 88  CO-BEN-I-G-NOT-USED        VALUE SPACE.
+000812                 88  CO-BEN-I-G-IS-INDV         VALUE 'I'.
+000813                 88  CO-BEN-I-G-IS-GRP          VALUE 'G'.
+000814
+000815         16  FILLER                         PIC X(304).
+000816
+000817
+000818****************************************************************
+000819*             CARRIER MASTER RECORD                            *
+000820****************************************************************
+000821
+000822     12  CF-CARRIER-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+000823         16  CF-ADDRESS-DATA.
+000824             20  CF-MAIL-TO-NAME            PIC X(30).
+000825             20  CF-IN-CARE-OF              PIC X(30).
+000826             20  CF-ADDRESS-LINE-1          PIC X(30).
+000827             20  CF-ADDRESS-LINE-2          PIC X(30).
+000828             20  CF-CITY-STATE              PIC X(30).
+000829             20  CF-ZIP-CODE-NUM            PIC 9(9)      COMP-3.
+000830             20  CF-PHONE-NO                PIC 9(11)     COMP-3.
+000831
+000832         16  CF-CLAIM-NO-CONTROL.
+000833             20  CF-CLAIM-NO-METHOD         PIC X.
+000834                 88  CLAIM-NO-MANUAL            VALUE '1'.
+000835                 88  CLAIM-NO-Y-M-SEQ           VALUE '2'.
+000836                 88  CLAIM-NO-SEQ               VALUE '3'.
+000837                 88  CLAIM-NO-ALPHA-SEQ         VALUE '5'.
+000838             20  CF-CLAIM-COUNTER           PIC S9(8)   COMP.
+000839                 88  CLAIM-CNT-RESET-IF-SEQ     VALUE +9999999.
+000840                 88  CLAIM-CNT-RESET-IF-YRMO    VALUE +99999.
+000841                 88  CLAIM-CNT-RESET-IF-YRALPHA VALUE +9999.
+000842
+000843         16  CF-CHECK-NO-CONTROL.
+000844             20  CF-CHECK-NO-METHOD         PIC X.
+000845                 88  CHECK-NO-MANUAL            VALUE '1'.
+000846                 88  CHECK-NO-AUTO-SEQ          VALUE '2'.
+000847                 88  CHECK-NO-CARR-SEQ          VALUE '3'.
+000848                 88  CHECK-NO-AT-PRINT          VALUE '4'.
+000849             20  CF-CHECK-COUNTER           PIC S9(8)   COMP.
+000850                 88  CHECK-CNT-RESET-VALUE      VALUE +999999.
+000851
+000852         16  CF-DOMICILE-STATE              PIC XX.
+000853
+000854         16  CF-EXPENSE-CONTROLS.
+000855             20  CF-EXPENSE-METHOD          PIC X.
+000856                 88  EXPENSE-CALC-MANUAL        VALUE '1'.
+000857                 88  DOLLARS-PER-PMT            VALUE '2'.
+000858                 88  PERCENT-OF-PAYMENT         VALUE '3'.
+000859                 88  DOLLARS-PER-MONTH          VALUE '4'.
+000860             20  CF-EXPENSE-PERCENT         PIC S999V99   COMP-3.
+000861             20  CF-EXPENSE-DOLLAR          PIC S999V99   COMP-3.
+000862
+000863         16  CF-CORRESPONDENCE-CONTROL.
+000864             20  CF-LETTER-RESEND-OPT       PIC X.
+000865                 88  LETTERS-NOT-ARCHIVED       VALUE SPACE.
+000866                 88  LETTERS-ARE-ARCHIVED       VALUE '1'.
+000867             20  FILLER                     PIC X(4).
+000868
+000869         16  CF-RESERVE-CONTROLS.
+000870             20  CF-MANUAL-SW               PIC X.
+000871                 88  CF-MANUAL-RESERVES-USED    VALUE '1'.
+000872             20  CF-FUTURE-SW               PIC X.
+000873                 88  CF-FUTURE-RESERVES-USED    VALUE '1'.
+000874             20  CF-PTC-SW                  PIC X.
+000875                 88  CF-PAY-TO-CURRENT-USED     VALUE '1'.
+000876             20  CF-IBNR-SW                 PIC X.
+000877                 88  CF-IBNR-RESERVES-USED      VALUE '1'.
+000878             20  CF-PTC-LF-SW               PIC X.
+000879                 88  CF-LF-PTC-USED             VALUE '1'.
+000880             20  CF-CDT-ACCESS-METHOD       PIC X.
+000881                 88  CF-CDT-ROUND-NEAR          VALUE '1'.
+000882                 88  CF-CDT-ROUND-HIGH          VALUE '2'.
+000883                 88  CF-CDT-INTERPOLATED        VALUE '3'.
+000884             20  CF-PERCENT-OF-CDT          PIC S999V99   COMP-3.
+000885
+000886         16  CF-CLAIM-CALC-METHOD           PIC X.
+000887             88  360-PLUS-MONTHS                VALUE '1'.
+000888             88  365-PLUS-MONTHS                VALUE '2'.
+000889             88  FULL-MONTHS-ACTUAL-DAY         VALUE '3'.
+000890             88  360-DAILY                      VALUE '4'.
+000891             88  365-DAILY                      VALUE '5'.
+000892
+000893         16  CF-LAST-ALPHA-CHARACTER        PIC X.
+000894         16  FILLER                         PIC X(11).
+000895
+000896         16  CF-LIMIT-AMOUNTS.
+000897             20  CF-CALC-AMT-TOL            PIC S999V99   COMP-3.
+000898             20  CF-MAX-REG-PMT             PIC S9(7)V99  COMP-3.
+000899             20  CF-MAX-REG-DAYS            PIC S999      COMP-3.
+000900             20  CF-MAX-AUTO-PMT            PIC S9(7)V99  COMP-3.
+000901             20  CF-MAX-AUTO-MOS            PIC S999      COMP-3.
+000902             20  CF-CALC-DAYS-TOL           PIC S999      COMP-3.
+000903             20  CF-CR-TOL-PREM             PIC S999V99   COMP-3.
+000904             20  CF-CR-TOL-REFUND           PIC S999V99   COMP-3.
+000905             20  CF-CR-TOL-PREM-PCT         PIC S9V9(4)   COMP-3.
+000906             20  CF-CR-TOL-REFUND-PCT       PIC S9V9(4)   COMP-3.
+000907
+000908         16  CF-DAYS-BEFORE-CLOSED          PIC S999      COMP-3.
+000909         16  CF-MONTHS-BEFORE-PURGED        PIC S999      COMP-3.
+000910         16  CF-IBNR-PERCENT                PIC S9V9(4)   COMP-3.
+000911
+000912         16  CF-ZIP-CODE.
+000913             20  CF-ZIP-PRIME.
+000914                 24  CF-ZIP-1ST             PIC X.
+000915                     88  CF-CANADIAN-POST-CODE VALUE 'A' THRU 'Z'.
+000916                 24  FILLER                 PIC X(4).
+000917             20  CF-ZIP-PLUS4               PIC X(4).
+000918         16  CF-CANADIAN-POSTAL-CODE REDEFINES CF-ZIP-CODE.
+000919             20  CF-CAN-POSTAL-1            PIC XXX.
+000920             20  CF-CAN-POSTAL-2            PIC XXX.
+000921             20  FILLER                     PIC XXX.
+000922
+000923         16  CF-IBNR-UEPRM-PERCENT          PIC S9V9(4) COMP-3.
+000924         16  CF-IBNR-R78-PERCENT            PIC S9V9(4) COMP-3.
+000925         16  CF-IBNR-PRO-PERCENT            PIC S9V9(4) COMP-3.
+000926
+000927         16  CF-RATING-SWITCH               PIC X.
+000928             88  CF-PERFORM-RATING              VALUE ' ' 'Y'.
+000929             88  CF-NO-RATING                   VALUE 'N'.
+000930
+000931         16  CF-BUILD-RETRIEVE-AFTER-MONTHS PIC 99.
+000932
+000933         16  CF-CARRIER-OVER-SHORT.
+000934             20 CF-CR-OVR-SHT-AMT           PIC S999V99   COMP-3.
+000935             20 CF-CR-OVR-SHT-PCT           PIC S9V9(4)   COMP-3.
+000936
+000937         16  CF-CARRIER-CLP-TOL-PCT         PIC S9V9(4)   COMP-3.
+000938         16  CF-SECPAY-SWITCH               PIC X.
+000939             88  CF-SECURE-PAY-CARRIER          VALUE 'Y'.
+000940             88  CF-NO-SECURE-PAY               VALUE ' ' 'N'.
+000941         16  CF-CARRIER-LEASE-COMM          PIC S9(5)V99  COMP-3.
+000942         16  CF-CARRIER-NEXT-AUDIT-CHK-NO   PIC S9(8)     COMP.
+000943         16  FILLER                         PIC X(444).
+000944*        16  FILLER                         PIC X(452).
+000945
+000946
+000947****************************************************************
+000948*             MORTALITY MASTER RECORD                          *
+000949****************************************************************
+000950
+000951     12  CF-MORTALITY-MASTER-REC REDEFINES  CF-RECORD-BODY.
+000952         16  CF-MORT-TABLE-LINE OCCURS  9  TIMES
+000953                                INDEXED BY CF-MORT-NDX.
+000954             20  CF-MORT-TABLE              PIC X(5).
+000955             20  CF-MORT-TABLE-TYPE         PIC X.
+000956                 88  CF-MORT-JOINT              VALUE 'J'.
+000957                 88  CF-MORT-SINGLE             VALUE 'S'.
+000958                 88  CF-MORT-COMBINED           VALUE 'C'.
+000959                 88  CF-MORT-TYPE-VALID-C       VALUE 'J' 'S'.
+000960                 88  CF-MORT-TYPE-VALID-M       VALUE 'J' 'S' 'C'.
+000961             20  CF-MORT-INTEREST           PIC SV9(4)  COMP-3.
+000962             20  CF-MORT-AGE-METHOD         PIC XX.
+000963                 88  CF-AGE-LAST                VALUE 'AL'.
+000964                 88  CF-AGE-NEAR                VALUE 'AN'.
+000965             20  CF-MORT-RESERVE-ADJUSTMENT PIC S9V9(4) COMP-3.
+000966             20  CF-MORT-ADJUSTMENT-DIRECTION
+000967                                            PIC X.
+000968                 88  CF-MINUS                   VALUE '-'.
+000969                 88  CF-PLUS                    VALUE '+'.
+000970             20  CF-MORT-JOINT-FACTOR       PIC S9V9(4) COMP-3.
+000971             20  CF-MORT-JOINT-CODE         PIC X.
+000972                 88  CF-VALID-JOINT-CODE        VALUE 'A' 'V'.
+000973             20  CF-MORT-PC-Q               PIC X.
+000974                 88  CF-VALID-PC-Q              VALUE 'Y' 'N' ' '.
+000975             20  CF-MORT-TABLE-CODE         PIC X(4).
+000976             20  CF-MORT-COMMENTS           PIC X(15).
+000977             20  FILLER                     PIC X(14).
+000978
+000979         16  FILLER                         PIC X(251).
+000980
+000981
+000982****************************************************************
+000983*             BUSSINESS TYPE MASTER RECORD                     *
+000984****************************************************************
+000985
+000986     12  CF-BUSINESS-TYPE-MASTER-REC REDEFINES  CF-RECORD-BODY.
+000987* FIRST ENTRY IS TYPE 01.. LAST IS TYPE 20
+000988* RECORD 02 IS TYPES 21-40..RECORD 03 IS 41-60..04 IS 61-80
+000989* AND RECORD 05 IS TYPES 81-99
+000990         16  CF-TYPE-DESCRIPTIONS   OCCURS  20  TIMES.
+000991             20  CF-BUSINESS-TITLE          PIC  X(19).
+000992             20  CF-BUS-MOD-ST-TRGT-LOSS-RATIO
+000993                                            PIC S9V9(4) COMP-3.
+000994             20  CF-BUS-EXCL-ST-CALL        PIC  X.
+000995             20  FILLER                     PIC  X.
+000996         16  FILLER                         PIC  X(248).
+000997
+000998
+000999****************************************************************
+001000*             TERMINAL MASTER RECORD                           *
+001001****************************************************************
+001002
+001003     12  CF-TERMINAL-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+001004
+001005         16  CF-COMPANY-TERMINALS.
+001006             20  CF-TERMINAL-ID  OCCURS 120 TIMES
+001007                                  PIC X(4).
+001008         16  FILLER               PIC X(248).
+001009
+001010
+001011****************************************************************
+001012*             LIFE EDIT MASTER RECORD                          *
+001013****************************************************************
+001014
+001015     12  CF-LIFE-EDIT-MASTER-REC REDEFINES  CF-RECORD-BODY.
+001016         16  CF-LIFE-EDIT-ENTRIES   OCCURS 120  TIMES.
+001017             20  CF-LIFE-CODE-IN            PIC XX.
+001018             20  CF-LIFE-CODE-OUT           PIC XX.
+001019         16  FILLER                         PIC X(248).
+001020
+001021
+001022****************************************************************
+001023*             AH EDIT MASTER RECORD                            *
+001024****************************************************************
+001025
+001026     12  CF-AH-EDIT-MASTER-REC REDEFINES  CF-RECORD-BODY.
+001027         16  CF-AH-EDIT-ENTRIES   OCCURS  96  TIMES.
+001028             20  CF-AH-CODE-IN              PIC XXX.
+001029             20  CF-AH-CODE-OUT             PIC XX.
+001030         16  FILLER                         PIC X(248).
+001031
+001032
+001033****************************************************************
+001034*             CREDIBILITY TABLES                               *
+001035****************************************************************
+001036
+001037     12  CF-CREDIBILITY-MASTER-REC REDEFINES  CF-RECORD-BODY.
+001038         16  CF-CRDB-ENTRY   OCCURS 36 TIMES
+001039                             INDEXED BY CF-CRDB-NDX.
+001040             20  CF-CRDB-FROM               PIC S9(7)   COMP-3.
+001041             20  CF-CRDB-TO                 PIC S9(7)   COMP-3.
+001042             20  CF-CREDIBILITY-FACTOR      PIC S9V9(4) COMP-3.
+001043         16  FILLER                         PIC  X(332).
+001044
+001045
+001046****************************************************************
+001047*             REPORT CUSTOMIZATION RECORD                      *
+001048****************************************************************
+001049
+001050     12  CF-CUSTOM-REPORT-REC  REDEFINES  CF-RECORD-BODY.
+001051         16  CF-ACCOUNT-MASTER-STATUS       PIC X.
+001052             88  CF-ACTIVE-ACCOUNTS             VALUE 'A'.
+001053             88  CF-INACTIVE-ACCOUNTS           VALUE 'I'.
+001054             88  CF-CANCELLED-ACCOUNTS          VALUE 'C'.
+001055**** NOTE: INACTIVE WILL INCLUDE ACCOUNT MASTER CODED WITH ****
+001056****       A T-TRANSFER.                                   ****
+001057             88  CF-ALL-ACCOUNTS                VALUE 'B'.
+001058
+001059         16  FILLER                         PIC XX.
+001060
+001061         16  CF-CARRIER-CNTL-OPT.
+001062             20  CF-CARRIER-OPT-SEQ         PIC 9.
+001063                 88  CF-CARRIER-OPT-USED        VALUE 1 THRU 6.
+001064                 88  CF-CARRIER-OPT-NOT-USED    VALUE 0.
+001065             20  CF-CARRIER-SELECT OCCURS 3 TIMES
+001066                                            PIC X.
+001067         16  CF-GROUP-CNTL-OPT.
+001068             20  CF-GROUP-OPT-SEQ           PIC 9.
+001069                 88  CF-GROUP-OPT-USED          VALUE 1 THRU 6.
+001070                 88  CF-GROUP-OPT-NOT-USED      VALUE 0.
+001071             20  CF-GROUP-SELECT OCCURS 3 TIMES
+001072                                            PIC X(6).
+001073         16  CF-STATE-CNTL-OPT.
+001074             20  CF-STATE-OPT-SEQ           PIC 9.
+001075                 88  CF-STATE-OPT-USED          VALUE 1 THRU 6.
+001076                 88  CF-STATE-OPT-NOT-USED      VALUE 0.
+001077             20  CF-STATE-SELECT OCCURS 3 TIMES
+001078                                            PIC XX.
+001079         16  CF-ACCOUNT-CNTL-OPT.
+001080             20  CF-ACCOUNT-OPT-SEQ         PIC 9.
+001081                 88  CF-ACCOUNT-OPT-USED        VALUE 1 THRU 6.
+001082                 88  CF-ACCOUNT-OPT-NOT-USED    VALUE 0.
+001083             20  CF-ACCOUNT-SELECT OCCURS 3 TIMES
+001084                                            PIC X(10).
+001085         16  CF-BUS-TYP-CNTL-OPT.
+001086             20  CF-BUS-TYP-OPT-SEQ         PIC 9.
+001087                 88  CF-BUS-TYP-OPT-USED        VALUE 1 THRU 6.
+001088                 88  CF-BUS-TYP-OPT-NOT-USED    VALUE 0.
+001089             20  CF-BUS-TYP-SELECT OCCURS 3 TIMES
+001090                                            PIC XX.
+001091         16  CF-LF-TYP-CNTL-OPT.
+001092             20  CF-LF-TYP-OPT-SEQ          PIC 9.
+001093                 88  CF-LF-TYP-OPT-USED         VALUE 1 THRU 6.
+001094                 88  CF-LF-TYP-OPT-NOT-USED     VALUE 0.
+001095             20  CF-BUS-LF-SELECT OCCURS 3 TIMES
+001096                                            PIC XX.
+001097         16  CF-AH-TYP-CNTL-OPT.
+001098             20  CF-AH-TYP-OPT-SEQ          PIC 9.
+001099                 88  CF-AH-TYP-OPT-USED         VALUE 1 THRU 6.
+001100                 88  CF-AH-TYP-OPT-NOT-USED     VALUE 0.
+001101             20  CF-BUS-AH-SELECT OCCURS 3 TIMES
+001102                                            PIC XX.
+001103         16  CF-REPTCD1-CNTL-OPT.
+001104             20  CF-REPTCD1-OPT-SEQ         PIC 9.
+001105                 88  CF-REPTCD1-OPT-USED        VALUE 1 THRU 6.
+001106                 88  CF-REPTCD1-OPT-NOT-USED    VALUE 0.
+001107             20  CF-REPTCD1-SELECT OCCURS 3 TIMES
+001108                                            PIC X(10).
+001109         16  CF-REPTCD2-CNTL-OPT.
+001110             20  CF-REPTCD2-OPT-SEQ         PIC 9.
+001111                 88  CF-REPTCD2-OPT-USED        VALUE 1 THRU 6.
+001112                 88  CF-REPTCD2-OPT-NOT-USED    VALUE 0.
+001113             20  CF-REPTCD2-SELECT OCCURS 3 TIMES
+001114                                            PIC X(10).
+001115         16  CF-USER1-CNTL-OPT.
+001116             20  CF-USER1-OPT-SEQ           PIC 9.
+001117                 88  CF-USER1-OPT-USED          VALUE 1 THRU 6.
+001118                 88  CF-USER1-OPT-NOT-USED      VALUE 0.
+001119             20  CF-USER1-SELECT OCCURS 3 TIMES
+001120                                            PIC X(10).
+001121         16  CF-USER2-CNTL-OPT.
+001122             20  CF-USER2-OPT-SEQ           PIC 9.
+001123                 88  CF-USER2-OPT-USED          VALUE 1 THRU 6.
+001124                 88  CF-USER2-OPT-NOT-USED      VALUE 0.
+001125             20  CF-USER2-SELECT OCCURS 3 TIMES
+001126                                            PIC X(10).
+001127         16  CF-USER3-CNTL-OPT.
+001128             20  CF-USER3-OPT-SEQ           PIC 9.
+001129                 88  CF-USER3-OPT-USED          VALUE 1 THRU 6.
+001130                 88  CF-USER3-OPT-NOT-USED      VALUE 0.
+001131             20  CF-USER3-SELECT OCCURS 3 TIMES
+001132                                            PIC X(10).
+001133         16  CF-USER4-CNTL-OPT.
+001134             20  CF-USER4-OPT-SEQ           PIC 9.
+001135                 88  CF-USER4-OPT-USED          VALUE 1 THRU 6.
+001136                 88  CF-USER4-OPT-NOT-USED      VALUE 0.
+001137             20  CF-USER4-SELECT OCCURS 3 TIMES
+001138                                            PIC X(10).
+001139         16  CF-USER5-CNTL-OPT.
+001140             20  CF-USER5-OPT-SEQ           PIC 9.
+001141                 88  CF-USER5-OPT-USED          VALUE 1 THRU 6.
+001142                 88  CF-USER5-OPT-NOT-USED      VALUE 0.
+001143             20  CF-USER5-SELECT OCCURS 3 TIMES
+001144                                            PIC X(10).
+001145         16  CF-REINS-CNTL-OPT.
+001146             20  CF-REINS-OPT-SEQ           PIC 9.
+001147                 88  CF-REINS-OPT-USED          VALUE 1 THRU 6.
+001148                 88  CF-REINS-OPT-NOT-USED      VALUE 0.
+001149             20  CF-REINS-SELECT OCCURS 3 TIMES.
+001150                 24  CF-REINS-PRIME         PIC XXX.
+001151                 24  CF-REINS-SUB           PIC XXX.
+001152
+001153         16  CF-AGENT-CNTL-OPT.
+001154             20  CF-AGENT-OPT-SEQ           PIC 9.
+001155                 88  CF-AGENT-OPT-USED          VALUE 1 THRU 6.
+001156                 88  CF-AGENT-OPT-NOT-USED      VALUE 0.
+001157             20  CF-AGENT-SELECT OCCURS 3 TIMES
+001158                                            PIC X(10).
+001159
+001160         16  FILLER                         PIC X(43).
+001161
+001162         16  CF-LOSS-RATIO-SELECT.
+001163             20  CF-SEL-LO-LOSS-RATIO       PIC S999V99  COMP-3.
+001164             20  CF-SEL-HI-LOSS-RATIO       PIC S999V99  COMP-3.
+001165         16  CF-ENTRY-DATE-SELECT.
+001166             20  CF-SEL-LO-ENTRY-DATE       PIC XX.
+001167             20  CF-SEL-HI-ENTRY-DATE       PIC XX.
+001168         16  CF-EFFECTIVE-DATE-SELECT.
+001169             20  CF-SEL-LO-EFFECTIVE-DATE   PIC XX.
+001170             20  CF-SEL-HI-EFFECTIVE-DATE   PIC XX.
+001171
+001172         16  CF-EXCEPTION-LIST-IND          PIC X.
+001173             88  CF-EXCEPTION-LIST-REQUESTED VALUE 'Y'.
+001174
+001175         16  FILLER                         PIC X(318).
+001176
+001177****************************************************************
+001178*                  EXCEPTION REPORTING RECORD                  *
+001179****************************************************************
+001180
+001181     12  CF-EXCEPTION-REPORT-REC REDEFINES   CF-RECORD-BODY.
+001182         16  CF-ACCOUNTS-LT-ONE-YEAR        PIC X.
+001183             88  CF-EXCEPTION-ACCTS-WITHIN-ONE  VALUE 'Y'.
+001184
+001185         16  CF-COMBINED-LIFE-AH-OPT.
+001186             20  CF-ISS-COUNT-DIFF          PIC S9(05)     COMP-3.
+001187             20  CF-SINGLE-MO-PREM-PCT      PIC S9(02).
+001188             20  CF-EARN-PREM-DECR-PCT      PIC S9(02).
+001189             20  CF-CANCELLATION-RATIO      PIC S9(02).
+001190
+001191         16  CF-LIFE-OPT.
+001192             20  CF-LF-LOSS-RATIO-PCT       PIC S9(03)     COMP-3.
+001193             20  CF-LF-LTM-LOSS-RATIO       PIC S9(03)     COMP-3.
+001194             20  CF-LF-PERIOD-PROFIT        PIC S9(03)     COMP-3.
+001195             20  CF-LF-LTM-PROFIT-PCT       PIC S9(02)V9   COMP-3.
+001196             20  CF-LF-LTM-INFORCE-DECR     PIC S9(02)V9   COMP-3.
+001197             20  CF-LF-LTM-TERM-CHG         PIC S9(02)V9   COMP-3.
+001198             20  CF-LF-TERM-AVG-WEIGHTED    PIC S9(02)V9   COMP-3.
+001199             20  CF-LF-LTM-AGE-PCT          PIC S9(02)V9   COMP-3.
+001200             20  CF-LF-AGE-AVG-WEIGHTED     PIC S9(02)V9   COMP-3.
+001201             20  CF-LF-AVG-AGE-MAX          PIC S9(02).
+001202
+001203         16  CF-AH-OPT.
+001204             20  CF-AH-LOSS-RATIO-PCT       PIC S9(03)     COMP-3.
+001205             20  CF-AH-LTM-LOSS-RATIO       PIC S9(03)     COMP-3.
+001206             20  CF-AH-PERIOD-PROFIT        PIC S9(03)     COMP-3.
+001207             20  CF-AH-LTM-PROFIT-PCT       PIC S9(02)V9   COMP-3.
+001208             20  CF-AH-LTM-INFORCE-DECR     PIC S9(02)V9   COMP-3.
+001209             20  CF-AH-LTM-TERM-CHG         PIC S9(02)V9   COMP-3.
+001210             20  CF-AH-TERM-AVG-WEIGHTED    PIC S9(02)V9   COMP-3.
+001211             20  CF-AH-LTM-AGE-PCT          PIC S9(02)V9   COMP-3.
+001212             20  CF-AH-AGE-AVG-WEIGHTED     PIC S9(02)V9   COMP-3.
+001213             20  CF-AH-AVG-AGE-MAX          PIC S9(02).
+001214
+001215         16  CF-ACCT-ZERO-MONTH-PRODUCTION PIC X.
+001216             88  CF-ACCT-CURRENT-MONTH-ACT      VALUE 'A'.
+001217             88  CF-ACCT-WITH-NO-PRODUCTION     VALUE 'B'.
+001218             88  CF-ACCT-WITH-ISSUE-ACTIVITY    VALUE 'C'.
+001219
+001220         16  CF-RETENTION-LIMIT             PIC S9(7)      COMP-3.
+001221
+001222         16  FILLER                         PIC X(673).
+001223
+001224
+001225****************************************************************
+001226*             MORTGAGE SYSTEM PLAN RECORD                      *
+001227****************************************************************
+001228
+001229     12  CF-MORTGAGE-PLAN-MASTER  REDEFINES  CF-RECORD-BODY.
+001230         16  CF-PLAN-TYPE                   PIC X.
+001231             88  CF-LIFE-MORT-PLAN             VALUE 'L'.
+001232             88  CF-DISAB-MORT-PLAN            VALUE 'D'.
+001233             88  CF-AD-D-MORT-PLAN             VALUE 'A'.
+001234         16  CF-PLAN-ABBREV                 PIC XXX.
+001235         16  CF-PLAN-DESCRIPT               PIC X(10).
+001236         16  CF-PLAN-NOTES                  PIC X(20).
+001237         16  CF-PLAN-ESTABLISH-DATE         PIC XX.
+001238         16  CF-PLAN-UNDERWRITING.
+001239             20  CF-PLAN-TERM-DATA.
+001240                 24  CF-MINIMUM-TERM        PIC S999      COMP-3.
+001241                 24  CF-MAXIMUM-TERM        PIC S999      COMP-3.
+001242             20  CF-PLAN-AGE-DATA.
+001243                 24  CF-MINIMUM-AGE         PIC S999      COMP-3.
+001244                 24  CF-MAXIMUM-AGE         PIC S999      COMP-3.
+001245                 24  CF-MAXIMUM-ATTAIN-AGE  PIC S999      COMP-3.
+001246             20  CF-PLAN-BENEFIT-DATA.
+001247                 24  CF-MINIMUM-BENEFIT     PIC S9(7)V99  COMP-3.
+001248                 24  CF-MAXIMUM-BENEFIT     PIC S9(7)V99  COMP-3.
+001249                 24  CF-MAXIMUM-MONTHLY-BENEFIT
+001250                                            PIC S9(7)V99  COMP-3.
+001251         16  CF-PLAN-POLICY-FORMS.
+001252             20  CF-POLICY-FORM             PIC X(12).
+001253             20  CF-MASTER-APPLICATION      PIC X(12).
+001254             20  CF-MASTER-POLICY           PIC X(12).
+001255         16  CF-PLAN-RATING.
+001256             20  CF-RATE-CODE               PIC X(5).
+001257             20  CF-SEX-RATING              PIC X.
+001258                 88  CF-PLAN-NOT-SEX-RATED     VALUE '1'.
+001259                 88  CF-PLAN-SEX-RATED         VALUE '2'.
+001260             20  CF-SUB-STD-PCT             PIC S9V9999   COMP-3.
+001261             20  CF-SUB-STD-TYPE            PIC X.
+001262                 88  CF-PCT-OF-PREM            VALUE '1'.
+001263                 88  CF-PCT-OF-BENE            VALUE '2'.
+001264         16  CF-PLAN-PREM-TOLERANCES.
+001265             20  CF-PREM-TOLERANCE          PIC S999      COMP-3.
+001266             20  CF-PREM-TOLERANCE-PCT      PIC SV999     COMP-3.
+001267         16  CF-PLAN-PYMT-TOLERANCES.
+001268             20  CF-PYMT-TOLERANCE          PIC S999      COMP-3.
+001269             20  CF-PYMT-TOLERANCE-PCT      PIC SV999     COMP-3.
+001270         16  CF-PLAN-MISC-DATA.
+001271             20  FILLER                     PIC X.
+001272             20  CF-FREE-EXAM-DAYS          PIC S999      COMP-3.
+001273             20  CF-RETRO-RETENTION         PIC S9V9999   COMP-3.
+001274         16  CF-MORT-PLAN-USE-CTR           PIC S999      COMP-3.
+001275         16  CF-PLAN-IND-GRP                PIC X.
+001276             88  CF-MORT-INDIV-PLAN            VALUE 'I'
+001277                                                     '1'.
+001278             88  CF-MORT-GROUP-PLAN            VALUE 'G'
+001279                                                     '2'.
+001280         16  CF-MIB-SEARCH-SW               PIC X.
+001281             88  CF-MIB-SEARCH-ALL             VALUE '1'.
+001282             88  CF-MIB-SEARCH-NONE            VALUE '2'.
+001283             88  CF-MIB-SEARCH-EXCEEDED        VALUE '3'.
+001284             88  CF-MIB-SEARCH-VALID      VALUES ARE '1' '2' '3'.
+001285         16  CF-ALPHA-SEARCH-SW             PIC X.
+001286             88  CF-MIB-ALPHA-ALL              VALUE '1'.
+001287             88  CF-MIB-ALPHA-NONE             VALUE '2'.
+001288             88  CF-MIB-APLHA-EXCEEDED         VALUE '3'.
+001289             88  CF-CLIENT-ALPHA-ALL           VALUE 'A'.
+001290             88  CF-CLIENT-ALPHA-NONE          VALUE 'B'.
+001291             88  CF-CLIENT-APLHA-EXCEEDED      VALUE 'C'.
+001292             88  CF-BOTH-ALPHA-ALL             VALUE 'X'.
+001293             88  CF-BOTH-ALPHA-NONE            VALUE 'Y'.
+001294             88  CF-BOTH-APLHA-EXCEEDED        VALUE 'Z'.
+001295             88  CF-ALPHA-SEARCH-VALID    VALUES ARE '1' '2' '3'
+001296                                                     'A' 'B' 'C'
+001297                                                     'X' 'Y' 'Z'.
+001298         16  CF-EFF-DT-RULE-SW              PIC X.
+001299             88  CF-EFF-DT-ENTER               VALUE 'E'.
+001300             88  CF-EFF-DT-MONTH               VALUE 'M'.
+001301             88  CF-EFF-DT-QTR                 VALUE 'Q'.
+001302             88  CF-EFF-DT-SEMI                VALUE 'S'.
+001303             88  CF-EFF-DT-ANN                 VALUE 'A'.
+001304         16  FILLER                         PIC X(4).
+001305         16  CF-HEALTH-QUESTIONS            PIC X.
+001306             88  CF-VALID-QUESTIONS-CNT VALUES ARE '0' THRU '9'.
+001307         16  CF-GRACE-PERIOD                PIC S999      COMP-3.
+001308         16  CF-NUMBER-LAPSE-NOTICES        PIC S999      COMP-3.
+001309         16  CF-PLAN-SNGL-JNT               PIC X.
+001310             88  CF-COMBINED-PLAN              VALUE 'C'.
+001311             88  CF-JNT-PLAN                   VALUE 'J'.
+001312             88  CF-SNGL-PLAN                  VALUE 'S'.
+001313         16  CF-DAYS-TO-1ST-NOTICE          PIC  99.
+001314         16  CF-DAYS-TO-2ND-NOTICE          PIC  99.
+001315         16  CF-DAYS-TO-3RD-NOTICE          PIC  99.
+001316         16  CF-DAYS-TO-4TH-NOTICE          PIC  99.
+001317         16  CF-RERATE-CNTL                 PIC  X.
+001318             88  CF-RERATE-WITH-ISSUE-AGE       VALUE '1'.
+001319             88  CF-RERATE-WITH-CURRENT-AGE     VALUE '2'.
+001320             88  CF-DO-NOT-RERATE               VALUE '3' ' '.
+001321             88  CF-AUTO-RECALC                 VALUE '4'.
+001322         16  CF-BENEFIT-TYPE                PIC  X.
+001323             88  CF-BENEFIT-IS-LEVEL            VALUE '1'.
+001324             88  CF-BENEFIT-REDUCES             VALUE '2'.
+001325         16  CF-POLICY-FEE                  PIC S999V99
+001326                                                    COMP-3.
+001327         16  CF-1ST-NOTICE-FORM             PIC  X(04).
+001328         16  CF-2ND-NOTICE-FORM             PIC  X(04).
+001329         16  CF-3RD-NOTICE-FORM             PIC  X(04).
+001330         16  CF-4TH-NOTICE-FORM             PIC  X(04).
+001331         16  FILLER                         PIC  X(32).
+001332         16  CF-TERMINATION-FORM            PIC  X(04).
+001333         16  FILLER                         PIC  X(08).
+001334         16  CF-CLAIM-CAP                   PIC S9(7)V99
+001335                                                       COMP-3.
+001336         16  CF-REOCCURRING-DISABILITY-PRD  PIC S999   COMP-3.
+001337         16  CF-ISSUE-LETTER                PIC  X(4).
+001338         16  CF-YEARS-TO-NEXT-RERATE        PIC  99.
+001339         16  CF-DEPENDENT-COVERAGE          PIC  X.
+001340             88  CF-YES-DEP-COV                 VALUE 'Y'.
+001341             88  CF-NO-DEP-COV             VALUES ARE 'N' ' '.
+001342         16  CF-MP-REFUND-CALC              PIC X.
+001343             88  CF-MP-REFUND-NOT-USED          VALUE SPACE.
+001344             88  CF-MP-REFD-BY-R78              VALUE '1'.
+001345             88  CF-MP-REFD-BY-PRO-RATA         VALUE '2'.
+001346             88  CF-MP-REFD-AS-CALIF            VALUE '3'.
+001347             88  CF-MP-REFD-AS-TEXAS            VALUE '4'.
+001348             88  CF-MP-REFD-IS-NET-PAY          VALUE '5'.
+001349             88  CF-MP-REFD-ANTICIPATION        VALUE '6'.
+001350             88  CF-MP-REFD-MEAN                VALUE '8'.
+001351         16  CF-ALT-RATE-CODE               PIC  X(5).
+001352
+001353
+001354         16  FILLER                         PIC X(498).
+001355****************************************************************
+001356*             MORTGAGE COMPANY MASTER RECORD                   *
+001357****************************************************************
+001358
+001359     12  CF-MORTG-COMPANY-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+001360         16  CF-MORTG-ALT-MORT-CODE         PIC X(4).
+001361         16  CF-MORTG-ACCESS-CONTROL        PIC X.
+001362             88  CF-MORT-ST-PROD-CNTL                VALUE ' '.
+001363             88  CF-MORT-CARR-GRP-ST-PROD-CNTL       VALUE '1'.
+001364             88  CF-MORT-CARR-ST-PROD-CNTL           VALUE '2'.
+001365             88  CF-MORT-PROD-CNTL                   VALUE '3'.
+001366             88  CF-MORT-CARR-PROD-CNTL              VALUE '4'.
+001367
+001368         16  CF-MORTG-CONVERSION-DATE       PIC XX.
+001369         16  CF-MORTG-RATE-FILE-MAINT-DATE  PIC XX.
+001370         16  CF-MORTG-RATE-FILE-CREAT-DATE  PIC XX.
+001371         16  CF-MORTG-PROD-FILE-MAINT-DATE  PIC XX.
+001372         16  CF-MORTG-PROD-FILE-CREAT-DATE  PIC XX.
+001373
+001374         16  CF-MP-POLICY-LINKAGE-IND       PIC X(1).
+001375             88  CF-MP-PLCY-LINKAGE-USED     VALUE 'Y'.
+001376         16  CF-MP-RECON-USE-IND            PIC X(1).
+001377             88  CF-MP-USE-RECON             VALUE 'Y'.
+001378         16  CF-MORTG-CHECK-NO-COUNTER      PIC 9(6).
+001379             88  CF-MP-CHECK-CNT-RESET-VALUE VALUE 999999.
+001380         16  CF-MP-REPORT-LANGUAGE-IND      PIC X(1).
+001381             88  CF-MP-LANGUAGE-IS-ENG       VALUE 'E'.
+001382             88  CF-MP-LANGUAGE-IS-FR        VALUE 'F'.
+001383         16  FILLER                         PIC X(1).
+001384         16  CF-MORTG-CHECK-QUEUE-COUNTER   PIC 9(6).
+001385             88  CF-MP-CHKQ-CNT-RESET-VALUE  VALUE 999999.
+001386         16  CF-MORTG-MIB-VERSION           PIC X.
+001387             88  CF-MORTG-MIB-BATCH         VALUE '1'.
+001388             88  CF-MORTG-MIB-ONLINE        VALUE '2'.
+001389             88  CF-MORTG-MIB-BOTH          VALUE '3'.
+001390         16  CF-MORTG-ALT-MIB-SEARCH-CNTL.
+001391             20  CF-MORTG-MIB-LNAME-SEARCH  PIC X.
+001392                 88  CF-MIB-LAST-NAME-SEARCH     VALUE 'Y'.
+001393             20  CF-MORTG-MIB-FNAME-SEARCH  PIC X.
+001394                 88  CF-MIB-FIRST-NAME-SEARCH    VALUE 'Y'.
+001395             20  CF-MORTG-MIB-MNAME-SEARCH  PIC X.
+001396                 88  CF-MIB-MIDDLE-NAME-SEARCH   VALUE 'Y'.
+001397             20  CF-MORTG-MIB-BDATE-SEARCH  PIC X.
+001398                 88  CF-MIB-BIRTH-DATE-SEARCH    VALUE 'Y'.
+001399             20  CF-MORTG-MIB-BSTATE-SEARCH PIC X.
+001400                 88  CF-MIB-BIRTH-STATE-SEARCH   VALUE 'Y'.
+001401             20  CF-MORTG-MIB-RSTATE-SEARCH PIC X.
+001402                 88  CF-MIB-RESIDNT-STATE-SEARCH VALUE 'Y'.
+001403         16  CF-MORTG-MIB-COMPANY-SYMBOL    PIC XXX.
+001404         16  FILLER                         PIC X(7).
+001405         16  CF-MORTG-DESTINATION-SYMBOL.
+001406             20  CF-MORTG-MIB-COMM          PIC X(5).
+001407             20  CF-MORTG-MIB-TERM          PIC X(5).
+001408         16  CF-ASSIGN-POLICY-NO-SW         PIC X(01).
+001409             88  CF-ASSIGN-POLICY-NO             VALUE 'Y'.
+001410         16  FILLER                         PIC X(03).
+001411         16  CF-MP-CHECK-NO-CONTROL.
+001412             20  CF-MP-CHECK-NO-METHOD      PIC X(01).
+001413                 88  CF-MP-CHECK-NO-MANUAL     VALUE '1'.
+001414                 88  CF-MP-CHECK-NO-AUTO-SEQ   VALUE '2'
+001415                                                ' ' LOW-VALUES.
+001416                 88  CF-MP-CHECK-NO-PRE-PRINTED
+001417                                               VALUE '3'.
+001418         16  CF-MORTG-LOAN-SHIFT-IND        PIC X(01).
+001419         16  CF-MORTG-SOLICITATION-NUM      PIC S9(17) COMP-3.
+001420         16  CF-MORTG-ALT-ALPHA-SEARCH-CNTL.
+001421             20  CF-MORTG-ALP-LNAME-SEARCH  PIC X.
+001422                 88  CF-ALPHA-LAST-NAME-SEARCH      VALUE 'Y'.
+001423             20  CF-MORTG-ALP-FNAME-SEARCH  PIC X.
+001424                 88  CF-ALPHA-FIRST-NAME-SEARCH     VALUE 'Y'.
+001425             20  CF-MORTG-ALP-MNAME-SEARCH  PIC X.
+001426                 88  CF-ALPHA-MIDDLE-NAME-SEARCH    VALUE 'Y'.
+001427             20  CF-MORTG-ALP-BDATE-SEARCH  PIC X.
+001428                 88  CF-ALPHA-BIRTH-DATE-SEARCH     VALUE 'Y'.
+001429             20  CF-MORTG-ALP-BSTATE-SEARCH PIC X.
+001430                 88  CF-ALPHA-BIRTH-STATE-SEARCH    VALUE 'Y'.
+001431             20  CF-MORTG-ALP-RSTATE-SEARCH PIC X.
+001432                 88  CF-ALPHA-RESIDNT-STATE-SEARCH  VALUE 'Y'.
+001433         16  CF-MORTG-BILLING-AREA.
+001434             20  CF-MORTG-BILL-CYCLE   OCCURS  5  TIMES
+001435                                            PIC X.
+001436         16  CF-MORTG-MONTH-END-DT          PIC XX.
+001437         16  CF-MORTG-CURRENT-ARCH-NUM      PIC S9(8)  COMP.
+001438         16  CF-MORTG-START-ARCH-NUM        PIC S9(8)  COMP.
+001439         16  CF-MORTG-MIB-DEST-SW           PIC X.
+001440             88 CF-MORTG-MIB-COMM-DEST              VALUE '1'.
+001441             88 CF-MORTG-MIB-TERM-DEST              VALUE '2'.
+001442         16  FILLER                         PIC X.
+001443         16  CF-MORTG-LABEL-CONTROL         PIC X.
+001444             88 CF-MORTG-CREATE-LABELS              VALUE 'Y'.
+001445             88 CF-MORTG-BYPASS-LABELS              VALUE 'N'.
+001446         16  CF-ACH-ORIGINATING-DFI-ID      PIC X(8).
+001447         16  FILLER                         PIC X(8).
+001448         16  CF-ACH-SENDING-DFI-NAME        PIC X(23).
+001449         16  CF-ACH-RECVING-DFI-ROUTING-NO  PIC X(8).
+001450         16  CF-ACH-RECVING-DFI-NAME        PIC X(23).
+001451         16  CF-ACH-COMPANY-ID.
+001452             20  CF-ACH-ID-CODE-DESIGNATOR  PIC X.
+001453                 88  CF-ACH-ICD-IRS-EIN             VALUE '1'.
+001454                 88  CF-ACH-ICD-DUNS                VALUE '3'.
+001455                 88  CF-ACH-ICD-USER-ASSIGNED-NO    VALUE '9'.
+001456             20  CF-ACH-COMPANY-ID-NO       PIC X(9).
+001457         16  CF-MORTG-BILL-GROUPING-CODE    PIC X.
+001458             88  CF-MORTG-CO-HAS-GROUPING           VALUE 'Y'.
+001459         16  CF-RATE-DEV-AUTHORIZATION      PIC X.
+001460             88  CF-RATE-DEV-AUTHORIZED             VALUE 'Y'.
+001461             88  CF-RATE-DEV-NOT-AUTHORIZED         VALUE 'N'.
+001462         16  CF-ACH-SENDING-DFI-ROUTING-NO  PIC X(9).
+001463         16  CF-CBA-FILE-CREATE-NUM         PIC 9(4).
+001464         16  FILLER                         PIC X(536).
+001465
+001466****************************************************************
+001467*             MORTGAGE HEIGHT - WEIGHT CHARTS                  *
+001468****************************************************************
+001469
+001470     12  CF-FEMALE-HT-WT-REC  REDEFINES CF-RECORD-BODY.
+001471         16  CF-FEMALE-HT-WT-INFO OCCURS 30 TIMES.
+001472             20  CF-FEMALE-HEIGHT.
+001473                 24  CF-FEMALE-FT           PIC 99.
+001474                 24  CF-FEMALE-IN           PIC 99.
+001475             20  CF-FEMALE-MIN-WT           PIC 999.
+001476             20  CF-FEMALE-MAX-WT           PIC 999.
+001477         16  FILLER                         PIC X(428).
+001478
+001479     12  CF-MALE-HT-WT-REC    REDEFINES CF-RECORD-BODY.
+001480         16  CF-MALE-HT-WT-INFO   OCCURS 30 TIMES.
+001481             20  CF-MALE-HEIGHT.
+001482                 24  CF-MALE-FT             PIC 99.
+001483                 24  CF-MALE-IN             PIC 99.
+001484             20  CF-MALE-MIN-WT             PIC 999.
+001485             20  CF-MALE-MAX-WT             PIC 999.
+001486         16  FILLER                         PIC X(428).
+001487******************************************************************
+001488*             AUTOMATIC ACTIVITY RECORD                          *
+001489******************************************************************
+001490     12  CF-AUTO-ACTIVITY-REC REDEFINES CF-RECORD-BODY.
+001491         16  CF-SYSTEM-DEFINED-ACTIVITY OCCURS 09 TIMES.
+001492             20  CF-SYS-ACTIVE-SW           PIC X(01).
+001493             20  CF-SYS-LETTER-ID           PIC X(04).
+001494             20  CF-SYS-RESEND-DAYS         PIC 9(03).
+001495             20  CF-SYS-FOLLOW-UP-DAYS      PIC 9(03).
+001496             20  CF-SYS-RESET-SW            PIC X(01).
+001497             20  CF-SYS-REPORT-DAYS         PIC 9(03).
+001498             20  CF-SYS-EACH-DAY-AFTER-SW   PIC X(01).
+001499
+001500         16  FILLER                         PIC X(50).
+001501
+001502         16  CF-USER-DEFINED-ACTIVITY  OCCURS 08 TIMES.
+001503             20  CF-USER-ACTIVE-SW          PIC X(01).
+001504             20  CF-USER-LETTER-ID          PIC X(04).
+001505             20  CF-USER-RESEND-DAYS        PIC 9(03).
+001506             20  CF-USER-FOLLOW-UP-DAYS     PIC 9(03).
+001507             20  CF-USER-RESET-SW           PIC X(01).
+001508             20  CF-USER-REPORT-DAYS        PIC 9(03).
+001509             20  CF-USER-EACH-DAY-AFTER-SW  PIC X(01).
+001510             20  CF-USER-ACTIVITY-DESC      PIC X(20).
+001511
+001512         16  FILLER                         PIC X(246).
+      *<<((file: ELCCNTL))
+000456     EJECT
+000457*                                    COPY ERCCMKQ.
+      *>>((file: ERCCMKQ))
+000001******************************************************************
+000002*                                                                *
+000003*                                                                *
+000004*                            ERCCMKQ                             *
+000005*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+000006*                            VMOD=2.014                          *
+000007*                                                                *
+000008*   FILE DESCRIPTION = CHECK QUE FILE FOR THE COMMISSION         *
+000009*                      CHECK OF THE CREDIT SYSTEM                *
+000010*                                                                *
+000011*   FILE TYPE = VSAM,KSDS                                        *
+000012*   RECORD SIZE = 1800 RECFORM = FIXED                           *
+000013*                                                                *
+000014*   BASE CLUSTER = ERCMKQ                         RKP=2,LEN=7    *
+000015*       ALTERNATE PATH  = ERCMKQ2  (BY PAYEE CONTRO AND          *
+000016*                                      CONTROL NUMBER)           *
+000017*                                                 RKP=9,LEN=30   *
+000018*                                                                *
+000019*   LOG = NO                                                     *
+000020*   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+000021******************************************************************
+000022 01  COMMISSION-CHECK-QUE.
+000023     12  MQ-RECORD-ID                PIC XX.
+000024         88  VALID-MQ-ID                     VALUE 'MQ'.
+000025
+000026     12  MQ-CONTROL-PRIMARY.
+000027         16  MQ-COMPANY-CD           PIC X.
+000028         16  MQ-CONTROL-NUMBER       PIC S9(8)       COMP.
+000029         16  MQ-SEQUENCE-NUMBER      PIC S9(4)       COMP.
+000030
+000031     12  MQ-CONTROL-BY-PAYEE.
+000032         16  MQ-COMPANY-CD-A1        PIC X.
+000033         16  MQ-CSR-A1               PIC X(4).
+000034         16  MQ-CARRIER-A1           PIC X.
+000035         16  MQ-GROUPING-A1          PIC X(6).
+000036         16  MQ-PAYEE-A1             PIC X(10).
+000037         16  MQ-PAYEE-SEQ-A1         PIC S9(4)       COMP.
+000038         16  MQ-CONTROL-NUMBER-A1    PIC S9(8)       COMP.
+000039         16  MQ-SEQUENCE-NUMBER-A1   PIC S9(4)       COMP.
+000040
+000041     12  MQ-ENTRY-TYPE               PIC X.
+000042             88  CHECK-ON-QUE           VALUE 'Q'.
+000043             88  ALIGNMENT-CHECK        VALUE 'A'.
+000044             88  SPOILED-CHECK          VALUE 'S'.
+000045             88  PAYMENT-ABORTED        VALUE 'X'.
+000046             88  ACH-PAYMENT            VALUE 'P'.
+000047
+000048     12  FILLER                      PIC X(10).
+000049
+000050     12  MQ-CREDIT-CHEK-CNTL.
+000051         16  MQ-CHEK-CSR             PIC X(4).
+000052         16  MQ-CHEK-CARRIER         PIC X.
+000053         16  MQ-CHEK-GROUPING        PIC X(6).
+000054         16  MQ-CHEK-PAYEE           PIC X(10).
+000055         16  MQ-CHEK-PAYEE-SEQ       PIC S9(4)       COMP.
+000056         16  MQ-CHEK-SEQ-NO          PIC S9(4)       COMP.
+000057
+000058     12  FILLER                      PIC X(10).
+000059
+000060     12  MQ-PAYEE-INFO.
+000061         16  MQ-PAYEE-NAME           PIC X(30).
+000062         16  MQ-PAYEE-ADDRESS-1      PIC X(30).
+000063         16  MQ-PAYEE-ADDRESS-2      PIC X(30).
+000064         16  MQ-PAYEE-CITY-ST        PIC X(30).
+000065         16  MQ-PAYEE-ZIP-CODE.
+000066             20  MQ-PAYEE-ZIP.
+000067                 24  FILLER          PIC X(1).
+000068                     88 MQ-PAYEE-CANADIAN-POST-CODE
+000069                                     VALUE 'A' THRU 'Z'.
+000070                 24  FILLER          PIC X(4).
+000071             20  MQ-PAYEE-ZIP-EXT    PIC X(4).
+000072         16  MQ-PAYEE-CANADIAN-POSTAL-CODES
+000073                 REDEFINES MQ-PAYEE-ZIP-CODE.
+000074             20  MQ-PAY-CAN-POSTAL-CD-1
+000075                                     PIC X(3).
+000076             20  MQ-PAY-CAN-POSTAL-CD-2
+000077                                     PIC X(3).
+000078             20  FILLER              PIC X(3).
+000079
+000080     12  MQ-CREDIT-PYAJ-CNTL.
+000081         16  MQ-PYAJ-CARRIER         PIC X.
+000082         16  MQ-PYAJ-GROUPING        PIC X(6).
+000083         16  MQ-PYAJ-FIN-RESP        PIC X(10).
+000084         16  FILLER                  PIC X(6).
+000085
+000086     12  MQ-CHECK-NUMBER             PIC X(6).
+000087     12  MQ-CHECK-AMOUNT             PIC S9(7)V99    COMP-3.
+000088     12  MQ-NUMBER-OF-CK-STUBS       PIC S9(3)       COMP-3.
+000089     12  MQ-VOID-DT                  PIC XX.
+000090     12  MQ-TIMES-PRINTED            PIC S9(4)       COMP.
+000091     12  MQ-PRINT-AT-HHMM            PIC S9(4)       COMP.
+000092     12  MQ-CHECK-BY-USER            PIC X(4).
+000093     12  MQ-PRE-NUMBERING-SW         PIC X.
+000094       88  CHECKS-WERE-NOT-PRE-NUMBERED    VALUE SPACE.
+000095       88  CHECKS-WERE-PRE-NUMBERED        VALUE '1'.
+000096
+000097     12  MQ-CHECK-WRITTEN-DT         PIC XX.
+000098     12  MQ-ACH-WRITTEN-DT REDEFINES  MQ-CHECK-WRITTEN-DT
+000099                                     PIC XX.
+000100     12  MQ-LAST-MAINT-BY            PIC X(4).
+000101     12  MQ-LAST-MAINT-HHMMSS        PIC S9(6)       COMP-3.
+000102     12  MQ-LAST-MAINT-DT            PIC XX.
+000103     12  MQ-CHECK-RELEASE-DT         PIC XX.
+000104     12  MQ-RECORD-TYPE              PIC X.
+000105         88  MQ-DETAIL                     VALUE 'D'.
+000106         88  MQ-TEXT                       VALUE 'T'.
+000107
+000108     12  MQ-DETAIL-INFORMATION.
+000109         16  MQ-DETAIL-INFO        OCCURS 15 TIMES.
+000110             20  MQ-CHECK-STUB-LINE.
+000111                 24  MQ-STUB-COMMENT        PIC X(23).
+000112                 24  MQ-ACCT-AGENT          PIC X(10).
+000113                 24  MQ-INVOICE             PIC X(6).
+000114                 24  MQ-REFERENCE           PIC X(12).
+000115                 24  MQ-LEDGER-NO           PIC X(14).
+000116                 24  MQ-PYAJ-AMT            PIC S9(7)V99 COMP-3.
+000117                 24  MQ-PYAJ-REC-TYPE       PIC X.
+000118                 24  MQ-PYAJ-SEQ            PIC S9(8)    COMP.
+000119                 24  MQ-PAYMENT-TYPE        PIC X.
+000120                 24  MQ-PYAJ-PMT-APPLIED    PIC X.
+000121                 24  MQ-LAST-MAINT-APPLIED  PIC X.
+000122                 24  MQ-NON-AR-ITEM         PIC X.
+000123                 24  FILLER                 PIC X(19).
+000124
+000125     12  MQ-CHECK-STUB-TEXT REDEFINES MQ-DETAIL-INFORMATION.
+000126         16  MQ-CHECK-TEXT-ITEMS   OCCURS 3 TIMES.
+000127             20  MQ-STUB-TEXT        PIC X(70).
+000128         16  MQ-STUB-FILLER          PIC X(1260).
+000129
+000130     12  MQ-CREDIT-SELECT-DATE       PIC XX.
+000131     12  MQ-CREDIT-ACCEPT-DATE       PIC XX.
+000132
+000133     12  MQ-AR-STATEMENT-DT          PIC XX.
+000134     12  MQ-CO-TYPE                  PIC X.
+000135
+000136     12  MQ-STARTING-CHECK-NUMBER    PIC X(06).
+000137     12  FILLER                      PIC X(41).
+000138******************************************************************
+      *<<((file: ERCCMKQ))
+000458     EJECT
+       PROCEDURE DIVISION USING DFHEIBLK DFHCOMMAREA.
+       0000-DFHEXIT SECTION.
+           MOVE FUNCTION WHEN-COMPILED TO DFHEIVL0(1:21).
+           MOVE '9#                    %   ' TO DFHEIV0.
+           MOVE 'EL685' TO DFHEIV1.
+           CALL 'kxdfhei1' USING DFHEIV0 DFH-START DFHEIV DFHEIV1
+                DFHEIVL0.
+000459 VCOBOL-DUMMY-PROCEDURE.
+000460
+000461     MOVE DFHCOMMAREA            TO  PROGRAM-INTERFACE-BLOCK.
+000462
+000463*    NOTE *******************************************************
+000464*         *      ACCESS TO THIS MODULE CAN BE ONLY FROM AN XCTL *
+000465*         *  FROM ANOTHER MODULE.                               *
+000466*         *******************************************************.
+000467
+000468     IF EIBCALEN NOT GREATER THAN ZERO
+000469         MOVE UNACCESS-MSG       TO  LOGOFF-MSG
+000470         GO TO 8300-SEND-TEXT.
+000471
+000472     
+      * EXEC CICS HANDLE CONDITION
+000473*        PGMIDERR (9600-PGMIDERR)
+000474*        ERROR    (9990-ERROR)
+000475*    END-EXEC.
+      *    MOVE '"$L.                  ! " #00005988' TO DFHEIV0
+           MOVE X'22244C2E2020202020202020' &
+                X'202020202020202020202120' &
+                X'2220233030303035393838' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000476
+000477     EJECT
+000478 0010-MAIN-LOGIC.
+000479     IF PI-CALLED-FROM-AR-MENU
+000480         MOVE 'EL685B' TO WS-MAP-NAME.
+000481
+000482     IF PI-CALLING-PROGRAM NOT = WS-PROGRAM-ID
+000483         IF PI-RETURN-TO-PROGRAM NOT = WS-PROGRAM-ID
+000484             MOVE PI-SAVED-PROGRAM-5   TO  PI-SAVED-PROGRAM-6
+000485             MOVE PI-SAVED-PROGRAM-4   TO  PI-SAVED-PROGRAM-5
+000486             MOVE PI-SAVED-PROGRAM-3   TO  PI-SAVED-PROGRAM-4
+000487             MOVE PI-SAVED-PROGRAM-2   TO  PI-SAVED-PROGRAM-3
+000488             MOVE PI-SAVED-PROGRAM-1   TO  PI-SAVED-PROGRAM-2
+000489             MOVE PI-RETURN-TO-PROGRAM TO  PI-SAVED-PROGRAM-1
+000490             MOVE PI-CALLING-PROGRAM   TO  PI-RETURN-TO-PROGRAM
+000491             MOVE WS-PROGRAM-ID        TO  PI-CALLING-PROGRAM
+000492           ELSE
+000493             MOVE PI-RETURN-TO-PROGRAM TO  PI-CALLING-PROGRAM
+000494             MOVE PI-SAVED-PROGRAM-1   TO  PI-RETURN-TO-PROGRAM
+000495             MOVE PI-SAVED-PROGRAM-2   TO  PI-SAVED-PROGRAM-1
+000496             MOVE PI-SAVED-PROGRAM-3   TO  PI-SAVED-PROGRAM-2
+000497             MOVE PI-SAVED-PROGRAM-4   TO  PI-SAVED-PROGRAM-3
+000498             MOVE PI-SAVED-PROGRAM-5   TO  PI-SAVED-PROGRAM-4
+000499             MOVE PI-SAVED-PROGRAM-6   TO  PI-SAVED-PROGRAM-5
+000500             MOVE SPACES               TO  PI-SAVED-PROGRAM-6
+000501     ELSE
+000502         GO TO 0020-MAIN-LOGIC.
+000503
+000504
+000505 0015-MAIN-LOGIC.
+000506
+000507
+000508*    NOTE *******************************************************
+000509*         *                                                     *
+000510*         *      INITALIZE THE WORK FIELDS FOR THE PROGRAM      *
+000511*         *  INTERFACE BLOCK FOR THIS MODULE.                   *
+000512*         *                                                     *
+000513*         *******************************************************.
+000514
+000515     
+      * EXEC CICS HANDLE CONDITION
+000516*        QIDERR (0015-NEXT-SENTENCE)
+000517*    END-EXEC.
+      *    MOVE '"$N                   ! # #00006031' TO DFHEIV0
+           MOVE X'22244E202020202020202020' &
+                X'202020202020202020202120' &
+                X'2320233030303036303331' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000518
+000519     MOVE EIBTRMID               TO  WS-TS-TERM-ID.
+000520
+000521     
+      * EXEC CICS DELETEQ TS
+000522*        QUEUE (WS-TEMP-STORAGE-KEY)
+000523*    END-EXEC.
+      *    MOVE '*&                    #   #00006037' TO DFHEIV0
+           MOVE X'2A2620202020202020202020' &
+                X'202020202020202020202320' &
+                X'2020233030303036303337' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-TEMP-STORAGE-KEY, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000524
+000525 0015-NEXT-SENTENCE.
+000526
+000527     MOVE PI-AR-MODE             TO  WS-SAVE-AR-MODE.
+000528     MOVE SPACES                 TO  PI-PROGRAM-WORK-AREA
+000529
+000530     MOVE LOW-VALUES             TO  PI-CHECK-QUE-KEY
+000531                                     PI-PREV-CHECK-QUE-KEY
+000532
+000533     MOVE ZERO                   TO  PI-END-OF-FILE
+000534                                     PI-TEMP-STORAGE-ITEM
+000535                                     PI-CONTROL-TOT
+000536                                     PI-CONTROL-SAVE-CONTROL
+000537                                     PI-START-CONTROL-NO
+000538                                     PI-CONTROL-GRAND-TOT.
+000539     MOVE WS-SAVE-CHECK-MODE     TO  PI-CHECK-MODE.
+000540     MOVE WS-SAVE-AR-MODE        TO  PI-AR-MODE.
+000541     MOVE PI-COMPANY-CD          TO  PI-CK-COMPANY-CODE
+000542     MOVE 'Y'                    TO  PI-FIRST-TIME-SW
+000543     MOVE 'Y'                    TO  PI-FIRST-TOTAL-SW
+000544     MOVE 'N'                    TO  PI-SEND-TOT-SWT
+000545     MOVE 'N'                    TO  PI-EOF-SWT
+000546     INITIALIZE HOLD-CHECK-RECORD.
+000547
+000548     IF WS-START-CNTLNO GREATER ZERO
+000549         MOVE WS-START-CNTLNO    TO  PI-CK-CONTROL-NO.
+000550
+000551     MOVE EIBDATE                TO  DC-JULIAN-YYDDD
+000552     MOVE '5'                    TO  DC-OPTION-CODE
+000553     PERFORM 8500-DATE-CONVERSION
+000554     MOVE DC-BIN-DATE-1          TO  PI-CURRENT-DATE-BIN
+000555     MOVE DC-GREG-DATE-1-EDIT    TO  PI-CURRENT-DATE.
+000556
+000557     PERFORM 4000-BROWSE-CHECK-QUEUE-FILE.
+000558
+000559     EJECT
+000560 0020-MAIN-LOGIC.
+000561
+000562
+000563*    NOTE *******************************************************
+000564*         *                                                     *
+000565*         *      AFTER THE FIRST TIME THROUGH THE PROPER ATTEN- *
+000566*         *  TION KEY USAGE NEEDS TO BE CHECKED FOR VALIDITY    *
+000567*         *  BEFORE ANY FURTHER PROCESSING CAN BE DONE.         *
+000568*         *                                                     *
+000569*         *******************************************************.
+000570
+000571     IF EIBAID = DFHCLEAR
+000572         GO TO 9400-CLEAR.
+000573
+000574     IF EIBAID = DFHPA1 OR DFHPA2 OR DFHPA3
+000575         MOVE +8                 TO  EMI-ERROR
+000576         MOVE -1                 TO  APFKL
+000577         PERFORM 8200-SEND-DATAONLY.
+000578
+000579     IF PI-CALLED-FROM-AR-MENU
+000580         
+      * EXEC CICS RECEIVE
+000581*            INTO   (EL685BI)
+000582*            MAPSET (WS-MAPSET-NAME)
+000583*            MAP    (WS-MAP-NAME)
+000584*        END-EXEC
+           MOVE LENGTH OF
+            EL685BI
+             TO DFHEIV11
+      *    MOVE '8"T I  L              ''   #00006096' TO DFHEIV0
+           MOVE X'382254204920204C20202020' &
+                X'202020202020202020202720' &
+                X'2020233030303036303936' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-MAP-NAME, 
+                 EL685BI, 
+                 DFHEIV11, 
+                 WS-MAPSET-NAME, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+000585      ELSE
+000586         
+      * EXEC CICS RECEIVE
+000587*            INTO   (EL685AI)
+000588*            MAPSET (WS-MAPSET-NAME)
+000589*            MAP    (WS-MAP-NAME)
+000590*        END-EXEC.
+           MOVE LENGTH OF
+            EL685AI
+             TO DFHEIV11
+      *    MOVE '8"T I  L              ''   #00006102' TO DFHEIV0
+           MOVE X'382254204920204C20202020' &
+                X'202020202020202020202720' &
+                X'2020233030303036313032' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-MAP-NAME, 
+                 EL685AI, 
+                 DFHEIV11, 
+                 WS-MAPSET-NAME, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000591
+000592     IF PI-CALLED-FROM-AR-MENU       AND
+000593           BPFKL IS GREATER THAN ZERO
+000594           IF EIBAID NOT = DFHENTER
+000595               MOVE +4             TO  EMI-ERROR
+000596               MOVE AL-UNBOF       TO  BPFKA
+000597               MOVE -1             TO  BPFKL
+000598               PERFORM 8200-SEND-DATAONLY
+000599           ELSE
+000600             IF BPFKO IS NUMERIC
+000601               AND BPFKO IS GREATER THAN ZERO
+000602               AND BPFKO IS LESS THAN '25'
+000603                 MOVE PF-VALUES (BPFKI)  TO  EIBAID
+000604               ELSE
+000605                 MOVE +29            TO  EMI-ERROR
+000606                 MOVE AL-UNBOF       TO  BPFKA
+000607                 MOVE -1             TO  BPFKL
+000608                 PERFORM 8200-SEND-DATAONLY.
+000609
+000610     IF NOT PI-CALLED-FROM-AR-MENU   AND
+000611           APFKL IS GREATER THAN ZERO
+000612           IF EIBAID NOT = DFHENTER
+000613               MOVE +4             TO  EMI-ERROR
+000614               MOVE AL-UNBOF       TO  APFKA
+000615               MOVE -1             TO  APFKL
+000616               PERFORM 8200-SEND-DATAONLY
+000617           ELSE
+000618             IF APFKO IS NUMERIC
+000619               AND APFKO IS GREATER THAN ZERO
+000620               AND APFKO IS LESS THAN '25'
+000621                 MOVE PF-VALUES (APFKI)  TO  EIBAID
+000622               ELSE
+000623                 MOVE +29            TO  EMI-ERROR
+000624                 MOVE AL-UNBOF       TO  APFKA
+000625                 MOVE -1             TO  APFKL
+000626                 PERFORM 8200-SEND-DATAONLY.
+000627
+000628     IF EIBAID IS = DFHPF12
+000629         MOVE 'EL010   '         TO  WS-PROGRAM-ID
+000630         GO TO 9300-XCTL.
+000631
+000632     IF EIBAID IS = DFHPF23
+000633         GO TO 9000-RETURN-CICS.
+000634
+000635     IF EIBAID IS = DFHPF24
+000636         MOVE 'EL126   '         TO  WS-PROGRAM-ID
+000637         GO TO 9300-XCTL.
+000638
+000639     IF EIBAID = (DFHENTER OR DFHPF1 OR DFHPF2
+000640                           OR DFHPF3 OR DFHPF4)
+000641         NEXT SENTENCE
+000642       ELSE
+000643         MOVE +8                 TO  EMI-ERROR
+000644         MOVE -1                 TO  APFKL
+000645         PERFORM 8200-SEND-DATAONLY.
+000646
+000647     EJECT
+000648 0100-MAIN-LOGIC.
+000649
+000650     IF PI-CALLED-FROM-AR-MENU         AND
+000651        EIBAID = DFHPF3
+000652         IF BCNTLNOL IS GREATER THAN +0
+000653             MOVE BCNTLNOI           TO  PI-START-CONTROL-NO
+000654             GO TO 0130-MAIN-LOGIC
+000655         ELSE
+000656             GO TO 0130-MAIN-LOGIC.
+000657
+000658     IF NOT PI-CALLED-FROM-AR-MENU         AND
+000659        EIBAID = DFHPF3
+000660         IF CNTLNOL IS GREATER THAN +0
+000661             MOVE CNTLNOI            TO  PI-START-CONTROL-NO
+000662             GO TO 0130-MAIN-LOGIC
+000663         ELSE
+000664             GO TO 0130-MAIN-LOGIC.
+000665
+000666     IF NOT PI-CALLED-FROM-AR-MENU     AND
+000667        EIBAID = DFHPF4
+000668         IF CHECKS-TO-BE-PRINTED
+000669             MOVE 'Y' TO WS-SAVE-CHECK-MODE
+000670             IF CNTLNOL GREATER ZERO
+000671                 IF CNTLNOI NUMERIC
+000672                     MOVE CNTLNOI TO WS-START-CNTLNO
+000673                     GO TO 0015-MAIN-LOGIC
+000674                 ELSE
+000675                     GO TO 0015-MAIN-LOGIC
+000676             ELSE
+000677                 GO TO 0015-MAIN-LOGIC
+000678         ELSE
+000679             IF CHECKS-PRINTED
+000680                 MOVE SPACE TO WS-SAVE-CHECK-MODE
+000681                 IF CNTLNOL IS GREATER THAN +0
+000682                     IF CNTLNOI IS NUMERIC
+000683                         MOVE CNTLNOI  TO  WS-START-CNTLNO
+000684                         GO TO 0015-MAIN-LOGIC
+000685                     ELSE
+000686                         GO TO 0015-MAIN-LOGIC
+000687                 ELSE
+000688                     GO TO 0015-MAIN-LOGIC.
+000689
+000690     IF PI-CALLED-FROM-AR-MENU         AND
+000691        EIBAID = DFHPF4
+000692         IF CHECKS-TO-BE-PRINTED
+000693             MOVE 'Y' TO WS-SAVE-CHECK-MODE
+000694             IF BCNTLNOL GREATER ZERO
+000695                 IF BCNTLNOI NUMERIC
+000696                     MOVE BCNTLNOI TO WS-START-CNTLNO
+000697                     GO TO 0015-MAIN-LOGIC
+000698                 ELSE
+000699                     GO TO 0015-MAIN-LOGIC
+000700             ELSE
+000701                 GO TO 0015-MAIN-LOGIC
+000702         ELSE
+000703             IF CHECKS-PRINTED
+000704                 MOVE SPACE TO WS-SAVE-CHECK-MODE
+000705                 IF BCNTLNOL IS GREATER THAN +0
+000706                     IF BCNTLNOI IS NUMERIC
+000707                         MOVE BCNTLNOI   TO  WS-START-CNTLNO
+000708                         GO TO 0015-MAIN-LOGIC
+000709                     ELSE
+000710                         GO TO 0015-MAIN-LOGIC
+000711                 ELSE
+000712                     GO TO 0015-MAIN-LOGIC.
+000713
+000714     IF EIBAID = DFHPF1 OR DFHPF2
+000715         GO TO 0110-MAIN-LOGIC.
+000716
+000717     IF NOT PI-CALLED-FROM-AR-MENU    AND
+000718        CNTLNOL GREATER ZERO
+000719         IF CNTLNOI NUMERIC
+000720             MOVE CNTLNOI TO WS-START-CNTLNO
+000721             MOVE PI-CHECK-MODE TO WS-SAVE-CHECK-MODE
+000722             GO TO 0015-MAIN-LOGIC.
+000723
+000724     IF PI-CALLED-FROM-AR-MENU    AND
+000725        BCNTLNOL GREATER ZERO
+000726         IF BCNTLNOI NUMERIC
+000727             MOVE BCNTLNOI TO WS-START-CNTLNO
+000728             MOVE PI-CHECK-MODE TO WS-SAVE-CHECK-MODE
+000729             GO TO 0015-MAIN-LOGIC.
+000730
+000731     IF PI-END-OF-FILE NOT = ZERO
+000732         PERFORM 9400-CLEAR.
+000733
+000734     PERFORM 4000-BROWSE-CHECK-QUEUE-FILE.
+000735
+000736 0110-MAIN-LOGIC.
+000737     IF PI-CALLED-FROM-AR-MENU
+000738         MOVE BPAGEI                 TO  WS-TEMP-STORAGE-ITEM
+000739     ELSE
+000740         MOVE APAGEI                 TO  WS-TEMP-STORAGE-ITEM.
+000741
+000742     IF EIBAID = DFHPF1 AND
+000743        PI-SEND-TOT     AND
+000744        PI-EOF          AND
+000745        WS-TEMP-STORAGE-ITEM = PI-TEMP-STORAGE-ITEM
+000746        IF NOT PI-CALLED-FROM-AR-MENU
+000747            MOVE LOW-VALUE TO EL685AI
+000748            MOVE WS-TEMP-STORAGE-ITEM TO APAGEO
+000749            MOVE +375                   TO  EMI-ERROR
+000750            SET EL685A-INDEX TO 1
+000751            MOVE 'CONTL TOTAL' TO EL685A-PMT-TYPE (EL685A-INDEX)
+000752            MOVE PI-CONTROL-TOT TO EL685A-AMT (EL685A-INDEX)
+000753            SET EL685A-INDEX UP BY +1
+000754            MOVE PI-CONTROL-GRAND-TOT TO EL685A-AMT (EL685A-INDEX)
+000755            MOVE 'GRAND TOTAL' TO EL685A-PMT-TYPE (EL685A-INDEX)
+000756            MOVE -1 TO APFKL
+000757            MOVE 'T' TO PI-PREV-DISPLAY-SWT
+000758            GO TO 8100-SEND-INITIAL-MAP
+000759        ELSE
+000760            MOVE LOW-VALUE TO EL685BI
+000761            MOVE WS-TEMP-STORAGE-ITEM TO BPAGEO
+000762            MOVE +375                   TO  EMI-ERROR
+000763            SET EL685B-INDEX TO 1
+000764            MOVE ' CONTL'      TO EL685B-DESC-ONE   (EL685B-INDEX)
+000765            MOVE 'TOTAL'       TO EL685B-DESC-TWO   (EL685B-INDEX)
+000766            MOVE PI-CONTROL-TOT TO EL685B-AMT (EL685B-INDEX)
+000767            SET EL685B-INDEX UP BY +1
+000768            MOVE PI-CONTROL-GRAND-TOT TO EL685B-AMT (EL685B-INDEX)
+000769            MOVE ' GRAND'      TO EL685B-DESC-ONE   (EL685B-INDEX)
+000770            MOVE 'TOTAL'       TO EL685B-DESC-TWO   (EL685B-INDEX)
+000771            MOVE -1 TO BPFKL
+000772            MOVE 'T' TO PI-PREV-DISPLAY-SWT
+000773            GO TO 8100-SEND-INITIAL-MAP.
+000774
+000775     IF EIBAID = DFHPF1
+000776        IF WS-TEMP-STORAGE-ITEM LESS THAN PI-TEMP-STORAGE-ITEM
+000777         ADD +1  TO  WS-TEMP-STORAGE-ITEM
+000778         GO TO 0120-MAIN-LOGIC
+000779        ELSE
+000780         IF PI-NOT-EOF
+000781            GO TO 4000-BROWSE-CHECK-QUEUE-FILE
+000782         ELSE
+000783            NEXT SENTENCE
+000784     ELSE
+000785        NEXT SENTENCE.
+000786
+000787     IF EIBAID = DFHPF2
+000788       IF WS-TEMP-STORAGE-ITEM GREATER THAN +1
+000789           IF PI-TOTAL-SCREEN
+000790               MOVE SPACES TO PI-PREV-DISPLAY-SWT
+000791               GO TO 0120-MAIN-LOGIC
+000792           ELSE
+000793               SUBTRACT +1 FROM WS-TEMP-STORAGE-ITEM
+000794               GO TO 0120-MAIN-LOGIC
+000795       ELSE
+000796           IF PI-TOTAL-SCREEN
+000797               MOVE SPACES TO PI-PREV-DISPLAY-SWT
+000798               GO TO 0120-MAIN-LOGIC.
+000799
+000800     MOVE +312                   TO  EMI-ERROR
+000801     IF PI-CALLED-FROM-AR-MENU
+000802         MOVE -1                     TO  BPFKL
+000803     ELSE
+000804         MOVE -1                     TO  APFKL.
+000805     PERFORM 8200-SEND-DATAONLY.
+000806     EJECT
+000807 0120-MAIN-LOGIC.
+000808     MOVE EIBTRMID               TO  WS-TS-TERM-ID.
+000809
+000810     IF PI-CALLED-FROM-AR-MENU
+000811         
+      * EXEC CICS READQ TS
+000812*            QUEUE  (WS-TEMP-STORAGE-KEY)
+000813*            ITEM   (WS-TEMP-STORAGE-ITEM)
+000814*            INTO   (EL685BI)
+000815*            LENGTH (WS-TS-LENGTH)
+000816*        END-EXEC
+      *    MOVE '*$II   L              ''   #00006327' TO DFHEIV0
+           MOVE X'2A2449492020204C20202020' &
+                X'202020202020202020202720' &
+                X'2020233030303036333237' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-TEMP-STORAGE-KEY, 
+                 EL685BI, 
+                 WS-TS-LENGTH, 
+                 WS-TEMP-STORAGE-ITEM, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+000817     ELSE
+000818         
+      * EXEC CICS READQ TS
+000819*            QUEUE  (WS-TEMP-STORAGE-KEY)
+000820*            ITEM   (WS-TEMP-STORAGE-ITEM)
+000821*            INTO   (EL685AI)
+000822*            LENGTH (WS-TS-LENGTH)
+000823*        END-EXEC.
+      *    MOVE '*$II   L              ''   #00006334' TO DFHEIV0
+           MOVE X'2A2449492020204C20202020' &
+                X'202020202020202020202720' &
+                X'2020233030303036333334' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-TEMP-STORAGE-KEY, 
+                 EL685AI, 
+                 WS-TS-LENGTH, 
+                 WS-TEMP-STORAGE-ITEM, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000824
+000825     IF PI-CALLED-FROM-AR-MENU
+000826         MOVE WS-TEMP-STORAGE-ITEM  TO  BPAGEO
+000827     ELSE
+000828         MOVE WS-TEMP-STORAGE-ITEM  TO  APAGEO.
+000829
+000830     PERFORM 8100-SEND-INITIAL-MAP.
+000831     EJECT
+000832 0130-MAIN-LOGIC.
+000833     
+      * EXEC CICS HANDLE CONDITION
+000834*         TERMIDERR    (0130-TERMID-ERROR)
+000835*         TRANSIDERR   (0130-TRANS-ERROR)
+000836*         END-EXEC.
+      *    MOVE '"$[\                  ! $ #00006349' TO DFHEIV0
+           MOVE X'22245B5C2020202020202020' &
+                X'202020202020202020202120' &
+                X'2420233030303036333439' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000837
+000838     MOVE SPACES                     TO PI-ALT-DMD-PRT-ID.
+000839     IF PI-CALLED-FROM-AR-MENU
+000840         IF BPRINTRL NOT = ZEROS
+000841            MOVE BPRINTRI            TO WS-PRINTER-ID
+000842                                        PI-ALT-DMD-PRT-ID
+000843            GO TO 0130-START
+000844         ELSE
+000845            NEXT SENTENCE
+000846     ELSE
+000847         IF PRINTERL NOT = ZEROS
+000848            MOVE PRINTERI            TO WS-PRINTER-ID
+000849                                        PI-ALT-DMD-PRT-ID
+000850            GO TO 0130-START.
+000851
+000852     IF PI-PROCESSOR-PRINTER IS NOT EQUAL TO SPACES
+000853         MOVE PI-PROCESSOR-PRINTER   TO  WS-PRINTER-ID
+000854         GO TO 0130-START.
+000855
+000856     MOVE PI-COMPANY-ID          TO CNTL-CO
+000857     MOVE '1'                    TO CNTL-RECORD-TYPE
+000858     MOVE SPACES                 TO CNTL-GENL
+000859     MOVE ZEROS                  TO CNTL-SEQ
+000860     
+      * EXEC CICS READ
+000861*         DATASET   (WS-CONTROL-DSID)
+000862*         SET       (ADDRESS OF CONTROL-FILE)
+000863*         RIDFLD    (CNTL-KEY)
+000864*    END-EXEC.
+      *    MOVE '&"S        E          (   #00006376' TO DFHEIV0
+           MOVE X'262253202020202020202045' &
+                X'202020202020202020202820' &
+                X'2020233030303036333736' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-CONTROL-DSID, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 CNTL-KEY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF CONTROL-FILE TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000865
+000866     MOVE CF-FORMS-PRINTER-ID    TO WS-PRINTER-ID.
+000867
+000868 0130-START.
+000869
+000870     IF PI-COMPANY-ID = 'DMD' OR 'XXX'
+000871*        MOVE EIBTRMID       TO WS-PRINTER-ID
+000872         
+      * EXEC CICS START
+000873*             INTERVAL(0)
+000874*             TRANSID    (WS-PRINT-TRAN-ID)
+000875*             FROM       (PROGRAM-INTERFACE-BLOCK)
+000876*             LENGTH     (PI-COMM-LENGTH)
+000877*             TERMID     (WS-PRINTER-ID)
+000878*        END-EXEC
+           MOVE 0 TO DFHEIV10
+      *    MOVE '0(ILF                 1   #00006388' TO DFHEIV0
+           MOVE X'3028494C4620202020202020' &
+                X'202020202020202020203120' &
+                X'2020233030303036333838' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV10, 
+                 WS-PRINT-TRAN-ID, 
+                 DFHEIV99, 
+                 PROGRAM-INTERFACE-BLOCK, 
+                 PI-COMM-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+000879     ELSE
+000880         
+      * EXEC CICS START
+000881*             INTERVAL(0)
+000882*             TRANSID    (WS-PRINT-TRAN-ID)
+000883*             FROM       (PROGRAM-INTERFACE-BLOCK)
+000884*             LENGTH     (PI-COMM-LENGTH)
+000885*             TERMID     (WS-PRINTER-ID)
+000886*        END-EXEC.
+           MOVE 0 TO DFHEIV10
+      *    MOVE '0(ILFT                1   #00006396' TO DFHEIV0
+           MOVE X'3028494C4654202020202020' &
+                X'202020202020202020203120' &
+                X'2020233030303036333936' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV10, 
+                 WS-PRINT-TRAN-ID, 
+                 DFHEIV99, 
+                 PROGRAM-INTERFACE-BLOCK, 
+                 PI-COMM-LENGTH, 
+                 WS-PRINTER-ID, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000887
+000888     MOVE 0567                   TO EMI-ERROR
+000889     MOVE -1                     TO APFKL
+000890     GO TO 8200-SEND-DATAONLY.
+000891
+000892
+000893 0130-TERMID-ERROR.
+000894     MOVE 0412                   TO EMI-ERROR
+000895     MOVE -1                     TO APFKL
+000896     GO TO 8200-SEND-DATAONLY.
+000897 0130-TRANS-ERROR.
+000898     MOVE 0413                   TO EMI-ERROR
+000899     MOVE -1                     TO APFKL
+000900     GO TO 8200-SEND-DATAONLY.
+000901
+000902     EJECT
+000903 4000-BROWSE-CHECK-QUEUE-FILE SECTION.
+000904
+000905     IF PI-CALLED-FROM-AR-MENU
+000906         PERFORM 5000-BROWSE-COMM-CHECK-QUEUE
+000907         GO TO 4990-EXIT.
+000908
+000909     
+      * EXEC CICS HANDLE CONDITION
+000910*        NOTFND   (8400-NOTFND)
+000911*    END-EXEC.
+      *    MOVE '"$I                   ! % #00006425' TO DFHEIV0
+           MOVE X'222449202020202020202020' &
+                X'202020202020202020202120' &
+                X'2520233030303036343235' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000912
+000913     MOVE LOW-VALUES             TO  EL685AI
+000914
+000915     
+      * EXEC CICS STARTBR
+000916*        DATASET (WS-CHECK-QUEUE-DSID)
+000917*        RIDFLD  (PI-CHECK-QUE-KEY)
+000918*        GTEQ
+000919*    END-EXEC.
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&,         G          &   #00006431' TO DFHEIV0
+           MOVE X'262C20202020202020202047' &
+                X'202020202020202020202620' &
+                X'2020233030303036343331' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-CHECK-QUEUE-DSID, 
+                 PI-CHECK-QUE-KEY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000920
+000921     SET EL685A-INDEX TO +1.
+000922
+000923 4100-READNEXT.
+000924     MOVE PI-CHECK-QUE-KEY           TO  PI-PREV-CHECK-QUE-KEY
+000925
+000926     
+      * EXEC CICS HANDLE CONDITION
+000927*        ENDFILE  (4800-END-OF-FILE)
+000928*    END-EXEC.
+      *    MOVE '"$''                   ! & #00006442' TO DFHEIV0
+           MOVE X'222427202020202020202020' &
+                X'202020202020202020202120' &
+                X'2620233030303036343432' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000929
+000930     
+      * EXEC CICS READNEXT
+000931*        DATASET (WS-CHECK-QUEUE-DSID)
+000932*        RIDFLD  (PI-CHECK-QUE-KEY)
+000933*        SET     (ADDRESS OF CHECK-QUE) END-EXEC
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&.S                   )   #00006446' TO DFHEIV0
+           MOVE X'262E53202020202020202020' &
+                X'202020202020202020202920' &
+                X'2020233030303036343436' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-CHECK-QUEUE-DSID, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 PI-CHECK-QUE-KEY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF CHECK-QUE TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+000934
+000935     IF CQ-COMPANY-CD NOT = PI-COMPANY-CD
+000936         GO TO 4800-END-OF-FILE.
+000937
+000938     IF CQ-ENTRY-TYPE NOT = 'Q'
+000939         GO TO 4100-READNEXT.
+000940
+000941     IF CQ-VOID-INDICATOR = 'V'
+000942         GO TO 4100-READNEXT.
+000943
+000944     IF CQ-CHECK-AMOUNT = ZEROS
+000945         GO TO 4100-READNEXT.
+000946
+000947     IF CQ-TIMES-PRINTED NOT = ZERO
+000948         IF CHECKS-PRINTED
+000949             NEXT SENTENCE
+000950         ELSE
+000951             GO TO 4100-READNEXT
+000952     ELSE
+000953         IF CHECKS-TO-BE-PRINTED
+000954             NEXT SENTENCE
+000955         ELSE
+000956             GO TO 4100-READNEXT.
+000957
+000958     IF PI-FIRST-TIME
+000959         IF CNTLNOL IS EQUAL TO +0
+000960             MOVE PI-CK-CONTROL-NO   TO  PI-START-CONTROL-NO.
+000961
+000962     
+      * EXEC CICS
+000963*         ASKTIME
+000964*    END-EXEC.
+      *    MOVE '0"                    "   #00006478' TO DFHEIV0
+           MOVE X'302220202020202020202020' &
+                X'202020202020202020202220' &
+                X'2020233030303036343738' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+000965
+000966     IF EL685A-INDEX LESS THAN +18
+000967        IF PI-CONTROL-SAVE-CONTROL NOT = CQ-CONTROL-NUMBER
+000968           IF PI-FIRST-TIME
+000969              MOVE CQ-CONTROL-NUMBER TO PI-CONTROL-SAVE-CONTROL
+000970           ELSE
+000971              MOVE 'CONTL TOTAL' TO EL685A-PMT-TYPE (EL685A-INDEX)
+000972              MOVE PI-CONTROL-TOT TO EL685A-AMT (EL685A-INDEX)
+000973              SET EL685A-INDEX UP BY +1
+000974              MOVE ZEROS TO PI-CONTROL-TOT
+000975              MOVE CQ-CONTROL-NUMBER TO PI-CONTROL-SAVE-CONTROL.
+000976
+000977     MOVE 'N'                    TO PI-FIRST-TIME-SW.
+000978
+000979     IF EL685A-INDEX GREATER THAN +17
+000980        MOVE +1 TO WS-READNEXT-SW.
+000981
+000982     IF WS-READNEXT-SW GREATER THAN ZERO
+000983         GO TO 4900-ENDBROWSE.
+000984
+000985     ADD CQ-CHECK-AMOUNT        TO  PI-CONTROL-TOT
+000986                                    PI-CONTROL-GRAND-TOT.
+000987     MOVE CQ-CONTROL-NUMBER     TO  EL685A-CONTROL  (EL685A-INDEX)
+000988     MOVE CQ-CHECK-NUMBER       TO  EL685A-CHECK-NO (EL685A-INDEX)
+000989     MOVE CQ-CHECK-AMOUNT       TO  EL685A-AMT      (EL685A-INDEX)
+000990
+000991     IF CQ-BILLING-CREDIT
+000992        MOVE 'BILL CREDIT'     TO  EL685A-PMT-TYPE (EL685A-INDEX)
+000993     ELSE
+000994         IF CQ-REFUND-PMT
+000995            MOVE 'REFUND PMT'  TO  EL685A-PMT-TYPE (EL685A-INDEX)
+000996         ELSE
+000997            MOVE 'CHECK MAINT' TO  EL685A-PMT-TYPE (EL685A-INDEX).
+000998
+000999     IF CQ-CHECK-MAINT-PMT OR CQ-REFUND-PMT
+001000       IF PI-COMPANY-ID = 'LAP'  OR  'RMC'
+001001         MOVE CQ-CHEK-GROUPING  TO  EL685A-GROUPING (EL685A-INDEX)
+001002         MOVE CQ-CHEK-CARRIER   TO  EL685A-CARRIER  (EL685A-INDEX)
+001003         MOVE CQ-CHEK-ACCOUNT   TO  EL685A-FIN-RESP (EL685A-INDEX)
+001004         MOVE CQ-CHEK-CERT-NO   TO  EL685A-ACCOUNT  (EL685A-INDEX)
+001005       ELSE
+001006         MOVE CQ-CHEK-GROUPING  TO  EL685A-GROUPING (EL685A-INDEX)
+001007         MOVE CQ-CHEK-CARRIER   TO  EL685A-CARRIER  (EL685A-INDEX)
+001008         MOVE CQ-CHEK-FIN-RESP  TO  EL685A-FIN-RESP (EL685A-INDEX)
+001009         MOVE CQ-CHEK-ACCOUNT   TO  EL685A-ACCOUNT  (EL685A-INDEX)
+001010     ELSE
+001011         MOVE CQ-PYAJ-GROUPING  TO  EL685A-GROUPING (EL685A-INDEX)
+001012         MOVE CQ-PYAJ-CARRIER   TO  EL685A-CARRIER  (EL685A-INDEX)
+001013         MOVE CQ-PYAJ-FIN-RESP  TO  EL685A-FIN-RESP (EL685A-INDEX)
+001014         MOVE CQ-PYAJ-ACCOUNT   TO  EL685A-ACCOUNT (EL685A-INDEX).
+001015
+001016     IF EL685A-INDEX LESS THAN +18
+001017         SET EL685A-INDEX UP BY +1
+001018         GO TO 4100-READNEXT.
+001019
+001020     MOVE +1                     TO  WS-READNEXT-SW.
+001021     GO TO 4100-READNEXT.
+001022
+001023 4800-END-OF-FILE.
+001024     
+      * EXEC CICS
+001025*         ASKTIME
+001026*    END-EXEC.
+      *    MOVE '0"                    "   #00006540' TO DFHEIV0
+           MOVE X'302220202020202020202020' &
+                X'202020202020202020202220' &
+                X'2020233030303036353430' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001027
+001028     MOVE +1                     TO  PI-END-OF-FILE.
+001029
+001030     MOVE 'Y'                    TO PI-EOF-SWT.
+001031     IF EL685A-INDEX GREATER +16
+001032        MOVE 'Y' TO PI-SEND-TOT-SWT
+001033        GO TO 4900-ENDBROWSE.
+001034
+001035     MOVE +375                   TO  EMI-ERROR.
+001036     IF EL685A-INDEX LESS THAN +18
+001037              MOVE 'CONTL TOTAL' TO EL685A-PMT-TYPE (EL685A-INDEX)
+001038              MOVE PI-CONTROL-TOT TO EL685A-AMT (EL685A-INDEX)
+001039              SET EL685A-INDEX UP BY +1
+001040     ELSE
+001041        NEXT SENTENCE.
+001042     IF EL685A-INDEX LESS THAN +18
+001043        SET EL685A-INDEX UP BY +1
+001044        MOVE PI-CONTROL-GRAND-TOT TO EL685A-AMT (EL685A-INDEX)
+001045        MOVE 'GRAND TOTAL' TO EL685A-PMT-TYPE (EL685A-INDEX)
+001046     ELSE
+001047        NEXT SENTENCE.
+001048
+001049 4900-ENDBROWSE.
+001050     MOVE -1                     TO  APFKL
+001051
+001052     MOVE EIBTRMID               TO  WS-TS-TERM-ID
+001053
+001054     
+      * EXEC CICS WRITEQ TS
+001055*        QUEUE  (WS-TEMP-STORAGE-KEY)
+001056*        ITEM   (PI-TEMP-STORAGE-ITEM)
+001057*        FROM   (EL685AI)
+001058*        LENGTH (WS-TS-LENGTH)
+001059*    END-EXEC.
+      *    MOVE '*" I   L              ''   #00006570' TO DFHEIV0
+           MOVE X'2A2220492020204C20202020' &
+                X'202020202020202020202720' &
+                X'2020233030303036353730' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-TEMP-STORAGE-KEY, 
+                 EL685AI, 
+                 WS-TS-LENGTH, 
+                 PI-TEMP-STORAGE-ITEM, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001060
+001061     MOVE PI-TEMP-STORAGE-ITEM  TO  APAGEO
+001062
+001063     PERFORM 8100-SEND-INITIAL-MAP.
+001064
+001065 4990-EXIT.
+001066     EXIT.
+001067
+001068     EJECT
+001069 5000-BROWSE-COMM-CHECK-QUEUE SECTION.
+001070
+001071     
+      * EXEC CICS HANDLE CONDITION
+001072*        NOTFND   (8400-NOTFND)
+001073*    END-EXEC.
+      *    MOVE '"$I                   ! '' #00006587' TO DFHEIV0
+           MOVE X'222449202020202020202020' &
+                X'202020202020202020202120' &
+                X'2720233030303036353837' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001074
+001075     MOVE LOW-VALUES             TO  EL685BI
+001076
+001077     
+      * EXEC CICS STARTBR
+001078*        DATASET (WS-COMCK-QUEUE-DSID)
+001079*        RIDFLD  (PI-CHECK-QUE-KEY)
+001080*        GTEQ
+001081*    END-EXEC.
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&,         G          &   #00006593' TO DFHEIV0
+           MOVE X'262C20202020202020202047' &
+                X'202020202020202020202620' &
+                X'2020233030303036353933' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-COMCK-QUEUE-DSID, 
+                 PI-CHECK-QUE-KEY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001082
+001083     SET EL685B-INDEX TO +1.
+001084
+001085 5100-READNEXT.
+001086
+001087     
+      * EXEC CICS HANDLE CONDITION
+001088*        ENDFILE  (5800-END-OF-FILE)
+001089*    END-EXEC.
+      *    MOVE '"$''                   ! ( #00006603' TO DFHEIV0
+           MOVE X'222427202020202020202020' &
+                X'202020202020202020202120' &
+                X'2820233030303036363033' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001090
+001091     
+      * EXEC CICS READNEXT
+001092*        DATASET (WS-COMCK-QUEUE-DSID)
+001093*        RIDFLD  (PI-CHECK-QUE-KEY)
+001094*        SET     (ADDRESS OF COMMISSION-CHECK-QUE)
+001095*    END-EXEC.
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&.S                   )   #00006607' TO DFHEIV0
+           MOVE X'262E53202020202020202020' &
+                X'202020202020202020202920' &
+                X'2020233030303036363037' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-COMCK-QUEUE-DSID, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 PI-CHECK-QUE-KEY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF COMMISSION-CHECK-QUE TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001096
+001097     IF MQ-COMPANY-CD NOT = PI-COMPANY-CD
+001098         GO TO 5800-END-OF-FILE.
+001099
+001100     IF MQ-VOID-DT NOT = LOW-VALUES
+001101         GO TO 5100-READNEXT.
+001102
+001103     IF MQ-ENTRY-TYPE = 'Q' OR 'P'
+001104         NEXT SENTENCE
+001105     ELSE
+001106         GO TO 5100-READNEXT.
+001107
+001108     IF CHECKS-TO-BE-PRINTED
+001109         IF MQ-CHECK-AMOUNT = ZEROS
+001110             GO TO 5100-READNEXT.
+001111
+001112     IF MQ-TIMES-PRINTED NOT = ZERO
+001113         IF CHECKS-PRINTED
+001114             NEXT SENTENCE
+001115         ELSE
+001116             GO TO 5100-READNEXT
+001117     ELSE
+001118         IF CHECKS-TO-BE-PRINTED
+001119             NEXT SENTENCE
+001120         ELSE
+001121             GO TO 5100-READNEXT.
+001122
+001123     IF PI-PAGE-FORWARD
+001124         MOVE COMMISSION-CHECK-QUE
+001125                                 TO  HOLD-CHECK-RECORD
+001126         MOVE 'N'                TO  PI-PAGING-SW
+001127         IF CHECKS-PRINTED
+001128             GO TO 5100-READNEXT.
+001129
+001130     IF PI-FIRST-TIME
+001131         IF BCNTLNOL IS EQUAL TO +0
+001132             MOVE PI-CK-CONTROL-NO   TO  PI-START-CONTROL-NO
+001133         END-IF
+001134     END-IF.
+001135
+001136     IF MQ-COMPANY-CD-A1  = HOLD-COMPANY-CD-A1  AND
+001137        MQ-CONTROL-NUMBER = HOLD-CONTROL-NUMBER AND
+001138        MQ-CARRIER-A1     = HOLD-CARRIER-A1     AND
+001139        MQ-GROUPING-A1    = HOLD-GROUPING-A1    AND
+001140        MQ-PAYEE-A1       = HOLD-PAYEE-A1       AND
+001141        MQ-PAYEE-SEQ-A1   = HOLD-PAYEE-SEQ-A1
+001142         NEXT SENTENCE
+001143     ELSE
+001144         MOVE PI-CHECK-QUE-KEY   TO  PI-PREV-CHECK-QUE-KEY.
+001145
+001146     IF CHECKS-PRINTED
+001147         GO TO 5200-PRINTED.
+001148
+001149 5100-TO-BE-PRINTED.
+001150
+001151     IF PI-FIRST-TOTAL
+001152         IF BCNTLNOL IS EQUAL TO +0
+001153             MOVE PI-CK-CONTROL-NO
+001154                                 TO  PI-START-CONTROL-NO.
+001155
+001156     
+      * EXEC CICS
+001157*         ASKTIME
+001158*    END-EXEC.
+      *    MOVE '0"                    "   #00006672' TO DFHEIV0
+           MOVE X'302220202020202020202020' &
+                X'202020202020202020202220' &
+                X'2020233030303036363732' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001159
+001160     IF EL685B-INDEX LESS THAN +18
+001161        IF PI-CONTROL-SAVE-CONTROL NOT = MQ-CONTROL-NUMBER
+001162           IF PI-FIRST-TOTAL
+001163               MOVE MQ-CONTROL-NUMBER
+001164                                 TO PI-CONTROL-SAVE-CONTROL
+001165               MOVE PI-CK-CONTROL-NO
+001166                                 TO  PI-START-CONTROL-NO
+001167           ELSE
+001168              MOVE ' CONTL'      TO EL685B-DESC-ONE (EL685B-INDEX)
+001169              MOVE 'TOTAL'       TO EL685B-DESC-TWO (EL685B-INDEX)
+001170              MOVE PI-CONTROL-TOT
+001171                                 TO EL685B-AMT (EL685B-INDEX)
+001172              SET EL685B-INDEX UP BY +1
+001173              MOVE ZEROS         TO PI-CONTROL-TOT
+001174              MOVE MQ-CONTROL-NUMBER
+001175                                 TO PI-CONTROL-SAVE-CONTROL.
+001176
+001177     MOVE 'N'                    TO PI-FIRST-TOTAL-SW.
+001178
+001179     IF EL685B-INDEX GREATER THAN +17
+001180        MOVE +1 TO WS-READNEXT-SW.
+001181
+001182     IF WS-READNEXT-SW GREATER THAN ZERO
+001183         MOVE PI-PREV-CHECK-QUE-KEY
+001184                                 TO  PI-CHECK-QUE-KEY
+001185         MOVE 'Y'                TO  PI-PAGING-SW
+001186         GO TO 5900-WRITE-REPORT.
+001187
+001188     ADD MQ-CHECK-AMOUNT      TO  PI-CONTROL-TOT
+001189                                  PI-CONTROL-GRAND-TOT.
+001190     MOVE MQ-CONTROL-NUMBER   TO  EL685B-CONTROL   (EL685B-INDEX)
+001191
+001192     IF ACH-PAYMENT
+001193         MOVE ' ACH  '
+001194                              TO  EL685B-CHECK-NO  (EL685B-INDEX)
+001195     ELSE
+001196         MOVE MQ-CHECK-NUMBER
+001197                              TO  EL685B-CHECK-NO  (EL685B-INDEX).
+001198
+001199     MOVE MQ-CHECK-AMOUNT     TO  EL685B-AMT       (EL685B-INDEX)
+001200     MOVE MQ-CHEK-CARRIER     TO  EL685B-CARRIER   (EL685B-INDEX)
+001201     MOVE MQ-CHEK-GROUPING    TO  EL685B-GROUPING  (EL685B-INDEX)
+001202     MOVE MQ-CHEK-PAYEE       TO  EL685B-PAYEE     (EL685B-INDEX)
+001203     MOVE MQ-PAYEE-SEQ-A1     TO  EL685B-PAYEE-SEQ (EL685B-INDEX)
+001204     MOVE MQ-PAYEE-NAME       TO  EL685B-PAYEE-NA  (EL685B-INDEX)
+001205
+001206     IF PI-COMPANY-ID = 'CID' OR 'AHL' OR 'FNL'
+001207         MOVE MQ-CHECK-WRITTEN-DT    TO  DC-BIN-DATE-1
+001208         MOVE ' '                    TO  DC-OPTION-CODE
+001209         PERFORM 8500-DATE-CONVERSION
+001210         MOVE DC-GREG-DATE-1-EDIT TO
+001211                                  EL685B-CHK-DT (EL685B-INDEX)
+001212     ELSE
+001213         MOVE SPACES              TO  EL685B-CHK-DT(EL685B-INDEX)
+001214     END-IF.
+001215
+001216     IF EL685B-INDEX LESS THAN +18
+001217         SET EL685B-INDEX UP BY +1
+001218         GO TO 5100-READNEXT.
+001219
+001220     MOVE +1                     TO  WS-READNEXT-SW.
+001221     GO TO 5100-READNEXT.
+001222
+001223 5200-PRINTED.
+001224
+001225     IF PI-FIRST-TIME
+001226         MOVE COMMISSION-CHECK-QUE
+001227                                 TO  HOLD-CHECK-RECORD
+001228         IF BCNTLNOL IS EQUAL TO +0
+001229             MOVE PI-CK-CONTROL-NO
+001230                                 TO  PI-START-CONTROL-NO
+001231             MOVE 'N'            TO  PI-FIRST-TIME-SW
+001232             GO TO 5100-READNEXT.
+001233
+001234     IF MQ-COMPANY-CD-A1  = HOLD-COMPANY-CD-A1  AND
+001235        MQ-CONTROL-NUMBER = HOLD-CONTROL-NUMBER AND
+001236        MQ-CARRIER-A1     = HOLD-CARRIER-A1     AND
+001237        MQ-GROUPING-A1    = HOLD-GROUPING-A1    AND
+001238        MQ-PAYEE-A1       = HOLD-PAYEE-A1       AND
+001239        MQ-PAYEE-SEQ-A1   = HOLD-PAYEE-SEQ-A1
+001240        IF MQ-TEXT
+001241            IF MQ-CHECK-NUMBER = HOLD-CHECK-NUMBER
+001242                GO TO 5100-READNEXT
+001243            ELSE
+001244                MOVE HOLD-CHECK-AMOUNT
+001245                                 TO  MQ-CHECK-AMOUNT
+001246                MOVE ZEROS       TO  HOLD-CHECK-AMOUNT
+001247        ELSE
+001248            IF MQ-CHECK-NUMBER = HOLD-CHECK-NUMBER
+001249                MOVE COMMISSION-CHECK-QUE
+001250                                 TO  HOLD-CHECK-RECORD
+001251                GO TO 5100-READNEXT
+001252            ELSE
+001253                GO TO 5210-CONTINUE.
+001254
+001255     IF MQ-CHECK-NUMBER NOT = HOLD-CHECK-NUMBER
+001256         NEXT SENTENCE
+001257     ELSE
+001258         MOVE COMMISSION-CHECK-QUE
+001259                                 TO  HOLD-CHECK-RECORD
+001260         GO TO 5100-READNEXT.
+001261
+001262 5210-CONTINUE.
+001263
+001264*    IF EL685B-INDEX LESS THAN +18
+001265        IF PI-CONTROL-SAVE-CONTROL NOT = HOLD-CONTROL-NUMBER
+001266           IF PI-FIRST-TOTAL
+001267               MOVE HOLD-CONTROL-NUMBER
+001268                                 TO PI-CONTROL-SAVE-CONTROL
+001269               MOVE PI-CK-CONTROL-NO
+001270                                 TO  PI-START-CONTROL-NO
+001271               MOVE 'N'          TO  PI-FIRST-TOTAL-SW
+001272           ELSE
+001273              MOVE ' CONTL'      TO EL685B-DESC-ONE (EL685B-INDEX)
+001274              MOVE 'TOTAL'       TO EL685B-DESC-TWO (EL685B-INDEX)
+001275              MOVE PI-CONTROL-TOT
+001276                                 TO EL685B-AMT (EL685B-INDEX)
+001277              SET EL685B-INDEX UP BY +1
+001278              MOVE ZEROS         TO PI-CONTROL-TOT
+001279              MOVE HOLD-CONTROL-NUMBER
+001280                                 TO PI-CONTROL-SAVE-CONTROL.
+001281
+001282     ADD HOLD-CHECK-AMOUNT       TO  PI-CONTROL-TOT
+001283                                     PI-CONTROL-GRAND-TOT.
+001284     MOVE HOLD-CONTROL-NUMBER TO  EL685B-CONTROL   (EL685B-INDEX).
+001285
+001286     IF HOLD-ENTRY-TYPE = 'P'
+001287         MOVE ' ACH  '
+001288                              TO  EL685B-CHECK-NO  (EL685B-INDEX)
+001289     ELSE
+001290         MOVE HOLD-CHECK-NUMBER
+001291                              TO  EL685B-CHECK-NO  (EL685B-INDEX).
+001292
+001293     MOVE HOLD-CHECK-AMOUNT   TO  EL685B-AMT       (EL685B-INDEX).
+001294     MOVE HOLD-CHEK-CARRIER   TO  EL685B-CARRIER   (EL685B-INDEX).
+001295     MOVE HOLD-CHEK-GROUPING  TO  EL685B-GROUPING  (EL685B-INDEX).
+001296     MOVE HOLD-CHEK-PAYEE     TO  EL685B-PAYEE     (EL685B-INDEX).
+001297     MOVE HOLD-PAYEE-SEQ-A1   TO  EL685B-PAYEE-SEQ (EL685B-INDEX).
+001298     MOVE HOLD-PAYEE-NAME     TO  EL685B-PAYEE-NA  (EL685B-INDEX).
+001299
+001300     IF HOLD-CHECK-WRITTEN-DT = ZEROS OR LOW-VALUES OR SPACES
+001301         MOVE SPACES
+001302                              TO  EL685B-CHK-DT (EL685B-INDEX)
+001303     ELSE
+001304         MOVE HOLD-CHECK-WRITTEN-DT
+001305                              TO  DC-BIN-DATE-1
+001306         MOVE ' '             TO  DC-OPTION-CODE
+001307         PERFORM 8500-DATE-CONVERSION
+001308         MOVE DC-GREG-DATE-1-EDIT
+001309                              TO  EL685B-CHK-DT (EL685B-INDEX).
+001310
+001311     MOVE COMMISSION-CHECK-QUE   TO  HOLD-CHECK-RECORD.
+001312
+001313     IF EL685B-INDEX LESS THAN +18
+001314         SET EL685B-INDEX UP BY +1
+001315         GO TO 5100-READNEXT.
+001316
+001317     IF EL685B-INDEX GREATER THAN +17
+001318         MOVE 'Y'                TO  PI-PAGING-SW
+001319         GO TO 5900-WRITE-REPORT.
+001320
+001321     GO TO 5100-READNEXT.
+001322
+001323 5800-END-OF-FILE.
+001324
+001325     IF CHECKS-PRINTED
+001326         GO TO 5800-END-PRINTED.
+001327
+001328     IF EL685B-INDEX LESS THAN +18
+001329         SET EL685B-INDEX UP BY +1.
+001330
+001331     
+      * EXEC CICS
+001332*         ASKTIME
+001333*    END-EXEC.
+      *    MOVE '0"                    "   #00006847' TO DFHEIV0
+           MOVE X'302220202020202020202020' &
+                X'202020202020202020202220' &
+                X'2020233030303036383437' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001334
+001335     MOVE +1                     TO  PI-END-OF-FILE.
+001336     MOVE 'Y'                    TO  PI-EOF-SWT.
+001337
+001338     IF EL685B-INDEX GREATER +16
+001339        MOVE 'Y'                 TO PI-SEND-TOT-SWT
+001340        GO TO 5900-WRITE-REPORT.
+001341
+001342     MOVE +375                   TO  EMI-ERROR.
+001343
+001344     IF EL685B-INDEX LESS THAN +18
+001345              MOVE ' CONTL'     TO EL685B-DESC-ONE (EL685B-INDEX)
+001346              MOVE 'TOTAL'      TO  EL685B-DESC-TWO (EL685B-INDEX)
+001347              MOVE PI-CONTROL-TOT
+001348                                 TO EL685B-AMT (EL685B-INDEX)
+001349              SET EL685B-INDEX UP BY +1
+001350     ELSE
+001351        NEXT SENTENCE.
+001352
+001353     IF EL685B-INDEX LESS THAN +18
+001354        SET EL685B-INDEX UP BY +1
+001355        MOVE PI-CONTROL-GRAND-TOT
+001356                                 TO EL685B-AMT (EL685B-INDEX)
+001357        MOVE ' GRAND'            TO EL685B-DESC-ONE (EL685B-INDEX)
+001358        MOVE 'TOTAL'             TO EL685B-DESC-TWO (EL685B-INDEX)
+001359     ELSE
+001360        NEXT SENTENCE.
+001361
+001362     GO TO 5900-WRITE-REPORT.
+001363
+001364 5800-END-PRINTED.
+001365
+001366     IF EL685B-INDEX LESS THAN +18
+001367        IF PI-CONTROL-SAVE-CONTROL NOT = HOLD-CONTROL-NUMBER
+001368           IF PI-FIRST-TOTAL
+001369               MOVE HOLD-CONTROL-NUMBER
+001370                                 TO PI-CONTROL-SAVE-CONTROL
+001371               MOVE PI-CK-CONTROL-NO
+001372                                 TO  PI-START-CONTROL-NO
+001373               MOVE 'N'          TO  PI-FIRST-TOTAL-SW
+001374           ELSE
+001375              MOVE ' CONTL'      TO EL685B-DESC-ONE (EL685B-INDEX)
+001376              MOVE 'TOTAL'       TO EL685B-DESC-TWO (EL685B-INDEX)
+001377              MOVE PI-CONTROL-TOT
+001378                                 TO EL685B-AMT (EL685B-INDEX)
+001379              SET EL685B-INDEX UP BY +1
+001380              MOVE ZEROS         TO PI-CONTROL-TOT
+001381              MOVE HOLD-CONTROL-NUMBER
+001382                                 TO PI-CONTROL-SAVE-CONTROL.
+001383
+001384     ADD HOLD-CHECK-AMOUNT       TO  PI-CONTROL-TOT
+001385                                     PI-CONTROL-GRAND-TOT
+001386     MOVE HOLD-CONTROL-NUMBER TO  EL685B-CONTROL   (EL685B-INDEX)
+001387
+001388     IF HOLD-ENTRY-TYPE = 'P'
+001389         MOVE ' ACH  '
+001390                              TO  EL685B-CHECK-NO  (EL685B-INDEX)
+001391     ELSE
+001392         MOVE HOLD-CHECK-NUMBER
+001393                              TO  EL685B-CHECK-NO  (EL685B-INDEX).
+001394
+001395     MOVE HOLD-CHECK-AMOUNT   TO  EL685B-AMT       (EL685B-INDEX)
+001396     MOVE HOLD-CHEK-CARRIER   TO  EL685B-CARRIER   (EL685B-INDEX)
+001397     MOVE HOLD-CHEK-GROUPING  TO  EL685B-GROUPING  (EL685B-INDEX)
+001398     MOVE HOLD-CHEK-PAYEE     TO  EL685B-PAYEE     (EL685B-INDEX)
+001399     MOVE HOLD-PAYEE-SEQ-A1   TO  EL685B-PAYEE-SEQ (EL685B-INDEX)
+001400     MOVE HOLD-PAYEE-NAME     TO  EL685B-PAYEE-NA  (EL685B-INDEX)
+001401     MOVE HOLD-CHECK-WRITTEN-DT
+001402                              TO  DC-BIN-DATE-1
+001403     MOVE ' '                 TO  DC-OPTION-CODE
+001404     PERFORM 8500-DATE-CONVERSION
+001405     MOVE DC-GREG-DATE-1-EDIT
+001406                              TO  EL685B-CHK-DT (EL685B-INDEX).
+001407
+001408     IF EL685B-INDEX LESS THAN +18
+001409         SET EL685B-INDEX UP BY +1.
+001410
+001411     MOVE +1                     TO  PI-END-OF-FILE.
+001412     MOVE 'Y'                    TO  PI-EOF-SWT.
+001413
+001414     IF EL685B-INDEX GREATER +16
+001415        MOVE 'Y'                 TO PI-SEND-TOT-SWT
+001416        GO TO 5900-WRITE-REPORT.
+001417
+001418     MOVE +375                   TO  EMI-ERROR.
+001419
+001420     IF EL685B-INDEX LESS THAN +18
+001421              MOVE ' CONTL'     TO EL685B-DESC-ONE (EL685B-INDEX)
+001422              MOVE 'TOTAL'      TO  EL685B-DESC-TWO (EL685B-INDEX)
+001423              MOVE PI-CONTROL-TOT
+001424                                 TO EL685B-AMT (EL685B-INDEX)
+001425              SET EL685B-INDEX UP BY +1
+001426     ELSE
+001427        NEXT SENTENCE.
+001428
+001429     IF EL685B-INDEX LESS THAN +18
+001430        SET EL685B-INDEX UP BY +1
+001431        MOVE PI-CONTROL-GRAND-TOT
+001432                                 TO EL685B-AMT (EL685B-INDEX)
+001433        MOVE ' GRAND'            TO EL685B-DESC-ONE (EL685B-INDEX)
+001434        MOVE 'TOTAL'             TO EL685B-DESC-TWO (EL685B-INDEX)
+001435     ELSE
+001436        NEXT SENTENCE.
+001437
+001438 5900-WRITE-REPORT.
+001439     MOVE -1                     TO  BPFKL
+001440
+001441     MOVE EIBTRMID               TO  WS-TS-TERM-ID
+001442
+001443     
+      * EXEC CICS WRITEQ TS
+001444*        QUEUE  (WS-TEMP-STORAGE-KEY)
+001445*        ITEM   (PI-TEMP-STORAGE-ITEM)
+001446*        FROM   (EL685BI)
+001447*        LENGTH (WS-TS-LENGTH)
+001448*    END-EXEC.
+      *    MOVE '*" I   L              ''   #00006959' TO DFHEIV0
+           MOVE X'2A2220492020204C20202020' &
+                X'202020202020202020202720' &
+                X'2020233030303036393539' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-TEMP-STORAGE-KEY, 
+                 EL685BI, 
+                 WS-TS-LENGTH, 
+                 PI-TEMP-STORAGE-ITEM, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001449
+001450     MOVE PI-TEMP-STORAGE-ITEM   TO  BPAGEO.
+001451
+001452     PERFORM 8100-SEND-INITIAL-MAP.
+001453
+001454 5990-EXIT.
+001455     EXIT.
+001456
+001457     EJECT
+001458 8100-SEND-INITIAL-MAP SECTION.
+001459
+001460     IF PI-COMPANY-ID = 'LAP'  OR  'RMC'
+001461         IF NOT PI-CALLED-FROM-AR-MENU
+001462             MOVE ' ACCOUNT'     TO ADESC1O
+001463             MOVE 'CERT NO.'     TO ADESC2O.
+001464
+001465     IF CHECKS-TO-BE-PRINTED
+001466         IF PI-CALLED-FROM-AR-MENU
+001467             MOVE WS-TO-BE-PRINTED-PFDESC     TO BPFDESCO
+001468             MOVE WS-AR-TO-BE-PRINTED-DESC    TO BTITLEO
+001469             MOVE 'EL685B'                    TO ASCREENO
+001470         ELSE
+001471             MOVE WS-TO-BE-PRINTED-PFDESC     TO APFDESCO
+001472             MOVE WS-TO-BE-PRINTED-DESC       TO ATITLEO
+001473             MOVE 'EL685A'                    TO ASCREENO
+001474     ELSE
+001475         IF PI-CALLED-FROM-AR-MENU
+001476             MOVE WS-CHECKS-PRINTED-PFDESC    TO BPFDESCO
+001477             MOVE WS-AR-CHECKS-PRINTED-DESC   TO BTITLEO
+001478             MOVE 'EL685D'                    TO BSCREENO
+001479         ELSE
+001480             MOVE WS-CHECKS-PRINTED-PFDESC    TO APFDESCO
+001481             MOVE WS-CHECKS-PRINTED-DESC      TO ATITLEO
+001482             MOVE 'EL685C'                    TO ASCREENO.
+001483
+001484     IF EMI-ERROR NOT = ZERO
+001485         PERFORM 9900-ERROR-FORMAT.
+001486
+001487     MOVE EIBTIME              TO  WS-TIME-WORK.
+001488     IF PI-CALLED-FROM-AR-MENU
+001489         MOVE PI-CURRENT-DATE      TO  BDATEO
+001490         MOVE WS-TIME              TO  BTIMEO
+001491         MOVE EMI-MESSAGE-AREA (1) TO  BEMSG1O
+001492     ELSE
+001493         MOVE PI-CURRENT-DATE      TO  ADATEO
+001494         MOVE WS-TIME              TO  ATIMEO
+001495         MOVE EMI-MESSAGE-AREA (1) TO  AEMSG1O.
+001496
+001497     IF PI-CALLED-FROM-AR-MENU
+001498         
+      * EXEC CICS SEND
+001499*            FROM   (EL685BI)
+001500*            MAPSET (WS-MAPSET-NAME)
+001501*            MAP    (WS-MAP-NAME)
+001502*            CURSOR ERASE
+001503*        END-EXEC
+           MOVE LENGTH OF
+            EL685BI
+             TO DFHEIV12
+           MOVE -1
+             TO DFHEIV11
+      *    MOVE '8$     CT  E    H L F ,   #00007014' TO DFHEIV0
+           MOVE X'382420202020204354202045' &
+                X'2020202048204C2046202C20' &
+                X'2020233030303037303134' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-MAP-NAME, 
+                 EL685BI, 
+                 DFHEIV12, 
+                 WS-MAPSET-NAME, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+001504     ELSE
+001505         
+      * EXEC CICS SEND
+001506*            FROM   (EL685AI)
+001507*            MAPSET (WS-MAPSET-NAME)
+001508*            MAP    (WS-MAP-NAME)
+001509*            CURSOR ERASE
+001510*        END-EXEC.
+           MOVE LENGTH OF
+            EL685AI
+             TO DFHEIV12
+           MOVE -1
+             TO DFHEIV11
+      *    MOVE '8$     CT  E    H L F ,   #00007021' TO DFHEIV0
+           MOVE X'382420202020204354202045' &
+                X'2020202048204C2046202C20' &
+                X'2020233030303037303231' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-MAP-NAME, 
+                 EL685AI, 
+                 DFHEIV12, 
+                 WS-MAPSET-NAME, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001511
+001512     PERFORM 9100-RETURN-TRAN.
+001513
+001514 8100-EXIT.
+001515     EXIT.
+001516
+001517     EJECT
+001518 8200-SEND-DATAONLY SECTION.
+001519
+001520     IF PI-COMPANY-ID = 'LAP'  OR  'RMC'
+001521         IF NOT PI-CALLED-FROM-AR-MENU
+001522             MOVE ' ACCOUNT'                  TO ADESC1O
+001523             MOVE 'CERT NO.'                  TO ADESC2O.
+001524
+001525     IF CHECKS-TO-BE-PRINTED
+001526         IF PI-CALLED-FROM-AR-MENU
+001527             MOVE WS-TO-BE-PRINTED-PFDESC     TO BPFDESCO
+001528             MOVE WS-AR-TO-BE-PRINTED-DESC    TO BTITLEO
+001529             MOVE 'EL685B'                    TO BSCREENO
+001530         ELSE
+001531             MOVE WS-TO-BE-PRINTED-PFDESC     TO APFDESCO
+001532             MOVE WS-TO-BE-PRINTED-DESC       TO ATITLEO
+001533             MOVE 'EL685A'                    TO ASCREENO
+001534     ELSE
+001535         IF PI-CALLED-FROM-AR-MENU
+001536             MOVE WS-CHECKS-PRINTED-PFDESC    TO BPFDESCO
+001537             MOVE WS-AR-CHECKS-PRINTED-DESC   TO BTITLEO
+001538             MOVE 'EL685D'                    TO BSCREENO
+001539         ELSE
+001540             MOVE WS-CHECKS-PRINTED-PFDESC    TO APFDESCO
+001541             MOVE WS-CHECKS-PRINTED-DESC      TO ATITLEO
+001542             MOVE 'EL685C'                    TO ASCREENO.
+001543
+001544     IF EMI-ERROR NOT = ZERO
+001545         PERFORM 9900-ERROR-FORMAT.
+001546
+001547     MOVE EIBTIME                TO  WS-TIME-WORK.
+001548     IF PI-CALLED-FROM-AR-MENU
+001549         MOVE PI-CURRENT-DATE        TO  BDATEO
+001550         MOVE WS-TIME                TO  BTIMEO
+001551         MOVE EMI-MESSAGE-AREA (1)   TO  BEMSG1O
+001552     ELSE
+001553         MOVE PI-CURRENT-DATE        TO  ADATEO
+001554         MOVE WS-TIME                TO  ATIMEO
+001555         MOVE EMI-MESSAGE-AREA (1)   TO  AEMSG1O.
+001556
+001557     IF PI-CALLED-FROM-AR-MENU
+001558         
+      * EXEC CICS SEND DATAONLY
+001559*            FROM   (EL685AI)
+001560*            MAPSET (WS-MAPSET-NAME)
+001561*            MAP    (WS-MAP-NAME)
+001562*            CURSOR
+001563*        END-EXEC
+           MOVE LENGTH OF
+            EL685AI
+             TO DFHEIV12
+           MOVE -1
+             TO DFHEIV11
+      *    MOVE '8$D    CT       H L F ,   #00007074' TO DFHEIV0
+           MOVE X'382444202020204354202020' &
+                X'2020202048204C2046202C20' &
+                X'2020233030303037303734' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-MAP-NAME, 
+                 EL685AI, 
+                 DFHEIV12, 
+                 WS-MAPSET-NAME, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+001564     ELSE
+001565         
+      * EXEC CICS SEND DATAONLY
+001566*            FROM   (EL685BI)
+001567*            MAPSET (WS-MAPSET-NAME)
+001568*            MAP    (WS-MAP-NAME)
+001569*            CURSOR
+001570*        END-EXEC.
+           MOVE LENGTH OF
+            EL685BI
+             TO DFHEIV12
+           MOVE -1
+             TO DFHEIV11
+      *    MOVE '8$D    CT       H L F ,   #00007081' TO DFHEIV0
+           MOVE X'382444202020204354202020' &
+                X'2020202048204C2046202C20' &
+                X'2020233030303037303831' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-MAP-NAME, 
+                 EL685BI, 
+                 DFHEIV12, 
+                 WS-MAPSET-NAME, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001571
+001572     PERFORM 9100-RETURN-TRAN.
+001573
+001574 8100-EXIT.
+001575     EXIT.
+001576
+001577     EJECT
+001578 8300-SEND-TEXT SECTION.
+001579
+001580     
+      * EXEC CICS SEND TEXT
+001581*        FROM   (LOGOFF-TEXT)
+001582*        LENGTH (LOGOFF-LENGTH)
+001583*        ERASE  FREEKB
+001584*    END-EXEC,
+      *    MOVE '8&      T  E F  H   F -   #00007096' TO DFHEIV0
+           MOVE X'382620202020202054202045' &
+                X'204620204820202046202D20' &
+                X'2020233030303037303936' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 LOGOFF-TEXT, 
+                 LOGOFF-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+           
+001585
+001586     
+      * EXEC CICS RETURN
+001587*        END-EXEC.
+      *    MOVE '.(                    ''   #00007102' TO DFHEIV0
+           MOVE X'2E2820202020202020202020' &
+                X'202020202020202020202720' &
+                X'2020233030303037313032' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001588
+001589
+001590 8300-EXIT.
+001591     EXIT.
+001592
+001593 8400-NOTFND.
+001594     MOVE 0586 TO EMI-ERROR.
+001595     PERFORM 9900-ERROR-FORMAT
+001596        THRU 9900-EXIT.
+001597
+001598     IF  PI-CALLED-FROM-AR-MENU
+001599         MOVE -1 TO BPFKL
+001600     ELSE
+001601         MOVE -1 TO APFKL.
+001602
+001603     GO TO 8100-SEND-INITIAL-MAP.
+001604
+001605 8400-EXIT.
+001606     EXIT.
+001607
+001608     EJECT
+001609 8500-DATE-CONVERSION SECTION.
+001610
+001611     
+      * EXEC CICS LINK
+001612*        PROGRAM  ('ELDATCV')
+001613*        COMMAREA (DATE-CONVERSION-DATA)
+001614*        LENGTH   (DC-COMM-LENGTH)
+001615*    END-EXEC.
+           MOVE 'ELDATCV' TO DFHEIV1
+      *    MOVE '."C                   (   #00007127' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' &
+                X'202020202020202020202820' &
+                X'2020233030303037313237' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DATE-CONVERSION-DATA, 
+                 DC-COMM-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001616
+001617 8500-EXIT.
+001618     EXIT.
+001619
+001620     EJECT
+001621 9000-RETURN-CICS SECTION.
+001622
+001623     MOVE 'EL005   '             TO  WS-PROGRAM-ID
+001624     MOVE EIBAID                 TO  PI-ENTRY-CD-1
+001625     PERFORM 9300-XCTL.
+001626
+001627 9000-EXIT.
+001628     EXIT.
+001629
+001630 9100-RETURN-TRAN SECTION.
+001631
+001632     MOVE EMI-ERROR-NUMBER (1)  TO  PI-LAST-ERROR-NO
+001633     MOVE WS-MAP-NUMBER          TO  PI-CURRENT-SCREEN-NO
+001634
+001635     
+      * EXEC CICS RETURN
+001636*        COMMAREA (PROGRAM-INTERFACE-BLOCK)
+001637*        LENGTH   (PI-COMM-LENGTH)
+001638*        TRANSID  (WS-TRANS-ID)
+001639*    END-EXEC.
+      *    MOVE '.(CT                  ''   #00007151' TO DFHEIV0
+           MOVE X'2E2843542020202020202020' &
+                X'202020202020202020202720' &
+                X'2020233030303037313531' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-TRANS-ID, 
+                 PROGRAM-INTERFACE-BLOCK, 
+                 PI-COMM-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001640
+001641 9100-EXIT.
+001642     EXIT.
+001643
+001644 9300-XCTL SECTION.
+001645     
+      * EXEC CICS HANDLE CONDITION
+001646*        QIDERR (9300-NEXT-SENTENCE)
+001647*    END-EXEC.
+      *    MOVE '"$N                   ! ) #00007161' TO DFHEIV0
+           MOVE X'22244E202020202020202020' &
+                X'202020202020202020202120' &
+                X'2920233030303037313631' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001648
+001649     MOVE EIBTRMID               TO  WS-TS-TERM-ID
+001650
+001651     
+      * EXEC CICS DELETEQ TS
+001652*        QUEUE (WS-TEMP-STORAGE-KEY)
+001653*    END-EXEC.
+      *    MOVE '*&                    #   #00007167' TO DFHEIV0
+           MOVE X'2A2620202020202020202020' &
+                X'202020202020202020202320' &
+                X'2020233030303037313637' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-TEMP-STORAGE-KEY, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001654
+001655 9300-NEXT-SENTENCE.
+001656
+001657     MOVE DFHENTER               TO  EIBAID
+001658
+001659     
+      * EXEC CICS XCTL
+001660*        PROGRAM  (WS-PROGRAM-ID)
+001661*        COMMAREA (PROGRAM-INTERFACE-BLOCK)
+001662*        LENGTH   (PI-COMM-LENGTH)
+001663*    END-EXEC.
+      *    MOVE '.$C                   %   #00007175' TO DFHEIV0
+           MOVE X'2E2443202020202020202020' &
+                X'202020202020202020202520' &
+                X'2020233030303037313735' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-PROGRAM-ID, 
+                 PROGRAM-INTERFACE-BLOCK, 
+                 PI-COMM-LENGTH, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001664
+001665 9300-EXIT.
+001666     EXIT.
+001667
+001668 9400-CLEAR SECTION.
+001669
+001670     MOVE PI-RETURN-TO-PROGRAM  TO  WS-PROGRAM-ID
+001671     PERFORM 9300-XCTL.
+001672
+001673 9400-EXIT.
+001674     EXIT.
+001675
+001676 9600-PGMIDERR SECTION.
+001677
+001678     
+      * EXEC CICS HANDLE CONDITION
+001679*        PGMIDERR (8300-SEND-TEXT)
+001680*    END-EXEC.
+      *    MOVE '"$L                   ! * #00007194' TO DFHEIV0
+           MOVE X'22244C202020202020202020' &
+                X'202020202020202020202120' &
+                X'2A20233030303037313934' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001681
+001682     MOVE WS-PROGRAM-ID          TO  PI-CALLING-PROGRAM
+001683                                     LOGOFF-PGM
+001684
+001685     MOVE 'EL005   '             TO  WS-PROGRAM-ID
+001686     MOVE SPACES                 TO  PI-ENTRY-CD-1
+001687
+001688     MOVE PGMIDERR-MSG           TO  LOGOFF-FILL
+001689
+001690     PERFORM 9300-XCTL.
+001691
+001692 9600-EXIT.
+001693     EXIT.
+001694
+001695     EJECT
+001696 9900-ERROR-FORMAT SECTION.
+001697
+001698     
+      * EXEC CICS LINK
+001699*        PROGRAM  ('EL001')
+001700*        COMMAREA (ERROR-MESSAGE-INTERFACE-BLOCK)
+001701*        LENGTH   (EMI-COMM-LENGTH)
+001702*    END-EXEC.
+           MOVE 'EL001' TO DFHEIV1
+      *    MOVE '."C                   (   #00007214' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' &
+                X'202020202020202020202820' &
+                X'2020233030303037323134' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 ERROR-MESSAGE-INTERFACE-BLOCK, 
+                 EMI-COMM-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001703
+001704 9900-EXIT.
+001705     EXIT.
+001706
+001707 9990-ERROR SECTION.
+001708
+001709     MOVE DFHEIBLK TO EMI-LINE1.
+001710     
+      * EXEC CICS LINK
+001711*        PROGRAM  ('EL004')
+001712*        COMMAREA (EMI-LINE1)
+001713*        LENGTH   (72)
+001714*    END-EXEC.
+           MOVE 'EL004' TO DFHEIV1
+           MOVE 72
+             TO DFHEIV11
+      *    MOVE '."C                   (   #00007226' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' &
+                X'202020202020202020202820' &
+                X'2020233030303037323236' TO DFHEIV0
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 EMI-LINE1, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+001715
+001716     IF PI-CALLED-FROM-AR-MENU
+001717         MOVE -1 TO BPFKL
+001718     ELSE
+001719         MOVE -1 TO APFKL.
+001720     PERFORM 8100-SEND-INITIAL-MAP.
+001721     GO TO 9100-RETURN-TRAN.
+001722
+001723 9990-EXIT.
+001724     EXIT.
+001725
+001726 9999-LAST-PARAGRAPH SECTION.
+001727
+001728     
+      * GOBACK.
+           MOVE '9%                    "   ' TO DFHEIV0
+           MOVE 'EL685' TO DFHEIV1
+           CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+           GOBACK.
+001729
+
+       9999-DFHBACK SECTION.
+           MOVE '9%                    "   ' TO DFHEIV0
+           MOVE 'EL685' TO DFHEIV1
+           CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+           GOBACK.
+       9999-DFHEXIT.
+           IF DFHEIGDJ EQUAL 0001
+               NEXT SENTENCE
+           ELSE IF DFHEIGDJ EQUAL 2
+               GO TO 9600-PGMIDERR,
+                     9990-ERROR
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 3
+               GO TO 0015-NEXT-SENTENCE
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 4
+               GO TO 0130-TERMID-ERROR,
+                     0130-TRANS-ERROR
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 5
+               GO TO 8400-NOTFND
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 6
+               GO TO 4800-END-OF-FILE
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 7
+               GO TO 8400-NOTFND
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 8
+               GO TO 5800-END-OF-FILE
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 9
+               GO TO 9300-NEXT-SENTENCE
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 10
+               GO TO 8300-SEND-TEXT
+               DEPENDING ON DFHEIGDI.
+           MOVE '9%                    "   ' TO DFHEIV0
+           MOVE 'EL685' TO DFHEIV1
+           CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+           GOBACK.

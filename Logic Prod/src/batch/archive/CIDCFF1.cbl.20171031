@@ -1,0 +1,322 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CIDCFF1.
+       AUTHOR.     PABLO.
+       DATE-COMPILED.
+030314******************************************************************
+030314*                   C H A N G E   L O G
+030314*
+030314* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+030314*-----------------------------------------------------------------
+030314*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+030314* EFFECTIVE    NUMBER
+030314*-----------------------------------------------------------------
+042814* 030314    2014041100001  AJRA  ADD TANA TO USER LIST
+030314******************************************************************
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT ELCNTL           ASSIGN TO ELCNTL
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS DYNAMIC
+                                   RECORD KEY IS CF-CONTROL-PRIMARY
+                                   FILE STATUS IS ELCNTL-FILE-STATUS.
+
+           SELECT EMER-OUT         ASSIGN TO SYS011.
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  ELCNTL.
+
+                                       COPY ELCCNTL.
+
+       FD  EMER-OUT
+           RECORDING MODE F
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+
+       01  EMER-OUT-REC.
+           05  EMER-PW                 PIC X(11).
+           05  HEX-0D                  PIC X.
+           05  HEX-0A                  PIC X.
+
+       WORKING-STORAGE SECTION.
+       77  SUB1                        PIC S9(3) COMP-3 VALUE +0.
+       77  S1                          PIC S999  COMP-3 VALUE +0.
+       77  S2                          PIC S999  COMP-3 VALUE +0.
+
+       01  WS-RANDOM-WORK.
+           05  WS-RANDOM-NUM           PIC 9v9(9)  VALUE ZEROS.
+           05  F REDEFINES WS-RANDOM-NUM.
+               10  F                   PIC XXX.
+               10  WS-NUM-PWORD        PIC X(7).
+           05  WS-RANDOM-SEED          pic 9(9)  VALUE ZEROS.
+
+       01  WS-STATUS-CODES.
+           05  ELCNTL-FILE-STATUS      PIC XX  VALUE SPACES.
+           05  WS-EOF-SW               PIC X   VALUE SPACES.
+               88  END-OF-ELCNTL               VALUE 'Y'.
+               88  MORE-ELCNTL                 VALUE ' '.
+
+                                       COPY ELCFUNDT.
+
+       01  RandInteger-Variables.            
+           05  random-integer-out pic  9(09) value zeros.
+           05  random-integer-max pic  9(09) value zeros.
+           05  did-it-work        pic  x(01) value ' '.
+
+       01  WS-PASSWORD                 PIC X(11)  VALUE SPACES.
+       01  WS-WORK-FIELDS.
+           05  WS-ABEND-FLD            PIC 9         VALUE ZEROS.
+           05  WS-ZERO-FLD             PIC 9         VALUE ZEROS.
+           05  WS-ELCNTL-RECS-IN       PIC 9(9)      VALUE ZEROS.
+           05  WS-ELCNTL-RECS-FIX      PIC 9(9)      VALUE ZEROS.
+           05  WS-DISPLAY-CNT          PIC Z,ZZZ,ZZ9 VALUE ZEROS.
+
+       LINKAGE SECTION.                                                 
+                                                                        
+       01  PARM.                                                        
+           05  PARM-LENGTH BINARY  PICTURE IS S9(4).                    
+           05  PARM-VALUE  DISPLAY PICTURE IS X(100).                   
+
+       PROCEDURE DIVISION USING PARM.                                   
+
+           PERFORM 0100-OPEN-FILES     THRU 0100-EXIT
+           PERFORM 0200-INITIALIZE     THRU 0200-EXIT
+           PERFORM 0500-PROCESS        THRU 0500-EXIT UNTIL
+              END-OF-ELCNTL
+
+           IF PARM-VALUE = 'CID1P'
+              OPEN OUTPUT EMER-OUT
+              MOVE WS-PASSWORD         TO EMER-PW
+              MOVE X'0D'               TO HEX-0D
+              MOVE X'0A'               TO HEX-0A
+              WRITE EMER-OUT-REC
+              CLOSE EMER-OUT
+           END-IF
+
+           PERFORM 3000-CLOSE-FILES    THRU 3000-EXIT
+           PERFORM 4000-FINAL-TOTALS   THRU 4000-EXIT
+           GOBACK
+
+           .
+       0000-EXIT.
+           EXIT.
+
+       0100-OPEN-FILES.
+
+           OPEN I-O   ELCNTL
+      *    OPEN INPUT ELCNTL
+
+           IF ELCNTL-FILE-STATUS = '00' OR '97'
+               CONTINUE
+           ELSE
+               DISPLAY '*** ERROR OPENING ELCNTL FILE ***'
+               DISPLAY '*** STATUS CODE IS ' ELCNTL-FILE-STATUS
+               PERFORM 9999-ABEND-RTN
+           END-IF
+
+           .
+       0100-EXIT.
+           EXIT.
+
+       0200-INITIALIZE.
+
+           IF PARM-LENGTH NOT = +5
+              DISPLAY ' INVALID PARM, MUST BE CID1P OR MDOFF '
+              PERFORM 9999-ABEND-RTN
+           END-IF
+
+           IF PARM-VALUE = 'CID1P' OR 'MDOFF' OR 'CID1T'
+              CONTINUE
+           ELSE
+              DISPLAY
+                 ' INVALID PARM, MUST BE CID1P OR MDOFF OR CID1T'
+              PERFORM 9999-ABEND-RTN
+           END-IF
+
+           MOVE FUNCTION CURRENT-DATE  TO FUNCTION-DATE
+           COMPUTE WS-RANDOM-SEED = WS-FN-HOURS + WS-FN-SECONDS +
+              WS-FN-MO + WS-FN-DA + WS-FN-MINUTES + WS-FN-CC +
+              WS-FN-YR + WS-FN-HUNDSECS
+           DISPLAY ' RANDOM SEED ' WS-RANDOM-SEED
+
+           MOVE SPACES                 TO WS-EOF-SW
+           MOVE ZEROS                  TO WS-ELCNTL-RECS-IN
+                                          WS-ELCNTL-RECS-FIX
+
+           PERFORM 1100-START-ELCNTL   THRU 1100-EXIT
+
+           PERFORM 1200-READ-ELCNTL    THRU 1200-EXIT
+
+           .
+       0200-EXIT.
+           EXIT.
+
+       0500-PROCESS.
+
+           IF (CF-RECORD-TYPE = '2')
+              AND (CF-SEQUENCE-NO = +0)
+              AND (CF-PROCESSOR = 'AJRA' OR 'DJWB' OR 'PEMA'
+042814           OR 'SDGA' OR 'EMER' OR 'TANA')
+              PERFORM 1000-PROCESS     THRU 1000-EXIT
+           END-IF
+
+           PERFORM 1200-READ-ELCNTL    THRU 1200-EXIT
+
+           .
+       0500-EXIT.
+           EXIT.
+
+       0600-GET-RANDOM.
+
+           COMPUTE WS-RANDOM-NUM = FUNCTION RANDOM (WS-RANDOM-SEED)
+           DISPLAY ' RANDOM NUM ' WS-RANDOM-NUM
+           COMPUTE WS-RANDOM-NUM = FUNCTION RANDOM
+           DISPLAY ' RANDOM NUM ' WS-RANDOM-NUM
+
+
+      *    call 'RANDINTEGR' using random-integer-out              
+      *                                random-integer-max              
+      *                                did-it-work                     
+      *    end-call                                               
+      *
+      *    DISPLAY ' R I O ' RANDOM-INTEGER-OUT
+      *    DISPLAY ' R I M ' RANDOM-INTEGER-MAX
+      *    DISPLAY ' D I W ' DID-IT-WORK
+
+           .
+       0600-EXIT.
+           EXIT.
+
+
+       1000-PROCESS.
+
+           IF PARM-VALUE = 'CID1P'
+              IF CF-PROCESSOR = 'EMER'
+                 PERFORM 0600-GET-RANDOM
+                                       THRU 0600-EXIT
+                 MOVE 'EMER'           TO CF-PROCESSOR-PASSWORD
+                 MOVE WS-NUM-PWORD     TO CF-PROCESSOR-PASSWORD (5:7)
+                 DISPLAY ' CF PW ' CF-PROCESSOR-PASSWORD
+                 MOVE CF-PROCESSOR-PASSWORD
+                                       TO WS-PASSWORD
+                 PERFORM 2100-REWRITE-ELCNTL
+                                       THRU 2100-EXIT
+              END-IF
+              GO TO 1000-EXIT
+           END-IF
+
+           IF CF-CURRENT-TERM-ON NOT = SPACES
+              MOVE SPACES              TO CF-CURRENT-TERM-ON
+           END-IF
+
+           MOVE 'YYYY'                 TO CF-PROC-SYS-ACCESS-ALL
+091813     MOVE '5'                    TO CF-APPROVAL-LEVEL
+           MOVE 'Y'                    TO CF-PROCESSOR-USER-ALMIGHTY
+           PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+              S1 > +4
+              MOVE 'YY'             TO CF-ADMINISTRATION-CONTROLS (S1)
+              MOVE 'Y'                 TO CF-APPLICATION-FORCE (S1)
+              PERFORM VARYING S2 FROM +1 BY +1 UNTIL
+                 S2 > +44
+                 MOVE 'YY'             TO CF-APP-SWITCHES (S1 S2)
+              END-PERFORM
+           END-PERFORM
+
+           PERFORM 2100-REWRITE-ELCNTL THRU 2100-EXIT
+
+           .
+       1000-EXIT.
+           EXIT.
+
+       1100-START-ELCNTL.
+
+           MOVE LOW-VALUES             TO CF-CONTROL-PRIMARY
+112612     MOVE 'AHL'                  TO CF-COMPANY-ID
+           MOVE '2'                    TO CF-RECORD-TYPE
+           MOVE +0                     TO CF-SEQUENCE-NO
+
+           START ELCNTL KEY >= CF-CONTROL-PRIMARY
+           IF ELCNTL-FILE-STATUS NOT = '00'
+              DISPLAY ' ELCNTL, BAD START ' ELCNTL-FILE-STATUS
+              PERFORM 9999-ABEND-RTN
+           END-IF
+
+           .
+       1100-EXIT.
+           EXIT.
+
+       1200-READ-ELCNTL.
+
+           READ ELCNTL NEXT RECORD
+
+           IF ELCNTL-FILE-STATUS = '10' OR '23'
+              SET END-OF-ELCNTL TO TRUE
+           ELSE
+              IF ELCNTL-FILE-STATUS NOT = '00'
+                 DISPLAY 'ELCNTL, BAD READ NEXT '
+                      ELCNTL-FILE-STATUS
+                 PERFORM 9999-ABEND-RTN
+              END-IF
+           END-IF
+
+           .
+       1200-EXIT.
+           EXIT.
+
+
+       2100-REWRITE-ELCNTL.
+
+           REWRITE CONTROL-FILE
+
+           IF ELCNTL-FILE-STATUS = '00'
+               ADD 1                   TO WS-ELCNTL-RECS-FIX
+           ELSE
+               DISPLAY 'ELCNTL, BAD REWRITE '
+               DISPLAY '*** STATUS CODE IS ' ELCNTL-FILE-STATUS
+               PERFORM 9999-ABEND-RTN
+           END-IF
+           .
+       2100-EXIT.
+           EXIT.
+
+
+       3000-CLOSE-FILES.
+
+           CLOSE ELCNTL
+
+           .
+       3000-EXIT.
+           EXIT.
+
+       4000-FINAL-TOTALS.
+
+           DISPLAY '**************************************************'
+           DISPLAY '***                                            ***'
+
+           MOVE WS-ELCNTL-RECS-IN      TO WS-DISPLAY-CNT
+           DISPLAY '***  CNTL RECORDS     IN         = ' WS-DISPLAY-CNT
+
+           MOVE WS-ELCNTL-RECS-FIX     TO WS-DISPLAY-CNT
+           DISPLAY '***  CNTL RECORDS     FIXED      = ' WS-DISPLAY-CNT
+
+           DISPLAY '***                                            ***'
+           DISPLAY '**************************************************'
+           .
+       4000-EXIT.
+           EXIT.
+
+       9999-ABEND-RTN.
+
+           DISPLAY '*** ELCNTL  FILE CONVERSION PROGRAM ABENDING ***'
+           DISPLAY '************************************************'
+
+           MOVE 1                      TO WS-ABEND-FLD
+           MOVE 0                      TO WS-ZERO-FLD
+
+           COMPUTE WS-ABEND-FLD = WS-ABEND-FLD / WS-ZERO-FLD
+           .
+       9999-EXIT.
+           EXIT.

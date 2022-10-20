@@ -1,0 +1,284 @@
+################################################################################
+#                  
+#     JOB: vplgm35
+#                 
+################################################################################
+BEGINJOB mode='MVS' 
+ONRETCODE EQ 64 GOTO END_JOB 
+
+################################################################################
+LABEL name=NOTEBKP 
+################################################################################
+ONRETCODE MAXRC GT '11' BYPASS scope='STEP'  
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='IN1' dataset='CI.DD.LG.ERNOTE' type='VS' filename='ERNOTE' disp='i-o' 
+ASSGNDD ddname='OUT1' dataset='CI.XX.LG.ERNOTE.BKP' gdg='+1' filename='$SEQFILES/CI.XX.LG.ERNOTE.BKP' disp='o' normal='k' abend='d' recfmt='F' recsize='825' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(IN1)  -
+         OFILE(OUT1)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='NOTEBKP' 
+
+################################################################################
+LABEL name=ECS061 
+################################################################################
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS006' type='DUMMY' 
+ASSGNDD ddname='SYS010' dataset='VP.XX.CTRN' gdg='0' filename='$SEQFILES/VP.XX.CTRN' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' dataset='VP.XX.COMM' gdg='0' filename='$SEQFILES/VP.XX.COMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS013' filename='$SEQFILES/VP.WW.PAYADJS' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS012' filename='/tmp/${JOBNAME}_PMT3800' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SYS015' filename='$SEQFILES/VP.DD.COMPMSTR.OUT061' disp='o' normal='k' abend='d' recsize='700' recfmt='F' 
+ASSGNDD ddname='SYS018' filename='$SEQFILES/VP.DD.PREMCOMP.OUT061' disp='o' normal='k' abend='d' recsize='270' recfmt='F' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/VP.EX.FICH061' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS017' filename='/tmp/${JOBNAME}_PYMTFILE' disp='o' normal='k' abend='d' recsize='80' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS061' stepname='ECS061' 
+
+################################################################################
+LABEL name=CPY061 
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/VP.EX.FICH061' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH061' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY061' parm='ALL' 
+
+################################################################################
+LABEL name=DEFPNDE
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d ERPNDE
+!
+EXECPGM pgmname='BPXBATCH' stepname='DEFPNDE' parm='SH'
+
+################################################################################
+LABEL name=EL349 
+################################################################################
+#  ********************************************************************  
+#  **                       LOAD ERPNDE FILE                             
+#  **    -- NOTE --  ONE DUMMY RECORD IS ALL THAT IS LOADED              
+#  ********************************************************************  
+#  *************************************************    INPUT FILES      
+ASSGNDD ddname='ERPNDE' dataset='CI.TT.LG.ERPNDE' type='VS' filename='ERPNDE' disp='i-o' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+ERPNDE  LOAD                                                            
+!
+
+EXECPGM pgmname='EL349' stepname='EL349' 
+
+################################################################################
+LABEL name=EL560 
+################################################################################
+#  ********************************************************************  
+#  * INPUT IS 'VP.XX.EXTR521' FROM MONTH-END VPLGM15             
+#  ********************************************************************  
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS010' dataset='VP.XX.EXTR521' gdg='0' filename='$SEQFILES/VP.XX.EXTR521' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERPNDE' dataset='CI.TT.LG.ERPNDE' type='VS' filename='ERPNDE' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+EXECPGM pgmname='EL560' stepname='EL560' 
+
+################################################################################
+LABEL name=CPY560
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL560/SYS008_${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH560' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY560' parm='ALL'
+
+################################################################################
+LABEL name=EL562 
+################################################################################
+### USING A PARM OF 'UPDATE' WILL REMOVE THE BILLING NOTE LINE NUMBERS ON THE 
+### ERNOTE VSAM TABLE AFTER THE NOTE HAS BEEN PRINTED ON THE 562 REPORT
+### FOR ANY ISSUES AND CANCELS THAT DO NOT HAVE ERRORS.
+#  ********************************************************************  
+#  ***            PRINT COMPENSATION STATEMENTS                          
+#  *                                                                     
+#  *         DSN=VP.DD.COMPMSTR.OUT061                                   
+#  *         DSN=VP.DD.PREMCOMP.OUT061                                   
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS015' filename='$SEQFILES/VP.DD.COMPMSTR.OUT061' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS017' filename='$SEQFILES/VP.DD.PREMCOMP.OUT061' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERNOTE' dataset='CI.DD.LG.ERNOTE' type='VS' filename='ERNOTE' disp='i-o' 
+ASSGNDD ddname='ERCHEK' dataset='CI.DD.LG.ERCHEK' type='VS' filename='ERCHEK' disp='i-o' 
+ASSGNDD ddname='ELERRS' dataset='CI.DD.LG.ELERRS' type='VS' filename='ELERRS' disp='i-o' 
+ASSGNDD ddname='ERPNDE2' dataset='CI.TT.LG.ERPNDE2' type='VS' filename='ERPNDE2' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' filename='$SEQFILES/VP.WW.EL562.RPT' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS016' filename='/tmp/${JOBNAME}_COMPTRAN' disp='o' normal='k' abend='d' recsize='700' recfmt='F' 
+ASSGNDD ddname='SYS018' filename='/tmp/${JOBNAME}_SUMMTRAN' disp='o' normal='k' abend='d' recsize='136' recfmt='F' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/VP.EX.FICH562' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+
+EXECPGM pgmname='VPP562' stepname='EL562' parm='UPDATE'
+
+################################################################################
+LABEL name=CPY562 
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/VP.WW.EL562.RPT' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH562' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY562' parm='ALL' 
+
+################################################################################
+LABEL name=ECS063 
+################################################################################
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS015' filename='/tmp/${JOBNAME}_COMPTRAN' disp='i-o' normal='k' abend='d' 
+ASSGNDD ddname='SYS017' filename='/tmp/${JOBNAME}_SUMMTRAN' disp='i-o' normal='k' abend='d' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='B'  
+ASSGNDD ddname='SYS010' dataset='VP.ME.COMM' gdg='+1' filename='$SEQFILES/VP.ME.COMM' disp='o' normal='k' abend='d' recfmt='F' recsize='700' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/VP.EX.FICH063' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS063' stepname='ECS063' 
+
+################################################################################
+LABEL name=CPY063 
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/VP.EX.FICH063' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH063' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY063' parm='ALL' 
+
+################################################################################
+LABEL name=ECS064 
+################################################################################
+#  ********************************************************************  
+#  ***--                                                          --***  
+#  ***--            AGED ACCOUNTS RECEIVABLE                      --***  
+#  ***--    SEE RESTART INSTRUCTIONS BEFORE RESTARTING            --***  
+#  ***--                                                          --***  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' dataset='VP.ME.COMM' gdg='+1' filename='$SEQFILES/VP.ME.COMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS012' filename='$SEQFILES/\${JOBNAME}.ECS064.ME50.BAL.AMTS' disp='o' normal='k' abend='k' recfmt='F' recsize='133' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='B'  
+ASSGNDD ddname='SYS020' filename='$SEQFILES/VP.EX.FICH064' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+
+EXECPGM pgmname='ECS064' stepname='ECS064' 
+
+################################################################################
+LABEL name=CPY064 
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/VP.EX.FICH064' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH064' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY064' parm='ALL' 
+
+################################################################################
+LABEL name=ECS193 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='VP.ME.COMM' gdg='+1' filename='$SEQFILES/VP.ME.COMM' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS011' type='DUMMY' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+EXECPGM pgmname='ECS193' stepname='ECS193' 
+
+################################################################################
+LABEL name=CPY193 
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/ECS193/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH193' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY193' parm='ALL' 
+
+################################################################################
+LABEL name=ECS060 
+################################################################################
+#  ********************************************************************  
+#  ***--                                                          --***  
+#  ***--              COMPENSATION SUMMARY                        --***  
+#  ***--    SEE RESTART INSTRUCTIONS BEFORE RESTARTING            --***  
+#  ***--                                                          --***  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' dataset='VP.ME.COMM' gdg='+1' filename='$SEQFILES/VP.ME.COMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/VP.EX.FICH060' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+
+EXECPGM pgmname='ECS060' stepname='ECS060' 
+
+################################################################################
+LABEL name=CPY060 
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/VP.EX.FICH060' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH060' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY060' parm='ALL' 
+
+################################################################################
+LABEL name=ECS065 
+################################################################################
+#  ********************************************************************  
+#  ***--              PRINT VPP MAILING LABELS                    --***  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' dataset='VP.ME.COMM' gdg='+1' filename='$SEQFILES/VP.ME.COMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD  ddname='SYS008' type='SYSOUT'
+ASSGNDD ddname='SYS015' filename='/tmp/${JOBNAME}_COMPWRK' disp='o' normal='k' abend='d' recsize='700' recfmt='F' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+EXECPGM pgmname='ECS065' stepname='ECS065' 
+
+################################################################################
+LABEL name=PRINT6 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/VP.EX.FICH562' disp='i-o' normal='k' abend='k' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' recfmt='F'  
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT6' 
+
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+
+   ftp -n ntis1.cso.local < $JCLLIB/ftp-vplgm35
+
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 040517 CR2015082500001 PEMA   NEW JOB for VPP

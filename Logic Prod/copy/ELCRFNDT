@@ -1,0 +1,808 @@
+00001 ****************************************************************  04/18/98
+00002 *                                                              *  ELCRFNDP
+00003 *                            ELCRFNDP.                         *     LV007
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL**6
+00005 *                            VMOD=2.028                        *  ELCRFNDP
+00006 *                                                              *  ELCRFNDP
+00007 ****************************************************************. ELCRFNDP
+00008                                                                   ELCRFNDP
+00009      MOVE ZERO                   TO  CP-RETURN-CODE               ELCRFNDP
+00010                                      CP-CALC-REFUND.              ELCRFNDP
+00011      MOVE SPACE                  TO  CP-REFUND-TYPE-USED.         ELCRFNDP
+00012                                                                   ELCRFNDP
+00013  0001-GET-CANCEL-TYPE.                                            ELCRFNDP
+00014      IF CP-CERT-EFF-DT = CP-VALUATION-DT                          ELCRFNDP
+00015         MOVE CP-ORIGINAL-PREMIUM TO CP-CALC-REFUND                ELCRFNDP
+00016         GO TO 1999-CALC-REF-AMT-X.                                ELCRFNDP
+00017                                                                   ELCRFNDP
+00018      IF CP-REMAINING-TERM = ZERO   OR                             ELCRFNDP
+00019         CP-REMAINING-TERM NEGATIVE                                ELCRFNDP
+00020           MOVE ZERO TO CP-CALC-REFUND                             ELCRFNDP
+00021           GO TO 1999-CALC-REF-AMT-X.                              ELCRFNDP
+00022                                                                   ELCRFNDP
+00023      MOVE CP-CERT-EFF-DT     TO DC-BIN-DATE-1.                    ELCRFNDP
+00024      MOVE SPACE              TO DC-OPTION-CODE.                   ELCRFNDP
+00025      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                       CL**4
+00026                                                                   ELCRFNDP
+00027      IF DATE-CONVERSION-ERROR                                     ELCRFNDP
+00028          MOVE '2' TO CP-RETURN-CODE                               ELCRFNDP
+00029          GO TO 1999-CALC-REF-AMT-X.                               ELCRFNDP
+00030                                                                   ELCRFNDP
+00031      IF CP-AH                                                     ELCRFNDP
+00032         GO TO 1030-GET-AH-REFUND.                                 ELCRFNDP
+00033                                                                   ELCRFNDP
+00034 ********************    LIFE REFUNDS    **************************ELCRFNDP
+00035                                                                   ELCRFNDP
+00036      IF CP-TERM-OR-EXT-DAYS NOT NUMERIC                           ELCRFNDP
+00037          MOVE +0                TO CP-TERM-OR-EXT-DAYS.           ELCRFNDP
+00038                                                                   ELCRFNDP
+00039      IF CP-LOAN-TERM NOT NUMERIC                                  ELCRFNDP
+00040          MOVE +0                TO CP-LOAN-TERM.                  ELCRFNDP
+00041                                                                   ELCRFNDP
+00042      COMPUTE PR-FACTOR = CP-REMAINING-TERM / CP-ORIGINAL-TERM.    ELCRFNDP
+00043                                                                   ELCRFNDP
+00044      COMPUTE R78-FACTOR =                                         ELCRFNDP
+00045             (CP-REMAINING-TERM * (CP-REMAINING-TERM + 1)) /       ELCRFNDP
+00046               (CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM + 1)).        ELCRFNDP
+CIDVAO************************************************************
+CIDVAO***       ADDED IF CONDITION FOR TESTING PURPOSES.       ***      ELCRFNDP
+CIDVAO***---------------------------------------------------------      ELCRFNDP
+CIDVAO     IF CP-TRUNCATED-LIFE                                         ELCRFNDP
+CIDVAO        MOVE  CP-LOAN-TERM         TO  WS-RATE-TERM               ELCRFNDP
+CIDVAO     ELSE                                                         ELCRFNDP
+CIDVAO        MOVE  CP-ORIGINAL-TERM     TO  WS-RATE-TERM.              ELCRFNDP
+CIDVAO***                                                               ELCRFNDP
+CIDVAO************************************************************
+00048 **** THE FOLLOWING IF STATEMENT FOR NCL ONLY SHOULD DO THE        ELCRFNDP
+00049 **** FOLLOWING.                                                   ELCRFNDP
+00050 ****       FOR NC. LIFE..                                         ELCRFNDP
+00051 ****  LEVEL LIFE COVERAGES   --- REFUND AS PRO RATA.              ELCRFNDP
+00052 ****  TRUNCATED NET COVERAGE --- TERM > 60 USE RULE OF ANTIC.     ELCRFNDP
+00053 ****                             TERM <= 60 USE SUM OF DIGITS.    ELCRFNDP
+00054 ****  DECREASING COVERAGE    --- EFF DATE > 093081 AND            ELCRFNDP
+00055 ****                             TERM > 60 USE RULE OF ANTIC      ELCRFNDP
+00056 ****                             OTHERWISE USE RULE OF 78.        ELCRFNDP
+00057 ****                                                              ELCRFNDP
+00058 ****                                                              ELCRFNDP
+00059                                                                   ELCRFNDP
+00060      IF (CP-COMPANY-ID = 'NCL') AND                               ELCRFNDP
+00061         (CP-STATE-STD-ABBRV = 'NC')                               ELCRFNDP
+00062         IF CP-LEVEL-LIFE                                          ELCRFNDP
+00063            GO TO 1023-REF-PR                                      ELCRFNDP
+00064         ELSE                                                      ELCRFNDP
+00065         IF CP-EARN-AS-NET-PAY AND                                 ELCRFNDP
+00066            CP-TRUNCATED-LIFE                                      ELCRFNDP
+00067            IF CP-ORIGINAL-TERM GREATER THAN 60                    ELCRFNDP
+00068               GO TO 1021-ANTICIPATION-REF                         ELCRFNDP
+00069            ELSE                                                   ELCRFNDP
+00070               GO TO 1026-REF-R78                                  ELCRFNDP
+00071         ELSE                                                      ELCRFNDP
+00072         IF CP-REDUCING-LIFE                                       ELCRFNDP
+00073            IF (DC-GREG-DATE-CYMD  GREATER 19810930 AND               CL**2
+00074               CP-ORIGINAL-TERM GREATER THAN 60)                   ELCRFNDP
+00075               GO TO 1021-ANTICIPATION-REF                         ELCRFNDP
+00076            ELSE                                                   ELCRFNDP
+00077               GO TO 1075-SUM-OF-DIGITS.                           ELCRFNDP
+00078                                                                   ELCRFNDP
+00079 **** THE FOLLOWING IF STATEMENT FOR NCL ONLY SHOULD DO THE        ELCRFNDP
+00080 **** FOLLOWING.                                                   ELCRFNDP
+00081 ****       FOR VA. LIFE..                                         ELCRFNDP
+00082 ****  LEVEL LIFE COVERAGES   --- REFUND AS PRO RATA.              ELCRFNDP
+00083 ****           NET COVERAGES --- USE RULE OF ANTIC.               ELCRFNDP
+00084 ****  DECREASING COVERAGE    --- EFF DATE < 010193 USE R78.       ELCRFNDP
+00085 ****                         --- EFF DATE > 123194 USE ANTIC.     ELCRFNDP
+00086 ****                         --- EFF DATE BETWEEN 010193 AND 12319ELCRFNDP
+00087 ****                             WITH TERM > 61 USE RULE OF ANTIC ELCRFNDP
+00088 ****                             OTHERWISE USE RULE OF 78.        ELCRFNDP
+00089 ****                                                              ELCRFNDP
+00090 ****    NOTE... PER NCL WE SHOULD NOT INCLUDE THEM IN ANY         ELCRFNDP
+00091 ****            OF THE SYSTEM DEFAULT STATUTORY REFUND RULES.     ELCRFNDP
+00092 ****            NCL WILL SUPPLY US WITH THE STATUTORY RULES THEY  ELCRFNDP
+00093 ****            WILL FOLLOW.                                      ELCRFNDP
+00094 ****                                                              ELCRFNDP
+00095 ****                                                              ELCRFNDP
+00096 ****                                                              ELCRFNDP
+00097                                                                   ELCRFNDP
+00098      IF (CP-COMPANY-ID = 'NCL') AND                               ELCRFNDP
+00099         (CP-STATE-STD-ABBRV = 'VA')                               ELCRFNDP
+00100         IF CP-LEVEL-LIFE                                          ELCRFNDP
+00101            GO TO 1023-REF-PR                                      ELCRFNDP
+00102         ELSE                                                      ELCRFNDP
+00103         IF CP-EARN-AS-NET-PAY                                     ELCRFNDP
+00104            GO TO 1021-ANTICIPATION-REF                            ELCRFNDP
+00105         ELSE                                                      ELCRFNDP
+00106         IF CP-REDUCING-LIFE                                       ELCRFNDP
+00107            IF DC-GREG-DATE-CYMD LESS THAN 19930101                   CL**2
+00108               GO TO 1026-REF-R78                                  ELCRFNDP
+00109            ELSE                                                   ELCRFNDP
+00110            IF DC-GREG-DATE-CYMD GREATER THAN 19941231                CL**2
+00111               GO TO 1021-ANTICIPATION-REF                         ELCRFNDP
+00112            ELSE                                                   ELCRFNDP
+00113            IF CP-ORIGINAL-TERM GREATER THAN 61                    ELCRFNDP
+00114               GO TO 1021-ANTICIPATION-REF                         ELCRFNDP
+00115            ELSE                                                   ELCRFNDP
+00116               GO TO 1026-REF-R78.                                 ELCRFNDP
+00117                                                                   ELCRFNDP
+00118      IF CP-CRITICAL-PERIOD                                        ELCRFNDP
+00119         IF CP-COMPANY-ID = 'NCL'                                  ELCRFNDP
+00120            NEXT SENTENCE                                          ELCRFNDP
+00121         ELSE                                                      ELCRFNDP
+00122            GO TO 1022-REF-CRITICAL-PERIOD-LF.                     ELCRFNDP
+00123                                                                   ELCRFNDP
+00124      IF CP-TERM-IS-DAYS  AND                                      ELCRFNDP
+00125         CP-TERM-OR-EXT-DAYS GREATER ZERO                          ELCRFNDP
+00126          GO TO 1024-REF-PR-DAYS.                                  ELCRFNDP
+00127                                                                   ELCRFNDP
+CIDMOD     IF CP-STATE-STD-ABBRV = 'NM'                                      000
+CIDMOD       IF CP-REDUCING-LIFE                                             000
+CIDMOD         IF DC-GREG-DATE-1-YMD LESS THAN '980901'                      000
+CIDMOD             GO TO 1026-REF-R78.                                       000
+CIDMOD                                                                       000
+00128      IF CP-EARN-ANTICIPATION                                      ELCRFNDP
+00129          GO TO 1021-ANTICIPATION-REF.                             ELCRFNDP
+00130                                                                   ELCRFNDP
+00131      IF CP-STATE-STD-ABBRV = 'ME'                                 ELCRFNDP
+00132          IF CP-COMPANY-ID = 'NCL' OR 'CVL'                        ELCRFNDP
+00133             NEXT SENTENCE                                         ELCRFNDP
+00134          ELSE                                                     ELCRFNDP
+00135             IF CP-REDUCING-LIFE                                   ELCRFNDP
+00136                GO TO 1021-ANTICIPATION-REF.                       ELCRFNDP
+00137                                                                   ELCRFNDP
+CIDMOD     IF CP-COMPANY-ID EQUAL 'CID' OR 'CSO'                        ELCRFNDP
+CIDMOD        IF CP-STATE-STD-ABBRV = 'TX'                              ELCRFNDP
+CIDMOD            GO TO SKIP-CSO-TEXAS-LIFE-PROCESSING                  ELCRFNDP
+CIDMOD        END-IF                                                    ELCRFNDP
+CIDMOD     END-IF.                                                      ELCRFNDP
+CIDMOD                                                                  ELCRFNDP
+00138      IF CP-STATE-STD-ABBRV = 'TX'                                 ELCRFNDP
+00139        IF CP-COMPANY-ID EQUAL 'HER' OR 'NCL'                      ELCRFNDP
+00140           NEXT SENTENCE                                           ELCRFNDP
+00141        END-IF                                                     ELCRFNDP
+00142         IF DC-GREG-DATE-CYMD GREATER 19920629  AND                   CL**2
+00143            CP-ORIGINAL-TERM NOT GREATER THAN 120                  ELCRFNDP
+00144            GO TO 1021-ANTICIPATION-REF.                           ELCRFNDP
+00145                                                                   ELCRFNDP
+CIDMOD SKIP-CSO-TEXAS-LIFE-PROCESSING.                                  ELCRFNDP
+CIDMOD                                                                  ELCRFNDP
+00146      IF CP-EARN-BY-PRORATA                                        ELCRFNDP
+00147          GO TO 1023-REF-PR.                                       ELCRFNDP
+00148                                                                   ELCRFNDP
+00149      IF CP-EARN-AS-MEAN                                           ELCRFNDP
+00150          GO TO 1025-REF-MEAN.                                     ELCRFNDP
+00151                                                                   ELCRFNDP
+00152      IF CP-EARN-AS-TEXAS                                          ELCRFNDP
+00153          GO TO 1027-TEXAS-REFUND.                                 ELCRFNDP
+00154                                                                   ELCRFNDP
+00155      IF CP-EARN-AS-NET-PAY                                        ELCRFNDP
+00156          GO TO 1028-NET-PAY-REFUND.                               ELCRFNDP
+00157                                                                   ELCRFNDP
+00158      IF CP-LIFE-OVERRIDE-CODE NOT = 'L'                           ELCRFNDP
+00159          GO TO 1000-NO-NET-PAY.                                   ELCRFNDP
+00160                                                                   ELCRFNDP
+CIDMOD     IF  CP-COMPANY-ID IS EQUAL TO 'CID' OR 'CSO'                 00003301
+CIDMOD       IF CP-STATE-STD-ABBRV = 'NC'                               00003336
+CIDMOD         IF CP-REDUCING-LIFE                                      00000808
+CIDMOD           IF CP-ORIGINAL-TERM GREATER 60  AND                    00000809
+CIDMOD              DC-GREG-DATE-CYMD GREATER 19810930                  00000810
+CIDMOD                GO TO 1028-NET-PAY-REFUND                         00000802
+CIDMOD           ELSE                                                   00000812
+CIDMOD              GO TO 1026-REF-R78.                                 00000813
+CIDMOD                                                                  00003300
+CIDMOD                                                                  ELCRFNDP
+00161      IF CP-STATE-STD-ABBRV = 'NC'                                 ELCRFNDP
+00162        IF CP-COMPANY-ID EQUAL 'NCL'                               ELCRFNDP
+00163           NEXT SENTENCE                                           ELCRFNDP
+00164        END-IF                                                     ELCRFNDP
+00165        IF CP-REDUCING-LIFE                                        ELCRFNDP
+00166          IF CP-ORIGINAL-TERM GREATER 60  AND                      ELCRFNDP
+00167             DC-GREG-DATE-CYMD GREATER 19810930                       CL**7
+00168              GO TO 1021-ANTICIPATION-REF                          ELCRFNDP
+00169          ELSE                                                     ELCRFNDP
+00170              GO TO 1026-REF-R78.                                  ELCRFNDP
+00171                                                                   ELCRFNDP
+00172      IF CP-STATE-STD-ABBRV = 'UT'                                 ELCRFNDP
+00173        IF CP-COMPANY-ID EQUAL 'NCL'                               ELCRFNDP
+00174           NEXT SENTENCE                                           ELCRFNDP
+00175        END-IF                                                     ELCRFNDP
+00176          IF CP-ORIGINAL-TERM GREATER 62         AND               ELCRFNDP
+00177             CP-LOAN-APR GREATER ZERO            AND               ELCRFNDP
+00178             DC-GREG-DATE-CYMD GREATER 19810831 AND                   CL**2
+00179             DC-GREG-DATE-CYMD LESS    19830901                       CL**2
+00180              GO TO 1028-NET-PAY-REFUND                            ELCRFNDP
+00181          ELSE                                                     ELCRFNDP
+00182              GO TO 1026-REF-R78.                                  ELCRFNDP
+00183                                                                   ELCRFNDP
+00184      IF CP-STATE-STD-ABBRV = 'OH'                                 ELCRFNDP
+00185        IF CP-COMPANY-ID EQUAL 'NCL' OR 'HER'                      ELCRFNDP
+00186           NEXT SENTENCE                                           ELCRFNDP
+00187        END-IF                                                     ELCRFNDP
+00188            IF CP-ORIGINAL-TERM GREATER 60         AND             ELCRFNDP
+00189               CP-LOAN-APR GREATER ZERO            AND             ELCRFNDP
+00190               DC-GREG-DATE-CYMD GREATER 19831031                     CL**2
+00191               GO TO 1028-NET-PAY-REFUND                           ELCRFNDP
+00192            ELSE                                                   ELCRFNDP
+00193               GO TO 1026-REF-R78.                                 ELCRFNDP
+CIDMOD                                                                  ELCRFNDP
+CIDMOD     IF CP-COMPANY-ID EQUAL 'CID' OR 'CSO'                        ELCRFNDP
+CIDMOD       IF CP-STATE-STD-ABBRV = 'MT'                               ELCRFNDP
+CIDMOD         GO TO SKIP-CSO-MT-LF-PROCESSING.                         ELCRFNDP
+CIDMOD                                                                  ELCRFNDP
+00194                                                                   ELCRFNDP
+00195      IF CP-STATE-STD-ABBRV = 'MT'                                 ELCRFNDP
+00196        IF CP-COMPANY-ID EQUAL 'NCL'                               ELCRFNDP
+00197           NEXT SENTENCE                                           ELCRFNDP
+00198        END-IF                                                     ELCRFNDP
+00199          IF CP-ORIGINAL-TERM GREATER 61         AND               ELCRFNDP
+00200             CP-LOAN-APR GREATER ZERO            AND               ELCRFNDP
+00201             DC-GREG-DATE-CYMD GREATER 19830318                       CL**2
+00202              GO TO 1028-NET-PAY-REFUND                            ELCRFNDP
+00203          ELSE                                                     ELCRFNDP
+00204              GO TO 1026-REF-R78.                                  ELCRFNDP
+00205                                                                   ELCRFNDP
+CIDMOD SKIP-CSO-MT-LF-PROCESSING.                                       ELCRFNDP
+CIDMOD                                                                  ELCRFNDP
+00206      IF CP-STATE-STD-ABBRV = 'RI'                                 ELCRFNDP
+00207        IF CP-COMPANY-ID EQUAL 'NCL'                               ELCRFNDP
+00208           NEXT SENTENCE                                           ELCRFNDP
+00209        END-IF                                                     ELCRFNDP
+00210          IF CP-ORIGINAL-TERM GREATER 60         AND               ELCRFNDP
+00211             CP-LOAN-APR GREATER ZERO            AND               ELCRFNDP
+00212             DC-GREG-DATE-CYMD GREATER 19831231                       CL**2
+00213              GO TO 1028-NET-PAY-REFUND                            ELCRFNDP
+00214          ELSE                                                     ELCRFNDP
+00215              GO TO 1026-REF-R78.                                  ELCRFNDP
+00216                                                                   ELCRFNDP
+00217                                                                   ELCRFNDP
+00218  1000-NO-NET-PAY.                                                 ELCRFNDP
+00219                                                                   ELCRFNDP
+00220      IF CP-STATE-STD-ABBRV = 'WY'                                 ELCRFNDP
+00221        IF CP-COMPANY-ID EQUAL 'NCL'                               ELCRFNDP
+00222           NEXT SENTENCE                                           ELCRFNDP
+00223        END-IF                                                     ELCRFNDP
+00224         IF CP-COMPANY-ID = 'TMS'                                  ELCRFNDP
+00225            GO TO 1026-REF-R78                                     ELCRFNDP
+00226         ELSE                                                      ELCRFNDP
+00227            GO TO 1023-REF-PR.                                     ELCRFNDP
+00228                                                                   ELCRFNDP
+00229      IF CP-EARN-BY-R78                                            ELCRFNDP
+00230          GO TO 1026-REF-R78.                                      ELCRFNDP
+00231                                                                   ELCRFNDP
+00232      IF CP-EARN-AS-SUM-OF-DIGITS                                  ELCRFNDP
+00233          GO TO 1075-SUM-OF-DIGITS.                                ELCRFNDP
+00234                                                                   ELCRFNDP
+00235      IF CP-LEVEL-LIFE                                             ELCRFNDP
+00236          GO TO 1023-REF-PR                                        ELCRFNDP
+00237      ELSE                                                         ELCRFNDP
+00238          GO TO 1026-REF-R78.                                      ELCRFNDP
+00239                                                                   ELCRFNDP
+00240 *-----------------------------------------------------------------ELCRFNDP
+00241  1021-ANTICIPATION-REF.                                           ELCRFNDP
+00242      MOVE '6'                  TO CP-REFUND-TYPE-USED.            ELCRFNDP
+00243                                                                   ELCRFNDP
+PEMMOD*    MOVE CP-LOAN-TERM         TO WS-SAVE-LOAN-TERM.              ELCRFNDP
+PEMMOD*    COMPUTE CP-LOAN-TERM = CP-LOAN-TERM - CP-ORIGINAL-TERM +     ELCRFNDP
+PEMMOD*                           CP-REMAINING-TERM.                    ELCRFNDP
+00247                                                                   ELCRFNDP
+00248      MOVE CP-ORIGINAL-BENEFIT  TO WS-SAVE-BENEFIT.                ELCRFNDP
+00249      MOVE CP-ORIGINAL-TERM     TO WS-SAVE-TERM.                   ELCRFNDP
+PEMMOD     MOVE CP-LOAN-TERM         TO WS-SAVE-LOAN-TERM.                   000
+00250      MOVE CP-REMAINING-TERM    TO CP-ORIGINAL-TERM                     000
+00251                                   CP-LOAN-TERM.                        000
+00250      MOVE CP-EARNING-METHOD    TO WS-SAVE-EARN-METHOD.            ELCRFNDP
+00251                                                                   ELCRFNDP
+00252      MOVE CP-REMAINING-BENEFIT TO CP-ORIGINAL-BENEFIT.            ELCRFNDP
+PEMMOD*    MOVE CP-REMAINING-TERM    TO CP-ORIGINAL-TERM.               ELCRFNDP
+PEMMOD     MOVE CP-REMAINING-TERM    TO CP-ORIGINAL-TERM                     000
+PEMMOD                                  CP-LOAN-TERM.                        000
+00254      MOVE CP-RATING-METHOD     TO CP-EARNING-METHOD.              ELCRFNDP
+00255                                                                   ELCRFNDP
+00256      IF CP-REMAINING-TERM = WS-SAVE-TERM                          ELCRFNDP
+00257          MOVE 'N'              TO CP-ROA-REFUND                   ELCRFNDP
+00258      ELSE                                                         ELCRFNDP
+00259          MOVE 'Y'              TO CP-ROA-REFUND.                  ELCRFNDP
+00260                                                                   ELCRFNDP
+00261 ******    TO COMPUTE PREMIUM AT REFUND DATE                       ELCRFNDP
+00262      PERFORM 2500-GET-RATE.                                       ELCRFNDP
+00263                                                                   ELCRFNDP
+00264      MOVE 'N'                  TO CP-ROA-REFUND.                  ELCRFNDP
+00265      MOVE WS-SAVE-BENEFIT      TO CP-ORIGINAL-BENEFIT.            ELCRFNDP
+00266      MOVE WS-SAVE-TERM         TO CP-ORIGINAL-TERM.               ELCRFNDP
+00267      MOVE WS-SAVE-LOAN-TERM    TO CP-LOAN-TERM.                   ELCRFNDP
+00268                                                                   ELCRFNDP
+00269      IF CP-PREMIUM-RATE = ZEROS                                   ELCRFNDP
+00270         MOVE '7'                 TO CP-RETURN-CODE                ELCRFNDP
+00271         MOVE WS-SAVE-EARN-METHOD TO CP-EARNING-METHOD             ELCRFNDP
+00272         GO TO 1999-CALC-REF-AMT-X.                                ELCRFNDP
+00273                                                                   ELCRFNDP
+00274      MOVE CP-CALC-PREMIUM         TO WS-REMAIN-PREM.              ELCRFNDP
+00275                                                                   ELCRFNDP
+00276 ******    TO COMPUTE PREMIUM AT ORIGINAL ISSUE DATE               ELCRFNDP
+00277      PERFORM 2500-GET-RATE.                                       ELCRFNDP
+00278                                                                   ELCRFNDP
+00279      MOVE WS-SAVE-EARN-METHOD     TO CP-EARNING-METHOD.           ELCRFNDP
+00280                                                                   ELCRFNDP
+00281      IF CP-PREMIUM-RATE = ZEROS                                   ELCRFNDP
+00282         MOVE '7'            TO CP-RETURN-CODE                     ELCRFNDP
+00283         GO TO 1999-CALC-REF-AMT-X.                                ELCRFNDP
+00284                                                                   ELCRFNDP
+00285      MOVE CP-CALC-PREMIUM         TO WS-ORIG-PREM.                ELCRFNDP
+00286                                                                   ELCRFNDP
+00287      IF  WS-ORIG-PREM = ZEROS                                     ELCRFNDP
+00288          MOVE ZEROS TO WS-NP-REF-FACTOR                           ELCRFNDP
+00289         ELSE                                                      ELCRFNDP
+00290          COMPUTE WS-NP-REF-FACTOR ROUNDED = WS-REMAIN-PREM /      ELCRFNDP
+00291                                             WS-ORIG-PREM.         ELCRFNDP
+00292                                                                   ELCRFNDP
+00293      COMPUTE CP-CALC-REFUND ROUNDED = WS-NP-REF-FACTOR *          ELCRFNDP
+00294                                         CP-ORIGINAL-PREMIUM.      ELCRFNDP
+00295                                                                   ELCRFNDP
+00296      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00297                                                                   ELCRFNDP
+00298 *---------------------------------------------------------------  ELCRFNDP
+00299  1022-REF-CRITICAL-PERIOD-LF.                                     ELCRFNDP
+00300      GO TO 1023-REF-PR.                                           ELCRFNDP
+00301                                                                   ELCRFNDP
+00302 *---------------------------------------------------------------  ELCRFNDP
+00303  1023-REF-PR.                                                     ELCRFNDP
+00304      MOVE '2'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00305      COMPUTE CP-CALC-REFUND ROUNDED =                             ELCRFNDP
+00306             CP-ORIGINAL-PREMIUM * PR-FACTOR.                      ELCRFNDP
+00307                                                                   ELCRFNDP
+00308      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00309                                                                   ELCRFNDP
+00310 *---------------------------------------------------------------  ELCRFNDP
+00311  1024-REF-PR-DAYS.                                                ELCRFNDP
+00312      MOVE CP-CERT-EFF-DT     TO DC-BIN-DATE-1.                    ELCRFNDP
+00313      MOVE CP-VALUATION-DT    TO DC-BIN-DATE-2.                    ELCRFNDP
+00314      MOVE '1'                TO DC-OPTION-CODE.                   ELCRFNDP
+00315      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                       CL**4
+00316                                                                   ELCRFNDP
+00317      IF DATE-CONVERSION-ERROR                                     ELCRFNDP
+00318          MOVE '2' TO CP-RETURN-CODE                               ELCRFNDP
+00319          GO TO 1999-CALC-REF-AMT-X.                               ELCRFNDP
+00320                                                                   ELCRFNDP
+00321      COMPUTE CP-CALC-REFUND ROUNDED =                             ELCRFNDP
+00322          (CP-ORIGINAL-PREMIUM / CP-TERM-OR-EXT-DAYS) *            ELCRFNDP
+00323                  (CP-TERM-OR-EXT-DAYS - DC-ELAPSED-DAYS).         ELCRFNDP
+00324                                                                   ELCRFNDP
+00325      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00326                                                                   ELCRFNDP
+00327 *---------------------------------------------------------------  ELCRFNDP
+00328  1025-REF-MEAN.                                                   ELCRFNDP
+00329      MOVE '8'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00330      COMPUTE CP-CALC-REFUND ROUNDED =                             ELCRFNDP
+00331           ((CP-ORIGINAL-PREMIUM * PR-FACTOR) +                    ELCRFNDP
+00332            (CP-ORIGINAL-PREMIUM * R78-FACTOR)) * +.5.             ELCRFNDP
+00333                                                                   ELCRFNDP
+00334      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00335                                                                   ELCRFNDP
+00336 *---------------------------------------------------------------  ELCRFNDP
+00337  1026-REF-R78.                                                    ELCRFNDP
+00338      MOVE '1'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00339 *    IF CP-TERM-TIMES-TERM                                        ELCRFNDP
+00340 *        COMPUTE R78-FACTOR =                                     ELCRFNDP
+00341 *            (CP-REMAINING-TERM * CP-REMAINING-TERM) /            ELCRFNDP
+00342 *               (CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM + 1)).      ELCRFNDP
+00343 *                                                                 ELCRFNDP
+00344      COMPUTE CP-CALC-REFUND ROUNDED =                             ELCRFNDP
+00345         CP-ORIGINAL-PREMIUM * R78-FACTOR.                         ELCRFNDP
+00346                                                                   ELCRFNDP
+00347      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00348                                                                   ELCRFNDP
+00349 *---------------------------------------------------------------  ELCRFNDP
+00350  1027-TEXAS-REFUND.                                               ELCRFNDP
+00351      MOVE '4'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00352      IF CP-PAY-FREQUENCY = ZERO                                   ELCRFNDP
+00353         MOVE ZERO TO CP-CALC-REFUND                               ELCRFNDP
+00354         MOVE '5'  TO CP-RETURN-CODE                               ELCRFNDP
+00355         GO TO 1999-CALC-REF-AMT-X.                                ELCRFNDP
+00356                                                                   ELCRFNDP
+00357      COMPUTE TEX-FACT-4 = (CP-ORIGINAL-TERM * CP-ORIGINAL-TERM) + ELCRFNDP
+00358          (CP-PAY-FREQUENCY * CP-ORIGINAL-TERM).                   ELCRFNDP
+00359                                                                   ELCRFNDP
+00360      DIVIDE CP-REMAINING-TERM BY CP-PAY-FREQUENCY                 ELCRFNDP
+00361          GIVING TEX-FACT-5                                        ELCRFNDP
+00362              REMAINDER TEX-FACT-6.                                ELCRFNDP
+00363                                                                   ELCRFNDP
+00364      COMPUTE TEX-FACT-5 = TEX-FACT-5 * CP-PAY-FREQUENCY.          ELCRFNDP
+00365                                                                   ELCRFNDP
+00366      COMPUTE TEX-FACT-7 = (TEX-FACT-5 * TEX-FACT-5) +             ELCRFNDP
+00367          (TEX-FACT-5 * CP-PAY-FREQUENCY) +                        ELCRFNDP
+00368          (2 * (TEX-FACT-6 * (TEX-FACT-5 + CP-PAY-FREQUENCY))).    ELCRFNDP
+00369                                                                   ELCRFNDP
+00370      COMPUTE TEX-FACT-8 ROUNDED = TEX-FACT-7 / TEX-FACT-4.        ELCRFNDP
+00371                                                                   ELCRFNDP
+00372      COMPUTE CP-CALC-REFUND ROUNDED = CP-ORIGINAL-PREMIUM         ELCRFNDP
+00373                                         * TEX-FACT-8.             ELCRFNDP
+00374                                                                   ELCRFNDP
+00375      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00376                                                                   ELCRFNDP
+00377 *---------------------------------------------------------------  ELCRFNDP
+00378  1028-NET-PAY-REFUND.                                             ELCRFNDP
+00379      MOVE '5'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00380      IF CP-LOAN-APR = ZERO                                        ELCRFNDP
+00381         MOVE ZERO TO CP-CALC-REFUND                               ELCRFNDP
+00382         MOVE '1'  TO CP-RETURN-CODE                               ELCRFNDP
+00383         GO TO 1999-CALC-REF-AMT-X.                                ELCRFNDP
+00384                                                                   ELCRFNDP
+00385      MOVE CP-LOAN-APR           TO N-P-APR.                       ELCRFNDP
+00386      MOVE CP-ORIGINAL-TERM      TO N-P-ORIG  N-P-LOAN.            ELCRFNDP
+00387      MOVE CP-REMAINING-TERM     TO N-P-REM.                       ELCRFNDP
+00388                                                                   ELCRFNDP
+00389      IF CP-TRUNCATED-LIFE                                         ELCRFNDP
+00390         MOVE CP-LOAN-TERM     TO N-P-LOAN.                        ELCRFNDP
+00391                                                                   ELCRFNDP
+00392      MOVE 'R'                   TO N-P-OPT.                       ELCRFNDP
+00393                                                                   ELCRFNDP
+00394      PERFORM 10000-NET-TERM THRU 99999-EXIT.                      ELCRFNDP
+00395                                                                   ELCRFNDP
+00396      COMPUTE CP-CALC-REFUND ROUNDED = N-P-FACTOR *                ELCRFNDP
+00397                                         CP-ORIGINAL-PREMIUM.      ELCRFNDP
+00398                                                                   ELCRFNDP
+00400  1029-UTAH-REFUND.                                                ELCRFNDP
+CIDMOD*                                                                 ELCRFNDP
+CIDMOD*---------------------------------------------------------------  ELCRFNDP
+CIDMOD* FOLLOWING IS FOR TRISH - 10/26/98  (FOR UTAH ONLY).             ELCRFNDP
+CIDMOD*---------------------------------------------------------------  ELCRFNDP
+CIDMOD*                                                                 ELCRFNDP
+CIDMOD     GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+CIDMOD*                                                                 ELCRFNDP
+CIDMOD*---------------------------------------------------------------  ELCRFNDP
+00401      IF (CP-STATE-STD-ABBRV NOT = 'UT')                           ELCRFNDP
+00402                       OR                                          ELCRFNDP
+00403         (CP-COMPANY-ID EQUAL 'NCL')                               ELCRFNDP
+00404          GO TO 1999-CALC-REF-AMT-X.                               ELCRFNDP
+00405      MOVE 'S'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00406                                                                   ELCRFNDP
+00407      IF (CP-ORIGINAL-TERM - CP-REMAINING-TERM)                    ELCRFNDP
+00408         GREATER ZERO AND LESS 13                                  ELCRFNDP
+00409          COMPUTE CP-CALC-REFUND = CP-CALC-REFUND -                ELCRFNDP
+00410                  (CP-CALC-REFUND * .05).                          ELCRFNDP
+00411                                                                   ELCRFNDP
+00412      IF (CP-ORIGINAL-TERM - CP-REMAINING-TERM)                    ELCRFNDP
+00413         GREATER 12 AND LESS 25                                    ELCRFNDP
+00414          COMPUTE CP-CALC-REFUND = CP-CALC-REFUND -                ELCRFNDP
+00415                  (CP-CALC-REFUND * .025).                         ELCRFNDP
+00416                                                                   ELCRFNDP
+00417      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00418 *---------------------------------------------------------------  ELCRFNDP
+00419      EJECT                                                        ELCRFNDP
+00420 *---------------------------------------------------------------  ELCRFNDP
+00421  1030-GET-AH-REFUND.                                              ELCRFNDP
+00422      COMPUTE PR-FACTOR = CP-REMAINING-TERM / CP-ORIGINAL-TERM.    ELCRFNDP
+00423                                                                   ELCRFNDP
+00424      COMPUTE R78-FACTOR =                                         ELCRFNDP
+00425             ((CP-REMAINING-TERM * (CP-REMAINING-TERM + 1)) /      ELCRFNDP
+00426                 (CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM + 1))).     ELCRFNDP
+00427                                                                   ELCRFNDP
+00428 *    IF CP-TERM-TIMES-TERM                                        ELCRFNDP
+00429 *        COMPUTE R78-FACTOR =                                     ELCRFNDP
+00430 *            (CP-REMAINING-TERM * CP-REMAINING-TERM) /            ELCRFNDP
+00431 *            (CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM + 1)).         ELCRFNDP
+00432 *                                                                 ELCRFNDP
+00433                                                                   ELCRFNDP
+00434 **** THE FOLLOWING IF STATEMENT FOR NCL ONLY SHOULD DO THE        ELCRFNDP
+00435 **** FOLLOWING.                                                   ELCRFNDP
+00436 ****       FOR VA. DISABILITY                                     ELCRFNDP
+00437 ****                         --- EFF DATE > 123192 AND            ELCRFNDP
+00438 ****                             TERM > 61 USE RULE OF ANTIC      ELCRFNDP
+00439 ****                             OTHERWISE USE RULE OF 78.        ELCRFNDP
+00440 ****                                                              ELCRFNDP
+00441 ****    NOTE... PER NCL WE SHOULD NOT INCLUDE THEM IN ANY         ELCRFNDP
+00442 ****            OF THE SYSTEM DEFAULT STATUTORY REFUND RULES.     ELCRFNDP
+00443 ****            NCL WILL SUPPLY US WITH THE STATUTORY RULES THEY  ELCRFNDP
+00444 ****            WILL FOLLOW.                                      ELCRFNDP
+00445 ****                                                              ELCRFNDP
+00446 ****                                                              ELCRFNDP
+00447 ****                                                              ELCRFNDP
+00448      IF CP-COMPANY-ID EQUAL 'NCL'                                 ELCRFNDP
+00449         IF CP-STATE-STD-ABBRV = 'VA'                              ELCRFNDP
+00450            IF (DC-GREG-DATE-CYMD GREATER 19921231) AND               CL**2
+00451               (CP-ORIGINAL-TERM GREATER THAN 61)                  ELCRFNDP
+00452                MOVE '6'        TO CP-EARNING-METHOD               ELCRFNDP
+00453                GO TO 1060-ANTICIPATION-REF                        ELCRFNDP
+00454             ELSE                                                  ELCRFNDP
+00455                MOVE '1'        TO CP-EARNING-METHOD               ELCRFNDP
+00456                GO TO 1050-R78-REF.                                ELCRFNDP
+00457                                                                   ELCRFNDP
+00458      IF CP-STATE-STD-ABBRV = 'WY'                                 ELCRFNDP
+00459         IF CP-COMPANY-ID = 'TMS'                                  ELCRFNDP
+00460            GO TO 1050-R78-REF.                                    ELCRFNDP
+00461                                                                   ELCRFNDP
+00462      IF CP-COMPANY-ID IS EQUAL TO 'NCL' OR 'WDS' OR 'CID'         ELCRFNDP
+00463          NEXT SENTENCE                                            ELCRFNDP
+00464      ELSE                                                         ELCRFNDP
+00465          IF CP-CRITICAL-PERIOD                                    ELCRFNDP
+00466              GO TO 1035-REF-AH-CRITICAL-PERIOD.                   ELCRFNDP
+00467                                                                   ELCRFNDP
+CIDMOD     IF CP-COMPANY-ID EQUAL 'CID' OR 'CSO'                        ELCRFNDP
+CIDMOD        IF CP-STATE-STD-ABBRV = 'NC'                              ELCRFNDP
+CIDMOD           GO TO SKIP-CSO-NC-AH-PROCESSING.                       ELCRFNDP
+CIDMOD                                                                  ELCRFNDP
+00468      IF CP-STATE-STD-ABBRV = 'NC'                                 ELCRFNDP
+00469        IF CP-COMPANY-ID EQUAL 'NCL' OR 'NCB'                      ELCRFNDP
+00470           NEXT SENTENCE                                           ELCRFNDP
+00471        END-IF                                                     ELCRFNDP
+00472          IF DC-GREG-DATE-CYMD GREATER 19810930                       CL**2
+00473             IF CP-EARN-ANTICIPATION                               ELCRFNDP
+00474                 GO TO 1060-ANTICIPATION-REF                       ELCRFNDP
+00475             ELSE                                                  ELCRFNDP
+00476                 GO TO 1055-MEAN-REF.                              ELCRFNDP
+00477                                                                   ELCRFNDP
+CIDMOD SKIP-CSO-NC-AH-PROCESSING.                                       ELCRFNDP
+CIDMOD                                                                  ELCRFNDP
+00478      IF CP-STATE-STD-ABBRV = 'NM'                                 ELCRFNDP
+00479        IF CP-COMPANY-ID EQUAL 'NCL'                               ELCRFNDP
+00480           NEXT SENTENCE                                           ELCRFNDP
+00481        END-IF                                                     ELCRFNDP
+00482          IF DC-GREG-DATE-CYMD GREATER THAN 19871231                  CL**2
+00483             IF CP-COMPANY-ID = 'MON'                              ELCRFNDP
+00484               MOVE '6'             TO CP-EARNING-METHOD           ELCRFNDP
+00485               GO TO 1060-ANTICIPATION-REF                         ELCRFNDP
+00486              ELSE                                                 ELCRFNDP
+00487               GO TO 1055-MEAN-REF.                                ELCRFNDP
+00488                                                                   ELCRFNDP
+00489      IF CP-STATE-STD-ABBRV = 'CT'                                 ELCRFNDP
+00490        IF CP-COMPANY-ID EQUAL 'NCL'                               ELCRFNDP
+00491           NEXT SENTENCE                                           ELCRFNDP
+00492        END-IF                                                     ELCRFNDP
+00493           MOVE '6'              TO CP-EARNING-METHOD              ELCRFNDP
+00494           GO TO 1060-ANTICIPATION-REF.                            ELCRFNDP
+00495                                                                   ELCRFNDP
+00496      IF CP-STATE-STD-ABBRV = 'ME'                                 ELCRFNDP
+00497        IF CP-COMPANY-ID EQUAL 'NCL' OR 'CVL'                      ELCRFNDP
+00498           NEXT SENTENCE                                           ELCRFNDP
+00499        END-IF                                                     ELCRFNDP
+00500            IF CP-EARN-BY-PRORATA                                  ELCRFNDP
+00501               GO TO 1040-PR-REF                                   ELCRFNDP
+00502            ELSE                                                   ELCRFNDP
+00503               MOVE '6'           TO CP-EARNING-METHOD             ELCRFNDP
+00504               GO TO 1060-ANTICIPATION-REF.                        ELCRFNDP
+00505                                                                   ELCRFNDP
+CIDMOD                                                                  ELCRFNDP
+CIDMOD     IF CP-COMPANY-ID EQUAL 'CID' OR 'CSO'                        ELCRFNDP
+CIDMOD        IF CP-STATE-STD-ABBRV = 'TX'                              ELCRFNDP
+CIDMOD            GO TO SKIP-CSO-TEXAS-AH-PROCESSING.                   ELCRFNDP
+CIDMOD                                                                  ELCRFNDP
+00506      IF CP-STATE-STD-ABBRV = 'TX'                                 ELCRFNDP
+00507        IF CP-COMPANY-ID EQUAL 'NCL' OR 'HER'                      ELCRFNDP
+00508           NEXT SENTENCE                                           ELCRFNDP
+00509        END-IF                                                     ELCRFNDP
+00510         IF DC-GREG-DATE-CYMD GREATER 19920629  AND                   CL**2
+00511            CP-ORIGINAL-TERM NOT GREATER THAN 120                  ELCRFNDP
+00512            MOVE '6'              TO CP-EARNING-METHOD             ELCRFNDP
+00513            GO TO 1060-ANTICIPATION-REF.                           ELCRFNDP
+00514                                                                   ELCRFNDP
+CIDMOD SKIP-CSO-TEXAS-AH-PROCESSING.                                    ELCRFNDP
+CIDMOD                                                                  ELCRFNDP
+00515      IF CP-STATE-STD-ABBRV = 'VA'                                 ELCRFNDP
+00516        IF CP-COMPANY-ID EQUAL 'NCL'                               ELCRFNDP
+00517           NEXT SENTENCE                                           ELCRFNDP
+00518        END-IF                                                     ELCRFNDP
+00519        IF CP-COMPANY-ID = 'NCB'                                   ELCRFNDP
+00520            MOVE '6'                TO CP-EARNING-METHOD           ELCRFNDP
+00521            GO TO 1060-ANTICIPATION-REF                            ELCRFNDP
+00522        ELSE                                                       ELCRFNDP
+00523            IF DC-GREG-DATE-CYMD GREATER 19921231                     CL**2
+00524                IF CP-ORIGINAL-TERM GREATER THAN 61                ELCRFNDP
+00525                    MOVE '6'        TO CP-EARNING-METHOD           ELCRFNDP
+00526                    GO TO 1060-ANTICIPATION-REF                    ELCRFNDP
+00527                ELSE                                               ELCRFNDP
+00528                    MOVE '1'        TO CP-EARNING-METHOD           ELCRFNDP
+00529                    GO TO 1050-R78-REF.                            ELCRFNDP
+00530                                                                   ELCRFNDP
+00531      IF CP-EARN-BY-PRORATA                                        ELCRFNDP
+00532          GO TO 1040-PR-REF.                                       ELCRFNDP
+00533                                                                   ELCRFNDP
+00534      IF CP-EARN-BY-R78                                            ELCRFNDP
+00535          GO TO 1050-R78-REF.                                      ELCRFNDP
+00536                                                                   ELCRFNDP
+00537      IF CP-EARN-AS-MEAN                                           ELCRFNDP
+00538         GO TO 1055-MEAN-REF.                                      ELCRFNDP
+00539                                                                   ELCRFNDP
+00540      IF CP-EARN-AS-SUM-OF-DIGITS                                  ELCRFNDP
+00541          GO TO 1075-SUM-OF-DIGITS.                                ELCRFNDP
+00542                                                                   ELCRFNDP
+00543      IF CP-EARN-AS-CALIF                                          ELCRFNDP
+00544          GO TO 1060-ANTICIPATION-REF.                             ELCRFNDP
+00545                                                                   ELCRFNDP
+00546      IF CP-EARN-ANTICIPATION                                      ELCRFNDP
+00547          GO TO 1060-ANTICIPATION-REF.                             ELCRFNDP
+00548                                                                   ELCRFNDP
+00549      IF CP-EARN-AS-NET-PAY                                        ELCRFNDP
+00550          GO TO 1070-NET-PAY-REFUND.                               ELCRFNDP
+00551                                                                   ELCRFNDP
+00552      GO TO 1050-R78-REF.                                          ELCRFNDP
+00553                                                                   ELCRFNDP
+00554 *---------------------------------------------------------------  ELCRFNDP
+00555  1035-REF-AH-CRITICAL-PERIOD.                                     ELCRFNDP
+00556      IF CP-REMAINING-TERM GREATER +6                              ELCRFNDP
+00557         COMPUTE CP-CALC-REFUND ROUNDED =                          ELCRFNDP
+00558           CP-ORIGINAL-PREMIUM * (((CP-REMAINING-TERM * +2) - +5) /ELCRFNDP
+00559                        ((CP-ORIGINAL-TERM * +2) - + 5))           ELCRFNDP
+00560       ELSE                                                        ELCRFNDP
+00561         COMPUTE CP-CALC-REFUND ROUNDED =                          ELCRFNDP
+00562           CP-ORIGINAL-PREMIUM * ((CP-REMAINING-TERM *             ELCRFNDP
+00563                                            CP-REMAINING-TERM + 1) ELCRFNDP
+00564                               /  (+12 * CP-ORIGINAL-TERM) - +30). ELCRFNDP
+00565                                                                   ELCRFNDP
+00566      IF CP-CALC-REFUND LESS ZERO                                  ELCRFNDP
+00567          MOVE ZERO TO CP-CALC-REFUND.                             ELCRFNDP
+00568                                                                   ELCRFNDP
+00569      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00570                                                                   ELCRFNDP
+00571 *---------------------------------------------------------------  ELCRFNDP
+00572  1040-PR-REF.                                                     ELCRFNDP
+00573      MOVE '2'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00574      COMPUTE CP-CALC-REFUND = CP-ORIGINAL-PREMIUM * PR-FACTOR.    ELCRFNDP
+00575                                                                   ELCRFNDP
+00576      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00577                                                                   ELCRFNDP
+00578 *---------------------------------------------------------------  ELCRFNDP
+00579  1050-R78-REF.                                                    ELCRFNDP
+00580      MOVE '1'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00581      COMPUTE CP-CALC-REFUND ROUNDED =                             ELCRFNDP
+00582            CP-ORIGINAL-PREMIUM * R78-FACTOR.                      ELCRFNDP
+00583                                                                   ELCRFNDP
+00584      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00585                                                                   ELCRFNDP
+00586 *---------------------------------------------------------------  ELCRFNDP
+00587  1055-MEAN-REF.                                                   ELCRFNDP
+00588      MOVE '8'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00589      COMPUTE CP-CALC-REFUND ROUNDED =                             ELCRFNDP
+00590          ((CP-ORIGINAL-PREMIUM * R78-FACTOR) +                    ELCRFNDP
+00591           (CP-ORIGINAL-PREMIUM * PR-FACTOR)) * .5.                ELCRFNDP
+00592                                                                   ELCRFNDP
+00593      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00594                                                                   ELCRFNDP
+00595 *---------------------------------------------------------------  ELCRFNDP
+00596  1060-ANTICIPATION-REF.                                           ELCRFNDP
+00597      MOVE '6'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00598                                                                   ELCRFNDP
+00599      MOVE CP-ORIGINAL-TERM  TO WS-SAVE-TERM.                      ELCRFNDP
+00600      MOVE CP-LOAN-TERM      TO WS-SAVE-LOAN-TERM.                 ELCRFNDP
+00601      MOVE CP-EARNING-METHOD TO WS-SAVE-EARN-METHOD.               ELCRFNDP
+00602                                                                   ELCRFNDP
+00603      MOVE CP-REMAINING-TERM TO CP-ORIGINAL-TERM                   ELCRFNDP
+00604                                CP-LOAN-TERM.                      ELCRFNDP
+00605      MOVE CP-RATING-METHOD  TO CP-EARNING-METHOD.                 ELCRFNDP
+00606                                                                   ELCRFNDP
+00607      PERFORM 2500-GET-RATE.                                       ELCRFNDP
+00608                                                                   ELCRFNDP
+00609      MOVE WS-SAVE-TERM      TO CP-ORIGINAL-TERM.                  ELCRFNDP
+00610      MOVE WS-SAVE-LOAN-TERM TO CP-LOAN-TERM.                      ELCRFNDP
+00611                                                                   ELCRFNDP
+00612      IF CP-PREMIUM-RATE = ZEROS                                   ELCRFNDP
+00613         MOVE '7'                 TO CP-RETURN-CODE                ELCRFNDP
+00614         MOVE WS-SAVE-EARN-METHOD TO CP-EARNING-METHOD             ELCRFNDP
+00615         GO TO 1999-CALC-REF-AMT-X.                                ELCRFNDP
+00616                                                                   ELCRFNDP
+00617      MOVE CP-CALC-PREMIUM         TO WS-REMAIN-PREM.              ELCRFNDP
+00618                                                                   ELCRFNDP
+00619      PERFORM 2500-GET-RATE.                                       ELCRFNDP
+00620                                                                   ELCRFNDP
+00621      MOVE WS-SAVE-EARN-METHOD     TO CP-EARNING-METHOD.           ELCRFNDP
+00622                                                                   ELCRFNDP
+00623      IF CP-PREMIUM-RATE = ZEROS                                   ELCRFNDP
+00624         MOVE '7'            TO CP-RETURN-CODE                     ELCRFNDP
+00625         GO TO 1999-CALC-REF-AMT-X.                                ELCRFNDP
+00626                                                                   ELCRFNDP
+00627      MOVE CP-CALC-PREMIUM         TO WS-ORIG-PREM.                ELCRFNDP
+00628                                                                   ELCRFNDP
+00629      IF  WS-ORIG-PREM = ZERO                                      ELCRFNDP
+00630          MOVE ZERO                TO WS-NP-REF-FACTOR             ELCRFNDP
+00631         ELSE                                                      ELCRFNDP
+00632          COMPUTE WS-NP-REF-FACTOR ROUNDED = WS-REMAIN-PREM /      ELCRFNDP
+00633                                             WS-ORIG-PREM.         ELCRFNDP
+00634                                                                   ELCRFNDP
+00635      COMPUTE CP-CALC-REFUND ROUNDED = WS-NP-REF-FACTOR *          ELCRFNDP
+00636                                         CP-ORIGINAL-PREMIUM.      ELCRFNDP
+00637                                                                   ELCRFNDP
+00638      IF NOT CP-EARN-AS-CALIF                                      ELCRFNDP
+00639          GO TO 1999-CALC-REF-AMT-X.                               ELCRFNDP
+00640                                                                   ELCRFNDP
+00641 *---------------------------------------------------------------  ELCRFNDP
+00642  1065-CALIF-REGS.                                                 ELCRFNDP
+00643      MOVE 'S'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00644      SUBTRACT CP-REMAINING-TERM FROM CP-ORIGINAL-TERM             ELCRFNDP
+00645          GIVING FACTOR-5.                                         ELCRFNDP
+00646                                                                   ELCRFNDP
+00647      IF FACTOR-5 NOT GREATER +6  AND                              ELCRFNDP
+00648         CP-CLASS-CODE = 'A '                                      ELCRFNDP
+00649          GO TO 1050-R78-REF.                                      ELCRFNDP
+00650                                                                   ELCRFNDP
+00651      IF FACTOR-5 = ZERO                                           ELCRFNDP
+00652          MOVE CP-ORIGINAL-PREMIUM   TO CP-CALC-REFUND             ELCRFNDP
+00653          GO TO 1999-CALC-REF-AMT-X.                               ELCRFNDP
+00654                                                                   ELCRFNDP
+00655      IF CP-ORIGINAL-TERM LESS +014                                ELCRFNDP
+00656          GO TO 1999-CALC-REF-AMT-X.                               ELCRFNDP
+00657                                                                   ELCRFNDP
+00658      MULTIPLY CP-ORIGINAL-TERM BY CP-ORIGINAL-TERM                ELCRFNDP
+00659                                    GIVING FACTOR-5 ROUNDED.       ELCRFNDP
+00660                                                                   ELCRFNDP
+00661      MULTIPLY FACTOR-5 BY +0.0000045573 GIVING FACTOR-1 ROUNDED.  ELCRFNDP
+00662                                                                   ELCRFNDP
+00663      MULTIPLY +0.001125 BY CP-ORIGINAL-TERM                       ELCRFNDP
+00664                                    GIVING FACTOR-2 ROUNDED.       ELCRFNDP
+00665                                                                   ELCRFNDP
+00666      SUBTRACT FACTOR-2 FROM FACTOR-1.                             ELCRFNDP
+00667      ADD +0.099375 TO FACTOR-1.                                   ELCRFNDP
+00668                                                                   ELCRFNDP
+00669      SUBTRACT CP-REMAINING-TERM FROM CP-ORIGINAL-TERM             ELCRFNDP
+00670                                    GIVING FACTOR-5 ROUNDED.       ELCRFNDP
+00671                                                                   ELCRFNDP
+00672      SUBTRACT +1.00 FROM FACTOR-5.                                ELCRFNDP
+00673                                                                   ELCRFNDP
+00674      IF CP-ORIGINAL-TERM LESS +049                                ELCRFNDP
+00675          SUBTRACT +013 FROM CP-ORIGINAL-TERM                      ELCRFNDP
+00676                                    GIVING FACTOR-6 ROUNDED        ELCRFNDP
+00677      ELSE                                                         ELCRFNDP
+00678          MOVE +035 TO FACTOR-6.                                   ELCRFNDP
+00679                                                                   ELCRFNDP
+00680      MOVE +001 TO FACTOR-2.                                       ELCRFNDP
+00681                                                                   ELCRFNDP
+00682      DIVIDE FACTOR-5 BY FACTOR-6 GIVING FACTOR-4 ROUNDED.         ELCRFNDP
+00683      SUBTRACT FACTOR-4 FROM FACTOR-2.                             ELCRFNDP
+00684      MULTIPLY FACTOR-1 BY FACTOR-2 GIVING FACTOR-3 ROUNDED.       ELCRFNDP
+00685      MOVE +001 TO FACTOR-2.                                       ELCRFNDP
+00686      SUBTRACT FACTOR-3 FROM FACTOR-2 GIVING FACTOR-1 ROUNDED.     ELCRFNDP
+00687                                                                   ELCRFNDP
+00688      MULTIPLY FACTOR-1 BY CP-CALC-REFUND                          ELCRFNDP
+00689          GIVING CAL-RFND ROUNDED.                                 ELCRFNDP
+00690                                                                   ELCRFNDP
+00691      IF CAL-RFND LESS +0.01                                       ELCRFNDP
+00692          MOVE ZEROS TO CAL-RFND.                                  ELCRFNDP
+00693                                                                   ELCRFNDP
+00694      IF CAL-RFND LESS CP-CALC-REFUND                              ELCRFNDP
+00695          MOVE CAL-RFND TO CP-CALC-REFUND.                         ELCRFNDP
+00696                                                                   ELCRFNDP
+00697      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00698                                                                   ELCRFNDP
+00699 *-----------------------------------------------------------------ELCRFNDP
+00700  1070-NET-PAY-REFUND.                                             ELCRFNDP
+00701      MOVE '5'                    TO  CP-REFUND-TYPE-USED.         ELCRFNDP
+00702                                                                   ELCRFNDP
+00703      IF CP-LOAN-APR = ZERO                                        ELCRFNDP
+00704          MOVE ZEROS              TO  CP-CALC-REFUND               ELCRFNDP
+00705          MOVE '1'                TO  CP-RETURN-CODE               ELCRFNDP
+00706          GO TO 1999-CALC-REF-AMT-X.                               ELCRFNDP
+00707                                                                   ELCRFNDP
+00708      MOVE CP-LOAN-APR            TO  N-P-APR.                     ELCRFNDP
+00709      MOVE CP-ORIGINAL-TERM       TO  N-P-ORIG  N-P-LOAN.          ELCRFNDP
+00710      MOVE CP-REMAINING-TERM      TO  N-P-REM.                     ELCRFNDP
+00711                                                                   ELCRFNDP
+00712      MOVE 'R'                    TO  N-P-OPT.                     ELCRFNDP
+00713                                                                   ELCRFNDP
+00714      PERFORM 10000-NET-TERM THRU 99999-EXIT.                      ELCRFNDP
+00715                                                                   ELCRFNDP
+00716      COMPUTE CP-CALC-REFUND ROUNDED = N-P-FACTOR *                ELCRFNDP
+00717                                         CP-ORIGINAL-PREMIUM.      ELCRFNDP
+00718                                                                   ELCRFNDP
+00719      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00720 *---------------------------------------------------------------  ELCRFNDP
+00721                                                                   ELCRFNDP
+00722  1075-SUM-OF-DIGITS.                                              ELCRFNDP
+00723                                                                   ELCRFNDP
+00724      MOVE '9'               TO CP-REFUND-TYPE-USED.               ELCRFNDP
+00725                                                                   ELCRFNDP
+00726      COMPUTE RSUM-REMAINING-TERM =                                ELCRFNDP
+00727              CP-LOAN-TERM -                                       ELCRFNDP
+00728                   (CP-ORIGINAL-TERM - (CP-REMAINING-TERM + 1))    ELCRFNDP
+00729                                                                   ELCRFNDP
+00730      COMPUTE RSUM-FACTOR =                                        ELCRFNDP
+00731         ((RSUM-REMAINING-TERM * (RSUM-REMAINING-TERM + 1)) -      ELCRFNDP
+00732                ((CP-LOAN-TERM - CP-ORIGINAL-TERM)          *      ELCRFNDP
+00733                  (CP-LOAN-TERM - CP-ORIGINAL-TERM + 1)))   /      ELCRFNDP
+00734             ((CP-LOAN-TERM * (CP-LOAN-TERM + 1))           -      ELCRFNDP
+00735                ((CP-LOAN-TERM - CP-ORIGINAL-TERM)          *      ELCRFNDP
+00736                  (CP-LOAN-TERM - CP-ORIGINAL-TERM  + 1))).        ELCRFNDP
+00737                                                                   ELCRFNDP
+00738      COMPUTE CP-CALC-REFUND ROUNDED =                             ELCRFNDP
+00739            CP-ORIGINAL-PREMIUM * RSUM-FACTOR.                     ELCRFNDP
+00740                                                                   ELCRFNDP
+00741      GO TO 1999-CALC-REF-AMT-X.                                   ELCRFNDP
+00742                                                                   ELCRFNDP
+00743 *-----------------------------------------------------------------ELCRFNDP
+00744                                                                   ELCRFNDP
+00745  1999-CALC-REF-AMT-X.                                             ELCRFNDP

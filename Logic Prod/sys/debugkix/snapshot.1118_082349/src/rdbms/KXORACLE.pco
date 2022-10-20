@@ -1,0 +1,144 @@
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2007-2013 Dell Inc.                             *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID. KXORACLE.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+      *---------------------------------------------------------------*
+      *  Code the userid and password, or use sit info to collect the
+      *  application name and connect using application name.
+      *---------------------------------------------------------------*
+	   EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+       01  USERID                         PIC X(8).
+       01  PASSWRD                        PIC X(30).
+       01  USERNAME                       PIC X(8).
+       01  SERVER                         PIC X(12).
+       01  SQL-STRING                     PIC X(40).
+	   EXEC SQL END DECLARE SECTION END-EXEC.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+
+       01  SQLCODE-DISP                   PIC -9(5).
+      *---------------------------------------------------------------*
+      * This copy book gives the tct and system information 
+      *---------------------------------------------------------------*
+       COPY "KXINFO.CPY".
+      *---------------------------------------------------------------*
+      * Sample COBOL program which contains entry points for
+      * interfacing UniKix's user exits with ORACLE software. The main
+      * entry point(KXORALGN) is for logging onto the ORACLE server and
+      * is called by the UniKix transaction processors
+      * and batch vsam processor when they are
+      * initiated by the UniKix system. Entry point KXORALGF is for
+      * logging off from the ORACLE server and is called by the UniKix 
+      * transaction processors and batch vsam processors when they terminate.
+      *
+      * Entry point KXORASAVE is for executing an SQL COMMIT statement and
+      * will be called at UniKix sync point time. If the user COBOL programs
+      * are already doing COMMITs, then this statement will have no effect.
+      * Entry point KXORAUNDO is for executing an SQL ROLLBACK statement and
+      * will be called at UniKix rollback time. If the user COBOL programs
+      * are already doing ROLLBACKs, then this statement will have no effect.
+      *
+      *---------------------------------------------------------------*
+       PROCEDURE DIVISION.
+       ENTRY "KXORALGN".
+	   MOVE "KXORALGN" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ABORT END-EXEC.
+      *---------------------------------------------------------------*
+      * This call update the  sit information
+      * user can use this information to set the userid . 
+      * In this example, application name is used as the userid and
+      * password.
+      *---------------------------------------------------------------*
+	   CALL "kxsysinfo" using KIX-SYS-INFO.
+       	   MOVE KIX-SIT-USR-NAME TO USERID.
+	   MOVE KIX-SIT-USR-PASS TO PASSWRD.
+           IF KIX-SIT-SRV-NAME NOT EQUAL SPACES
+	      MOVE KIX-SIT-SRV-NAME TO SERVER
+              EXEC SQL CONNECT       :USERID  
+                       IDENTIFIED BY :PASSWRD 
+                       USING         :SERVER END-EXEC
+           ELSE
+              EXEC SQL CONNECT       :USERID  
+                       IDENTIFIED BY :PASSWRD  END-EXEC.
+	   SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXORALGF".
+	   MOVE "KXORALGF" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+	   EXEC SQL COMMIT WORK RELEASE END-EXEC.
+	   SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXORABTRN".
+	   MOVE "KXORABTRN" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ABORT END-EXEC.
+      *---------------------------------------------------------------*
+      * This call updates the tct information
+      *---------------------------------------------------------------*
+	   CALL "kxtctinfo" using KIX-TCT-INFO.
+      *---------------------------------------------------------------*
+      *    Oracle7 specific security features.  Uncomment the code
+      *    to implement the feature.
+      *---------------------------------------------------------------*
+      *    MOVE KIX-USRNAM TO USERNAME.
+      *    STRING "SET ROLE " USERNAME DELIMITED BY SIZE
+      *            INTO SQL-STRING.
+      *	   EXEC SQL EXECUTE IMMEDIATE :SQL-STRING END-EXEC.
+           EXEC SQL SAVEPOINT oracle_savepoint END-EXEC.
+	   SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXORAETRN".
+	   MOVE "KXORAETRN" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+           EXEC SQL COMMIT WORK END-EXEC.
+	   SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXORASAVE".
+	   MOVE "KXORASAVE" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+           EXEC SQL COMMIT WORK END-EXEC.
+           EXEC SQL SAVEPOINT oracle_savepoint END-EXEC.
+	   SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXORAUNDO".
+	   MOVE "KXORAUNDO" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+           EXEC SQL ROLLBACK WORK END-EXEC.
+	   SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       SQL-ABORT.
+      *---------------------------------------------------------------*
+      *    Set return-code to Failure (1) or Abort (-1)
+      *    Failure during allocation brings up the SERVER, without
+      *           the database connected.
+      *    Abort always aborts the  transaction SERVER
+      *    This example aborts the transaction SERVER
+      *---------------------------------------------------------------*
+	   MOVE SQLCODE TO SQLCODE-DISP.
+	   STRING "DATABASE ERROR. SQLCODE = ", SQLCODE-DISP
+		  DELIMITED BY SIZE INTO KIX-MSG-STR.
+           CALL "kxsetmsg" USING KIX-MSG-INFO.
+	   SET RETURN-CODE TO -1.
+           EXIT PROGRAM.
+       SQL-ERROR.
+      *---------------------------------------------------------------*
+      *    Set return-code to Failure (1) or Abort (-1)
+      *    Failure during other exits terminates the transaction
+      *    Abort always aborts the  transaction SERVER
+      *    This example terminates transaction.
+      *---------------------------------------------------------------*
+	   MOVE SQLCODE TO SQLCODE-DISP.
+	   STRING "DATABASE ERROR. SQLCODE = ", SQLCODE-DISP
+		  DELIMITED BY SIZE INTO KIX-MSG-STR.
+           CALL "kxsetmsg" USING KIX-MSG-INFO.
+	   SET RETURN-CODE TO 1.
+           EXIT PROGRAM.

@@ -1,0 +1,583 @@
+40a41
+> 073107* 073107  CR2006051600002  PEMA  ADD OVERCHARGE PROCESSING
+52a54,61
+> 073107 77  N1                          PIC S999 COMP-3 VALUE +0.
+> 073107 77  N2                          PIC S999 COMP-3 VALUE +0.
+> 073107 77  N3                          PIC S999 COMP-3 VALUE +0.
+> 073107 77  WS-OC-AMT                   PIC S9(9)V99 COMP-3 VALUE +0.
+> 073107 77  WS-SAVE-ERPYAJ-KEY          PIC X(33) VALUE SPACES.
+> 073107 77  WS-REVERSE-SW               PIC X VALUE 'N'.
+>            88  REVERSAL                    VALUE 'Y'.
+>        77  WS-NOTE-SW                  PIC X  VALUE ' '.
+57a67,72
+> 073107 01  WS-OC-MESSAGE.
+>            12  FILLER                  PIC X(43) VALUE
+>               'OVERCHARGE AUTO CORRECTED IN THE AMOUNT OF '.
+>            12  WS-OC-DIS-AMT           PIC -----9.99.
+>            12  FILLER                  PIC X(4) VALUE ' ON '.
+>            12  WS-OC-DATE              PIC X(10).
+112a128
+> 073107     12  FILE-ID-ERPYAJ          PIC X(8)    VALUE 'ERPYAJ'.      
+125a142,151
+> 073107     12  ERPYAJ-KEY.
+> 073107         16  ERPYAJ-COMPANY-CD       PIC X.
+> 073107         16  ERPYAJ-CARRIER          PIC X.
+> 073107         16  ERPYAJ-GROUPING         PIC X(6).
+> 073107         16  ERPYAJ-FIN-RESP         PIC X(10).
+> 073107         16  ERPYAJ-ACCOUNT          PIC X(10).
+> 073107         16  ERPYAJ-SEQ-NO           PIC S9(8) COMP.
+> 073107         16  ERPYAJ-TYPE             PIC X.
+> 00121      12  ERPYAJ-RECORD-LENGTH        PIC S9(4) COMP VALUE +200.
+> 
+236a263,269
+>            12  WS-RESPONSE             PIC S9(8)   COMP.
+>                88  RESP-NORMAL                  VALUE +00.
+>                88  RESP-NOTFND                  VALUE +13.
+>                88  RESP-DUPREC                  VALUE +14.
+>                88  RESP-DUPKEY                  VALUE +15.
+>                88  RESP-NOTOPEN                 VALUE +19.
+>                88  RESP-ENDFILE                 VALUE +20.
+848c881
+< 00816      EJECT                                                        
+---
+> 073107     COPY ERCPYAJ.                                                
+3254a3288,3319
+> 073107     IF (BFORCEL NOT = ZEROS)
+> 073107        AND (PB-COMPANY-ID = 'DCC')
+> 073107        AND (BFORCEI = ' ')
+> 073107        AND (PB-FORCE-CODE = 'O')
+>               COMPUTE PB-I-AH-PREMIUM-AMT =
+>                  PB-I-DCC-OVER-CHG-AMT + PB-I-AH-PREM-CALC
+> 073107        PERFORM 1800-REMOVE-CERT-NOTES
+>                                        THRU 1800-EXIT
+> 073107        PERFORM 1900-DELETE-ERPYAJ
+>                                        THRU 1900-EXIT
+>               MOVE +0                  TO PB-I-DCC-OVER-CHG-AMT
+> 073107     END-IF
+> 
+> 073107     IF (BFORCEL NOT = ZEROS)
+> 073107        AND (PB-COMPANY-ID = 'DCC')
+> 073107        AND (BFORCEI = 'O')
+> 073107        AND (PB-FORCE-CODE NOT = 'O')
+>               COMPUTE WS-OC-AMT = PB-I-AH-PREMIUM-AMT -
+>                  PB-I-AH-PREM-CALC
+>               MOVE WS-CURRENT-BIN-DT   TO DC-BIN-DATE-1
+>               MOVE SPACE               TO DC-OPTION-CODE
+>               PERFORM 9700-DATE-LINK
+>               MOVE DC-GREG-DATE-A-EDIT TO WS-OC-DATE
+>               MOVE WS-OC-AMT           TO PB-I-DCC-OVER-CHG-AMT
+>               MOVE PB-I-AH-PREM-CALC   TO PB-I-AH-PREMIUM-AMT
+>               MOVE WS-OC-AMT           TO WS-OC-DIS-AMT
+> 073107        PERFORM 1500-UPDATE-ERNOTE
+>                                        THRU 1500-EXIT
+> 073107        PERFORM 1600-UPDATE-ERPYAJ
+>                                        THRU 1600-EXIT
+> 073107     END-IF
+> 
+4027,4028d4091
+< 03881      EJECT                                                        
+< 03882                                                                   
+4029a4093,4595
+> 03884 *            O V E R   C H A R G E   P R O C E S S I N G         *
+> 03885 ******************************************************************
+>        1500-UPDATE-ERNOTE.
+> 
+>            PERFORM 1510-ADD-ERNOTE-REC THRU 1510-EXIT
+>            MOVE '3'                    TO WS-NOTE-SW
+>            PERFORM 1520-UPDATE-ELCERT  THRU 1520-EXIT
+> 
+>            .
+>        1500-EXIT.
+>            EXIT.
+> 
+>        1510-ADD-ERNOTE-REC.
+> 
+>            EXEC CICS GETMAIN
+>                SET     (ADDRESS OF CERTIFICATE-NOTE)
+>                LENGTH  (ERNOTE-RECORD-LENGTH)
+>                INITIMG (GETMAIN-SPACE)                                 
+>            END-EXEC
+> 
+>            MOVE PB-CONTROL-BY-ACCOUNT (1:33)
+>                                        TO ERNOTE-KEY
+> 
+>            EXEC CICS READ
+>               DATASET    (FILE-ID-ERNOTE)
+>               RIDFLD     (ERNOTE-KEY)
+>               INTO       (CERTIFICATE-NOTE)
+>               RESP       (WS-RESPONSE)
+>               UPDATE
+>            END-EXEC
+> 
+>            IF RESP-NORMAL
+>               PERFORM VARYING N1 FROM +1 BY +1 UNTIL
+>                  (N1 > +10) OR
+>                  (CN-LINE (N1) = SPACES OR LOW-VALUES) OR
+> CIDMOD           (CN-LINE (N1) (1:10) = 'OVERCHARGE')
+>               END-PERFORM
+>             IF CN-LINE (N1) (1:10) = 'OVERCHARGE'
+> CIDMOD         EXEC CICS UNLOCK
+> CIDMOD            DATASET    (FILE-ID-ERNOTE)
+> CIDMOD         END-EXEC
+>             ELSE
+>               IF CN-BILLING-START-LINE-NO NOT NUMERIC
+>                  MOVE ZEROS            TO CN-BILLING-START-LINE-NO
+>               END-IF
+>               IF CN-BILLING-END-LINE-NO NOT NUMERIC
+>                  MOVE ZEROS            TO CN-BILLING-END-LINE-NO
+>               END-IF
+>               IF (N1 < +11) AND
+>                  (CN-BILLING-END-LINE-NO NOT = ZEROS) AND
+>                  (N1 = (CN-BILLING-END-LINE-NO + +1))
+>                  MOVE WS-OC-MESSAGE    TO CN-LINE (N1)
+>                  MOVE N1               TO CN-BILLING-END-LINE-NO
+>               ELSE
+>                  IF (N1 < +11) AND
+>                     (CN-BILLING-END-LINE-NO = ZEROS)
+>                     MOVE WS-OC-MESSAGE TO CN-LINE (N1)
+>                     MOVE N1            TO CN-BILLING-END-LINE-NO
+>                                           CN-BILLING-START-LINE-NO
+>                  ELSE
+>                     IF (N1 < +11) AND
+>                        (CN-BILLING-START-LINE-NO NOT = ZEROS) AND
+>                        (N1 = (CN-BILLING-START-LINE-NO - +1))
+>                        MOVE WS-OC-MESSAGE TO CN-LINE (N1)
+>                        MOVE N1             TO CN-BILLING-START-LINE-NO
+>                     ELSE
+>                        IF N1 < +11
+>                           PERFORM 1700-SQUEEZE-IT-IN
+>                                        THRU 1700-EXIT
+>                        END-IF
+>                     END-IF
+>                  END-IF
+>               END-IF
+>               MOVE 'E631'              TO CN-LAST-MAINT-USER
+>               MOVE WS-CURRENT-BIN-DT   TO CN-LAST-MAINT-DT
+>               MOVE EIBTIME             TO CN-LAST-MAINT-HHMMSS
+>               EXEC CICS REWRITE
+>                  DATASET    (FILE-ID-ERNOTE)
+>                  FROM       (CERTIFICATE-NOTE)
+>                  RESP       (WS-RESPONSE)
+>               END-EXEC
+>             END-IF
+>            ELSE
+>               MOVE SPACES              TO CERTIFICATE-NOTE
+>               MOVE 'CN'                TO CN-RECORD-ID
+>               MOVE PB-CONTROL-BY-ACCOUNT (1:33)
+>                                        TO CN-CONTROL-PRIMARY
+>                                           ERNOTE-KEY
+>               MOVE 01                  TO CN-BILLING-START-LINE-NO
+>                                           CN-BILLING-END-LINE-NO
+>               MOVE WS-OC-MESSAGE       TO CN-LINE (01)
+>               MOVE 'E631'              TO CN-LAST-MAINT-USER
+>               MOVE WS-CURRENT-BIN-DT   TO CN-LAST-MAINT-DT
+>               MOVE EIBTIME             TO CN-LAST-MAINT-HHMMSS
+>               EXEC CICS WRITE
+>                  DATASET    (FILE-ID-ERNOTE)
+>                  FROM       (CERTIFICATE-NOTE)
+>                  RIDFLD     (ERNOTE-KEY)
+>                  RESP       (WS-RESPONSE)
+>               END-EXEC
+>            END-IF
+> 
+>            .
+>        1510-EXIT.
+>            EXIT.
+> 
+>        1520-UPDATE-ELCERT.
+> 
+>            MOVE PB-CONTROL-BY-ACCOUNT (1:33)
+>                                        TO ELCERT-KEY
+>            EXEC CICS READ
+>                SET     (ADDRESS OF CERTIFICATE-MASTER)
+>                DATASET (FILE-ID-ELCERT)
+>                RIDFLD  (ELCERT-KEY)
+>                UPDATE
+>                RESP    (WS-RESPONSE)
+>            END-EXEC
+> 
+>            IF RESP-NORMAL
+>               MOVE WS-NOTE-SW          TO CM-NOTE-SW
+>               EXEC CICS REWRITE
+>                  DATASET    (FILE-ID-ELCERT)
+>                  FROM       (CERTIFICATE-MASTER)
+>                  RESP       (WS-RESPONSE)
+>               END-EXEC
+>               IF RESP-NORMAL
+>                  CONTINUE
+>               ELSE
+>                  MOVE WS-RESPONSE TO EMI-ERROR
+>                  PERFORM 9900-ERROR-FORMAT
+>                                        THRU 9900-EXIT
+>                  GO TO 8200-SEND-DATAONLY
+>               END-IF
+>            ELSE
+>               MOVE -1                  TO BMAINTL
+>               MOVE 0249                TO EMI-ERROR
+>               PERFORM 9900-ERROR-FORMAT
+>                                        THRU 9900-EXIT
+>               GO TO 8200-SEND-DATAONLY
+>            END-IF
+> 
+>            .
+>        1520-EXIT.
+>            EXIT.
+> 
+>        1600-UPDATE-ERPYAJ.
+> 
+>            PERFORM 1610-ADD-ERPYAJ-BANK-REC
+>                                        THRU 1610-EXIT
+>            PERFORM 1620-ADD-ERPYAJ-DLR-REC
+>                                        THRU 1620-EXIT
+>            
+>            .
+>        1600-EXIT.
+>            EXIT.
+> 
+>        1610-ADD-ERPYAJ-BANK-REC.
+> 
+>            EXEC CICS GETMAIN
+>                SET     (ADDRESS OF PENDING-PAY-ADJ)
+>                LENGTH  (ERPYAJ-RECORD-LENGTH)
+>                INITIMG (GETMAIN-SPACE)                                 
+>            END-EXEC
+> 
+>            MOVE PB-COMPANY-CD          TO ERPYAJ-COMPANY-CD
+>            MOVE PB-CARRIER             TO ERPYAJ-CARRIER
+>            MOVE PB-GROUPING            TO ERPYAJ-GROUPING
+>            MOVE PB-I-BANK-NUMBER       TO ERPYAJ-FIN-RESP
+>            MOVE LOW-VALUES             TO ERPYAJ-ACCOUNT
+>            MOVE +10                    TO ERPYAJ-SEQ-NO
+>            MOVE 'R'                    TO ERPYAJ-TYPE
+>            IF REVERSAL
+>               MOVE 'C'                 TO ERPYAJ-TYPE
+>            END-IF
+>            MOVE SPACES                 TO PENDING-PAY-ADJ
+>            MOVE 'PY'                   TO PY-RECORD-ID
+>            MOVE ERPYAJ-KEY             TO PY-CONTROL-PRIMARY
+>            MOVE WS-OC-AMT              TO PY-ENTRY-AMT
+>            IF REVERSAL
+>               MOVE PB-I-DCC-OVER-CHG-AMT
+>                                        TO PY-ENTRY-AMT
+>            END-IF
+>            MOVE WS-CURRENT-BIN-DT      TO PY-LAST-MAINT-DT
+>                                           PY-INPUT-DT
+>       *    MOVE X'A15F'                TO PY-LAST-MAINT-DT
+>       *                                   PY-INPUT-DT
+>            MOVE PI-PROCESSOR-ID        TO PY-LAST-MAINT-BY
+>            MOVE PI-CR-MONTH-END-DT     TO PY-CREDIT-SELECT-DT
+>            MOVE 'OVERCHARGE'           TO PY-GL-COMMENT
+>            IF PB-CARRIER = '2'
+>               MOVE '2725040330'        TO PY-GL-ACCOUNT
+>            ELSE
+>               MOVE '2725040130'        TO PY-GL-ACCOUNT
+>            END-IF
+>            MOVE LOW-VALUES             TO PY-CREDIT-ACCEPT-DT
+>                                           PY-BILLED-DATE
+>                                           PY-AR-DATE
+>                                           PY-REPORTED-DT
+>                                           PY-CHECK-WRITTEN-DT
+>            MOVE ZEROS                  TO PY-CHECK-QUE-CONTROL
+>                                           PY-CHECK-QUE-SEQUENCE
+>            MOVE EIBTIME                TO PY-LAST-MAINT-HHMMSS
+>            PERFORM WITH TEST AFTER
+>               UNTIL (NOT RESP-DUPKEY)
+>                  AND (NOT RESP-DUPREC)
+>               EXEC CICS WRITE
+>                  DATASET    (FILE-ID-ERPYAJ)
+>                  FROM       (PENDING-PAY-ADJ)
+>                  RIDFLD     (ERPYAJ-KEY)
+>                  RESP       (WS-RESPONSE)
+>               END-EXEC
+>               IF RESP-DUPKEY OR RESP-DUPREC
+>                  ADD +1                TO ERPYAJ-SEQ-NO
+>                  MOVE ERPYAJ-SEQ-NO    TO PY-FILE-SEQ-NO
+>               END-IF
+>            END-PERFORM
+> 
+>            .
+>        1610-EXIT.
+>            EXIT.
+> 
+>        1620-ADD-ERPYAJ-DLR-REC.
+> 
+>            MOVE 'C'                    TO ERPYAJ-TYPE
+>            IF REVERSAL
+>               MOVE 'R'                 TO ERPYAJ-TYPE
+>            END-IF
+>            MOVE PB-ACCOUNT             TO ERPYAJ-FIN-RESP
+>                                           ERPYAJ-ACCOUNT
+>            ADD +1                      TO ERPYAJ-SEQ-NO
+>            MOVE ERPYAJ-KEY             TO PY-CONTROL-PRIMARY
+>            IF PB-CARRIER = '2'
+>               MOVE '2725040330'        TO PY-GL-ACCOUNT
+>            ELSE
+>               MOVE '2725040130'        TO PY-GL-ACCOUNT
+>            END-IF
+> 
+>            PERFORM WITH TEST AFTER
+>               UNTIL (NOT RESP-DUPKEY)
+>                  AND (NOT RESP-DUPREC)
+>               EXEC CICS WRITE
+>                  DATASET    (FILE-ID-ERPYAJ)
+>                  FROM       (PENDING-PAY-ADJ)
+>                  RIDFLD     (ERPYAJ-KEY)
+>                  RESP       (WS-RESPONSE)
+>               END-EXEC
+>               IF RESP-DUPKEY OR RESP-DUPREC
+>                  ADD +1                TO ERPYAJ-SEQ-NO
+>                  MOVE ERPYAJ-SEQ-NO    TO PY-FILE-SEQ-NO
+>               END-IF
+>            END-PERFORM
+> 
+>            .
+>        1620-EXIT.
+>            EXIT.
+> 
+>        1700-SQUEEZE-IT-IN.
+> 
+>            PERFORM VARYING N2 FROM +1 BY +1 UNTIL
+>               CN-LINE (N2) NOT = SPACES
+>            END-PERFORM
+> 
+>            PERFORM VARYING N3 FROM +10 BY -1 UNTIL
+>               CN-LINE (N3) NOT = SPACES
+>            END-PERFORM
+> 
+>            IF (N1 > N3)
+>               AND (N3 < 10)
+>               PERFORM VARYING N3 FROM N3 BY -1 UNTIL
+>                  N3 = +1
+>                  MOVE CN-LINE (N3)     TO CN-LINE (N3 + 1)
+>                  IF (N3 - 1) = CN-BILLING-END-LINE-NO
+>                     MOVE WS-OC-MESSAGE TO CN-LINE (N3)
+>                     MOVE N3            TO CN-BILLING-END-LINE-NO
+>                     MOVE +2            TO N3
+>                  END-IF
+>               END-PERFORM
+>            ELSE
+>               IF (N1 < N3)
+>                  AND (N1 > 1)
+>                  PERFORM VARYING N1 FROM N1 BY +1 UNTIL
+>                     N1 = +10
+>                     MOVE CN-LINE (N1 + 1) TO CN-LINE (N1)
+>                     IF (N1 + 1) = (CN-BILLING-START-LINE-NO - 1)
+>                        MOVE WS-OC-MESSAGE TO CN-LINE (N1 + 1)
+>                        COMPUTE CN-BILLING-START-LINE-NO = N1 + 1
+>                        MOVE +9 TO N1
+>                     END-IF
+>                  END-PERFORM
+>               END-IF
+>            END-IF
+> 
+>            .
+>        1700-EXIT.
+>            EXIT.
+> 
+>        1800-REMOVE-CERT-NOTES.
+> 
+>            MOVE PB-CONTROL-BY-ACCOUNT (1:33)
+>                                        TO ERNOTE-KEY
+> 
+>            EXEC CICS READ
+>               SET        (ADDRESS OF CERTIFICATE-NOTE)
+>               DATASET    (FILE-ID-ERNOTE)
+>               RIDFLD     (ERNOTE-KEY)
+>               RESP       (WS-RESPONSE)
+>               UPDATE
+>            END-EXEC
+> 
+>            IF RESP-NORMAL
+>               PERFORM VARYING N1 FROM +1 BY +1 UNTIL
+>                  (N1 > +10) OR
+>                  (CN-LINE (N1) (1:10) = 'OVERCHARGE')
+>               END-PERFORM
+>               IF N1 < +11
+>                  MOVE SPACES              TO CN-LINE (N1)
+>                  IF CN-BILLING-END-LINE-NO > 0
+>                     SUBTRACT 1 FROM CN-BILLING-END-LINE-NO
+>                  END-IF
+>                  IF CN-BILLING-END-LINE-NO < CN-BILLING-START-LINE-NO
+>                     MOVE ZEROS            TO CN-BILLING-END-LINE-NO
+>                                           CN-BILLING-START-LINE-NO
+>                  END-IF
+>                  PERFORM 1820-SQUEEZE-ERNOTE
+>                                        THRU 1820-EXIT
+>                  IF CN-LINES = SPACES
+>                     EXEC CICS DELETE
+>                        DATASET    (FILE-ID-ERNOTE)
+>                        RESP       (WS-RESPONSE)
+>                     END-EXEC
+>                     IF RESP-NORMAL
+>                        MOVE ' '        TO WS-NOTE-SW
+>                        PERFORM 1520-UPDATE-ELCERT
+>                                        THRU 1520-EXIT
+>                     END-IF
+>                  ELSE
+>                     EXEC CICS REWRITE
+>                        DATASET    (FILE-ID-ERNOTE)
+>                        FROM       (CERTIFICATE-NOTE)
+>                        RESP       (WS-RESPONSE)
+>                     END-EXEC
+>                  END-IF
+>               END-IF
+>            END-IF
+> 
+>            .
+>        1800-EXIT.
+>            EXIT.
+> 
+>        1820-SQUEEZE-ERNOTE.
+> 
+>            PERFORM VARYING N1 FROM +1 BY +1 UNTIL
+>               (N1 > +9)
+>               IF CN-LINE (N1) = SPACES
+>                  MOVE CN-LINE (N1 + +1)
+>                                        TO CN-LINE (N1)
+>                  MOVE SPACES           TO CN-LINE (N1 + +1)
+>               END-IF
+>            END-PERFORM
+> 
+>            .
+>        1820-EXIT.
+>            EXIT.
+> 
+>        1900-DELETE-ERPYAJ.
+> 
+>            MOVE PB-COMPANY-CD          TO ERPYAJ-COMPANY-CD
+>            MOVE PB-CARRIER             TO ERPYAJ-CARRIER
+>            MOVE PB-GROUPING            TO ERPYAJ-GROUPING
+>            MOVE PB-I-BANK-NUMBER       TO ERPYAJ-FIN-RESP
+>            MOVE LOW-VALUES             TO ERPYAJ-ACCOUNT
+>            MOVE +10                    TO ERPYAJ-SEQ-NO
+>            MOVE 'R'                    TO ERPYAJ-TYPE
+> 
+>            MOVE ERPYAJ-KEY             TO WS-SAVE-ERPYAJ-KEY
+> 
+>            EXEC CICS STARTBR
+>               DATASET    (FILE-ID-ERPYAJ)
+>               RIDFLD     (ERPYAJ-KEY)
+>               RESP       (WS-RESPONSE)
+>            END-EXEC
+> 
+>            IF RESP-NORMAL
+>               CONTINUE
+>            ELSE
+>               GO TO 1900-GET-DEALER
+>            END-IF   
+> 
+>            .
+>        1900-READNEXT-ERPYAJ-B.
+> 
+>       *  GET THE BANK ERPYAJ RECORD
+>            EXEC CICS READNEXT
+>               DATASET    (FILE-ID-ERPYAJ)
+>               RIDFLD     (ERPYAJ-KEY)
+>               SET        (ADDRESS OF PENDING-PAY-ADJ)
+>               RESP       (WS-RESPONSE)
+>            END-EXEC
+> 
+>            IF RESP-NORMAL
+>               IF PY-CONTROL-PRIMARY (1:28) = WS-SAVE-ERPYAJ-KEY (1:28)
+>                  IF (PB-I-DCC-OVER-CHG-AMT = PY-ENTRY-AMT)
+>                     IF (PY-INPUT-DT = WS-CURRENT-BIN-DT)
+>                        AND (PY-LAST-MAINT-BY = PI-PROCESSOR-ID)
+>                        EXEC CICS READ
+>                           DATASET    (FILE-ID-ERPYAJ)
+>                           RIDFLD     (ERPYAJ-KEY)
+>                           SET        (ADDRESS OF PENDING-PAY-ADJ)
+>                           RESP       (WS-RESPONSE)
+>                           UPDATE
+>                        END-EXEC
+>                        IF RESP-NORMAL
+>                           EXEC CICS DELETE
+>                              DATASET   (FILE-ID-ERPYAJ)
+>                              RESP      (WS-RESPONSE)
+>                           END-EXEC
+>                        END-IF
+>                     ELSE
+>                        SET REVERSAL    TO TRUE
+>                        PERFORM 1600-UPDATE-ERPYAJ
+>                                        THRU 1600-EXIT
+>                        GO TO 1900-EXIT
+>                     END-IF
+>                  ELSE
+>                     GO TO 1900-READNEXT-ERPYAJ-B
+>                  END-IF
+>               END-IF
+>               EXEC CICS ENDBR
+>                  DATASET   (FILE-ID-ERPYAJ)
+>               END-EXEC
+>            END-IF
+> 
+>            .
+>        1900-GET-DEALER.
+> 
+>            MOVE PB-COMPANY-CD          TO ERPYAJ-COMPANY-CD
+>            MOVE PB-CARRIER             TO ERPYAJ-CARRIER
+>            MOVE PB-GROUPING            TO ERPYAJ-GROUPING
+>            MOVE PB-ACCOUNT             TO ERPYAJ-FIN-RESP
+>            MOVE PB-ACCOUNT             TO ERPYAJ-ACCOUNT
+>            MOVE +10                    TO ERPYAJ-SEQ-NO
+>            MOVE 'C'                    TO ERPYAJ-TYPE
+> 
+>            MOVE ERPYAJ-KEY             TO WS-SAVE-ERPYAJ-KEY
+> 
+>            EXEC CICS STARTBR
+>               DATASET    (FILE-ID-ERPYAJ)
+>               RIDFLD     (ERPYAJ-KEY)
+>               RESP       (WS-RESPONSE)
+>            END-EXEC
+> 
+>            IF RESP-NORMAL
+>               CONTINUE
+>            ELSE
+>               GO TO 1900-EXIT
+>            END-IF
+> 
+>            .
+>        1900-READNEXT-ERPYAJ-D.
+> 
+>       *  GET THE DEALER ERPYAJ RECORD
+>            EXEC CICS READNEXT
+>               DATASET    (FILE-ID-ERPYAJ)
+>               RIDFLD     (ERPYAJ-KEY)
+>               SET        (ADDRESS OF PENDING-PAY-ADJ)
+>               RESP       (WS-RESPONSE)
+>            END-EXEC
+> 
+>            IF RESP-NORMAL
+>               IF PY-CONTROL-PRIMARY (1:28) = WS-SAVE-ERPYAJ-KEY (1:28)
+>                  IF (PB-I-DCC-OVER-CHG-AMT = PY-ENTRY-AMT)
+>                     IF (PY-INPUT-DT = WS-CURRENT-BIN-DT)
+>                        AND (PY-LAST-MAINT-BY = PI-PROCESSOR-ID)
+>                        EXEC CICS READ
+>                           DATASET    (FILE-ID-ERPYAJ)
+>                           RIDFLD     (ERPYAJ-KEY)
+>                           SET        (ADDRESS OF PENDING-PAY-ADJ)
+>                           RESP       (WS-RESPONSE)
+>                           UPDATE
+>                        END-EXEC
+>                        IF RESP-NORMAL
+>                           EXEC CICS DELETE
+>                              DATASET   (FILE-ID-ERPYAJ)
+>                              RESP      (WS-RESPONSE)
+>                           END-EXEC
+>                        END-IF
+>                     ELSE
+>                        SET REVERSAL    TO TRUE
+>                     END-IF
+>                  ELSE
+>                     GO TO 1900-READNEXT-ERPYAJ-D
+>                  END-IF
+>               END-IF
+>               EXEC CICS ENDBR
+>                  DATASET   (FILE-ID-ERPYAJ)
+>               END-EXEC
+>            END-IF
+> 
+>            .
+>        1900-EXIT.
+>            EXIT.
+> 
+> 03883 ******************************************************************

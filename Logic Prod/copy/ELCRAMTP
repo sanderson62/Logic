@@ -1,0 +1,333 @@
+00001 ***************************************************************** 
+00002 *                                                               * 
+00002 *                                                               * 
+00003 *                            ELCRAMTP.                          * 
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+00005 *                            VMOD=2.015                         * 
+00006 *                                                               * 
+00007 *                CALCULATE THE REMAINING AMOUNT.                * 
+00008 *****************************************************************
+041710*****************************************************************
+041710*                   C H A N G E   L O G
+041710*
+041710* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+041710*-----------------------------------------------------------------
+041710*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+041710* EFFECTIVE    NUMBER
+041710*-----------------------------------------------------------------
+041710* 041710    2007111300001  AJRA  CALC SC NET PAY PLUS 6
+071211* 071211  CR2009050700003  PEMA  ADD SPP DEALER DIRECT
+032612* 032612  CR2011110200001  PEMA  AHL CHANGES
+071312* 071312  CR2012042600002  PEMA  AHL GROSS TRUNC RAMT
+060414* 060414  IR2014060200001  PEMA  DISAB REM AMT CHANGES
+041710******************************************************************
+00009                                                                   
+00010      MOVE ZERO                   TO  CP-RETURN-CODE               
+00011                                      CP-REMAINING-AMT             
+00012                                      CP-REMAINING-AMT-PRV         
+00013                                      CP-REMAMT-FACTOR             
+00014                                      NP-FACTOR                    
+00015                                      WS-PASS-SW.                  
+00016                                                                   
+00017  050-START.                                                       
+00018      IF COMPUTING-PRIOR-MO                                        
+00019          COMPUTE WS-REMAINING-TERM = CP-REMAINING-TERM + +1       
+00020       ELSE                                                        
+00021           MOVE CP-REMAINING-TERM   TO WS-REMAINING-TERM.          
+00022                                                                   
+00023      IF CP-BENEFIT-TYPE = 'A'                                     
+071211        IF (CP-R-MAX-MON-BEN NOT = ZEROS)
+060414           and (cp-r-max-mon-ben < cp-original-benefit)
+071211           COMPUTE CP-REMAINING-AMT = CP-REMAINING-TERM *
+071211              CP-R-MAX-MON-BEN
+071211        ELSE
+00024            COMPUTE CP-REMAINING-AMT = CP-REMAINING-TERM  *          
+00025               CP-ORIGINAL-BENEFIT
+071211        END-IF
+00026         GO TO 999-CALC-REM-AMT-X
+071211     END-IF
+00027                                                                   
+00028      IF CP-BENEFIT-TYPE = 'L' OR 'P'                              
+00029          IF CP-EARN-AS-NET-PAY                                    
+00030              NEXT SENTENCE                                        
+00031          ELSE                                                     
+00032              MOVE CP-ORIGINAL-BENEFIT    TO  WS-REMAINING-AMT     
+00033              GO TO 800-CALC-REM-RESULT.                           
+00034                                                                   
+00035      IF CP-ORIGINAL-TERM = ZERO                                   
+00036          MOVE '4'                TO  CP-RETURN-CODE               
+00037          GO TO 999-CALC-REM-AMT-X.                                
+00038                                                                   
+00039 *    IF (CP-EARN-AS-REG-BALLOON)                                  
+00040 *      AND                                                        
+00041 *       (NOT CP-BALLOON-LAST-PMT)                                 
+00042 *       COMPUTE WS-TEMP-RESULT ROUNDED EQUAL                      
+00043 *         CP-ORIGINAL-BENEFIT / (CP-ORIGINAL-TERM - 1)            
+00044 *    ELSE                                                         
+
+071312     if (cp-company-id = 'AHL')
+071312        and (cp-lf-claim-calc-sw = 'Y')
+071312        and (cp-loan-term > cp-original-term)
+071312        compute ws-temp-result rounded = 
+071312           cp-original-benefit / cp-loan-term
+071312     else
+00045         COMPUTE WS-TEMP-RESULT ROUNDED EQUAL                         
+00046                 CP-ORIGINAL-BENEFIT / CP-ORIGINAL-TERM
+071312     end-if
+00047                                                                   
+00048      IF CP-EARN-AS-REG-BALLOON                                    
+00049         GO TO 400-CALC-REM-BALLOON.                               
+00050                                                                   
+00051      IF (CP-EARN-AS-NET-PAY)
+pemtst*       AND (CP-LOAN-APR > ZEROS)
+00052         GO TO 300-CALC-NET-PAY-REM
+           END-IF
+00053                                                                   
+00054      IF CP-SPECIAL-CALC-CD IS EQUAL TO 'N'                        
+00055          GO TO 300-CALC-NET-PAY-REM.                              
+00056                                                                   
+00057      MOVE CP-CERT-EFF-DT            TO  DC-BIN-DATE-1.            
+00058      MOVE ' '                       TO  DC-OPTION-CODE.           
+00059      PERFORM 0030-CNVT-DT THRU 0030-CNVT-EXIT.                    
+00060                                                                   
+CIDMOD*    IF CP-STATE-STD-ABBRV IS EQUAL TO 'OH'   AND                 
+CIDMOD     IF (CP-STATE-STD-ABBRV IS EQUAL TO 'OH')   AND               
+CIDMOD        (CP-CLASS-CODE NOT = 'L ') AND
+00062         CP-ORIGINAL-TERM IS GREATER THAN +60  AND                 
+00063         CP-LOAN-APR IS GREATER THAN +0                            
+00064          IF DC-GREG-DATE-CYMD IS GREATER THAN 19831031            
+00065              GO TO 300-CALC-NET-PAY-REM.                          
+00066                                                                   
+00067      IF CP-STATE-STD-ABBRV IS EQUAL TO 'MT'   AND                 
+00068         CP-ORIGINAL-TERM IS GREATER THAN +61  AND                 
+00069         CP-LOAN-APR IS GREATER THAN +0                            
+00070          IF DC-GREG-DATE-CYMD IS GREATER THAN 19830318            
+00071              GO TO 300-CALC-NET-PAY-REM.                          
+00072                                                                   
+00073      IF CP-STATE-STD-ABBRV IS EQUAL TO 'UT'   AND                 
+00074         CP-ORIGINAL-TERM IS GREATER THAN +62  AND                 
+00075         CP-LOAN-APR IS GREATER THAN +0                            
+00076          IF DC-GREG-DATE-CYMD IS GREATER THAN 19810831  AND       
+00077             DC-GREG-DATE-CYMD IS LESS    THAN 19830901            
+00078              GO TO 300-CALC-NET-PAY-REM.                          
+00079                                                                   
+00080      IF CP-STATE-STD-ABBRV IS EQUAL TO 'RI'   AND                 
+00081         CP-ORIGINAL-TERM IS GREATER THAN +60  AND                 
+00082         CP-LOAN-APR IS GREATER THAN +0                            
+00083          IF DC-GREG-DATE-CYMD IS GREATER THAN 19831231            
+00084              GO TO 300-CALC-NET-PAY-REM.                          
+00085                                                                   
+00086      IF WS-REMAINING-TERM = CP-ORIGINAL-TERM                      
+00087          MOVE CP-ORIGINAL-BENEFIT TO WS-REMAINING-AMT             
+00088          GO TO 800-CALC-REM-RESULT.                               
+00089                                                                   
+00090      IF CP-EARN-AS-TEXAS                                          
+00091          GO TO 200-CALC-TEXAS-REM.                                
+00092                                                                   
+00093  100-ORDINARY-REM.                                                
+
+071312     if (cp-company-id = 'AHL')
+071312        and (cp-loan-term > cp-original-term)
+071312        compute ws-temp-result rounded = 
+071312           cp-original-benefit / cp-loan-term
+071312        compute ws-remaining-amt rounded = ws-temp-result *
+071312           (ws-remaining-term + cp-loan-term - cp-original-term)
+071312     else
+00094         COMPUTE WS-REMAINING-AMT ROUNDED = WS-TEMP-RESULT *          
+00095                                           WS-REMAINING-TERM
+071312     end-if
+
+00096      GO TO 800-CALC-REM-RESULT.                                   
+00097                                                                   
+00098  200-CALC-TEXAS-REM.                                              
+00099      DIVIDE CP-ORIGINAL-BENEFIT BY CP-ORIGINAL-TERM               
+00100          GIVING TEX-FACT-1.                                       
+00101                                                                   
+00102      IF CP-PAY-FREQUENCY = ZERO                                   
+00103          MOVE '5'                TO  CP-RETURN-CODE               
+00104          GO TO 999-CALC-REM-AMT-X.                                
+00105                                                                   
+00106      DIVIDE WS-REMAINING-TERM BY CP-PAY-FREQUENCY                 
+00107          GIVING TEX-FACT-2                                        
+00108          REMAINDER TEX-FACT-3.                                    
+00109                                                                   
+00110      IF TEX-FACT-3 NOT = ZERO                                     
+00111          ADD +1 TO TEX-FACT-2.                                    
+00112                                                                   
+00113      IF (TEX-FACT-2 * CP-PAY-FREQUENCY) = CP-ORIGINAL-TERM        
+00114          MOVE CP-ORIGINAL-BENEFIT TO WS-REMAINING-AMT             
+00115      ELSE                                                         
+00116          COMPUTE WS-REMAINING-AMT ROUNDED =                       
+00117              (TEX-FACT-1 * (TEX-FACT-2 * CP-PAY-FREQUENCY)).      
+00118                                                                   
+00119      GO TO 800-CALC-REM-RESULT.                                   
+00120                                                                   
+00121  300-CALC-NET-PAY-REM.                                            
+00122                                                                   
+00123      MOVE CP-LOAN-APR            TO  NP-APR.                      
+00124      MOVE CP-ORIGINAL-TERM       TO  NP-ORIG.                     
+00125      MOVE WS-REMAINING-TERM      TO  NP-REM.                      
+00126      MOVE CP-LOAN-TERM           TO  NP-LOAN-TERM.                
+00127      MOVE CP-SPECIAL-CALC-CD     TO  NP-OPT.                      
+00128                                                                   
+00129      IF CP-COMPANY-ID IS NOT EQUAL TO 'NCL'                       
+00130          GO TO 300-CONT-CALC-NET-PAY-REM.                         
+00131                                                                   
+00132      MOVE CP-CERT-EFF-DT         TO  DC-BIN-DATE-1.               
+00133      MOVE CP-FIRST-PAY-DATE      TO  DC-BIN-DATE-2.               
+00134      MOVE '1'                    TO  DC-OPTION-CODE.              
+00135      PERFORM 0030-CNVT-DT THRU 0030-CNVT-EXIT.                    
+00136                                                                   
+00137      IF DATE-CONVERSION-ERROR                                     
+00138          MOVE '2'                TO  CP-RETURN-CODE               
+00139          GO TO 999-CALC-REM-AMT-X                                 
+00140      ELSE                                                         
+00141          MOVE DC-ELAPSED-MONTHS  TO  CP-MNTHS-TO-FIRST-PMT        
+00142          MOVE DC-ODD-DAYS-OVER   TO  CP-ODD-DAYS-TO-PMT.          
+00143                                                                   
+00144      IF WS-REMAINING-TERM = CP-ORIGINAL-TERM                      
+00145          MOVE +1                 TO ODF                           
+00146      ELSE                                                         
+00147          COMPUTE ODF =                                            
+00148          ((1 + (NP-APR / +1200)) ** (1 - CP-MNTHS-TO-FIRST-PMT)) /
+00149          ((1 + (CP-ODD-DAYS-TO-PMT * NP-APR / 36500))).           
+00150                                                                   
+00151  300-CONT-CALC-NET-PAY-REM.                                       
+00152                                                                   
+00153      PERFORM 1000-NET-TERM.                                       
+00154                                                                   
+041710     IF ANNUAL-INT-RATE = ZEROS                                   
+041710         COMPUTE WS-REMAINING-AMT ROUNDED = 
+041710             (CP-ORIGINAL-BENEFIT / CP-ORIGINAL-TERM) 
+041710              * WS-REMAINING-TERM
+041710     ELSE
+00155      COMPUTE WS-REMAINING-AMT ROUNDED =                           
+00156              NP-FACTOR * (CP-ORIGINAL-BENEFIT / +1000).           
+00157                                                                   
+032612     IF CP-COMPANY-ID NOT = 'CID' AND 'AHL'
+TSTMOD        IF CP-STATE-STD-ABBRV IS EQUAL TO 'NC'                    
+TSTMOD                  AND                                             
+TSTMOD           CP-EARN-AS-NET-PAY                                     
+TSTMOD            MOVE CP-CERT-EFF-DT         TO  DC-BIN-DATE-1         
+TSTMOD            MOVE ' '                    TO  DC-OPTION-CODE        
+TSTMOD            PERFORM 0030-CNVT-DT THRU 0030-CNVT-EXIT              
+TSTMOD            IF DC-GREG-DATE-CYMD IS GREATER THAN 19931231         
+TSTMOD                GO TO 500-CALC-REM-RESULT.                        
+
+071312     evaluate true
+071312        when (cp-company-id = 'AHL')
+071312           and (cp-benefit-cd = '5M' OR '6M')
+071312           and (cp-lf-claim-calc-sw = 'Y')
+071312           move 1                to ws-extra-pmts
+071312           go to 600-calc-rem-result
+071312        when (cp-company-id = 'AHL')
+071312           and (cp-benefit-cd = '5G' or '5J' or '5S'
+071312                or '6D' or '6H' or '6R')
+071312           and (cp-lf-claim-calc-sw = 'Y')
+071312           move 2                to ws-extra-pmts
+071312           go to 600-calc-rem-result
+071312        when (cp-company-id = 'AHL')
+071312           and (cp-benefit-cd = '5I' OR '6J')
+071312           and (cp-lf-claim-calc-sw = 'Y')
+071312           move 6                to ws-extra-pmts
+071312           go to 600-calc-rem-result
+071312        when(CP-COMPANY-ID = 'CID' AND
+041710           CP-STATE-STD-ABBRV = 'SC' AND
+041710           CP-EARN-AS-NET-PAY AND
+041710           CP-LF-CLAIM-CALC-SW = 'Y' AND
+041710           (CP-BENEFIT-CD = '2I' OR '2J' OR '2K' OR '2L'))
+071312           move 6                to ws-extra-pmts
+041710           GO TO 600-CALC-REM-RESULT
+071312     end-evaluate
+
+00167      GO TO 800-CALC-REM-RESULT.                                   
+00168                                                                   
+00169  400-CALC-REM-BALLOON.                                            
+00170      IF CP-ORIGINAL-TERM LESS THAN CP-REMAINING-TERM              
+00171         MOVE CP-ORIGINAL-BENEFIT TO CP-REMAINING-AMT              
+00172         ADD CP-ALTERNATE-BENEFIT TO CP-REMAINING-AMT              
+00173         GO TO 999-CALC-REM-AMT-X.                                 
+00174                                                                   
+00175      IF NOT CP-BALLOON-LAST-PMT                                   
+00176         COMPUTE WS-REMAINING-AMT ROUNDED =                        
+00177           (WS-TEMP-RESULT * CP-REMAINING-TERM) +                  
+00178 *         (WS-TEMP-RESULT * (CP-REMAINING-TERM - 1)) +            
+00179            CP-ALTERNATE-BENEFIT                                   
+00180      ELSE                                                         
+00181         COMPUTE WS-REMAINING-AMT ROUNDED =                        
+00182           (WS-TEMP-RESULT * CP-REMAINING-TERM ) +                 
+00183            CP-ALTERNATE-BENEFIT.                                  
+00184                                                                   
+00185      GO TO 800-CALC-REM-RESULT.                                   
+00186                                                                   
+00187  500-CALC-REM-RESULT.                                             
+00188                                                                   
+00189      IF ANNUAL-INT-RATE = ZEROS                                   
+00190          MOVE CP-ORIGINAL-BENEFIT                                 
+00191                               TO  WS-REMAINING-AMT                
+00192          GO TO 999-CALC-REM-AMT-X.                                
+00193                                                                   
+00194      IF REMAINING-TERM  = ZEROS                                   
+00195          GO TO 999-CALC-REM-AMT-X.                                
+00196                                                                   
+00197      COMPUTE ANGLEN = WK1 / I.                                    
+00198      COMPUTE WS-TEMP-RESULT = CP-ORIGINAL-BENEFIT / ANGLEN.       
+00199      COMPUTE WS-REMAINING-AMT =                                   
+00200              WS-REMAINING-AMT + (WS-TEMP-RESULT * 3).             
+00201      MOVE WS-TEMP-RESULT      TO  CP-MONTHLY-PAYMENT.             
+00202                                                                   
+00203      GO TO 800-CALC-REM-RESULT.                                   
+00204                                                                   
+041710 600-CALC-REM-RESULT.                                             
+041710                                                                  
+041710     IF WS-REMAINING-TERM  = ZEROS                                   
+041710         GO TO 800-CALC-REM-RESULT
+041710     END-IF.                                
+041710                                                                  
+041710     IF ANNUAL-INT-RATE = ZEROS                                   
+041710         COMPUTE WS-TEMP-RESULT ROUNDED = CP-ORIGINAL-BENEFIT /
+041710                                  CP-ORIGINAL-TERM
+041710         COMPUTE WS-REMAINING-AMT ROUNDED =                                   
+071312             WS-TEMP-RESULT * (WS-REMAINING-TERM + WS-EXTRA-PMTS)
+041710         IF WS-REMAINING-AMT > CP-ORIGINAL-BENEFIT
+041710            MOVE CP-ORIGINAL-BENEFIT TO WS-REMAINING-AMT
+041710         END-IF             
+041710         MOVE WS-TEMP-RESULT      TO  CP-MONTHLY-PAYMENT
+041710         GO TO 800-CALC-REM-RESULT
+041710     END-IF.           
+041710                                                                  
+041710     COMPUTE ANGLEN = WK1 / I.                                    
+041710     COMPUTE Y = (1 + ((CP-TERM-OR-EXT-DAYS + +30) * I) / +30)
+041710                 / (1 + I)
+041710     COMPUTE ANGLEN1 = ANGLEN / Y
+041710     COMPUTE WS-TEMP-RESULT ROUNDED = CP-ORIGINAL-BENEFIT / 
+041710                                   ANGLEN1. 
+041710     COMPUTE CP-SCNP-6MO-AMT ROUNDED = WS-TEMP-RESULT
+071312        * WS-EXTRA-PMTS.
+041710     COMPUTE WS-REMAINING-AMT ROUNDED =                                   
+041710             WS-REMAINING-AMT + CP-SCNP-6MO-AMT.
+041710     IF WS-REMAINING-AMT > CP-ORIGINAL-BENEFIT
+041710         MOVE CP-ORIGINAL-BENEFIT TO WS-REMAINING-AMT
+041710     END-IF
+
+           .
+00205  800-CALC-REM-RESULT.                                             
+00206      IF COMPUTING-CURRENT-MO                                      
+00207         MOVE WS-REMAINING-AMT TO CP-REMAINING-AMT                 
+00208         MOVE NP-FACTOR        TO CP-REMAMT-FACTOR                 
+00209         MOVE 1                TO WS-PASS-SW
+071211        IF (CP-R-MAX-TOT-BEN NOT = ZEROS)
+071211           AND (CP-R-MAX-TOT-BEN < CP-REMAINING-AMT)
+071211           MOVE CP-R-MAX-TOT-BEN TO CP-REMAINING-AMT
+071211        END-IF
+00210         GO TO 050-START                                           
+00211       ELSE                                                        
+00212         MOVE WS-REMAINING-AMT TO CP-REMAINING-AMT-PRV
+071211        IF (CP-R-MAX-TOT-BEN NOT = ZEROS)
+071211           AND (CP-R-MAX-TOT-BEN < CP-REMAINING-AMT-PRV)
+071211           MOVE CP-R-MAX-TOT-BEN TO CP-REMAINING-AMT-PRV
+071211        END-IF
+071211     END-IF
+071211     .
+00214  999-CALC-REM-AMT-X.                                              
+00215                                                                   

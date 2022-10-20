@@ -1,0 +1,93 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 8 GOTO END_JOB 
+
+################################################################################
+LABEL name=ECS016 
+################################################################################
+#  ********************************************************************  
+#  ***--                                                                 
+#  ***               EPEC FILE UPDATE                                    
+#  ***  ACCT MSTR MUST BE RELOADED IF THIS STEP ABENDS.                  
+#  ***--                                                                 
+#  ********************************************************************  
+#  ************************************************     INPUT FILES      
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/CI.XX.EPEC_01' disp='i-o' normal='k' abend='k' 
+#  *-----------------------------------------------------------------    
+#  (TEMP COPY OF CI.XX.SUM010 CART) 00000157
+ASSGNDD ddname='SYS018' filename='\${SEQFILES}/ZI.DD.SUM010.TEMP' disp='i-o' normal='k' abend='k' 
+#  ************************************************      OUTPUT FILES    
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133'
+ASSGNDD ddname='SYS012' filename='\${SEQFILES}/ZI.XX.EPEC.TEMP' disp='o' normal='k' abend='d' recfmt='F' recsize='325' 
+ASSGNDD ddname='SYS014' filename='\${SEQFILES}/ZI.XX.ACCT' disp='o' normal='k' abend='d' recfmt='F' recsize='2000' 
+ASSGNDD ddname='SYS020' filename='\${SEQFILES}/ZI.EX.FICH016' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS022' type='SYSOUT' class='A' recfmt='F' recsize='133'
+#  ************************************************   SORT WORK FILES    
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS016' stepname='ECS016' 
+
+################################################################################
+LABEL name=CPY016
+################################################################################
+ASSGNDD ddname='SYS010' filename='\$SYSOUTDIR/$JOBNAME/ECS016/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.DL.CIADM.FICH016' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY016' parm='ALL' 
+
+################################################################################
+LABEL name=ECS041 
+################################################################################
+#  ********************************************************************  
+#  ***--                                                                 
+#  ***        MISC. ADJUSTMENTS POSTING SUMMARY                          
+#  ***--                                                                 
+#  ********************************************************************* 
+#  ***                                                                   
+#  ***     * * *    ECS041 DOES NOT USE INPUT FROM ECS039    * * *       
+#  ***                                                                   
+#  ********************************************************************* 
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS002' type='DUMMY' 
+ASSGNDD ddname='SYS004' filename='\${SEQFILES}/CI.WW.INPUT041' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS012' filename='\${SEQFILES}/CI.WW.RETROS' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZI.XX.EPEC.TEMP' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.XX.EPEC' disp='o' normal='k' abend='d' recfmt='F' recsize='325' 
+ASSGNDD ddname='SYS020' filename='\${SEQFILES}/ZI.EX.FICH041' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='ERMEBL' type='DUMMY'
+#  ****************************************************  WORK FILES      
+ASSGNDD ddname='SYS003' filename='/tmp/${JOBNAME}_WORK041' disp='o' normal='k' abend='d' recfmt='F' recsize='98' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+
+EXECPGM pgmname='ECS041' stepname='ECS041' 
+
+################################################################################
+LABEL name=CPY041
+################################################################################
+ASSGNDD ddname='SYS010' filename='\$SYSOUTDIR/$JOBNAME/ECS041/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.DL.CIADM.FICH041' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY041' parm='ALL' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+     "ftp -n ntcso1 < $JCLLIB/ftp-cilgm17"
+   echo " Nothing to print here "
+else
+   echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

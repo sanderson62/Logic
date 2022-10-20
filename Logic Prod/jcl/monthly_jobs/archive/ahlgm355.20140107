@@ -1,0 +1,62 @@
+################################################################################
+#                                                                              #
+#     JOB: ahlg355                                                             #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+#if ($EBMSYS != 'mdoff') then
+#   echo "Job aborting, not MODEL OFFICE"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=EL355
+################################################################################
+ONRETCODE MAXRC GT '11' BYPASS scope='STEP'  
+
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ELDENY' type='VS' filename='ELDENY' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='EL355' stepname='EL355'
+
+################################################################################
+LABEL name=CPY355
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL355/SYS008_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.CIADM.AHL355.@MEMMDDYYYY' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPY355' parm='ALL'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the files from above and creates pdf files
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/AH.DL.CIADM.AHL355.@MEMMDDYYYY $SEQFILES/AH.DL.CIADM.AHL355.@MEMMDDYYYY.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+	  echo " Nothing to print at this time "
+    "uuencode $SEQFILES/AH.DL.CIADM.AHL355.@MEMMDDYYYY.pdf AH.DL.CIADM.AHL355.@MEMMDDYYYY.pdf|mailx -s 'AHL EL355 Report' -r 'slunikix@cso.com' pema@cso.com,djwb@cso.com,jms@cso.com,kmsb@cso.com"
+else
+	echo " Job aborted, print not released "
+endif
+
+################################################################################
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################

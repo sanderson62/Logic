@@ -1,0 +1,72 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+################################################################################
+LABEL name=BKPCOMP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERCOMP -s $SEQFILES/ercomp.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPCOMP' parm='SH'
+
+################################################################################
+LABEL name=BKPPYAJ
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERPYAJ -s $SEQFILES/erpyaj.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPPYAJ' parm='SH'
+
+################################################################################
+LABEL name=GETCIDJV
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/vouchers/cidjvtmpin $SEQFILES/vouchers/cidjvin
+touch $SEQFILES/vouchers/cidjvtmpin $SEQFILES/vouchers/cidjvin
+cat /data/seqfiles/vouchers/*_CID_JV_EXTRACT*.Logic > $SEQFILES/vouchers/cidjvtmpin
+
+if [ -a $SEQFILES/vouchers/cidjvtmpin ] ; then
+   echo "we got a file " ;
+else
+   echo "No file today "
+   exit 1
+fi
+
+tr -d '\015' < $SEQFILES/vouchers/cidjvtmpin > $SEQFILES/vouchers/cidjvin
+cp $SEQFILES/vouchers/cidjvin $SEQFILES/vouchers/cidjvin.20100820
+rm -f $SEQFILES/*_CID_JV_EXTRACT*.Logic
+!
+EXECPGM pgmname='BPXBATCH' stepname='GETGAJV' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+
+################################################################################
+LABEL name=CIDPYB2
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/vouchers/cidjvin' disp='i-o'
+ASSGNDD ddname='ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+ASSGNDD ddname='ERCOMP' type='VS' filename='ERCOMP' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.ER.DATECARD.DBLD' disp='i-o' 
+
+EXECPGM pgmname='CIDPYB2TT' stepname='CIDPYB2'
+
+if ($JOBSTATUS == 0) then
+        echo " Nothing to print "
+else
+        echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 121504                 PEMA   NEW JOB
+# 050305                 PEMA   ADDED GETJV AND CIDPYB2

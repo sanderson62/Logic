@@ -1,0 +1,92 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+ONRETCODE GT 8 GOTO END_JOB 
+
+################################################################################
+###  if you want the detail remove the branch and run ecs072a,
+###  ecs072s is the summary report that's what they want on a daily basis,
+###  thus the reason for the branch to ecs072s
+################################################################################
+
+GOTO ECS072S
+
+################################################################################
+LABEL name=ECS072A
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' filename='$PROJECT_ROOT/sys/RATES.rpt' disp='i-o'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133'
+ASSGNDD ddname='SYS020' filename='$SEQFILES/VP.EX.FICH072A' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+
+EXECPGM pgmname='ECS072A' stepname='ECS072A'
+
+################################################################################
+LABEL name=CPY072A
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/VP.EX.FICH072A' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH072A' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY072A' parm='ALL'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/rpt2pdf $SEQFILES/VP.DL.CIADM.FICH072A $SEQFILES/VPP.RATE.FILE.AUDIT.RPT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=ECS072S
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+#  ****************************************************  INPUT FILES     
+#ASSGNDD ddname='SYS010' filename='/apps/prod/cid1p/jnlbkp/RATES.jnl' disp='i-o'
+ASSGNDD ddname='SYS010' filename='$PROJECT_ROOT/sys/RATES.rpt' disp='i-o'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133'
+ASSGNDD ddname='SYS020' filename='$SEQFILES/VP.EX.FICH072S' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+
+################################################################################
+###
+###  IF YOU WANT TO RUN IT FOR A SPECIFIC DAY, USE THE RATES.jnl FILE and
+###  SET THE PARM VALUE TO CCYYMMDD  ie 20130930. Otherwise leave it at 0
+###
+################################################################################
+
+EXECPGM pgmname='ECS072AS' stepname='ECS072S' parm='00000000'
+
+################################################################################
+LABEL name=CPY072S
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/VP.EX.FICH072S' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH072S' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY072S' parm='ALL'
+
+################################################################################
+LABEL name=PERL2
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/rpt2pdf $SEQFILES/VP.DL.CIADM.FICH072S $SEQFILES/VPP.RATE.FILE.AUDIT.RPT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL2' parm='SH'
+
+
+################################################################################
+if ($JOBSTATUS == 0) then
+else
+        echo "job aborted, print not released"
+endif
+
+ENDJOB 

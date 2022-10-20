@@ -1,0 +1,74 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job aborted, not MDOFF"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=GETCIDEA
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/Email.Address.File.txt
+ftp -n ntcso1 < $JCLLIB/ftp-get-cideab1
+!
+EXECPGM pgmname='BPXBATCH' stepname='GETCIDEA' parm='SH'
+
+################################################################################
+
+################################################################################
+LABEL name=STEP0
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ -a $SEQFILES/Email.Address.File.txt ] ; then
+   echo "we got a file " ;
+else
+   echo "No file today "
+   exit 1
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP0' parm='SH'
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+
+################################################################################
+LABEL name=BKPEADR
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d EREADR -s $SEQFILES/ereadr.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPEADR' parm='SH'
+
+################################################################################
+LABEL name=DELEADR
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d EREADR
+!
+EXECPGM pgmname='BPXBATCH' stepname='DELEADR' parm='SH'
+
+################################################################################
+LABEL name=CIDEAB1
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/Email.Address.File.txt' disp='i-o'
+ASSGNDD ddname='EREADR' type='VS' filename='EREADR' disp='i-o' 
+ASSGNDD ddname='ERCOMP' type='VS' filename='ERCOMP' disp='i-o'
+ASSGNDD ddname='ERACCT3' type='VS' filename='ERACCT3' disp='i-o'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.DBLD' disp='i-o'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDEAB1' stepname='CIDEAB1'
+
+if ($JOBSTATUS == 0) then
+   echo " Nothing to print "
+else
+   echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

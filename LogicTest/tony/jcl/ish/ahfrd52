@@ -1,0 +1,77 @@
+################################################################################
+#                                                                              #
+#     JOB: ahfrd52                                                             #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' 
+
+#if ($EBMSYS != 'ahltst') then
+#   echo "Job Aborting, not ahltst"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=FNB165 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.DD.LG.ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i-o' 
+
+#  DOWNLOAD
+ASSGNDD ddname='SYS011' filename='$SEQFILES/FA.DL.FX.AHLPYAJ' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='FNB165' stepname='FNB165' parm='10172022_10182022' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                     PRINT SUMMARY REPORT 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYS007' dataset='FN.DD.PRINT.DATA' member='FNFRD52' filename='$SEQFILES/FNFRD52' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/FA.DL.FX.AHLPYAJ' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='AHLPYADJ'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='FN.DD.PRINT.DATA' member='FNFRD52' filename='$SEQFILES/FNFRD52' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/FA.DL.AHLPYAJ.FNFRD52' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID pyaj 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/FA.DL.FX.AHLPYAJ' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/AHLPYAJ_10-18-22.DAT' disp='o' abend='d' normal='k' recsize='250' recfmt='F'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+
+################################################################################
+
+################################################################################
+LABEL name=FTPPYAJ
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n sdv-free02.cso.local < $JCLLIB/ftp-ahfrd52
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTPPYAJ' parm='SH'
+
+
+ENDJOB
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                       PEMA    NEW JOB

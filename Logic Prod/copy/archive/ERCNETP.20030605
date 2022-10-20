@@ -1,0 +1,1452 @@
+00001 ***************************************************************** 04/29/98
+00002 *                                                               * ERCNETP
+00003 *                            ERCNETP                            *    LV006
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL**6
+00005 *                            VMOD=2.029                         *    CL**3
+00006 *                                                               * ERCNETP
+00007 *****************************************************************.ERCNETP
+00008 *                                                                 ERCNETP
+00009 *    FIVE PARAMETERS ARE PASSED TO THIS MODULE AND A FACTOR IS    ERCNETP
+00010 *    RETURNED. PARAMETERS PASSED  - A.P.R. (S999V9999)            ERCNETP
+00011 *                                   ORIGINAL TERM (S999)          ERCNETP
+00012 *                                   REMAINING TERM (S999)         ERCNETP
+00013 *                                   NET PAY OPTION (X)            ERCNETP
+00014 *                                   LOAN TERM (S999)              ERCNETP
+00015 *              FACTOR RETURNED IS - FACTOR (S9(4)V9(9))           ERCNETP
+00016 *                                                                 ERCNETP
+00017 *    FACTOR RETURNED IS MULTIPLIED BY ORIG. FACE TO GET REMAINING ERCNETP
+00018 *    FACE. IF ORIGNAL TERM = REMAINING TERM, FACTOR WOULD BE 1,   ERCNETP
+00019 *    THEREFORE MODULE ASSUMES RATING IS DESIRED AND FACTOR THAT   ERCNETP
+00020 *    IS RETURNED MAY BE MULTIPLIED BY THOUSANDS OF ORIGINAL FACE  ERCNETP
+00021 *    AND REGULAR PREMIUM PER $100 PER MONTH TO GET PREMIUM TO BE  ERCNETP
+00022 *    CHARGED.                                                     ERCNETP
+00023 *                                                                 ERCNETP
+00024 *    OPTIONS - S = NET SIMPLE                                     ERCNETP
+00025 *          SPACE = NET PAY  (1 MO. INTEREST)                      ERCNETP
+00026 *              A = NET PAY  (0 MO. INTEREST)                      ERCNETP
+00027 *              I = NET PAY  (2 MO. INTEREST)                      ERCNETP
+00028 *              J = NET PAY  (3 MO. INTEREST)                      ERCNETP
+00029 *              K = NET PAY  (4 MO. INTEREST)                      ERCNETP
+00030 *              T = TRUNCATED  (0 MO. INTEREST)                    ERCNETP
+00031 *              U = TRUNCATED  (1 MO. INTEREST)                    ERCNETP
+00032 *              V = TRUNCATED  (2 MO. INTEREST)                    ERCNETP
+00033 *              W = TRUNCATED  (3 MO. INTEREST)                    ERCNETP
+00034 *              X = TRUNCATED  (4 MO. INTEREST)                    ERCNETP
+00035 *              R = REFUNDS (REGULAR OR TRUNCATED)                 ERCNETP
+00036                                                                   ERCNETP
+00037      MOVE N-P-APR     TO ANNUAL-INT-RATE.                         ERCNETP
+00038      MOVE N-P-ORIG    TO ORIGINAL-TERM.                           ERCNETP
+00039      MOVE N-P-LOAN    TO LOAN-TERM.                               ERCNETP
+00040      MOVE N-P-REM     TO REMAINING-TERM.                          ERCNETP
+00041      MOVE N-P-OPT     TO OPTION-SW.                               ERCNETP
+00042                                                                   ERCNETP
+00043      MOVE +0 TO FACTOR.                                           ERCNETP
+00044                                                                   ERCNETP
+00045      IF ANNUAL-INT-RATE = ZERO                                    ERCNETP
+00046          GO TO 99000-ERROR.                                       ERCNETP
+00047      IF ORIGINAL-TERM = ZERO                                      ERCNETP
+00048          GO TO 99999-RETURN.                                      ERCNETP
+00049      IF REMAINING-TERM = ZERO                                     ERCNETP
+00050          GO TO 99999-RETURN.                                      ERCNETP
+00051      IF REMAINING-TERM GREATER ORIGINAL-TERM                      ERCNETP
+00052          GO TO 99000-ERROR.                                       ERCNETP
+00053      IF LOAN-TERM = ZERO                                          ERCNETP
+00054          GO TO 99999-RETURN.                                      ERCNETP
+00055      IF LOAN-TERM LESS ORIGINAL-TERM                              ERCNETP
+00056          GO TO 99000-ERROR.                                       ERCNETP
+00057                                                                   ERCNETP
+00058      IF ANNUAL-INT-RATE LESS +2                                   ERCNETP
+00059          COMPUTE ANNUAL-INT-RATE = ANNUAL-INT-RATE * +10.         ERCNETP
+00060      IF ANNUAL-INT-RATE LESS +2                                   ERCNETP
+00061          COMPUTE ANNUAL-INT-RATE = ANNUAL-INT-RATE * +10.         ERCNETP
+00062      IF ANNUAL-INT-RATE LESS +2                                   ERCNETP
+00063          COMPUTE ANNUAL-INT-RATE = ANNUAL-INT-RATE * +10.         ERCNETP
+00064                                                                   ERCNETP
+00065      IF NPO-REFUND                                                ERCNETP
+00066          MOVE '2' TO NP-PROCESS-SW                                ERCNETP
+00067        ELSE                                                       ERCNETP
+00068          IF ORIGINAL-TERM = REMAINING-TERM                        ERCNETP
+00069             MOVE '1'   TO NP-PROCESS-SW                           ERCNETP
+00070            ELSE                                                   ERCNETP
+00071             MOVE '3'   TO NP-PROCESS-SW.                          ERCNETP
+00072                                                                   ERCNETP
+00073      IF NPO-SIMPLE                                                ERCNETP
+00074          MOVE 'S' TO TYPE-SW                                      ERCNETP
+00075      ELSE                                                         ERCNETP
+00076          MOVE 'N' TO TYPE-SW.                                     ERCNETP
+00077                                                                   ERCNETP
+00078      COMPUTE I ROUNDED = (ANNUAL-INT-RATE / K100) / K12.          ERCNETP
+00079                                                                   ERCNETP
+00080      COMPUTE V ROUNDED = K1 / (K1 + I).                           ERCNETP
+00081                                                                   ERCNETP
+00082      MOVE V     TO VX                                             ERCNETP
+00083                    SV.                                            ERCNETP
+00084                                                                   ERCNETP
+00085      MOVE +1    TO X1                                             ERCNETP
+00086                    SX.                                            ERCNETP
+00087                                                                   ERCNETP
+00088      MOVE LOAN-TERM TO MAX-X.                                     ERCNETP
+00089                                                                   ERCNETP
+00090      COMPUTE X2 = MAX-X - ORIGINAL-TERM.                          ERCNETP
+00091                                                                   ERCNETP
+00092      IF MAX-X = +1                                                ERCNETP
+00093         GO TO 10700-COMPUTE-REMAINING-FACTOR.                     ERCNETP
+00094                                                                   ERCNETP
+00095      COMPUTE EXPIRED-TERM = ORIGINAL-TERM - REMAINING-TERM.       ERCNETP
+00096                                                                   ERCNETP
+00097      IF (CP-COMPANY-ID EQUAL 'CDC' OR 'GTL' OR 'CID' OR 'MON'     ERCNETP
+00098                          OR 'NCL') AND                            ERCNETP
+00099         (NOT NP-REFUND)                                           ERCNETP
+00100         NEXT SENTENCE                                             ERCNETP
+00101      ELSE                                                         ERCNETP
+00102      IF LOAN-TERM NOT = ORIGINAL-TERM                             ERCNETP
+00103         COMPUTE REMAINING-TERM = LOAN-TERM - EXPIRED-TERM.        ERCNETP
+00104                                                                   ERCNETP
+00105      COMPUTE SV-MINUS-ONE EQUAL ORIGINAL-TERM - +1.               ERCNETP
+00106                                                                   ERCNETP
+00107  10500-VX-LOOP.                                                   ERCNETP
+00108                                                                   ERCNETP
+00109 ***  VX = AMORT. LOAN TERM.                                       ERCNETP
+00110 ***  SV = AMORT. INSURANCE TERM.                                  ERCNETP
+00111 ***  SV = AMORT. REMAINING TERM FOR REFUND CALCS.                 ERCNETP
+00112 ***  SX = AMORT. LOAN TERM - INSURANCE TERM. (USED FOR TRUNCATED. ERCNETP
+00113 ***  SV-MINUS-ONE = INSURANCE TERM - +1... (TMS ONLY)             ERCNETP
+00114                                                                   ERCNETP
+00115      COMPUTE VX ROUNDED = VX * V.                                 ERCNETP
+00116                                                                   ERCNETP
+00117      ADD B1 TO X1.                                                ERCNETP
+00118                                                                   ERCNETP
+00119      IF X1 = REMAINING-TERM                                       ERCNETP
+00120           MOVE VX    TO SV.                                       ERCNETP
+00121                                                                   ERCNETP
+00122      IF X1 EQUAL SV-MINUS-ONE                                     ERCNETP
+00123         MOVE VX      TO SV-MINUS-ONE.                             ERCNETP
+00124                                                                   ERCNETP
+00125      IF X1 = X2                                                   ERCNETP
+00126           MOVE VX    TO SX.                                       ERCNETP
+00127                                                                   ERCNETP
+00128      IF X1 NOT = MAX-X                                            ERCNETP
+00129           GO TO 10500-VX-LOOP.                                    ERCNETP
+00130                                                                   ERCNETP
+00131  10700-COMPUTE-REMAINING-FACTOR.                                  ERCNETP
+00132      COMPUTE WK1 = K1 - VX.                                       ERCNETP
+00133      COMPUTE WK2 = K1 - SV.                                       ERCNETP
+00134      COMPUTE WK5 = K1 - SX.                                       ERCNETP
+00135      COMPUTE WK6 = K1 - SV-MINUS-ONE.                             ERCNETP
+00136                                                                   ERCNETP
+00137      IF NP-RATING                                                 ERCNETP
+00138          GO TO 12000-PREMIUM-RATE.                                ERCNETP
+00139                                                                   ERCNETP
+00140      IF NP-REFUND                                                 ERCNETP
+00141          GO TO 11000-REFUND-CALC.                                 ERCNETP
+00142                                                                   ERCNETP
+00143      IF NET-STD                                                   ERCNETP
+00144          COMPUTE WK3 ROUNDED = (WK2 * K1000) / WK1.               ERCNETP
+00145                                                                   ERCNETP
+00146      IF NET-SMP                                                   ERCNETP
+00147          COMPUTE WK3 ROUNDED = ((R + 1) / (N + 1)) * (R / N)      ERCNETP
+00148          COMPUTE WK3 ROUNDED = (1 - WK3) * ((I * N / WK1) - 1)    ERCNETP
+00149          COMPUTE WK3 ROUNDED = WK3 + 1 - ((N - R) * I / WK1)      ERCNETP
+00150          COMPUTE WK3 ROUNDED = WK3 * 1000.                        ERCNETP
+00151                                                                   ERCNETP
+00152      IF REMAINING-TERM LESS THAN X2                               ERCNETP
+00153          MOVE +0 TO WK3.                                          ERCNETP
+00154                                                                   ERCNETP
+00155      MOVE WK3 TO FACTOR.                                          ERCNETP
+00156                                                                   ERCNETP
+00157      GO TO 99999-RETURN.                                          ERCNETP
+00158                                                                   ERCNETP
+00159  11000-REFUND-CALC.                                               ERCNETP
+00160      IF REMAINING-TERM NOT LESS MAX-X                             ERCNETP
+00161         MOVE +1 TO FACTOR                                         ERCNETP
+00162         GO TO 99999-RETURN.                                       ERCNETP
+00163                                                                   ERCNETP
+00164      IF REMAINING-TERM LESS +1                                    ERCNETP
+00165         MOVE 0 TO FACTOR                                          ERCNETP
+00166         GO TO 99999-RETURN.                                       ERCNETP
+00167                                                                   ERCNETP
+00168      COMPUTE WK2 ROUNDED = WK2 / I.                               ERCNETP
+00169      COMPUTE WK5 ROUNDED = WK5 / I.                               ERCNETP
+00170      COMPUTE WK1 ROUNDED = WK1 / I.                               ERCNETP
+00171                                                                   ERCNETP
+00172      COMPUTE WK3 ROUNDED =                                        ERCNETP
+00173           (N-P-REM - WK2 + WK5) / (ORIGINAL-TERM - WK1 + WK5).    ERCNETP
+00174                                                                   ERCNETP
+00175      MOVE WK3  TO FACTOR.                                         ERCNETP
+00176                                                                   ERCNETP
+00177      GO TO 99999-RETURN.                                          ERCNETP
+00178                                                                   ERCNETP
+00179  12000-PREMIUM-RATE.                                              ERCNETP
+00180 *    K-I IS ADJUSTMENT FACTOR FOR NO. MONTHS ADD'L. INTEREST      ERCNETP
+00181 *      OPTION - N OR U OR SPACE  = 1 MO,  SO K-I = 1 + I          ERCNETP
+00182 *      OPTION - A OR T           = 0 MO,  SO K-I = 1              ERCNETP
+00183 *      OPTION - I OR V           = 2 MO,  SO K-I = 1 + 2I         ERCNETP
+00184 *      OPTION - J OR W           = 3 MO,  SO K-I = 1 + 3I         ERCNETP
+00185 *      OPTION - K OR X           = 4 MO,  SO K-I = 1 + 4I         ERCNETP
+00186                                                                   ERCNETP
+00187      COMPUTE K-I = K1 + I.                                        ERCNETP
+00188      MOVE K-I TO ONE-PLUS-I.                                      ERCNETP
+00189                                                                   ERCNETP
+00190      IF NPO-ALT OR NPO-TRUNC-0                                    ERCNETP
+00191          MOVE K1 TO K-I.                                          ERCNETP
+00192                                                                   ERCNETP
+00193      IF NPO-2MO OR NPO-TRUNC-2                                    ERCNETP
+00194          COMPUTE K-I = K1 + (2 * I).                              ERCNETP
+00195                                                                   ERCNETP
+00196      IF NPO-3MO OR NPO-TRUNC-3                                    ERCNETP
+00197          COMPUTE K-I = K1 + (3 * I).                              ERCNETP
+00198                                                                   ERCNETP
+00199      IF NPO-4MO OR NPO-TRUNC-4                                    ERCNETP
+00200          COMPUTE K-I = K1 + (4 * I).                              ERCNETP
+00201                                                                   ERCNETP
+00202      COMPUTE RA ROUNDED = 1 -                                     ERCNETP
+00203              ((X2 * (X2 + 1)) /                                   ERCNETP
+00204               (N *  (N  + 1))).                                   ERCNETP
+00205                                                                   ERCNETP
+00206      IF (CP-COMPANY-ID EQUAL 'CSL') AND                           ERCNETP
+00207         (CP-CSL-VALID-NP-BENEFIT-CD)                              ERCNETP
+00208         NEXT SENTENCE                                             ERCNETP
+00209      ELSE                                                         ERCNETP
+00210         GO TO XXXX-CHECK-DISCOUNT-5.                              ERCNETP
+00211                                                                   ERCNETP
+00212      MOVE CP-CERT-EFF-DT TO DC-BIN-DATE-1.                        ERCNETP
+00213      MOVE ' ' TO DC-OPTION-CODE.                                  ERCNETP
+00214      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                    ERCNETP
+00215                                                                   ERCNETP
+00216      IF DATE-CONVERSION-ERROR                                     ERCNETP
+00217         MOVE '2'                 TO CP-RETURN-CODE                ERCNETP
+00218         MOVE ZEROS               TO FACTOR                        ERCNETP
+00219                                     CP-CALC-PREMIUM               ERCNETP
+00220          GO TO 99999-RETURN.                                      ERCNETP
+00221                                                                   ERCNETP
+00222      MOVE DC-JULIAN-DATE-1 TO WS-INT-BEGIN-DATE                      CL**2
+00223      MOVE CP-FIRST-PAY-DATE TO DC-BIN-DATE-1                      ERCNETP
+00224      MOVE ' ' TO DC-OPTION-CODE                                   ERCNETP
+00225      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                    ERCNETP
+00226                                                                   ERCNETP
+00227      IF DATE-CONVERSION-ERROR                                     ERCNETP
+00228         MOVE '2'                 TO CP-RETURN-CODE                ERCNETP
+00229         MOVE ZEROS               TO FACTOR                        ERCNETP
+00230                                     CP-CALC-PREMIUM               ERCNETP
+00231          GO TO 99999-RETURN.                                      ERCNETP
+00232                                                                   ERCNETP
+00233      MOVE DC-JULIAN-DATE-1 TO WS-DUE-DATE.                           CL**2
+00234                                                                   ERCNETP
+00235      COMPUTE ANGLEN-1 EQUAL 1 + (WK6 / I).                        ERCNETP
+00236                                                                   ERCNETP
+00237      IF (WS-DUE-DATE - WS-INT-BEGIN-DATE) GREATER THAN 30         ERCNETP
+00238         COMPUTE WK3 EQUAL 1 + ((30 + CP-TERM-OR-EXT-DAYS) *       ERCNETP
+00239         CP-PAY-FREQUENCY / 365) * I                               ERCNETP
+00240      ELSE                                                         ERCNETP
+00241         COMPUTE WK3 EQUAL 1 + ((30 - CP-TERM-OR-EXT-DAYS) *       ERCNETP
+00242         CP-PAY-FREQUENCY / 365) * I.                              ERCNETP
+00243                                                                   ERCNETP
+00244      COMPUTE WS-WORK-RATE EQUAL ((2 * CP-PREMIUM-RATE) /          ERCNETP
+00245      13).                                                         ERCNETP
+00246                                                                   ERCNETP
+00247      COMPUTE WK5-CSL EQUAL WS-WORK-RATE * ((1 + I) / I) *         ERCNETP
+00248      (N - ( ANGLEN-1 / WK3)).                                     ERCNETP
+00249                                                                   ERCNETP
+00250      MOVE ZEROS TO WS-Y-X-FACTOR WS-X-Y-FACTOR.                   ERCNETP
+00251                                                                   ERCNETP
+00252      COMPUTE WS-CALC-FREQ-RATE EQUAL                              ERCNETP
+00253        (CP-LOAN-APR * .01) / CP-PAY-FREQUENCY.                    ERCNETP
+00254                                                                   ERCNETP
+00255      COMPUTE WS-Y-X-FACTOR EQUAL                                  ERCNETP
+00256        1 + ((1 - (1 + WS-CALC-FREQ-RATE) ** -(N - 1)) /           ERCNETP
+00257        WS-CALC-FREQ-RATE).                                        ERCNETP
+00258                                                                   ERCNETP
+00259      COMPUTE WS-ODD-DAY-UNITS EQUAL                               ERCNETP
+00260        (WS-DUE-DATE - WS-INT-BEGIN-DATE) * CP-PAY-FREQUENCY / 365.ERCNETP
+00261                                                                   ERCNETP
+00262      COMPUTE WS-X-Y-FACTOR EQUAL                                  ERCNETP
+00263        1 + (WS-ODD-DAY-UNITS * WS-CALC-FREQ-RATE).                ERCNETP
+00264                                                                   ERCNETP
+00265      COMPUTE WS-NP-FACTOR EQUAL WS-WORK-RATE *                    ERCNETP
+00266        ((1 + WS-CALC-FREQ-RATE) / WS-CALC-FREQ-RATE) *            ERCNETP
+00267        (N - (WS-Y-X-FACTOR / WS-X-Y-FACTOR)).                     ERCNETP
+00268                                                                   ERCNETP
+00269      COMPUTE CP-CALC-PREMIUM EQUAL CP-MONTHLY-PAYMENT * WK5-CSL.  ERCNETP
+00270                                                                   ERCNETP
+00271      GO TO 99999-RETURN.                                          ERCNETP
+00272                                                                   ERCNETP
+00273  XXXX-CHECK-DISCOUNT-5.                                           ERCNETP
+00274                                                                   ERCNETP
+00275      IF WS-DISCOUNT-OPTION EQUAL '5'                              ERCNETP
+00276         NEXT SENTENCE                                             ERCNETP
+00277      ELSE                                                         ERCNETP
+00278         GO TO 12000-CHECK-CLIENT.                                 ERCNETP
+00279                                                                   ERCNETP
+00280       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00281                                                                   ERCNETP
+00282       COMPUTE APR100 EQUAL ANNUAL-INT-RATE / +100.                ERCNETP
+00283                                                                   ERCNETP
+00284       COMPUTE WK3 EQUAL                                           ERCNETP
+00285         (12 *                                                     ERCNETP
+00286         (((CP-ORIGINAL-BENEFIT / ANGLEN) * N) -                   ERCNETP
+00287         CP-ORIGINAL-BENEFIT)) /                                   ERCNETP
+00288         APR100.                                                   ERCNETP
+00289                                                                   ERCNETP
+00290      COMPUTE WK3 EQUAL                                            ERCNETP
+00291         (WK3 * CP-PREMIUM-RATE) / +1000.                          ERCNETP
+00292                                                                   ERCNETP
+00293      COMPUTE WK3 EQUAL                                            ERCNETP
+00294         (24 * WK3) / (24 + (WS-WORK-DIS-RATE * N)).               ERCNETP
+00295                                                                   ERCNETP
+00296       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00297                                                                   ERCNETP
+00298      GO TO 99999-RETURN.                                          ERCNETP
+00299                                                                   ERCNETP
+00300  12000-CHECK-CLIENT.                                              ERCNETP
+00301                                                                   ERCNETP
+00302      IF (CP-COMPANY-ID EQUAL 'MON') AND                           ERCNETP
+00303         (CP-STATE-STD-ABBRV EQUAL 'MD') AND                       ERCNETP
+00304         (CP-TRUNCATED-LIFE)                                       ERCNETP
+00305         NEXT SENTENCE                                             ERCNETP
+00306      ELSE                                                         ERCNETP
+00307         GO TO 12000-CHECK-NEXT.                                   ERCNETP
+00308                                                                   ERCNETP
+00309      COMPUTE WS-WORK-RATE EQUAL CP-PREMIUM-RATE / +100.           ERCNETP
+00310                                                                   ERCNETP
+00311      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00312      COMPUTE ANGLEM EQUAL WK2 / I.                                ERCNETP
+00313                                                                   ERCNETP
+00314      COMPUTE FM EQUAL                                             ERCNETP
+00315                     (((ONE-PLUS-I ** M) * I * M) /                ERCNETP
+00316                     ((ONE-PLUS-I ** M) - 1))                      ERCNETP
+00317                     - 1.                                          ERCNETP
+00318                                                                   ERCNETP
+00319      COMPUTE FN EQUAL                                             ERCNETP
+00320                     (((ONE-PLUS-I ** N) * I * N) /                ERCNETP
+00321                     ((ONE-PLUS-I ** N) - 1))                      ERCNETP
+00322                     - 1.                                          ERCNETP
+00323                                                                   ERCNETP
+00324      COMPUTE FNM EQUAL                                            ERCNETP
+00325                     (((ONE-PLUS-I ** (N - M)) * I * (N - M)) /    ERCNETP
+00326                     ((ONE-PLUS-I ** (N - M)) - 1))                ERCNETP
+00327                     - 1.                                          ERCNETP
+00328                                                                   ERCNETP
+00329      COMPUTE GR EQUAL                                             ERCNETP
+00330                     (WS-WORK-RATE * ANGLEM * I) /                 ERCNETP
+00331                     (M - ANGLEM).                                 ERCNETP
+00332                                                                   ERCNETP
+00333      COMPUTE ODF EQUAL                                            ERCNETP
+00334                      (1 +                                         ERCNETP
+00335                      ((12 * I * (CP-TERM-OR-EXT-DAYS + 30)) /     ERCNETP
+00336                      360)) /                                      ERCNETP
+00337                      ONE-PLUS-I.                                  ERCNETP
+00338                                                                   ERCNETP
+00339      COMPUTE OD EQUAL                                             ERCNETP
+00340                     (1 + (ODF * (FN / I - 1))) +                  ERCNETP
+00341                     ((12 * CP-TERM-OR-EXT-DAYS) / +360).          ERCNETP
+00342                                                                   ERCNETP
+00343      COMPUTE WK3 EQUAL                                            ERCNETP
+00344 *                   ((1 + FN) * ODF * CP-ORIGINAL-BENEFIT) /      ERCNETP
+00345                     ((1 + FN) * ODF *                             ERCNETP
+00346                     (CP-ORIGINAL-BENEFIT - CP-ORIGINAL-PREMIUM)) /ERCNETP
+00347                     (1 - (GR * (OD - ((ONE-PLUS-I ** M) / I) *    ERCNETP
+00348                     FNM * ODF * (1 - ANGLEM / ANGLEN)))).         ERCNETP
+00349                                                                   ERCNETP
+00350      COMPUTE TRUNC-PMT EQUAL WK3 / N.                             ERCNETP
+00351      COMPUTE WK3 EQUAL TRUNC-PMT * N.                             ERCNETP
+00352                                                                   ERCNETP
+00353      COMPUTE WK3 EQUAL                                            ERCNETP
+00354                     (WK3 / (ODF * (1 + FN))) -                    ERCNETP
+00355 *                   CP-ORIGINAL-BENEFIT.                          ERCNETP
+00356                     (CP-ORIGINAL-BENEFIT - CP-ORIGINAL-PREMIUM).  ERCNETP
+00357                                                                   ERCNETP
+00358       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00359                                                                   ERCNETP
+00360      GO TO 99999-RETURN.                                          ERCNETP
+00361                                                                   ERCNETP
+00362  12000-CHECK-NEXT.                                                ERCNETP
+00363                                                                   ERCNETP
+00364      IF WS-DISCOUNT-OPTION EQUAL '3' OR '4'                       ERCNETP
+00365         NEXT SENTENCE                                             ERCNETP
+00366      ELSE                                                         ERCNETP
+00367         GO TO 12000-CHECK-PA-TRUNC.                               ERCNETP
+00368                                                                   ERCNETP
+00369       IF WS-WORK-DIS-RATE EQUAL +0                                ERCNETP
+00370          MOVE '7'                TO CP-RETURN-CODE                ERCNETP
+00371          MOVE ZEROS              TO FACTOR                        ERCNETP
+00372                                     CP-CALC-PREMIUM               ERCNETP
+00373          GO TO 99999-RETURN.                                      ERCNETP
+00374                                                                   ERCNETP
+00375       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00376                                                                   ERCNETP
+00377       COMPUTE APR100 EQUAL ANNUAL-INT-RATE / +100.                ERCNETP
+00378                                                                   ERCNETP
+00379       IF WS-WORK-DIS-RATE EQUAL APR100                            ERCNETP
+00380          ADD .00001 TO APR100.                                    ERCNETP
+00381                                                                   ERCNETP
+00382       COMPUTE WK8 EQUAL 12 / (12 + WS-WORK-DIS-RATE).             ERCNETP
+00383       COMPUTE WK9 EQUAL 12 / (12 + APR100).                       ERCNETP
+00384                                                                   ERCNETP
+00385       IF CP-COMPANY-ID EQUAL 'CDL'                                ERCNETP
+00386          COMPUTE WK3 EQUAL                                        ERCNETP
+00387                                                                   ERCNETP
+00388           (144 * CP-ORIGINAL-BENEFIT / ANGLEN) *                  ERCNETP
+00389           ((1 + WS-WORK-DIS-RATE / 12) ** .5) *                   ERCNETP
+00390                                                                   ERCNETP
+00391           ((1 / (WS-WORK-DIS-RATE * APR100)) -                    ERCNETP
+00392                                                                   ERCNETP
+00393           ((WK8 ** N) /                                           ERCNETP
+00394           (WS-WORK-DIS-RATE * (APR100 - WS-WORK-DIS-RATE))) +     ERCNETP
+00395                                                                   ERCNETP
+00396           ((WK9 ** N) /                                           ERCNETP
+00397           (APR100 * (APR100 - WS-WORK-DIS-RATE))))                ERCNETP
+00398                                                                   ERCNETP
+00399       ELSE                                                        ERCNETP
+00400          COMPUTE WK3 EQUAL                                        ERCNETP
+00401                                                                   ERCNETP
+00402           ((CP-ORIGINAL-BENEFIT / ANGLEN) *                       ERCNETP
+00403           (12 + WS-WORK-DIS-RATE) * 12) *                         ERCNETP
+00404                                                                   ERCNETP
+00405           ((1 / (WS-WORK-DIS-RATE * APR100)) -                    ERCNETP
+00406                                                                   ERCNETP
+00407           ((WK8 ** N) /                                           ERCNETP
+00408           (WS-WORK-DIS-RATE * (APR100 - WS-WORK-DIS-RATE))) +     ERCNETP
+00409                                                                   ERCNETP
+00410           ((WK9 ** N) /                                           ERCNETP
+00411           (APR100 * (APR100 - WS-WORK-DIS-RATE)))).               ERCNETP
+00412                                                                   ERCNETP
+00413       COMPUTE WK3 EQUAL                                           ERCNETP
+00414           (WK3 * CP-PREMIUM-RATE) / +1000.                        ERCNETP
+00415                                                                   ERCNETP
+00416       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00417                                                                   ERCNETP
+00418      GO TO 99999-RETURN.                                          ERCNETP
+00419                                                                   ERCNETP
+00420  12000-CHECK-PA-TRUNC.                                            ERCNETP
+00421                                                                   ERCNETP
+00422      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00423         (CP-STATE-STD-ABBRV EQUAL 'PA') AND                          CL**3
+00424         (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+00425         (CP-TRUNCATED-LIFE)                                       ERCNETP
+00426         NEXT SENTENCE                                             ERCNETP
+00427      ELSE                                                         ERCNETP
+00428         GO TO 12000-CHECK-MD-TRUNC.                               ERCNETP
+00429                                                                   ERCNETP
+00430      COMPUTE WS-WORK-RATE EQUAL CP-PREMIUM-RATE / +100.           ERCNETP
+00431                                                                   ERCNETP
+00432      COMPUTE ANGLEN-M EQUAL WK5 / I.                              ERCNETP
+00433      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00434                                                                   ERCNETP
+00435      COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                         ERCNETP
+00436                                                                   ERCNETP
+00437      COMPUTE WK3 EQUAL                                            ERCNETP
+00438         (CP-ORIGINAL-BENEFIT * 2 * (M - (ANGLEN-M - ANGLEN)) *    ERCNETP
+00439         WS-WORK-RATE) / (ANGLEN-1 * (N + 1) * I).                 ERCNETP
+00440                                                                   ERCNETP
+00441      MOVE WK3 TO CP-CALC-PREMIUM.                                 ERCNETP
+00442                                                                   ERCNETP
+00443      GO TO 99999-RETURN.                                          ERCNETP
+00444                                                                   ERCNETP
+00445  12000-CHECK-MD-TRUNC.                                            ERCNETP
+00446                                                                   ERCNETP
+00447      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00448         (CP-STATE-STD-ABBRV EQUAL 'MD') AND                       ERCNETP
+00449         (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+00450         (CP-TRUNCATED-LIFE)                                       ERCNETP
+00451         NEXT SENTENCE                                             ERCNETP
+00452      ELSE                                                         ERCNETP
+00453         GO TO 12000-CHECK-MD.                                     ERCNETP
+00454                                                                   ERCNETP
+00455      COMPUTE WS-WORK-RATE EQUAL CP-PREMIUM-RATE / +100.           ERCNETP
+00456                                                                   ERCNETP
+00457      COMPUTE ANGLEN-M EQUAL WK5 / I.                              ERCNETP
+00458      COMPUTE ANGLEM EQUAL WK2 / I.                                ERCNETP
+00459      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00460                                                                   ERCNETP
+00461      COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                         ERCNETP
+00462                                                                   ERCNETP
+00463      COMPUTE WK3 EQUAL                                            ERCNETP
+00464         CP-ORIGINAL-BENEFIT * WS-WORK-RATE *                      ERCNETP
+00465         ((ANGLEM * (M - (ANGLEN - ANGLEN-M))) /                   ERCNETP
+00466         (ANGLEN-1 * (M - ANGLEM))).                               ERCNETP
+00467                                                                   ERCNETP
+00468      MOVE WK3 TO CP-CALC-PREMIUM.                                 ERCNETP
+00469                                                                   ERCNETP
+00470      GO TO 99999-RETURN.                                          ERCNETP
+00471                                                                   ERCNETP
+00472  12000-CHECK-MD.                                                  ERCNETP
+00473                                                                   ERCNETP
+00474      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00475         (CP-STATE-STD-ABBRV EQUAL 'MD') AND                       ERCNETP
+00476         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00477         NEXT SENTENCE                                             ERCNETP
+00478      ELSE                                                         ERCNETP
+00479         GO TO 12000-CHECK-ME-TRUNC.                               ERCNETP
+00480                                                                   ERCNETP
+00481      COMPUTE WS-WORK-RATE EQUAL CP-PREMIUM-RATE / +100.           ERCNETP
+00482                                                                   ERCNETP
+00483      COMPUTE WK3 EQUAL                                            ERCNETP
+00484         CP-ORIGINAL-BENEFIT * WS-WORK-RATE.                       ERCNETP
+00485                                                                   ERCNETP
+00486      MOVE WK3 TO CP-CALC-PREMIUM.                                 ERCNETP
+00487                                                                   ERCNETP
+00488      GO TO 99999-RETURN.                                          ERCNETP
+00489                                                                   ERCNETP
+00490  12000-CHECK-ME-TRUNC.                                            ERCNETP
+00491                                                                   ERCNETP
+00492      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00493         (CP-STATE-STD-ABBRV EQUAL 'ME') AND                       ERCNETP
+00494         (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+00495         (CP-TRUNCATED-LIFE)                                       ERCNETP
+00496         NEXT SENTENCE                                             ERCNETP
+00497      ELSE                                                         ERCNETP
+00498         GO TO 12000-CHECK-VT-TRUNC.                               ERCNETP
+00499                                                                   ERCNETP
+00500      COMPUTE WS-WORK-RATE EQUAL CP-PREMIUM-RATE / +100.           ERCNETP
+00501                                                                   ERCNETP
+00502      COMPUTE ANGLEN-M EQUAL WK5 / I.                              ERCNETP
+00503      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00504                                                                   ERCNETP
+00505      COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                         ERCNETP
+00506                                                                   ERCNETP
+00507      COMPUTE WK8 EQUAL 1 / (1 + (.045 * N / 24)).                 ERCNETP
+00508      COMPUTE WK9 EQUAL                                            ERCNETP
+00509         1 / (1 + (.045 * (N - M) / 24))                           ERCNETP
+00510      COMPUTE WK7 EQUAL                                            ERCNETP
+00511         WS-WORK-RATE * 20 / (M + 1).                              ERCNETP
+00512      COMPUTE WK3 EQUAL                                            ERCNETP
+00513         ((( N - ANGLEN) * WK7 * WK8) /                            ERCNETP
+00514         (10 * ANGLEN-1 * I)) -                                    ERCNETP
+00515         (((N - M - ANGLEN-M) * WK7 * WK9 * 1) /                   ERCNETP
+00516         (10 * ANGLEN-1 * I * (1.0635 ** (M / 12)))).              ERCNETP
+00517      COMPUTE WK3 EQUAL WK3 * CP-ORIGINAL-BENEFIT.                 ERCNETP
+00518                                                                   ERCNETP
+00519      MOVE WK3 TO CP-CALC-PREMIUM.                                 ERCNETP
+00520                                                                   ERCNETP
+00521      GO TO 99999-RETURN.                                          ERCNETP
+00522                                                                   ERCNETP
+00523  12000-CHECK-VT-TRUNC.                                            ERCNETP
+00524                                                                   ERCNETP
+00525      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00526         (CP-STATE-STD-ABBRV EQUAL 'VT') AND                       ERCNETP
+00527         (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+00528         (CP-TRUNCATED-LIFE)                                       ERCNETP
+00529         NEXT SENTENCE                                             ERCNETP
+00530      ELSE                                                         ERCNETP
+00531         GO TO 12000-CHECK-VT.                                     ERCNETP
+00532                                                                   ERCNETP
+00533       COMPUTE WS-WORK-RATE EQUAL CP-PREMIUM-RATE / +1000.         ERCNETP
+00534                                                                   ERCNETP
+00535       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00536                                                                   ERCNETP
+00537       COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                        ERCNETP
+00538                                                                   ERCNETP
+00539       COMPUTE WK8 EQUAL (1 / (1 + I)) ** N.                       ERCNETP
+00540       COMPUTE WK9 EQUAL                                           ERCNETP
+00541         (1 - ((1 / (1 + ((.0054 - I) / (1 + I)))) ** (M - 1))) /  ERCNETP
+00542         ((.0054 - I) / (1 + I)).                                  ERCNETP
+00543       COMPUTE WK7 EQUAL                                           ERCNETP
+00544         (1 - (1 / 1.0054) ** (M - 1)) / .0054.                    ERCNETP
+00545       COMPUTE WK3 EQUAL  CP-ORIGINAL-BENEFIT * WS-WORK-RATE *     ERCNETP
+00546         ((WK7 + 1) - (WK8 * (WK9 + 1))) / (ANGLEN-1 * I).         ERCNETP
+00547                                                                   ERCNETP
+00548       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00549                                                                   ERCNETP
+00550      GO TO 99999-RETURN.                                          ERCNETP
+00551                                                                   ERCNETP
+00552  12000-CHECK-VT.                                                  ERCNETP
+00553                                                                   ERCNETP
+00554      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00555         (CP-STATE-STD-ABBRV EQUAL 'VT') AND                       ERCNETP
+00556         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00557         NEXT SENTENCE                                             ERCNETP
+00558      ELSE                                                         ERCNETP
+00559         GO TO 12000-CHECK-MINN-WDS.                               ERCNETP
+00560                                                                   ERCNETP
+00561       COMPUTE WS-WORK-RATE EQUAL CP-PREMIUM-RATE / +1000.         ERCNETP
+00562                                                                   ERCNETP
+00563       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00564                                                                   ERCNETP
+00565       COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                        ERCNETP
+00566                                                                   ERCNETP
+00567       COMPUTE WK3 EQUAL ((CP-ORIGINAL-BENEFIT * WS-WORK-RATE) /   ERCNETP
+00568                         (ANGLEN-1 * I)) *                         ERCNETP
+00569                                                                   ERCNETP
+00570                         (((1.0054 ** N - 1) /                     ERCNETP
+00571                         (1.0054 ** (N - 1) * .0054)) -            ERCNETP
+00572                                                                   ERCNETP
+00573                         ((V * (1 - 1.0054 ** N * VX)) /           ERCNETP
+00574                         (1.0054 ** (N - 1) * (1 - 1.0054 * V)))). ERCNETP
+00575                                                                   ERCNETP
+00576       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00577                                                                   ERCNETP
+00578      GO TO 99999-RETURN.                                          ERCNETP
+00579                                                                   ERCNETP
+00580  12000-CHECK-MINN-WDS.                                            ERCNETP
+00581                                                                   ERCNETP
+00582      IF (CP-COMPANY-ID EQUAL 'WDS') AND                           ERCNETP
+00583         (CP-STATE-STD-ABBRV EQUAL 'MN') AND                       ERCNETP
+00584         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00585         NEXT SENTENCE                                             ERCNETP
+00586      ELSE                                                         ERCNETP
+00587         GO TO 12000-CHECK-MINN-BALL-LEV.                          ERCNETP
+00588                                                                   ERCNETP
+00589      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00590      COMPUTE WK3 EQUAL (CP-PREMIUM-RATE / +100) *                 ERCNETP
+00591               (N / +12) * (2 / (N + 1)).                          ERCNETP
+00592      COMPUTE WK3 EQUAL (CP-ORIGINAL-BENEFIT / ANGLEN) *           ERCNETP
+00593          WK3 * ((N - ANGLEN) / I).                                ERCNETP
+00594                                                                   ERCNETP
+00595       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00596                                                                   ERCNETP
+00597      GO TO 99999-RETURN.                                          ERCNETP
+00598                                                                   ERCNETP
+00599  12000-CHECK-MINN-BALL-LEV.                                       ERCNETP
+00600                                                                   ERCNETP
+00601      IF (CP-COMPANY-ID EQUAL 'WDS') AND                           ERCNETP
+00602         (CP-STATE-STD-ABBRV EQUAL 'MN') AND                       ERCNETP
+00603         (CP-DEVIATION-CODE EQUAL 'LEV') AND                       ERCNETP
+00604         (CP-EARN-AS-REG-BALLOON)                                  ERCNETP
+00605         NEXT SENTENCE                                             ERCNETP
+00606      ELSE                                                         ERCNETP
+00607         GO TO 12000-CHECK-MINN-BALL.                              ERCNETP
+00608                                                                   ERCNETP
+00609      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00610                                                                   ERCNETP
+00611      COMPUTE WK3 EQUAL 1 / (1 + I) ** N.                          ERCNETP
+00612                                                                   ERCNETP
+00613      COMPUTE WK3 EQUAL CP-ORIGINAL-BENEFIT * CP-PREMIUM-RATE /    ERCNETP
+00614         +100 * N / 12 * 2 / (N + 1) * (ANGLEN / WK3).             ERCNETP
+00615                                                                   ERCNETP
+00616      MOVE WK3 TO CP-CALC-PREMIUM.                                 ERCNETP
+00617                                                                   ERCNETP
+00618      GO TO 99999-RETURN.                                          ERCNETP
+00619                                                                   ERCNETP
+00620  12000-CHECK-MINN-BALL.                                           ERCNETP
+00621                                                                   ERCNETP
+00622      IF (CP-COMPANY-ID EQUAL 'WDS') AND                           ERCNETP
+00623         (CP-STATE-STD-ABBRV EQUAL 'MN') AND                       ERCNETP
+00624         (CP-EARN-AS-REG-BALLOON)                                  ERCNETP
+00625         NEXT SENTENCE                                             ERCNETP
+00626      ELSE                                                         ERCNETP
+00627         GO TO 12000-CHECK-NC-WDS.                                 ERCNETP
+00628                                                                   ERCNETP
+00629      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00630      COMPUTE ANGLEN-1 EQUAL WK6 / I.                              ERCNETP
+00631                                                                   ERCNETP
+00632      COMPUTE WK3 EQUAL CP-ORIGINAL-BENEFIT * CP-PREMIUM-RATE      ERCNETP
+00633      / +100 * (N - 1) / 12 * 2 / N *                              ERCNETP
+00634      (((N - 1) - ANGLEN-1) / (I * ANGLEN-1)).                     ERCNETP
+00635                                                                   ERCNETP
+00636       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00637                                                                   ERCNETP
+00638      GO TO 99999-RETURN.                                          ERCNETP
+00639                                                                   ERCNETP
+00640  12000-CHECK-NC-WDS.                                              ERCNETP
+00641                                                                   ERCNETP
+00642      IF (CP-COMPANY-ID EQUAL 'WDS') AND                           ERCNETP
+00643         (CP-STATE-STD-ABBRV EQUAL 'NC') AND                       ERCNETP
+00644         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00645         NEXT SENTENCE                                             ERCNETP
+00646      ELSE                                                         ERCNETP
+00647         GO TO 12000-CHECK-NC-BALL-LEV.                            ERCNETP
+00648                                                                   ERCNETP
+00649      COMPUTE WK4 EQUAL N * (1 + I * 2).                           ERCNETP
+00650      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00651      COMPUTE WK3 EQUAL CP-ORIGINAL-BENEFIT *                      ERCNETP
+00652               CP-PREMIUM-RATE / +100 *                            ERCNETP
+00653               N / +12 * 2 / (N + 1) *                             ERCNETP
+00654               (WK4 - ANGLEN) / (I * ANGLEN).                      ERCNETP
+00655                                                                   ERCNETP
+00656       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00657                                                                   ERCNETP
+00658      GO TO 99999-RETURN.                                          ERCNETP
+00659                                                                   ERCNETP
+00660  12000-CHECK-NC-BALL-LEV.                                         ERCNETP
+00661                                                                   ERCNETP
+00662      IF (CP-COMPANY-ID EQUAL 'WDS') AND                           ERCNETP
+00663         (CP-STATE-STD-ABBRV EQUAL 'NC') AND                       ERCNETP
+00664         (CP-DEVIATION-CODE EQUAL 'LEV') AND                       ERCNETP
+00665         (CP-EARN-AS-REG-BALLOON)                                  ERCNETP
+00666         NEXT SENTENCE                                             ERCNETP
+00667      ELSE                                                         ERCNETP
+00668         GO TO 12000-CHECK-NC-BALL.                                ERCNETP
+00669                                                                   ERCNETP
+00670      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00671                                                                   ERCNETP
+00672 **** VX = 1 / (1 + I)**N.                                         ERCNETP
+00673                                                                   ERCNETP
+00674      COMPUTE WK3 EQUAL CP-ORIGINAL-BENEFIT * CP-PREMIUM-RATE /    ERCNETP
+00675         +100 * N / 12 * 2 / (N + 1) * (ANGLEN / VX).              ERCNETP
+00676                                                                   ERCNETP
+00677      MOVE WK3 TO CP-CALC-PREMIUM.                                 ERCNETP
+00678                                                                   ERCNETP
+00679      GO TO 99999-RETURN.                                          ERCNETP
+00680                                                                   ERCNETP
+00681  12000-CHECK-NC-BALL.                                             ERCNETP
+00682                                                                   ERCNETP
+00683      IF (CP-COMPANY-ID EQUAL 'WDS') AND                           ERCNETP
+00684         (CP-STATE-STD-ABBRV EQUAL 'NC') AND                       ERCNETP
+00685         (CP-EARN-AS-REG-BALLOON)                                  ERCNETP
+00686         NEXT SENTENCE                                             ERCNETP
+00687      ELSE                                                         ERCNETP
+00688         GO TO 12000-CHECK-MINN-TRUNC.                             ERCNETP
+00689                                                                   ERCNETP
+00690      COMPUTE WK4 EQUAL (N - 1) * (1 + I * 2).                     ERCNETP
+00691      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00692      COMPUTE ANGLEN-1 EQUAL WK6 / I.                              ERCNETP
+00693 **** VX = 1 / (1 + I)**N.                                         ERCNETP
+00694                                                                   ERCNETP
+00695      COMPUTE WK3 EQUAL CP-ORIGINAL-BENEFIT * CP-PREMIUM-RATE      ERCNETP
+00696      / +100 * (N - 1) / 12 * 2 / N *                              ERCNETP
+00697      (WK4 - ANGLEN-1) / (I * ANGLEN-1).                           ERCNETP
+00698                                                                   ERCNETP
+00699       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00700                                                                   ERCNETP
+00701      GO TO 99999-RETURN.                                          ERCNETP
+00702                                                                   ERCNETP
+00703  12000-CHECK-MINN-TRUNC.                                          ERCNETP
+00704                                                                   ERCNETP
+00705      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00706         (CP-STATE-STD-ABBRV EQUAL 'MN') AND                       ERCNETP
+00707         (M GREATER THAN +63) AND                                  ERCNETP
+00708         (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+00709         (CP-TRUNCATED-LIFE)                                       ERCNETP
+00710         NEXT SENTENCE                                             ERCNETP
+00711      ELSE                                                         ERCNETP
+00712         GO TO 12000-CHECK-MINN.                                   ERCNETP
+00713                                                                   ERCNETP
+00714       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00715       COMPUTE ANGLEN-M EQUAL WK5 / I.                             ERCNETP
+00716                                                                   ERCNETP
+00717       COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                        ERCNETP
+00718                                                                   ERCNETP
+00719       COMPUTE WK3 EQUAL (CP-ORIGINAL-BENEFIT *                    ERCNETP
+00720        (CP-PREMIUM-RATE / +100) * 2) / (ANGLEN-1 * (N + 1)) *     ERCNETP
+00721        (((M - ANGLEN + ANGLEN-M) / I) + (2 * M)).                 ERCNETP
+00722                                                                   ERCNETP
+00723       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00724                                                                   ERCNETP
+00725      GO TO 99999-RETURN.                                          ERCNETP
+00726                                                                   ERCNETP
+00727  12000-CHECK-MINN.                                                ERCNETP
+00728                                                                   ERCNETP
+00729      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00730         (CP-STATE-STD-ABBRV EQUAL 'MN') AND                       ERCNETP
+00731         (M GREATER THAN +63) AND                                  ERCNETP
+00732         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00733         NEXT SENTENCE                                             ERCNETP
+00734      ELSE                                                         ERCNETP
+00735         GO TO 12000-CHECK-MONTANA-TRUNC.                          ERCNETP
+00736                                                                   ERCNETP
+00737       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00738                                                                   ERCNETP
+00739       COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                        ERCNETP
+00740                                                                   ERCNETP
+00741       COMPUTE WK3 EQUAL (CP-ORIGINAL-BENEFIT *                    ERCNETP
+00742        (CP-PREMIUM-RATE / +100) * 2) / (ANGLEN-1 * (N + 1)) *     ERCNETP
+00743        (((N - ANGLEN) / I) + (2 * N)).                            ERCNETP
+00744                                                                   ERCNETP
+00745       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00746                                                                   ERCNETP
+00747      GO TO 99999-RETURN.                                          ERCNETP
+00748                                                                   ERCNETP
+00749  12000-CHECK-MONTANA-TRUNC.                                       ERCNETP
+00750                                                                   ERCNETP
+00751      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00752         (CP-STATE-STD-ABBRV EQUAL 'MT') AND                       ERCNETP
+00753         (M GREATER THAN +63) AND                                  ERCNETP
+00754         (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+00755         (CP-TRUNCATED-LIFE)                                       ERCNETP
+00756         NEXT SENTENCE                                             ERCNETP
+00757      ELSE                                                         ERCNETP
+00758         GO TO 12000-CHECK-MONTANA.                                ERCNETP
+00759                                                                   ERCNETP
+00760       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00761       COMPUTE ANGLEN-M EQUAL WK5 / I.                             ERCNETP
+00762                                                                   ERCNETP
+00763       COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                        ERCNETP
+00764                                                                   ERCNETP
+00765       COMPUTE WK3 EQUAL CP-ORIGINAL-BENEFIT *                     ERCNETP
+00766       ((CP-PREMIUM-RATE / +100) * 2) / (ANGLEN-1 * (N + 1)) *     ERCNETP
+00767        (((M - ANGLEN + ANGLEN-M) / I) + (4 * M)).                 ERCNETP
+00768                                                                   ERCNETP
+00769       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00770                                                                   ERCNETP
+00771      GO TO 99999-RETURN.                                          ERCNETP
+00772                                                                   ERCNETP
+00773  12000-CHECK-MONTANA.                                             ERCNETP
+00774                                                                   ERCNETP
+00775      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00776         (CP-STATE-STD-ABBRV EQUAL 'MT') AND                       ERCNETP
+00777         (M GREATER THAN +63) AND                                  ERCNETP
+00778         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00779         NEXT SENTENCE                                             ERCNETP
+00780      ELSE                                                         ERCNETP
+00781         GO TO 12001-CONTINUE-NCL-TRUNC.                           ERCNETP
+00782                                                                   ERCNETP
+00783       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00784                                                                   ERCNETP
+00785       COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                        ERCNETP
+00786                                                                   ERCNETP
+00787       COMPUTE WK3 EQUAL (CP-ORIGINAL-BENEFIT *                    ERCNETP
+00788        (CP-PREMIUM-RATE / +100) * 2) / (ANGLEN-1 * (N + 1)) *     ERCNETP
+00789        (((N - ANGLEN) / I) + (4 * N)).                            ERCNETP
+00790                                                                   ERCNETP
+00791       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00792                                                                   ERCNETP
+00793      GO TO 99999-RETURN.                                          ERCNETP
+00794                                                                   ERCNETP
+00795  12001-CONTINUE-NCL-TRUNC.                                        ERCNETP
+00796                                                                   ERCNETP
+00797      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00798         (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+00799         (CP-TRUNCATED-LIFE)                                       ERCNETP
+00800         NEXT SENTENCE                                             ERCNETP
+00801      ELSE                                                         ERCNETP
+00802         GO TO 12001-CONTINUE-NCL.                                 ERCNETP
+00803                                                                   ERCNETP
+00804       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00805       COMPUTE ANGLEN-M EQUAL WK5 / I.                             ERCNETP
+00806                                                                   ERCNETP
+00807       COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                        ERCNETP
+00808                                                                   ERCNETP
+00809       COMPUTE WK3 EQUAL (CP-ORIGINAL-BENEFIT * 2 *                ERCNETP
+00810       (M - (ANGLEN - ANGLEN-M)) * (CP-PREMIUM-RATE / +100)) /     ERCNETP
+00811       (ANGLEN-1 * (N + 1) * I).                                   ERCNETP
+00812                                                                   ERCNETP
+00813       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00814                                                                   ERCNETP
+00815      GO TO 99999-RETURN.                                          ERCNETP
+00816                                                                   ERCNETP
+00817  12001-CONTINUE-NCL.                                              ERCNETP
+00818                                                                   ERCNETP
+00819      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00820         (CP-STATE-STD-ABBRV EQUAL 'NC') AND                       ERCNETP
+00821         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00822         GO TO 12001-CHECK-NC-NET-PLUS3.                           ERCNETP
+00823                                                                   ERCNETP
+00824      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00825         (CP-STATE-STD-ABBRV EQUAL 'CA') AND                       ERCNETP
+00826         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00827         GO TO 12001-CHECK-CA.                                     ERCNETP
+00828                                                                   ERCNETP
+00829      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           ERCNETP
+00830         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00831         NEXT SENTENCE                                             ERCNETP
+00832      ELSE                                                         ERCNETP
+00833         GO TO 12000-CONTINUE-NET.                                 ERCNETP
+00834                                                                   ERCNETP
+00835       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00836       MOVE ANGLEN                TO ANGLEN-1.                     ERCNETP
+00837                                                                   ERCNETP
+00838       COMPUTE ANGLEN-1 EQUAL ANGLEN * ODF.                        ERCNETP
+00839                                                                   ERCNETP
+00840       COMPUTE WK3 EQUAL (CP-ORIGINAL-BENEFIT *                    ERCNETP
+00841        (CP-PREMIUM-RATE / +100) * 2) / (ANGLEN-1 * (N + 1)) *     ERCNETP
+00842        ((N - ANGLEN) / I).                                        ERCNETP
+00843                                                                   ERCNETP
+00844       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00845                                                                   ERCNETP
+00846      GO TO 99999-RETURN.                                          ERCNETP
+00847                                                                   ERCNETP
+00848  12000-CONTINUE-NET.                                              ERCNETP
+00849                                                                   ERCNETP
+00850      IF (CP-COMPANY-ID EQUAL 'TMS') AND                           ERCNETP
+00851         (CP-STATE-STD-ABBRV EQUAL 'MN' OR 'CA' OR 'WA') AND       ERCNETP
+00852         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00853         NEXT SENTENCE                                             ERCNETP
+00854      ELSE                                                         ERCNETP
+00855         GO TO 12001-CONTINUE-MINN.                                ERCNETP
+00856                                                                   ERCNETP
+00857       COMPUTE ANGLEN EQUAL WK6 / I.                               ERCNETP
+00858       COMPUTE ODF EQUAL 1 + (12 * CP-TERM-OR-EXT-DAYS / +365).    ERCNETP
+00859                                                                   ERCNETP
+00860       COMPUTE WK7 EQUAL (1 + ODF * I) / (1 + ANGLEN).             ERCNETP
+00861       COMPUTE WK3 EQUAL (M  * WK7) - 1.                           ERCNETP
+00862       COMPUTE WK3 EQUAL (WK3 / I) *                               ERCNETP
+00863        ((M * (CP-PREMIUM-RATE / +100)) / (+6 * (M + 1))).         ERCNETP
+00864                                                                   ERCNETP
+00865       IF CP-R-MAX-TOT-BEN NOT NUMERIC                             ERCNETP
+00866          MOVE +0 TO CP-R-MAX-TOT-BEN.                             ERCNETP
+00867                                                                   ERCNETP
+00868       COMPUTE WK3 EQUAL (WK3 * CP-ORIGINAL-BENEFIT)               ERCNETP
+00869                                                                   ERCNETP
+00870       IF (CP-ORIGINAL-BENEFIT GREATER THAN CP-R-MAX-TOT-BEN) AND  ERCNETP
+00871          (CP-R-MAX-TOT-BEN NOT EQUAL +0)                          ERCNETP
+00872          COMPUTE WK3 EQUAL (WK3 * CP-R-MAX-TOT-BEN).              ERCNETP
+00873                                                                   ERCNETP
+00874       MOVE WK3 TO CP-CALC-PREMIUM.                                ERCNETP
+00875                                                                   ERCNETP
+00876      GO TO 99999-RETURN.                                          ERCNETP
+00877                                                                   ERCNETP
+00878  12001-CONTINUE-MINN.                                             ERCNETP
+00879                                                                   ERCNETP
+00880      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           ERCNETP
+00881         (CP-STATE-STD-ABBRV EQUAL 'NJ') AND                       ERCNETP
+00882         (CP-TRUNCATED-LIFE)                                       ERCNETP
+00883         NEXT SENTENCE                                             ERCNETP
+00884      ELSE                                                         ERCNETP
+00885         GO TO 12001-CHECK-RI-GTL.                                 ERCNETP
+00886                                                                   ERCNETP
+00887       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00888       COMPUTE ANGLEM EQUAL WK2 / I.                               ERCNETP
+00889                                                                   ERCNETP
+00890       COMPUTE WK3 EQUAL ((M - ANGLEM * SX) /                      ERCNETP
+00891        (I * ANGLEN) * CP-PREMIUM-RATE / (1 + WS-WORK-DIS-RATE     ERCNETP
+00892        * M / 2400) * 1000 + .5) / 1000000.                        ERCNETP
+00893                                                                   ERCNETP
+00894       COMPUTE CP-CALC-PREMIUM EQUAL WK3 * (CP-ORIGINAL-BENEFIT    ERCNETP
+00895        - CP-ORIGINAL-PREMIUM) / (1 - WK3).                        ERCNETP
+00896                                                                   ERCNETP
+00897      GO TO 99999-RETURN.                                          ERCNETP
+00898                                                                   ERCNETP
+00899  12001-CHECK-RI-GTL.                                              ERCNETP
+00900                                                                   ERCNETP
+00901      IF (CP-COMPANY-ID EQUAL 'GTL' ) AND                          ERCNETP
+00902         (CP-STATE-STD-ABBRV EQUAL 'RI') AND                       ERCNETP
+00903         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00904         NEXT SENTENCE                                             ERCNETP
+00905      ELSE                                                         ERCNETP
+00906         GO TO 12001-CHECK-RI-LEASE-GTL.                           ERCNETP
+00907                                                                   ERCNETP
+00908       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+00909 *     COMPUTE ANGLEM EQUAL WK2 / I.                               ERCNETP
+00910                                                                   ERCNETP
+00911       COMPUTE WK3 EQUAL (1000 * I * ANGLEN) *                     ERCNETP
+00912                (1 + WS-WORK-DIS-RATE * N).                        ERCNETP
+00913       COMPUTE CP-CALC-PREMIUM EQUAL CP-ORIGINAL-BENEFIT *         ERCNETP
+00914          ((N - ANGLEN) * (1 + 2 * I) * CP-PREMIUM-RATE) / WK3.    ERCNETP
+00915                                                                   ERCNETP
+00916                                                                   ERCNETP
+00917      GO TO 99999-RETURN.                                          ERCNETP
+00918                                                                   ERCNETP
+00919  12001-CHECK-RI-LEASE-GTL.                                        ERCNETP
+00920                                                                   ERCNETP
+00921      IF (CP-COMPANY-ID EQUAL 'GTL' ) AND                          ERCNETP
+00922         (CP-STATE-STD-ABBRV EQUAL 'RI') AND                       ERCNETP
+00923         (CP-SPECIAL-CALC-CD EQUAL 'H')                            ERCNETP
+00924         NEXT SENTENCE                                             ERCNETP
+00925      ELSE                                                         ERCNETP
+00926         GO TO 12001-CHECK-OR-GTL.                                 ERCNETP
+00927                                                                   ERCNETP
+00928      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00929                                                                   ERCNETP
+00930      COMPUTE WK3 EQUAL (CP-ORIGINAL-BENEFIT / ANGLEN *            ERCNETP
+00931         (N - ANGLEN) * CP-PREMIUM-RATE * (1 + 2 * I))             ERCNETP
+00932                         /                                         ERCNETP
+00933         (1000 * I * (1 + .0021 * N)).                             ERCNETP
+00934      COMPUTE CP-CALC-PREMIUM EQUAL WK3 +                          ERCNETP
+00935        (CP-ALTERNATE-BENEFIT * CP-PREMIUM-RATE * (N + 1))         ERCNETP
+00936                             /                                     ERCNETP
+00937        (1000 * (1 + .0027 * (N + 1))).                            ERCNETP
+00938                                                                   ERCNETP
+00939      GO TO 99999-RETURN.                                          ERCNETP
+00940                                                                   ERCNETP
+00941  12001-CHECK-OR-GTL.                                              ERCNETP
+00942                                                                   ERCNETP
+00943      IF (CP-COMPANY-ID EQUAL 'GTL' ) AND                          ERCNETP
+00944         (CP-STATE-STD-ABBRV EQUAL 'OR') AND                       ERCNETP
+00945         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00946         NEXT SENTENCE                                             ERCNETP
+00947      ELSE                                                         ERCNETP
+00948         GO TO 12001-CHECK-GA-GTL.                                 ERCNETP
+00949                                                                   ERCNETP
+00950      COMPUTE ANGLEN-M EQUAL WK5 / I.                              ERCNETP
+00951      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00952                                                                   ERCNETP
+00953      IF M LESS THAN +64                                           ERCNETP
+00954         COMPUTE WK3 EQUAL (((N - (N - M)) - (ANGLEN - ANGLEN-M)) *ERCNETP
+00955          (1 + I) * CP-PREMIUM-RATE * (N - (N - M)))               ERCNETP
+00956                    /                                              ERCNETP
+00957          (I * ANGLEN * (N - (N - M) + 1) * 600)                   ERCNETP
+00958         COMPUTE CP-CALC-PREMIUM EQUAL WK3 * CP-ORIGINAL-BENEFIT   ERCNETP
+00959      ELSE                                                         ERCNETP
+00960         COMPUTE WK3 EQUAL (((N - (N - M)) - (ANGLEN - ANGLEN-M)) *ERCNETP
+00961         CP-PREMIUM-RATE * (1 + I))                                ERCNETP
+00962                   /                                               ERCNETP
+00963         (+1000 * I * ANGLEN)                                      ERCNETP
+00964         COMPUTE CP-CALC-PREMIUM EQUAL WK3 * CP-ORIGINAL-BENEFIT.  ERCNETP
+00965 *    MOVE WK3 TO CP-CALC-PREMIUM.                                 ERCNETP
+00966      GO TO 99999-RETURN.                                          ERCNETP
+00967                                                                   ERCNETP
+00968  12001-CHECK-GA-GTL.                                              ERCNETP
+00969                                                                   ERCNETP
+00970      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           ERCNETP
+00971         (CP-STATE-STD-ABBRV EQUAL 'GA') AND                       ERCNETP
+00972         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+00973 *       (CP-TRUNCATED-LIFE)                                       ERCNETP
+00974         NEXT SENTENCE                                             ERCNETP
+00975      ELSE                                                         ERCNETP
+00976         GO TO 12001-CHECK-MA-GTL.                                 ERCNETP
+00977                                                                   ERCNETP
+00978      COMPUTE ANGLEN-M EQUAL WK5 / I.                              ERCNETP
+00979      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00980                                                                   ERCNETP
+00981      COMPUTE WK3 EQUAL CP-ORIGINAL-BENEFIT / ANGLEN.              ERCNETP
+00982      COMPUTE WK3 EQUAL (CP-PREMIUM-RATE / +1000) * WK3 *          ERCNETP
+00983       ((N - (ANGLEN - ANGLEN-M)) / I) * (1 + 2 * I).              ERCNETP
+00984      MOVE WK3 TO CP-CALC-PREMIUM.                                 ERCNETP
+00985                                                                   ERCNETP
+00986      GO TO 99999-RETURN.                                          ERCNETP
+00987                                                                   ERCNETP
+00988  12001-CHECK-MA-GTL.                                              ERCNETP
+00989                                                                   ERCNETP
+00990      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           ERCNETP
+00991         (CP-STATE-STD-ABBRV EQUAL 'MA') AND                       ERCNETP
+00992         (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+00993         (CP-SPECIAL-CALC-CD EQUAL 'H')                            ERCNETP
+00994         NEXT SENTENCE                                             ERCNETP
+00995      ELSE                                                         ERCNETP
+00996         GO TO 12001-CHECK-NV-NET.                                 ERCNETP
+00997                                                                   ERCNETP
+00998      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+00999                                                                   ERCNETP
+01000      COMPUTE WK3 EQUAL (CP-PREMIUM-RATE / +1000) *                ERCNETP
+01001       CP-ALTERNATE-BENEFIT * N.                                   ERCNETP
+01002                                                                   ERCNETP
+01003      COMPUTE WK7 EQUAL (CP-ORIGINAL-BENEFIT + WK3) /              ERCNETP
+01004      (ANGLEN - (CP-PREMIUM-RATE / +1000) * (N - ANGLEN) / I).     ERCNETP
+01005                                                                   ERCNETP
+01006      COMPUTE WK3 EQUAL WK3 + (CP-PREMIUM-RATE / +1000) *          ERCNETP
+01007      WK7 * (N - ANGLEN) / I.                                      ERCNETP
+01008      MOVE WK3 TO CP-CALC-PREMIUM.                                 ERCNETP
+01009                                                                   ERCNETP
+01010      GO TO 99999-RETURN.                                          ERCNETP
+01011                                                                   ERCNETP
+01012  12001-CHECK-NV-NET.                                              ERCNETP
+01013                                                                   ERCNETP
+CIDMOD*    IF (CP-COMPANY-ID EQUAL 'CID') AND                           ERCNETP
+CIDMOD*       (CP-STATE-STD-ABBRV EQUAL 'NV') AND                       ERCNETP
+CIDMOD*       (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+CIDMOD*       (NOT CP-TRUNCATED-LIFE)                                   ERCNETP
+CIDMOD*       NEXT SENTENCE                                             ERCNETP
+CIDMOD*    ELSE                                                         ERCNETP
+CIDMOD*       GO TO 12001-CHECK-NV-TRUNC.                               ERCNETP
+CIDMOD*                                                                 ERCNETP
+CIDMOD*     COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+CIDMOD*                                                                 ERCNETP
+CIDMOD*     COMPUTE WK3 EQUAL CP-ORIGINAL-BENEFIT / ANGLEN.             ERCNETP
+CIDMOD*     COMPUTE CP-CALC-PREMIUM EQUAL WK3 *                         ERCNETP
+CIDMOD*     (CP-PREMIUM-RATE / +10) *                                   ERCNETP
+CIDMOD*     (((N - ANGLEN) / I) / +100).                                ERCNETP
+CIDMOD*                                                                 ERCNETP
+CIDMOD*    GO TO 99999-RETURN.                                          ERCNETP
+CIDMOD*                                                                 ERCNETP
+01031  12001-CHECK-NV-TRUNC.                                            ERCNETP
+01032                                                                   ERCNETP
+CIDMOD*    IF (CP-COMPANY-ID EQUAL 'CID') AND                           ERCNETP
+CIDMOD*       (CP-STATE-STD-ABBRV EQUAL 'NV') AND                       ERCNETP
+CIDMOD*       (CP-TRUNCATED-LIFE)                                       ERCNETP
+CIDMOD*       NEXT SENTENCE                                             ERCNETP
+CIDMOD*    ELSE                                                         ERCNETP
+CIDMOD*       GO TO 12001-CHECK-NC-NET.                                 ERCNETP
+CIDMOD*                                                                 ERCNETP
+CIDMOD*    COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+CIDMOD*    COMPUTE ANGLEM EQUAL WK2 / I.                                ERCNETP
+CIDMOD*    COMPUTE ANGLEN-M EQUAL WK5 / I.                              ERCNETP
+CIDMOD*                                                                 ERCNETP
+CIDMOD*    COMPUTE WK3 EQUAL CP-ORIGINAL-BENEFIT / ANGLEN.              ERCNETP
+CIDMOD*                                                                 ERCNETP
+CIDMOD*    COMPUTE CP-CALC-PREMIUM EQUAL WK3 *                          ERCNETP
+CIDMOD*    ((M - (ANGLEN - ANGLEN-M)) / I) *                            ERCNETP
+CIDMOD*    (CP-PREMIUM-RATE / +1000).                                   ERCNETP
+CIDMOD*                                                                 ERCNETP
+CIDMOD*    GO TO 99999-RETURN.                                          ERCNETP
+CIDMOD*                                                                 ERCNETP
+01052  12001-CHECK-NC-NET.                                              ERCNETP
+01053                                                                   ERCNETP
+01054      IF (CP-COMPANY-ID EQUAL 'NCB' ) AND                          ERCNETP
+01055         (CP-STATE-STD-ABBRV EQUAL 'NC') AND                       ERCNETP
+01056         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+01057         NEXT SENTENCE                                             ERCNETP
+01058      ELSE                                                         ERCNETP
+01059         GO TO 12001-CHECK-NC-NET-PLUS3.                           ERCNETP
+01060                                                                   ERCNETP
+01061       COMPUTE ANGLEN EQUAL WK1 / I.                               ERCNETP
+01062       COMPUTE ANGLEN-M EQUAL WK5 / I.                             ERCNETP
+01063                                                                   ERCNETP
+01064       COMPUTE WK6 ROUNDED = CP-ORIGINAL-BENEFIT /                 ERCNETP
+01065           (ANGLEN - (CP-PREMIUM-RATE / 1000) *                    ERCNETP
+01066           ((N - (ANGLEN - ANGLEN-M)) / I + 3 * N) -               ERCNETP
+01067           N * (CP-PREMIUM-RATE / 1000)).                          ERCNETP
+01068                                                                   ERCNETP
+01069       COMPUTE WK3 ROUNDED = (CP-PREMIUM-RATE / 1000) * WK6 *      ERCNETP
+01070           ((N - (ANGLEN - ANGLEN-M)) / I + 3 * N).                ERCNETP
+01071                                                                   ERCNETP
+01072       COMPUTE WK7 ROUNDED = (1 - (CP-PREMIUM-RATE / 1000) *       ERCNETP
+01073           ((N - ANGLEN) / I + 3) / ANGLEN) /                      ERCNETP
+01074           (1 - (CP-PREMIUM-RATE / 1000) * N * (N + 1) /           ERCNETP
+01075           (ANGLEN * 2))                                           ERCNETP
+01076                                                                   ERCNETP
+01077       COMPUTE WK7 ROUNDED = WK7 * N - 3.                          ERCNETP
+01078                                                                   ERCNETP
+01079       IF ANGLEN IS NOT LESS THAN WK7                              ERCNETP
+01080           COMPUTE CP-PREMIUM-RATE ROUNDED =                       ERCNETP
+01081               (CP-PREMIUM-RATE / 1000) * +6.5 * (N / 12)          ERCNETP
+01082           COMPUTE WK3 ROUNDED =                                   ERCNETP
+01083               (CP-ORIGINAL-BENEFIT * CP-PREMIUM-RATE).            ERCNETP
+01084                                                                   ERCNETP
+01085      MOVE WK3 TO CP-CALC-PREMIUM.                                 ERCNETP
+01086                                                                   ERCNETP
+01087      GO TO 99999-RETURN.                                          ERCNETP
+01088                                                                   ERCNETP
+01089  12001-CHECK-NC-NET-PLUS3.                                        ERCNETP
+01090                                                                   ERCNETP
+           IF (CP-STATE-STD-ABBRV EQUAL 'NC') AND                          ERCNE
+CIDMOD        (CP-EARN-AS-NET-PAY) AND                                     ERCNE
+CIDMOD        (CP-COMPANY-ID NOT = 'CID')
+              NEXT SENTENCE                                                ERCNE
+           ELSE                                                            ERCNE
+              GO TO 12001-CHECK-CA.                                        ERCNE
+01096                                                                   ERCNETP
+01097      MOVE CP-CERT-EFF-DT TO DC-BIN-DATE-1.                        ERCNETP
+01098      MOVE ' ' TO DC-OPTION-CODE.                                  ERCNETP
+01099      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                    ERCNETP
+01100                                                                   ERCNETP
+01101      IF DATE-CONVERSION-ERROR                                     ERCNETP
+01102         MOVE '2'                 TO CP-RETURN-CODE                ERCNETP
+01103         MOVE ZEROS               TO FACTOR                        ERCNETP
+01104                                     CP-CALC-PREMIUM               ERCNETP
+01105          GO TO 99999-RETURN.                                      ERCNETP
+01106                                                                   ERCNETP
+01107      IF DC-GREG-DATE-CYMD GREATER THAN 19931231                      CL**4
+01108         NEXT SENTENCE                                             ERCNETP
+01109      ELSE                                                         ERCNETP
+01110         GO TO 12001-CONTINUE-NET.                                 ERCNETP
+01111                                                                   ERCNETP
+01112      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+01113      COMPUTE ANGLEN-M EQUAL WK5 / I.                              ERCNETP
+01114                                                                   ERCNETP
+01115      COMPUTE NC-LR = CP-PREMIUM-RATE / ( ORIGINAL-TERM / 12).     ERCNETP
+01116                                                                   ERCNETP
+01117      COMPUTE NC-R = 20 *                                          ERCNETP
+01118                     ((NC-LR * ORIGINAL-TERM) / 12)                ERCNETP
+01119                           / (ORIGINAL-TERM + 1).                  ERCNETP
+01120                                                                   ERCNETP
+01121      COMPUTE NC-OB = NC-R / 1000.                                 ERCNETP
+01122                                                                   ERCNETP
+01123      COMPUTE NC-P = (((ORIGINAL-TERM - ANGLEN) / I) * NC-OB) +    ERCNETP
+01124                     (NC-OB * ORIGINAL-TERM * 3).                  ERCNETP
+01125                                                                   ERCNETP
+01126      IF CP-EXT-CHG-LF                                             ERCNETP
+01127          COMPUTE NC-BIG-D = CP-TERM-OR-EXT-DAYS + 30              ERCNETP
+01128      ELSE                                                         ERCNETP
+01129          MOVE 30                 TO  NC-BIG-D.                    ERCNETP
+01130                                                                   ERCNETP
+01131      COMPUTE NC-LITTLE-D = (1 + I) /                              ERCNETP
+01132              ((( 1 + ((NC-BIG-D / 30.4166666)) * I))).            ERCNETP
+01133                                                                   ERCNETP
+01134      COMPUTE NC-MP ROUNDED = CP-ORIGINAL-BENEFIT  /               ERCNETP
+01135              (ANGLEN * NC-LITTLE-D ).                             ERCNETP
+01136                                                                   ERCNETP
+01137      COMPUTE CP-CALC-PREMIUM ROUNDED = NC-MP * NC-P.              ERCNETP
+01138                                                                   ERCNETP
+01139      GO TO 99999-RETURN.                                          ERCNETP
+01140                                                                   ERCNETP
+01141  12001-CHECK-CA.                                                  ERCNETP
+01142                                                                   ERCNETP
+01143      IF (CP-STATE-STD-ABBRV EQUAL 'CA') AND                       ERCNETP
+01144         (WS-DISCOUNT-OPTION = '6')                                ERCNETP
+01145         NEXT SENTENCE                                             ERCNETP
+01146      ELSE                                                         ERCNETP
+01147         GO TO 12001-CHECK-GTL-IA.                                 ERCNETP
+01148                                                                   ERCNETP
+01149      COMPUTE CA-J = CA-DISCOUNT / 12.                             ERCNETP
+01150      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+01151      COMPUTE CA-MP = CP-ORIGINAL-BENEFIT  / ANGLEN.               ERCNETP
+01152      COMPUTE CA-API = (1 - (1 + I)** - ORIGINAL-TERM) / I.        ERCNETP
+01153      COMPUTE CA-APJ = (1 - (1 + CA-J)** - ORIGINAL-TERM) / CA-J.  ERCNETP
+01154      COMPUTE CA-VI = (1 + I)** -1.                                ERCNETP
+01155      COMPUTE CP-CALC-PREMIUM =                                    ERCNETP
+01156          ((CP-PREMIUM-RATE * 2) / (100 * (ORIGINAL-TERM + 1)) *   ERCNETP
+01157          ((1 + CA-J) / I) *                                       ERCNETP
+01158          (CA-APJ + (CA-J * CA-APJ - I * CA-API) *                 ERCNETP
+01159          ((CA-VI ** (LOAN-TERM - ORIGINAL-TERM)) /                ERCNETP
+01160          (I - CA-J))) * (1 + CP-ODD-DAYS-TO-PMT * I) * CA-MP).    ERCNETP
+01161                                                                   ERCNETP
+01162      GO TO 99999-RETURN.                                          ERCNETP
+01163                                                                   ERCNETP
+01164  12001-CHECK-GTL-IA.                                              ERCNETP
+01165                                                                   ERCNETP
+01166      IF (CP-COMPANY-ID EQUAL 'GTL')     AND                       ERCNETP
+01167         (CP-STATE-STD-ABBRV EQUAL 'IA') AND                       ERCNETP
+01168         (CP-EARN-AS-NET-PAY)                                      ERCNETP
+01169         NEXT SENTENCE                                             ERCNETP
+01170      ELSE                                                         ERCNETP
+CIDMOD        GO TO 12001-CHECK-CID-TRN-VA.                             ERCNETP
+01172                                                                   ERCNETP
+01173 ***************************************************************   ERCNETP
+01174                                                                   ERCNETP
+01175      COMPUTE GTL-IA-ODD-DAYS = CP-ODD-DAYS-TO-PMT - 30.           ERCNETP
+01176                                                                   ERCNETP
+01177      IF GTL-IA-ODD-DAYS = ZEROS                                   ERCNETP
+01178          MOVE ZERO               TO  GTL-IA-SGN                   ERCNETP
+01179      ELSE                                                         ERCNETP
+01180          IF GTL-IA-ODD-DAYS GREATER THAN ZERO                     ERCNETP
+01181              MOVE +1             TO  GTL-IA-SGN                   ERCNETP
+01182          ELSE                                                     ERCNETP
+01183              MOVE -1             TO  GTL-IA-SGN.                  ERCNETP
+01184                                                                   ERCNETP
+01185      MOVE GTL-IA-ODD-DAYS        TO  GTL-IA-ABS.                  ERCNETP
+01186      COMPUTE GTL-IA-ABS = GTL-IA-ABS - 30.                        ERCNETP
+01187                                                                   ERCNETP
+01188      COMPUTE GTL-IA-ODF = (1 + I * GTL-IA-ABS / 30) **            ERCNETP
+01189                           GTL-IA-SGN.                             ERCNETP
+01190                                                                   ERCNETP
+01191      COMPUTE ANGLEN EQUAL WK1 / I.                                ERCNETP
+01192      COMPUTE ANGLEN-M EQUAL WK5 / I.                                 CL**3
+01193                                                                   ERCNETP
+01194      IF GTL-IA-ODF NOT = ZERO                                     ERCNETP
+01195          COMPUTE ANGLEN EQUAL ANGLEN / GTL-IA-ODF                    CL**3
+01196          COMPUTE ANGLEN-M EQUAL ANGLEN-M / GTL-IA-ODF.               CL**3
+01197                                                                   ERCNETP
+01198      COMPUTE GTL-IA-DIVIDEND =                                       CL**3
+01199            (((N-P-LOAN - (N-P-LOAN - N-P-ORIG)) -                    CL**3
+01200                              (ANGLEN - ANGLEN-M))) *                 CL**3
+01201            ((K1 + I) * CP-PREMIUM-RATE *                             CL**3
+01202                      (N-P-LOAN - (N-P-LOAN - N-P-ORIG))).            CL**3
+01203                                                                      CL**3
+01204      COMPUTE GTL-IA-DIVISOR =                                     ERCNETP
+01205       I * ANGLEN * (N-P-LOAN - (N-P-LOAN - N-P-ORIG) + 1) * +600.    CL**3
+01206                                                                      CL**3
+01207      COMPUTE GTL-IA-FACTOR = GTL-IA-DIVIDEND / GTL-IA-DIVISOR.    ERCNETP
+01208                                                                      CL**3
+01209      COMPUTE CP-CALC-PREMIUM =                                    ERCNETP
+01210                            GTL-IA-FACTOR * CP-ORIGINAL-BENEFIT.   ERCNETP
+01211      GO TO 99999-RETURN.                                          ERCNETP
+01212                                                                   ERCNETP
+01212                                                                   ERCNETP
+CIDMOD 12001-CHECK-CID-TRN-VA.                                          ERCNETP
+CIDMOD                                                                  ERCNETP
+CIDMOD     IF (CP-COMPANY-ID EQUAL 'CID')     AND                       ERCNETP
+CIDMOD        (CP-STATE-STD-ABBRV EQUAL 'VA') AND                       ERCNETP
+CIDMOD        (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+CIDMOD        (CP-TRUNCATED-LIFE) AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE)
+CIDMOD        CONTINUE                                                  ERCNETP
+CIDMOD     ELSE                                                         ERCNETP
+CIDMOD        GO TO 12001-CHECK-CID-LEV-MN                              ERCNETP
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     COMPUTE ANGLEN EQUAL WK1 / I                                 ERCNETP
+CIDMOD     COMPUTE WS-WORK-DIS-RATE = WS-WORK-DIS-RATE / +12
+CIDMOD     IF WS-WORK-DIS-RATE = ZEROS
+CIDMOD        CONTINUE
+CIDMOD     ELSE
+CIDMOD        COMPUTE WK4 = 1 / (1 + WS-WORK-DIS-RATE)
+CIDMOD        COMPUTE WK7 = (1 / I) *
+CIDMOD              (((WK4 ** M - 1) / (WK4 - 1)) -
+CIDMOD              ((WK4 ** M * SX - VX) /
+CIDMOD              (WK4 * (1 + I) - 1))) *
+CIDMOD              (CP-PREMIUM-RATE / 1000)
+CIDMOD        COMPUTE WK4 = CP-ORIGINAL-BENEFIT / ANGLEN
+CIDMOD        COMPUTE WK8 = WK7 * 100 / ANGLEN
+CIDMOD        COMPUTE CP-CALC-PREMIUM =
+CIDMOD           WK8 *  ((WK4 * ANGLEN) / 100)
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     GO TO 99999-RETURN                                           ERCNETP
+CIDMOD
+01163      .                                                            ERCNETP
+01212                                                                   ERCNETP
+CIDMOD 12001-CHECK-CID-LEV-MN.                                          ERCNETP
+CIDMOD                                                                  ERCNETP
+CIDMOD     IF (CP-COMPANY-ID EQUAL 'CID')     AND                       ERCNETP
+CIDMOD        (CP-STATE-STD-ABBRV EQUAL 'MN') AND                       ERCNETP
+CIDMOD        (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+CIDMOD        (CP-LEVEL-LIFE) AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE)
+CIDMOD        CONTINUE                                                  ERCNETP
+CIDMOD     ELSE                                                         ERCNETP
+CIDMOD        GO TO 12001-CHECK-CID-LEV-CA                              ERCNETP
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     COMPUTE CP-CALC-PREMIUM = (CP-ORIGINAL-BENEFIT *
+CIDMOD         (N / +12) * (CP-PREMIUM-RATE / +100)) /
+CIDMOD         (1 - (N / +12) * (CP-PREMIUM-RATE / 100))
+CIDMOD
+CIDMOD     GO TO 99999-RETURN                                           ERCNETP
+CIDMOD
+            .
+CIDMOD 12001-CHECK-CID-LEV-CA.                                          ERCNETP
+CIDMOD                                                                  ERCNETP
+CIDMOD     IF (CP-COMPANY-ID EQUAL 'CID')     AND                       ERCNETP
+CIDMOD        (CP-STATE-STD-ABBRV EQUAL 'CA') AND                       ERCNETP
+CIDMOD        (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+CIDMOD        (CP-LEVEL-LIFE) AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE)
+CIDMOD        CONTINUE                                                  ERCNETP
+CIDMOD     ELSE                                                         ERCNETP
+CIDMOD        GO TO 12001-CHECK-CID-TRN-CA                              ERCNETP
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     COMPUTE WK4 = WS-WORK-DIS-RATE / 12
+CIDMOD     COMPUTE WK7 = (1 / (1 + WK4)) ** N
+CIDMOD     COMPUTE WK8 = (1 / (1 + WK4)) ** (N - 1)
+CIDMOD     COMPUTE ANGLEN-1 = (1 - WK8) / WK4
+CIDMOD     COMPUTE CP-CALC-PREMIUM =
+CIDMOD          (CP-ORIGINAL-BENEFIT * (1 + ANGLEN-1) *
+CIDMOD          (CP-PREMIUM-RATE / 1000)) /
+CIDMOD          (1 - ((1 + ANGLEN-1) * (CP-PREMIUM-RATE / 1000)))
+CIDMOD
+CIDMOD     GO TO 99999-RETURN                                           ERCNETP
+CIDMOD
+            .
+CIDMOD 12001-CHECK-CID-TRN-CA.                                          ERCNETP
+CIDMOD                                                                  ERCNETP
+CIDMOD     IF (CP-COMPANY-ID EQUAL 'CID')     AND                       ERCNETP
+CIDMOD        (CP-STATE-STD-ABBRV EQUAL 'CA') AND                       ERCNETP
+CIDMOD        (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+CIDMOD        (CP-TRUNCATED-LIFE) AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE) AND
+CIDMOD        (WS-DISCOUNT-OPTION NOT = ' ')
+CIDMOD        CONTINUE                                                  ERCNETP
+CIDMOD     ELSE                                                         ERCNETP
+CIDMOD        GO TO 12001-CHECK-CID-TRN-MT                              ERCNETP
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     COMPUTE ANGLEN EQUAL WK1 / I                                 ERCNETP
+CIDMOD     COMPUTE WS-WORK-DIS-RATE = WS-WORK-DIS-RATE / +12
+CIDMOD     IF WS-WORK-DIS-RATE = ZEROS
+CIDMOD        CONTINUE
+CIDMOD     ELSE
+CIDMOD        COMPUTE WK4 = 1 / (1 + WS-WORK-DIS-RATE)
+CIDMOD        COMPUTE WK7 = (1 / I) *
+CIDMOD              (((WK4 ** M - 1) / (WK4 - 1)) -
+CIDMOD              ((WK4 ** M * SX - VX) /
+CIDMOD              (WK4 * (1 + I) - 1))) *
+CIDMOD              (CP-PREMIUM-RATE / 1000)
+CIDMOD        COMPUTE WK4 = CP-ORIGINAL-BENEFIT / ANGLEN
+CIDMOD        COMPUTE CP-CALC-PREMIUM =
+CIDMOD           WK4 *  WK7
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     GO TO 99999-RETURN                                           ERCNETP
+CIDMOD
+CIDMOD      .
+CIDMOD 12001-CHECK-CID-TRN-MT.                                          ERCNETP
+CIDMOD                                                                  ERCNETP
+CIDMOD     IF (CP-COMPANY-ID EQUAL 'CID')     AND                       ERCNETP
+CIDMOD        (CP-STATE-STD-ABBRV EQUAL 'MT') AND                       ERCNETP
+CIDMOD        (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+CIDMOD        (CP-TRUNCATED-LIFE) AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE)
+CIDMOD        CONTINUE                                                  ERCNETP
+CIDMOD     ELSE                                                         ERCNETP
+CIDMOD        GO TO 12001-CHECK-CID-MT                                  ERCNETP
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     COMPUTE CP-TERM-OR-EXT-DAYS =
+CIDMOD           CP-TERM-OR-EXT-DAYS + 30
+CIDMOD
+CIDMOD     COMPUTE ANGLEN EQUAL WK1 / I                                 ERCNETP
+CIDMOD     COMPUTE WS-WORK-DIS-RATE = WS-WORK-DIS-RATE / +12
+CIDMOD     COMPUTE WK8 = (1 + (CP-TERM-OR-EXT-DAYS * I) / +30)
+CIDMOD                   / (1 + I)
+CIDMOD     COMPUTE ANGLEN-1 = ANGLEN / WK8
+CIDMOD     IF WS-WORK-DIS-RATE = ZEROS
+CIDMOD        CONTINUE
+CIDMOD     ELSE
+CIDMOD        COMPUTE WK4 = 1 / (1 + WS-WORK-DIS-RATE)
+CIDMOD        COMPUTE WK7 = ((1 + (2 * I)) / I) *
+CIDMOD              (((WK4 ** M - 1) / (WK4 - 1)) -
+CIDMOD              ((WK4 ** M * SX - VX) /
+CIDMOD              (WK4 * (1 + I) - 1))) *
+CIDMOD              (CP-PREMIUM-RATE / 1000)
+CIDMOD        COMPUTE WK4 = CP-ORIGINAL-BENEFIT / ANGLEN-1
+CIDMOD        COMPUTE WK8 = (WK7 * 100) / (ANGLEN * (1 + 2 * I))
+CIDMOD        COMPUTE CP-CALC-PREMIUM =
+CIDMOD           WK8 *  ((WK4 * ANGLEN * (1 + 2 * I)) / 100)
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     GO TO 99999-RETURN                                           ERCNETP
+CIDMOD
+01163      .                                                            ERCNETP
+CIDMOD 12001-CHECK-CID-MT.                                              ERCNETP
+CIDMOD                                                                  ERCNETP
+CIDMOD     IF (CP-COMPANY-ID EQUAL 'CID')     AND                       ERCNETP
+CIDMOD        (CP-STATE-STD-ABBRV EQUAL 'MT') AND                       ERCNETP
+CIDMOD        (CP-EARN-AS-NET-PAY) AND                                  ERCNETP
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE)
+CIDMOD        CONTINUE                                                  ERCNETP
+CIDMOD     ELSE                                                         ERCNETP
+CIDMOD        GO TO 12001-CONTINUE-NET                                  ERCNETP
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     COMPUTE CP-TERM-OR-EXT-DAYS =
+CIDMOD           CP-TERM-OR-EXT-DAYS + 30
+CIDMOD
+CIDMOD     COMPUTE ANGLEN EQUAL WK1 / I                                 ERCNETP
+CIDMOD     COMPUTE WS-WORK-DIS-RATE = WS-WORK-DIS-RATE / +12
+CIDMOD     COMPUTE WK8 = (1 + (CP-TERM-OR-EXT-DAYS * I) / +30)
+CIDMOD                   / (1 + I)
+CIDMOD     COMPUTE ANGLEN-1 = ANGLEN / WK8
+CIDMOD     IF WS-WORK-DIS-RATE = ZEROS
+CIDMOD        CONTINUE
+CIDMOD     ELSE
+CIDMOD        COMPUTE WK4 = 1 / (1 + WS-WORK-DIS-RATE)
+CIDMOD        COMPUTE WK7 = ((1 + (2 * I)) / I) *
+CIDMOD              (((WK4 ** N - 1) / (WK4 - 1)) -
+CIDMOD              ((WK4 ** N - SV) /
+CIDMOD              (WK4 * (1 + I) - 1))) *
+CIDMOD              (CP-PREMIUM-RATE / 1000)
+CIDMOD        COMPUTE WK4 = CP-ORIGINAL-BENEFIT / ANGLEN-1
+CIDMOD        COMPUTE WK8 = (WK7 * 100) / (ANGLEN * (1 + 2 * I))
+CIDMOD        COMPUTE CP-CALC-PREMIUM =
+CIDMOD           WK8 *  ((WK4 * ANGLEN * (1 + 2 * I)) / 100)
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     GO TO 99999-RETURN                                           ERCNETP
+CIDMOD
+01163      .                                                            ERCNETP
+01213  12001-CONTINUE-NET.                                              ERCNETP
+01214                                                                   ERCNETP
+01215      IF NET-STD                                                   ERCNETP
+01216         IF CP-COMPANY-ID EQUAL 'CDC' OR 'GTL' OR 'CID' OR 'MON'   ERCNETP
+01217          COMPUTE WK3 ROUNDED = ((I * M) + VX - SX) * 2 * N        ERCNETP
+01218          COMPUTE WK3 ROUNDED = WK3 / ((1 - VX) * M * I)           ERCNETP
+01219          COMPUTE WK3 ROUNDED = WK3 / ((2 * N) - M + 1)            ERCNETP
+01220          COMPUTE WK3 ROUNDED = (WK3 * RA * K-I)                   ERCNETP
+01221                                * ((1 + N) / (1 + M))              ERCNETP
+01222         ELSE                                                      ERCNETP
+01223          COMPUTE WK3 ROUNDED = ((I * M) + VX - SX) * 2 * N        ERCNETP
+01224          COMPUTE WK3 ROUNDED = WK3 / ((1 - VX) * M * I)           ERCNETP
+01225          COMPUTE WK3 ROUNDED = WK3 / ((2 * N) - M + 1)            ERCNETP
+01226          COMPUTE WK3 ROUNDED = WK3 * RA * K-I.                    ERCNETP
+01227                                                                   ERCNETP
+01228      IF NET-SMP                                                   ERCNETP
+01229          COMPUTE N2 = N * N                                       ERCNETP
+01230          COMPUTE N3 = N2 * N                                      ERCNETP
+01231          COMPUTE WK3 ROUNDED = 2 * N2 * WK1                       ERCNETP
+01232          COMPUTE WK3 ROUNDED = WK3 + (N3 * I) - (N2 * I)          ERCNETP
+01233          COMPUTE WK3 ROUNDED = WK3 + (4 * N * WK1)                ERCNETP
+01234          COMPUTE WK3 ROUNDED = WK3 * (1 + I) * 10                 ERCNETP
+01235          COMPUTE WK3 ROUNDED = WK3 / (36 * (N + 1) * WK1).        ERCNETP
+01236                                                                   ERCNETP
+01237      IF NPO-PRUDENTIAL                                            ERCNETP
+01238        PERFORM 12100-PRU-CALC THRU 12199-EXIT                     ERCNETP
+01239            VARYING WS-COUNTER FROM 1 BY 1                         ERCNETP
+01240                UNTIL WS-COUNTER = N                               ERCNETP
+01241        COMPUTE WK3 ROUNDED = (N * (I * PWK / (PWK - 1))) - 1      ERCNETP
+01242        COMPUTE WK3 ROUNDED = WK3 / (I * 12).                      ERCNETP
+01243                                                                   ERCNETP
+01244      MOVE WK3 TO FACTOR.                                          ERCNETP
+01245                                                                   ERCNETP
+01246      GO TO 99999-RETURN.                                          ERCNETP
+01247                                                                   ERCNETP
+01248  12100-PRU-CALC.                                                  ERCNETP
+01249      IF WS-COUNTER = 1                                            ERCNETP
+01250          COMPUTE PWK = (I + 1)                                    ERCNETP
+01251      ELSE                                                         ERCNETP
+01252          COMPUTE PWK = PWK * (I + 1).                             ERCNETP
+01253                                                                   ERCNETP
+01254  12199-EXIT.                                                      ERCNETP
+01255       EXIT.                                                       ERCNETP
+01256                                                                   ERCNETP
+01257  99000-ERROR.                                                     ERCNETP
+01258      MOVE +9999.999999999 TO N-P-FACTOR.                          ERCNETP
+01259      MOVE '4'             TO CP-RETURN-CODE.                      ERCNETP
+01260                                                                   ERCNETP
+01261      GO TO 99999-EXIT.                                            ERCNETP
+01262                                                                   ERCNETP
+01263  99999-RETURN.                                                    ERCNETP
+01264      MOVE FACTOR          TO N-P-FACTOR.                          ERCNETP
+01265                                                                   ERCNETP
+01266  99999-EXIT.                                                      ERCNETP
+01267       EXIT.                                                       ERCNETP

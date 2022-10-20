@@ -1,0 +1,56 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job Aborted, Not MDOFF"
+#   exit 1
+#endif
+
+setenv ODBCINI /usr/local/etc/odbc.ini
+setenv ODBCSYSINI /usr/local/etc
+
+echo $ODBCINI
+echo $ODBCSYSINI
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/balance_eom.pl 20170930 10312017 DCC $SEQFILES/
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+#
+#  The value in DCCbalstat.txt will be 0 if everything balanced okay
+#  If it's not, then we don't want to initiate submission of day 2
+#  The users will deal with it in the morning and we will go from there
+#
+################################################################################
+
+if (`cat $SEQFILES/DCCbalstat.txt` != 0) then
+   GOTO NOBAL
+endif
+
+################################################################################
+LABEL name=YESBAL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+smtp -f slunikix -t pema@cso.com -s 'DCC Month end is in Balance ' -ml 'The DCC Month end reports are in balance '
+mutt -s 'DCC Month end balanced ' -a $SEQFILES/DCCMebal.xlsx pema@cso.com < /dev/null
+!
+EXECPGM pgmname='BPXBATCH' stepname='YESBAL' parm='SH'
+
+
+GOTO END_JOB
+
+################################################################################
+LABEL name=NOBAL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+mutt -s 'DCC Month end DID NOT balance ' -a $SEQFILES/DCCMebal.xlsx pema@cso.com < /dev/null
+smtp -f slunikix -t pema@cso.com -s 'DCC Month end DID NOT balance ' -ml 'Action needed '
+!
+EXECPGM pgmname='BPXBATCH' stepname='NOBAL' parm='SH'
+
+ENDJOB 

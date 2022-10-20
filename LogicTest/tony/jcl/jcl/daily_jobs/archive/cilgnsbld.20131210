@@ -1,0 +1,154 @@
+################################################################################
+#     JOB: cilgnsld                                                            #
+#   This job is run each night to update the vsam files used in Napersoft      #
+#   This job loads the data for CID and DCC and AHL
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' verbose 
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job aborted, not MDOFF"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=GETCIDNS
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/EOBFILE.CID.txt $SEQFILES/EOBFILE.DCC.txt $SEQFILES/ENCFILE.CID.txt $SEQFILES/ENCFILE.DCC.txt
+rm -f $SEQFILES/EOBFILE.AHL.txt $SEQFILES/ENCFILE.AHL.txt
+ftp -n ntis2 < $JCLLIB/ftp-get-cilgnsbld
+perl $HOME/bin/ConvENCRec.pl $SEQFILES/claimssort.enc.cps $SEQFILES/ENCFILE.CID.txt
+perl $HOME/bin/ConvENCRec.pl $SEQFILES/claimssort.enc.dcc $SEQFILES/ENCFILE.DCC.txt
+perl $HOME/bin/ConvENCRec.pl $SEQFILES/claimssort.enc.ahl $SEQFILES/ENCFILE.AHL.txt
+tr -d '\015' < $SEQFILES/eobnotelookup.cps > $SEQFILES/eobtemp.cps
+tr -d '\011' < $SEQFILES/eobtemp.cps > $SEQFILES/EOBFILE.CID.txt
+tr -d '\015' < $SEQFILES/eobnotelookup.dcc > $SEQFILES/eobtemp.dcc
+tr -d '\011' < $SEQFILES/eobtemp.dcc > $SEQFILES/EOBFILE.DCC.txt
+tr -d '\015' < $SEQFILES/eobnotelookup.ahl > $SEQFILES/eobtemp.ahl
+tr -d '\011' < $SEQFILES/eobtemp.ahl > $SEQFILES/EOBFILE.AHL.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='GETCIDNS' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+
+################################################################################
+LABEL name=BKPENCC
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ELENCC -s $SEQFILES/$JOBNAME.elencc.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPENCC' parm='SH'
+
+################################################################################
+LABEL name=DELENCC
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d ELENCC
+!
+EXECPGM pgmname='BPXBATCH' stepname='DELENCC' parm='SH'
+
+################################################################################
+LABEL name=CIDNCB1
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/paul/exe/bat'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ENCFILE.CID.txt' disp='i'
+ASSGNDD ddname='ELENCC' type='VS' filename='ELENCC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.DBLD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDNCB1' stepname='CIDNCB1'
+
+################################################################################
+LABEL name=DCCNCB1
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/paul/exe/bat'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ENCFILE.DCC.txt' disp='i'
+ASSGNDD ddname='ELENCC' type='VS' filename='ELENCC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDNCB1' stepname='DCCNCB1'
+
+################################################################################
+LABEL name=AHLNCB1
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/paul/exe/bat'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ENCFILE.AHL.txt' disp='i'
+ASSGNDD ddname='ELENCC' type='VS' filename='ELENCC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD.DBLD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDNCB1' stepname='AHLNCB1'
+
+################################################################################
+LABEL name=BKPEOBC
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ELEOBC -s $SEQFILES/$JOBNAME.eleobc.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPEOBC' parm='SH'
+
+################################################################################
+LABEL name=DELEOBC
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d ELEOBC
+!
+EXECPGM pgmname='BPXBATCH' stepname='DELEOBC' parm='SH'
+
+################################################################################
+LABEL name=CIDEOB1
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/EOBFILE.CID.txt' disp='i'
+ASSGNDD ddname='ELEOBC' type='VS' filename='ELEOBC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.DBLD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDEOB1' stepname='CIDEOB1'
+
+################################################################################
+LABEL name=DCCEOB1
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/EOBFILE.DCC.txt' disp='i'
+ASSGNDD ddname='ELEOBC' type='VS' filename='ELEOBC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDEOB1' stepname='DCCEOB1'
+
+################################################################################
+LABEL name=AHLEOB1
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/EOBFILE.AHL.txt' disp='i'
+ASSGNDD ddname='ELEOBC' type='VS' filename='ELEOBC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD.DBLD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDEOB1' stepname='AHLEOB1'
+
+################################################################################
+################################################################################
+
+if ($JOBSTATUS == 0) then
+        echo " Nothing to print "
+else
+        echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 091410                 PEMA   NEW JOB
+# 042011  2011040600001  PEMA   ADD EOB PROCESSING FOR DCC

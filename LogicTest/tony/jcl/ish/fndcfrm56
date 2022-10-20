@@ -1,0 +1,89 @@
+################################################################################
+#
+#  Job:  fndcfrm56
+#
+################################################################################
+BEGINJOB mode='MVS' 
+
+#*******************************************************************************
+#*****
+#* This job is submitted via a job script <dccmth...> that may submit other
+#* jobs. Files beginning with DC.DL.CIADM... are ftp'd at the start of the next
+#* job script.  Other files not starting with DC.DL.. that are being
+#* transferred should be noted below.
+#*****
+#*******************************************************************************
+
+################################################################################
+LABEL name=FNB168
+################################################################################
+#  DATE: MMDDYYYY   
+#  FROM: CILGM17    
+ASSGNDD ddname='SYS010' dataset='DC.XX.EPEC' gdg='0' filename='\${SEQFILES}/DC.XX.EPEC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+#  ** DOWNLOAD LIFE **    
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/DC.DL.FN.FX.DCCRSRV' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+
+EXECPGM pgmname='FNB168' stepname='FNB168' parm='05312006'
+
+################################################################################
+LABEL name=FNB170L 
+################################################################################
+#  *                                                                     
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='\${SEQFILES}/FNDCFRM56' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/DC.DL.FN.FX.DCCRSRV' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170LR' stepname='FNB170L' parm='DCCRSRV' 
+
+################################################################################
+LABEL name=CPYM56
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/FNDCFRM56' disp='i'
+ASSGNDD  ddname='SYS011' filename='\${SEQFILES}/DC.DL.FN.FX.FRM56' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPYM56' parm='ALL'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/FNDCFRM56' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY1   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/DC.DL.FN.FX.DCCRSRV' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/LPACRSRV_05-31-06.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+EXECPGM pgmname='IDCAMS' stepname='COPY1'   
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "exelpr.sh l133std.parms '-ode=DCCO' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 050503                 SMVA   NEW JOB FOR DCC
+# 050803                 SMVA   ADD TEXT FILE FOR SUMMARY REPORT

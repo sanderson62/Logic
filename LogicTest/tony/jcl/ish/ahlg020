@@ -1,0 +1,140 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 7 GOTO END_JOB 
+
+if ($EBMSYS != "paul") then
+   echo "Job aborting, not paul"
+   exit 1
+endif
+
+################################################################################
+LABEL name=EL300
+################################################################################
+#  ***----------------------------------------------------------------*  
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLOG' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='J' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYS019' filename='/data/test/tony/seqfiles/AH.DD.ER.DATECARD.EC020' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCAHL1
+CLAS022912
+!
+
+EXECPGM pgmname='EL300' stepname='EL300'
+################################################################################
+LABEL name=ECS020 
+################################################################################
+#  ********************************************************************  
+#  **--                                                                  
+#  **--         EARNED PREMIUM AND LOSS REPORT                           
+#  **--   SEE RESTART INSTRUCTIONS BEFORE RESTARTING                     
+#  **--                                                                  
+#  ********************************************************************  
+ASSGNDD ddname='SYS011' filename='/data/test/paul/seqfiles/AH.XX.EPEC.FEB2012.ZERO' disp='i' normal='k' abend='k' 
+ASSGNDD ddname='SYS013' type='DUMMY'
+ASSGNDD ddname='ERRTBLT' type='VS' filename='ERRTBLA' disp='i-o'
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTA' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/data/test/tony/seqfiles/AH.DD.ER.DATECARD.EC020' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT'
+ASSGNDD ddname='SYS020' filename='/data/test/tony/seqfiles/AH.EX.FICH020' disp='o' normal='k' abend='d' recsize='150' recfmt='F' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS020' stepname='ECS020' 
+
+################################################################################
+LABEL name=CPY020A
+################################################################################
+ASSGNDD ddname='SYS010' filename='/data/test/tony/seqfiles/AH.EX.FICH020' disp='i'
+ASSGNDD ddname='SYS011' filename='/data/test/tony/seqfiles/AH.DL.CIADM.AHL020A.02292012.ZERO' disp='o' normal='k' abend='d' recfmt='F' recsize='149'
+
+EXECPGM pgmname='CIB009150' stepname='CPY020A' parm='ECS020A' 
+
+################################################################################
+LABEL name=CPY020R
+################################################################################
+ASSGNDD ddname='SYS010' filename='/data/test/tony/seqfiles/AH.EX.FICH020' disp='i'
+ASSGNDD ddname='SYS011' filename='/data/test/tony/seqfiles/AH.DL.CIADM.AHL020R.02292012.ZERO' disp='o' normal='k' abend='d' recfmt='F' recsize='149'
+
+EXECPGM pgmname='CIB009150' stepname='CPY020R' parm='ECS020R' 
+
+################################################################################
+LABEL name=CPY020S
+################################################################################
+ASSGNDD ddname='SYS010' filename='/data/test/tony/seqfiles/AH.EX.FICH020' disp='i'
+ASSGNDD ddname='SYS011' filename='/data/test/tony/seqfiles/AH.DL.CIADM.AHL020S.02292012.ZERO' disp='o' normal='k' abend='d' recfmt='F' recsize='149'
+
+EXECPGM pgmname='CIB009150' stepname='CPY020S' parm='ECS020S' 
+
+################################################################################
+LABEL name=PDF1
+################################################################################
+#
+# This step reads the files from above and creates pdf files
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/rpt2pdf /data/test/tony/seqfiles/AH.DL.CIADM.AHL020A.02292012.ZERO /data/test/tony/seqfiles/AH.DL.AHL020A.02292012.ZERO.pdf
+$HOME/bin/rpt2pdf /data/test/tony/seqfiles/AH.DL.CIADM.AHL020R.02292012.ZERO /data/test/tony/seqfiles/AH.DL.AHL020R.02292012.ZERO.pdf
+$HOME/bin/rpt2pdf /data/test/tony/seqfiles/AH.DL.CIADM.AHL020S.02292012.ZERO /data/test/tony/seqfiles/AH.DL.AHL020S.02292012.ZERO.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PDF1' parm='SH'
+
+################################################################################
+LABEL name=FTP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-ahlg020
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+
+
+GOTO END_JOB
+################################################################################
+LABEL name=CPY020B
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.EX.FICH020' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.CIADM.FICH020B' disp='o' normal='k' abend='d' recfmt='F' recsize='149'
+
+EXECPGM pgmname='CIB009150' stepname='CPY020B' parm='ECS020B' 
+
+################################################################################
+LABEL name=CPY020C
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.EX.FICH020' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.CIADM.FICH020C' disp='o' normal='k' abend='d' recfmt='F' recsize='149' 
+
+EXECPGM pgmname='CIB009150' stepname='CPY020C' parm='ECS020C' 
+
+################################################################################
+LABEL name=CPY020G
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.EX.FICH020' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.CIADM.FICH020G' disp='o' normal='k' abend='d' recfmt='F' recsize='149'
+
+EXECPGM pgmname='CIB009150' stepname='CPY020G' parm='ECS020G' 
+
+################################################################################
+LABEL name=CPY020X
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.EX.FICH020' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.CIADM.FICH020X' disp='o' normal='k' abend='d' recfmt='F' recsize='149'
+
+EXECPGM pgmname='CIB009150' stepname='CPY020X' parm='ECS020X' 
+
+
+if ($JOBSTATUS == 0) then
+   echo " Nothing to print "
+else
+	echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

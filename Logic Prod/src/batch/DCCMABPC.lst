@@ -1,0 +1,2466 @@
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page   1
+* DCCMABPC.cbl
+* Options: int("DCCMABPC.int") anim csi verbose NOBOUND PARAMCOUNTCHECK
+*          directives(cobopt.bth) endp list("DCCMABPC.lst")
+* Setting: NOACCEPTREFRESH NOADV ALIGN"8" ALPHASTART"1" NOALTER NOAMODE ANIM
+*          NOANIMPREP ANS85 APOST NOAREACHECK ARITHMETIC"OSVS" ASSIGN
+*          "EXTERNAL" NOASSIGN-PRINTER NOAUTOLOCK NOBELL NOBOUND NOBRIEF
+*          NOBS2000 BWZSTAR NOBYTEMODEMOVE CALLFH"ebmlsfile" NOCALLMCS
+*          NOCALLRECOVERY CALLSORT"EXTSM" CANCEL CANCELLBR NOCHANGEMESSAGE
+*          CHARSET"ASCII" NOCHECKDIV NOCHECKREFMOD NOCICS CICS-CPY
+*          NOCICSOPTIMIZE NOCMPR2 NOCOBFSTATCONV NOCOBIDY NOCOBOL370 COBOLDIR
+*          NOCOMP COMP-5"2" COMP-6"2" NOCOMS85 CONFIRM NOCONVERTRET CONVSPACE
+*          COPYEXT",cbl,cpy" NOCOPYLBR COPYLIST COPYLISTCOMMENT"1" CSI
+*          CURRENCY-SIGN"36" CURRENT-DATE"MMDDYY" NODATA DATACOMPRESS"0"
+*          NODATA-CONTEXT DATE DBCHECK DBCS"2" NODBCSSOSI DBSPACE DE-EDIT"2"
+*          DEFAULTBYTE"32" NODEFAULTCALLS DETECTLOCK NODG DIALECT"MF"
+*          NODIRECTIVES-IN-COMMENTS NODOSVS NODPCINSUBSCRIPT DYNAM
+*          NOEARLY-RELEASE ECHO NOECHOALL NOEDITOR ENSUITE"0" NOENTCOBOL
+*          ERRFORMAT"1" ERRLIST"EMBED" NOERRQ FASTSORT NOFCD3 NOFCDREG
+*          NOFDCLEAR NOFILESHARE FILETYPE"0" NOFLAG NOFLAGAS NOFLAGCD
+*          NOFLAGEUC NOFLAGMIG NOFLAGQ FLAGSINEDIT NOFLAGSTD NOFOLDCALLNAME
+*          NOFOLDCOPYNAME FORM"60" NOFP-ROUNDING NOHOSTARITHMETIC
+*          NOHOSTCONTZERO NOHOST-NUMCOMPARE NOHOST-NUMMOVE NOHOSTFD NOHOSTRW
+*          NOIBM-MS IBMCOMP IDXFORMAT"0" NOILGEN IMPLICITSCOPE NOINDD
+*          INFORETURN"0" NOINITCALL INITPTR INT"DCCMABPC.int" INTDATE"ANSI"
+*          INTLEVEL"2" IOCONV NOISO2002 NOIXNLSKEY NOIXNUMKEY KEEP-INT
+*          KEYCHECK KEYCOMPRESS"0" LIBRARIAN"2" NOLINE-COUNT LIST
+*          "DCCMABPC.lst" LISTPATH"" LISTWIDTH"80" LITVAL-SIZE"4" LOCKTYPE"0"
+*          NOMAPNAME NOMAXERROR METHODDEFAULT"REFERENCE" MF"15" MFCOMMENT
+*          NOMOVELENCHECK NOMS NOMVS NATIVE"ASCII" NONATIVEFLOATINGPOINT
+*          NONCHAR NONEWBASENAME NONLS NSYMBOL"DBCS" NOODOOSVS NOODOSLIDE
+*          NOOLDBLANKLINE NOOLDCOPY NOOLDINDEX NOOLDNEXTSENTENCE NOOLDREADINTO
+*          NOOLDSTRMIX OOCTRL"-C-E-G-P+Q+R-S+W" OPTIONAL-FILE NOOS390 OSEXT""
+*          NOOSVS NOOUTDD NOP64 NOPANVALET PERFORM-TYPE"OSVS" NOPREPLIST
+*          NOPREPROCESS NOPRINT-EXT NOPROFILE NOPROGID-COMMENT
+*          NOPROGID-INT-NAME NOPROTECT-LINKAGE PROTOTYPE"RELAXED" QUAL
+*          QUALPROC NOQUERY NOQUOTE NORAWLIST NORDW RECMODE"F" NOREENTRANT
+*          NOREF NOREFNO REMAINDER"1" REPORT-LINE"256" RESEQ NORETRYLOCK
+*          REWRITE-LS NORM RTNCODE-SIZE"4" NORWHARDPAGE NOSAA SEG NOSEQCHK
+*          SEQUENTIAL"RECORD" NOSERIAL SETTING"LINE" NOSHAREOUTDD NOSHOW-DIR
+*          SIGN"ASCII" NOSIGNDISCARD NOSIGNFIXUP SORTTYPE"DFSORT" SOURCEFORMAT
+*          "FIXED" SOURCETABSTOP"8" NOSPZERO NOSSRANGE STDERR NOSTICKY-LINKAGE
+*          NOSTICKY-PERFORM SUPFF SWITCHTYPE"1" SYMBSTART"1" SYSPUNCH"132"
+*          TERMPAGE TIME NOTRACE NOTRUNC NOTRUNCCALLNAME NOTRUNCCOPY TRUNCINC
+*          "10" UNICODE"NATIVE" VERBOSE VSC2"2" WARNING"1" NOWB NOWB2 NOWB3
+*          WEBSERVER"CGI" NOWRITELOCK NOWRITETHRU NOXOPEN NOXREF
+*          NOZEROLENGTHFALSE NOZEROSEQ NOZWB
+     1 IDENTIFICATION DIVISION.
+     2 PROGRAM-ID. DCCMABPC.
+     3*AUTHOR.     PABLO.
+     4*REMARKS.
+     5* THIS PROGRAM READS AN EXTRACT FILE FROM A POST CARD APPLICATION
+     6* IT LOOKS UP THE ELCERT RECORD AND THE ERMAIL RECORD.
+     7* IF A MATCH IS FOUND WITH THE ERMAIL FILE THEN THE POST CARD
+     8* ACTIVITY INFORMATION ON THE ERMAIL RECORD IS UPDATED. THIS SAME
+     9* PROGRAM ALSO READS AN EXTRACT FROM A TRUNCATED LETTER
+    10* AND UPDATES THE ADDRESS ON THE ERMAIL FILE. IT ASSUMES THAT IF
+    11* AN EXTRACT RECORD IS CREATED THEN THE ADDRESS MUST HAVE BEEN
+    12* UPDATED.
+    13******************************************************************
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page   2
+* DCCMABPC.cbl
+    14*                   C H A N G E   L O G
+    15*
+    16* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+    17*-----------------------------------------------------------------
+    18*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+    19* EFFECTIVE    NUMBER
+    20*-----------------------------------------------------------------
+    21* 083110  CR2010042900001  PEMA  SEPARATE CITY STATE
+    22******************************************************************
+    23 ENVIRONMENT DIVISION.
+    24 INPUT-OUTPUT SECTION.
+    25 FILE-CONTROL.
+    26
+    27     SELECT DISK-DATE        ASSIGN TO SYS019.
+    28     SELECT RPT-FILE         ASSIGN TO SYS008.
+    29
+    30     SELECT POST-CARD-IN     ASSIGN TO SYS010
+    31        ORGANIZATION IS LINE SEQUENTIAL.
+    32
+    33     SELECT ELCERT           ASSIGN TO ELCERT
+    34                             ORGANIZATION IS INDEXED
+    35                             ACCESS IS DYNAMIC
+    36                             RECORD KEY IS CM-CONTROL-PRIMARY
+    37                             FILE STATUS IS ELCERT-FILE-STATUS.
+    38
+    39     SELECT ERMAIL           ASSIGN TO ERMAIL
+    40                             ORGANIZATION IS INDEXED
+    41                             ACCESS IS DYNAMIC
+    42                             RECORD KEY IS MA-CONTROL-PRIMARY
+    43                             FILE STATUS IS ERMAIL-FILE-STATUS.
+    44
+    45 DATA DIVISION.
+    46
+    47 FILE SECTION.
+    48
+    49 FD  DISK-DATE
+*                                      COPY ELCDTEFD.
+    50******************************************************************04/15/98
+    51*                                                                *ELCDTEFD
+    52*                                                                *ELCDTEFD
+    53*                            ELCDTEFD.                           *   LV002
+    54*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL**2
+    55*                            VMOD=2.007                          *   CL**2
+    56*                                                                *ELCDTEFD
+    57******************************************************************ELCDTEFD
+    58     BLOCK CONTAINS 0 RECORDS
+    59     RECORDING MODE F.                                            ELCDTEFD
+    60                                                                  ELCDTEFD
+    61 01  DATE-DISK.                                                   ELCDTEFD
+    62     12  DD-ID                       PIC  X(4).                   ELCDTEFD
+    63     12  FILLER                      PIC  X(14).                  ELCDTEFD
+    64     12  DD-CR1                      PIC  9.                      ELCDTEFD
+    65     12  DD-CR1N                     PIC  X(30).                  ELCDTEFD
+    66     12  DD-CR2                      PIC  9.                      ELCDTEFD
+    67     12  DD-CR2N                     PIC  X(30).                  ELCDTEFD
+    68     12  FILLER                      PIC  X(20).                  ELCDTEFD
+    69                                                                  ELCDTEFD
+    70 01  DATE-DISK-R.                                                 ELCDTEFD
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page   3
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTEFD)
+    71     12  FILLER                      PIC  X(4).                   ELCDTEFD
+    72     12  DD-ST           OCCURS 3 TIMES                           ELCDTEFD
+    73                                     PIC  X(32).                  ELCDTEFD
+    74                                                                  ELCDTEFD
+    75 01  DATE-DISK-T.                                                 ELCDTEFD
+    76     12  FILLER                      PIC  X(4).                   ELCDTEFD
+    77     12  DD-TYPE         OCCURS 2 TIMES                           ELCDTEFD
+    78                                     PIC  X(48).                  ELCDTEFD
+    79                                                                  ELCDTEFD
+    80 01  DATE-DISK-M.                                                 ELCDTEFD
+    81     12  FILLER                      PIC  X(4).                   ELCDTEFD
+    82     12  DD-MORT         OCCURS 2 TIMES                           ELCDTEFD
+    83                                     PIC  X(48).                  ELCDTEFD
+    84                                                                  ELCDTEFD
+    85 01  DATE-DISK-P.                                                 ELCDTEFD
+    86     12  DD-IDA                      PIC  XX.                     ELCDTEFD
+    87     12  DD-IDX                      PIC  99.                     ELCDTEFD
+    88     12  DD-DATA                     PIC  X(96).                  ELCDTEFD
+    89     12  FILLER  REDEFINES DD-DATA.                               ELCDTEFD
+    90         16  DD-PS-PIC   OCCURS 50 TIMES                          ELCDTEFD
+    91                                     PIC  X.                      ELCDTEFD
+    92         16  FILLER                  PIC  X(46).                  ELCDTEFD
+    93     12  FILLER  REDEFINES DD-DATA.                               ELCDTEFD
+    94         16  DD-PS-PICO  OCCURS 20 TIMES.                         ELCDTEFD
+    95             20  DD-PS-PRT           PIC  X.                      ELCDTEFD
+    96             20  DD-PS-FMT           PIC  X.                      ELCDTEFD
+    97             20  DD-PS-PRC           PIC  X.                      ELCDTEFD
+    98             20  DD-PS-TOT           PIC  X.                      ELCDTEFD
+    99         16  FILLER                  PIC  X(16).                  ELCDTEFD
+   100                                                                  ELCDTEFD
+   101 01  DATE-DISK-E.                                                 ELCDTEFD
+   102     12  FILLER                      PIC  X(4).                   ELCDTEFD
+   103     12  DD-EDIT         OCCURS 24 TIMES                          ELCDTEFD
+   104                                     PIC  X(4).                   ELCDTEFD
+   105                                                                  ELCDTEFD
+   106 01  DATE-DISK-C.                                                 ELCDTEFD
+   107     12  FILLER                      PIC  X(7).                   ELCDTEFD
+   108     12  DD-CARR1-SECPAY-SW          PIC  X.
+   109     12  DD-CARR1-UEP-PCT            PIC  S9V9(4) COMP-3.         ELCDTEFD
+   110     12  DD-CARR1-R78-PCT            PIC  S9V9(4) COMP-3.         ELCDTEFD
+   111     12  DD-CARR1-PRO-PCT            PIC  S9V9(4) COMP-3.         ELCDTEFD
+   112     12  DD-CARR1                    PIC  X.                      ELCDTEFD
+   113     12  DD-CARR1S                   PIC  XX.                     ELCDTEFD
+   114     12  DD-CARR1N                   PIC  X(30).                  ELCDTEFD
+   115     12  DD-CARR2                    PIC  X.                      ELCDTEFD
+   116     12  DD-CARR2S                   PIC  XX.                     ELCDTEFD
+   117     12  DD-CARR2N                   PIC  X(30).                  ELCDTEFD
+   118     12  DD-CARR2-UEP-PCT            PIC  S9V9(4) COMP-3.         ELCDTEFD
+   119     12  DD-CARR2-R78-PCT            PIC  S9V9(4) COMP-3.         ELCDTEFD
+   120     12  DD-CARR2-PRO-PCT            PIC  S9V9(4) COMP-3.         ELCDTEFD
+   121     12  DD-CARR2-SECPAY-SW          PIC  X.
+   122     12  FILLER                      PIC  X(7).                   ELCDTEFD
+   123                                                                  ELCDTEFD
+   124 01  DATE-DISK-OPT.                                               ELCDTEFD
+   125     12  FILLER                      PIC  X(04).                  ELCDTEFD
+   126     12  DD-TLR-DATA.                                             ELCDTEFD
+   127         16  DD-TLR                  OCCURS 32 TIMES              ELCDTEFD
+   128                                     PIC  X(03).                  ELCDTEFD
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page   4
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTEFD)
+   129     12  DD-STATE-DATA REDEFINES DD-TLR-DATA.                     ELCDTEFD
+   130         16  DD-STATE-FLDS           OCCURS 16 TIMES              ELCDTEFD
+   131                                     PIC  X(06).                  ELCDTEFD
+   132     12  DD-CARR-DATA REDEFINES DD-TLR-DATA.                      ELCDTEFD
+   133         16  DD-CARR-FLDS            OCCURS 13 TIMES              ELCDTEFD
+   134                                     PIC  X(07).                  ELCDTEFD
+   135         16  FILLER                  PIC  X(05).                  ELCDTEFD
+   136     12  DD-MISC-DATA REDEFINES DD-TLR-DATA                       ELCDTEFD
+   137                                     PIC  X(96).                  ELCDTEFD
+   138******************************************************************ELCDTEFD
+   139
+   140 FD  RPT-FILE
+   141     RECORDING MODE IS F
+   142     LABEL RECORDS ARE STANDARD
+   143     RECORD CONTAINS 133 CHARACTERS
+   144     BLOCK CONTAINS 0 RECORDS
+   145     DATA RECORD IS RPT-REC-OUT.
+   146
+   147 01  RPT-REC-OUT.
+   148     05  RPT-REC                  PIC X(132).
+   149
+   150 FD  POST-CARD-IN
+   151     RECORDING MODE IS F
+   152     LABEL RECORDS ARE STANDARD.
+   153
+   154 01  POST-CARD-RECORD.
+   155     12  EX-FNAME                PIC X(10).
+   156     12  FILLER                  PIC X.
+   157     12  EX-MID                  PIC X.
+   158     12  FILLER                  PIC X.
+   159     12  EX-LNAME                PIC X(15).
+   160     12  FILLER                  PIC X.
+   161     12  EX-ADDRESS1             PIC X(30).
+   162     12  FILLER                  PIC X.
+   163     12  EX-ADDRESS2             PIC X(30).
+   164     12  FILLER                  PIC X.
+   165     12  EX-CITY-STATE           PIC X(32).
+   166     12  FILLER                  PIC X.
+   167     12  EX-ZIP                  PIC X(11).
+   168     12  FILLER                  PIC X.
+   169     12  EX-CERT                 PIC X(11).
+   170     12  FILLER                  PIC X.
+   171     12  EX-EFF                  PIC X(10).
+   172     12  FILLER                  PIC X.
+   173     12  EX-EXP                  PIC X(10).
+   174     12  FILLER                  PIC X.
+   175     12  EX-ACCOUNT              PIC X(10).
+   176     12  FILLER                  PIC X.
+   177     12  EX-ACCOUNT-NAME         PIC X(30).
+   178     12  EX-CARRIER-GRP-ST.
+   179         16  EX-CARRIER          PIC X.
+   180         16  EX-GROUP            PIC X(6).
+   181         16  EX-STATE            PIC XX.
+   182     12  FILLER                  PIC X.
+   183     12  EX-CLM-IND              PIC X.
+   184     12  FILLER                  PIC X.
+   185     12  EX-MAIL-DATE            PIC X(10).
+   186     12  FILLER                  PIC X.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page   5
+* DCCMABPC.cbl
+   187     12  EX-MAIL-STATUS          PIC XX.
+   188     12  EX-MAIL-TYPE            PIC X(15).
+   189     12  EX-END                  PIC X.
+   190
+   191 FD  ELCERT.
+*  192                                 COPY ELCCERT.
+   193******************************************************************04/15/98
+   194*                                                                *ELCCERT
+   195*                            ELCCERT.                            *   LV002
+   196*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL**2
+   197*                            VMOD=2.013                          *   CL**2
+   198*                                                                *ELCCERT
+   199*   FILE DESCRIPTION = CERTIFICATE MASTER                        *ELCCERT
+   200*                                                                *ELCCERT
+   201*   FILE TYPE = VSAM,KSDS                                        *ELCCERT
+   202*   RECORD SIZE = 450  RECFORM = FIXED                           *ELCCERT
+   203*                                                                *ELCCERT
+   204*   BASE CLUSTER = ELCERT                         RKP=2,LEN=33   *ELCCERT
+   205*       ALTERNATE PATH1 = ELCERT2 (BY NAME)       RKP=35,LEN=18  *ELCCERT
+   206*       ALTERNATE PATH2 = ELCERT3 (BY SOC SEC NO) RKP=53,LEN=12  *ELCCERT
+   207*       ALTERNATE PATH3 = ELCERT5 (BY CERT NO.)   RKP=65,LEN=12  *ELCCERT
+   208*       ALTERNATE PATH4 = ELCERT6 (BY MEMBER NO.) RKP=77,LEN=13  *ELCCERT
+   209*                                                                *ELCCERT
+   210*   LOG = YES                                                    *ELCCERT
+   211*   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *ELCCERT
+   212******************************************************************
+   213*                   C H A N G E   L O G
+   214*
+   215* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+   216*-----------------------------------------------------------------
+   217*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+   218* EFFECTIVE    NUMBER
+   219*-----------------------------------------------------------------
+   220* 122002                   PEMA  ADD MONTHLY PRODUCT PROCESSING
+   221* 040504  CR2003080800002  PEMA  ADD DEALER INCENTIVE PROCESSING
+   222* 061405  CR2005060300001  PEMA  ADD CLP STATE PROCESS FOR DCC
+   223* 110105    2005071200004  PEMA  INCREASE SIZE OF LOAN OFFICER
+   224* 072308  CR2007110500003  PEMA  ADD NH REFUND INTEREST PROCESSING
+   225* 102109  CR2008100900003  AJRA  ADD CLAIM CERT NOTE IND
+   226* 011410  CR2009050700003  PEMA  ADD SPP DEALER DIRECT
+   227* 032612  CR2011110200001  PEMA  AHL CHANGES
+   228* 090314  CR2014081300001  PEMA  LOAD CERTS INVOLVED IN THAO
+   229******************************************************************
+   230                                                                  ELCCERT
+   231 01  CERTIFICATE-MASTER.                                          ELCCERT
+   232     12  CM-RECORD-ID                      PIC XX.                ELCCERT
+   233         88  VALID-CM-ID                      VALUE 'CM'.         ELCCERT
+   234                                                                  ELCCERT
+   235     12  CM-CONTROL-PRIMARY.                                      ELCCERT
+   236         16  CM-COMPANY-CD                 PIC X.                 ELCCERT
+   237         16  CM-CARRIER                    PIC X.                 ELCCERT
+   238         16  CM-GROUPING.                                         ELCCERT
+   239             20  CM-GROUPING-PREFIX        PIC X(3).              ELCCERT
+   240             20  CM-GROUPING-PRIME         PIC X(3).              ELCCERT
+   241         16  CM-STATE                      PIC XX.                ELCCERT
+   242         16  CM-ACCOUNT.                                          ELCCERT
+   243             20  CM-ACCOUNT-PREFIX         PIC X(4).              ELCCERT
+   244             20  CM-ACCOUNT-PRIME          PIC X(6).              ELCCERT
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page   6
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCCERT)
+   245         16  CM-CERT-EFF-DT                PIC XX.                ELCCERT
+   246         16  CM-CERT-NO.                                          ELCCERT
+   247             20  CM-CERT-PRIME             PIC X(10).             ELCCERT
+   248             20  CM-CERT-SFX               PIC X.                 ELCCERT
+   249                                                                  ELCCERT
+   250     12  CM-CONTROL-BY-NAME.                                      ELCCERT
+   251         16  CM-COMPANY-CD-A1              PIC X.                 ELCCERT
+   252         16  CM-INSURED-LAST-NAME          PIC X(15).             ELCCERT
+   253         16  CM-INSURED-INITIALS.                                 ELCCERT
+   254             20  CM-INSURED-INITIAL1       PIC X.                 ELCCERT
+   255             20  CM-INSURED-INITIAL2       PIC X.                 ELCCERT
+   256                                                                  ELCCERT
+   257     12  CM-CONTROL-BY-SSN.                                       ELCCERT
+   258         16  CM-COMPANY-CD-A2              PIC X.                 ELCCERT
+   259         16  CM-SOC-SEC-NO.                                       ELCCERT
+   260             20  CM-SSN-STATE              PIC XX.                ELCCERT
+   261             20  CM-SSN-ACCOUNT            PIC X(6).              ELCCERT
+   262             20  CM-SSN-LN3.                                      ELCCERT
+   263                 25  CM-INSURED-INITIALS-A2.                      ELCCERT
+   264                     30 CM-INSURED-INITIAL1-A2   PIC X.           ELCCERT
+   265                     30 CM-INSURED-INITIAL2-A2   PIC X.           ELCCERT
+   266                 25 CM-PART-LAST-NAME-A2         PIC X.           ELCCERT
+   267                                                                  ELCCERT
+   268     12  CM-CONTROL-BY-CERT-NO.                                   ELCCERT
+   269         16  CM-COMPANY-CD-A4              PIC X.                 ELCCERT
+   270         16  CM-CERT-NO-A4                 PIC X(11).             ELCCERT
+   271                                                                  ELCCERT
+   272     12  CM-CONTROL-BY-MEMB.                                      ELCCERT
+   273         16  CM-COMPANY-CD-A5              PIC X.                 ELCCERT
+   274         16  CM-MEMBER-NO.                                        ELCCERT
+   275             20  CM-MEMB-STATE             PIC XX.                ELCCERT
+   276             20  CM-MEMB-ACCOUNT           PIC X(6).              ELCCERT
+   277             20  CM-MEMB-LN4.                                     ELCCERT
+   278                 25  CM-INSURED-INITIALS-A5.                      ELCCERT
+   279                     30 CM-INSURED-INITIAL1-A5   PIC X.           ELCCERT
+   280                     30 CM-INSURED-INITIAL2-A5   PIC X.           ELCCERT
+   281                 25 CM-PART-LAST-NAME-A5         PIC XX.          ELCCERT
+   282                                                                  ELCCERT
+   283     12  CM-INSURED-PROFILE-DATA.                                 ELCCERT
+   284         16  CM-INSURED-FIRST-NAME.                               ELCCERT
+   285             20  CM-INSURED-1ST-INIT       PIC X.                 ELCCERT
+   286             20  FILLER                    PIC X(9).              ELCCERT
+   287         16  CM-INSURED-ISSUE-AGE          PIC 99.                ELCCERT
+   288         16  CM-INSURED-SEX                PIC X.                 ELCCERT
+   289             88  CM-SEX-MALE                  VALUE 'M'.          ELCCERT
+   290             88  CM-SEX-FEMAL                 VALUE 'F'.          ELCCERT
+   291         16  CM-INSURED-JOINT-AGE          PIC 99.                ELCCERT
+   292         16  CM-JOINT-INSURED-NAME.                               ELCCERT
+   293             20  CM-JT-LAST-NAME           PIC X(15).             ELCCERT
+   294             20  CM-JT-FIRST-NAME.                                ELCCERT
+   295                 24  CM-JT-1ST-INIT        PIC X.                 ELCCERT
+   296                 24  FILLER                PIC X(9).              ELCCERT
+   297             20  CM-JT-INITIAL             PIC X.                 ELCCERT
+   298                                                                  ELCCERT
+   299     12  CM-LIFE-DATA.                                            ELCCERT
+   300         16  CM-LF-BENEFIT-CD              PIC XX.                ELCCERT
+   301         16  CM-LF-ORIG-TERM               PIC S999      COMP-3.  ELCCERT
+   302         16  CM-LF-CRITICAL-PERIOD         PIC S999      COMP-3.  ELCCERT
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page   7
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCCERT)
+   303         16  CM-LF-TERM-IN-DAYS            PIC S9(5)     COMP-3.  ELCCERT
+   304         16  CM-LF-DEV-CODE                PIC XXX.               ELCCERT
+   305         16  CM-LF-DEV-PCT                 PIC S9V9(6)   COMP-3.  ELCCERT
+   306         16  CM-LF-BENEFIT-AMT             PIC S9(9)V99  COMP-3.  ELCCERT
+   307         16  CM-LF-PREMIUM-AMT             PIC S9(7)V99  COMP-3.  ELCCERT
+   308         16  CM-LF-ALT-BENEFIT-AMT         PIC S9(9)V99  COMP-3.  ELCCERT
+   309         16  CM-LF-ALT-PREMIUM-AMT         PIC S9(7)V99  COMP-3.  ELCCERT
+   310         16  CM-LF-NSP-PREMIUM-AMT         PIC S9(7)V99  COMP-3.  ELCCERT
+   311         16  CM-LF-REMAINING-AMT           PIC S9(9)V99  COMP-3.  ELCCERT
+   312         16  CM-LF-ITD-CANCEL-AMT          PIC S9(7)V99  COMP-3.  ELCCERT
+   313         16  CM-LF-ITD-DEATH-AMT           PIC S9(9)V99  COMP-3.  ELCCERT
+   314         16  CM-LF-PREMIUM-RATE            PIC S99V9(5)  COMP-3.  ELCCERT
+   315         16  CM-LF-POLICY-FEE              PIC S9(3)V99  COMP-3.  ELCCERT
+   316         16  CM-LF-ALT-PREMIUM-RATE        PIC S99V9(5)  COMP-3.  ELCCERT
+   317         16  cm-temp-epiq                  pic xx.
+   318             88  EPIQ-CLASS                  value 'EQ'.
+   319*        16  FILLER                        PIC XX.                ELCCERT
+   320                                                                  ELCCERT
+   321     12  CM-AH-DATA.                                              ELCCERT
+   322         16  CM-AH-BENEFIT-CD              PIC XX.                ELCCERT
+   323         16  CM-AH-ORIG-TERM               PIC S999      COMP-3.  ELCCERT
+   324         16  CM-AH-CRITICAL-PERIOD         PIC S999      COMP-3.  ELCCERT
+   325         16  CM-AH-DEV-CODE                PIC XXX.               ELCCERT
+   326         16  CM-AH-DEV-PCT                 PIC S9V9(6)   COMP-3.  ELCCERT
+   327         16  CM-AH-BENEFIT-AMT             PIC S9(7)V99  COMP-3.  ELCCERT
+   328         16  CM-AH-PREMIUM-AMT             PIC S9(7)V99  COMP-3.  ELCCERT
+   329         16  CM-AH-NSP-PREMIUM-AMT         PIC S9(7)V99  COMP-3.  ELCCERT
+   330         16  CM-AH-ITD-CANCEL-AMT          PIC S9(7)V99  COMP-3.  ELCCERT
+   331         16  CM-AH-ITD-LUMP-PMT            PIC S9(7)V99  COMP-3.  ELCCERT
+   332         16  CM-AH-ITD-AH-PMT              PIC S9(9)V99  COMP-3.  ELCCERT
+   333         16  CM-AH-PAID-THRU-DT            PIC XX.                ELCCERT
+   334             88  NO-AH-CLAIMS-PAID            VALUE LOW-VALUE.    ELCCERT
+   335         16  CM-AH-PREMIUM-RATE            PIC S99V9(5)  COMP-3.  ELCCERT
+   336         16  CM-AH-POLICY-FEE              PIC S9(3)V99  COMP-3.  ELCCERT
+   337         16  CM-AH-CEDED-BENEFIT           PIC S9(7)V99  COMP-3.  ELCCERT
+   338         16  FILLER                        PIC X.                 ELCCERT
+   339                                                                  ELCCERT
+   340     12  CM-LOAN-INFORMATION.                                     ELCCERT
+   341         16  CM-LIVES                      PIC S9(7)     COMP-3.  ELCCERT
+   342         16  CM-DDF-IU-RATE-UP REDEFINES CM-LIVES
+   343                                           PIC S9(5)V99  COMP-3.
+   344         16  CM-BILLED                     PIC S9(7)     COMP-3.  ELCCERT
+   345         16  CM-LOAN-APR                   PIC S999V9(4) COMP-3.  ELCCERT
+   346         16  CM-PAY-FREQUENCY              PIC S99.               ELCCERT
+   347         16  CM-LOAN-TERM                  PIC S999      COMP-3.  ELCCERT
+   348         16  CM-RATE-CLASS                 PIC XX.                ELCCERT
+   349         16  CM-BENEFICIARY                PIC X(25).             ELCCERT
+   350         16  CM-POLICY-FORM-NO             PIC X(12).             ELCCERT
+   351         16  CM-PMT-EXTENSION-DAYS         PIC S999      COMP-3.  ELCCERT
+   352         16  CM-LAST-ADD-ON-DT             PIC XX.                ELCCERT
+   353         16  CM-DEDUCTIBLE-AMOUNTS.                               ELCCERT
+   354             20  CM-CLAIM-DEDUCT-WITHHELD  PIC S9(5)V99  COMP-3.  ELCCERT
+   355             20  CM-CANCEL-DEDUCT-WITHHELD PIC S9(5)V99  COMP-3.  ELCCERT
+   356         16  CM-RESIDENT-RATE REDEFINES CM-DEDUCTIBLE-AMOUNTS.    ELCCERT
+   357             20  CM-RESIDENT-STATE         PIC XX.                ELCCERT
+   358             20  CM-RATE-CODE              PIC X(4).              ELCCERT
+   359             20  FILLER                    PIC XX.                ELCCERT
+   360         16  FILLER REDEFINES CM-DEDUCTIBLE-AMOUNTS.              ELCCERT
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page   8
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCCERT)
+   361             20  CM-LOAN-OFFICER           PIC X(5).              ELCCERT
+   362             20  FILLER                    PIC XXX.               ELCCERT
+   363         16  CM-CSR-CODE                   PIC XXX.               ELCCERT
+   364         16  CM-UNDERWRITING-CODE          PIC X.                 ELCCERT
+   365             88  CM-POLICY-UNDERWRITTEN       VALUE 'Y'.          ELCCERT
+   366         16  CM-POST-CARD-IND              PIC X.
+   367         16  CM-NH-INTERFACE-SW            PIC X.
+   368         16  CM-PREMIUM-TYPE               PIC X.                 ELCCERT
+   369             88  CM-SING-PRM                  VALUE '1'.          ELCCERT
+   370             88  CM-O-B-COVERAGE              VALUE '2'.          ELCCERT
+   371             88  CM-OPEN-END                  VALUE '3'.          ELCCERT
+   372         16  CM-IND-GRP-TYPE               PIC X.                 ELCCERT
+   373             88  CM-INDIVIDUAL                VALUE 'I'.          ELCCERT
+   374             88  CM-GROUP                     VALUE 'G'.          ELCCERT
+   375         16  CM-SKIP-CODE                  PIC X.                 ELCCERT
+   376             88  NO-MONTHS-SKIPPED            VALUE SPACE.        ELCCERT
+   377             88  SKIP-JULY                    VALUE '1'.          ELCCERT
+   378             88  SKIP-AUGUST                  VALUE '2'.          ELCCERT
+   379             88  SKIP-SEPTEMBER               VALUE '3'.          ELCCERT
+   380             88  SKIP-JULY-AUG                VALUE '4'.          ELCCERT
+   381             88  SKIP-AUG-SEPT                VALUE '5'.          ELCCERT
+   382             88  SKIP-JULY-AUG-SEPT           VALUE '6'.          ELCCERT
+   383             88  SKIP-JUNE-JULY-AUG           VALUE '7'.          ELCCERT
+   384             88  SKIP-JUNE                    VALUE '8'.          ELCCERT
+   385             88  SKIP-JUNE-JULY               VALUE '9'.          ELCCERT
+   386             88  SKIP-AUG-SEPT-OCT            VALUE 'A'.          ELCCERT
+   387             88  SKIP-BI-WEEKLY-3RD-PMT       VALUE 'X'.          ELCCERT
+   388         16  CM-PAYMENT-MODE               PIC X.                 ELCCERT
+   389             88  PAY-MONTHLY                  VALUE SPACE.        ELCCERT
+   390             88  PAY-WEEKLY                   VALUE '1'.          ELCCERT
+   391             88  PAY-SEMI-MONTHLY             VALUE '2'.          ELCCERT
+   392             88  PAY-BI-WEEKLY                VALUE '3'.          ELCCERT
+   393             88  PAY-SEMI-ANUALLY             VALUE '4'.          ELCCERT
+   394         16  CM-LOAN-NUMBER                PIC X(8).              ELCCERT
+   395         16  CM-LOAN-BALANCE               PIC S9(7)V99  COMP-3.  ELCCERT
+   396         16  CM-OLD-LOF                    PIC XXX.               ELCCERT
+   397*        16  CM-LOAN-OFFICER               PIC XXX.               ELCCERT
+   398         16  CM-REIN-TABLE                 PIC XXX.               ELCCERT
+   399         16  CM-SPECIAL-REIN-CODE          PIC X.                 ELCCERT
+   400         16  CM-LF-LOAN-EXPIRE-DT          PIC XX.                ELCCERT
+   401         16  CM-AH-LOAN-EXPIRE-DT          PIC XX.                ELCCERT
+   402         16  CM-LOAN-1ST-PMT-DT            PIC XX.                ELCCERT
+   403                                                                  ELCCERT
+   404     12  CM-STATUS-DATA.                                          ELCCERT
+   405         16  CM-ENTRY-STATUS               PIC X.                 ELCCERT
+   406         16  CM-ENTRY-DT                   PIC XX.                ELCCERT
+   407                                                                  ELCCERT
+   408         16  CM-LF-STATUS-AT-CANCEL        PIC X.                 ELCCERT
+   409         16  CM-LF-CANCEL-DT               PIC XX.                ELCCERT
+   410         16  CM-LF-CANCEL-EXIT-DT          PIC XX.                ELCCERT
+   411                                                                  ELCCERT
+   412         16  CM-LF-STATUS-AT-DEATH         PIC X.                 ELCCERT
+   413         16  CM-LF-DEATH-DT                PIC XX.                ELCCERT
+   414         16  CM-LF-DEATH-EXIT-DT           PIC XX.                ELCCERT
+   415                                                                  ELCCERT
+   416         16  CM-LF-CURRENT-STATUS          PIC X.                 ELCCERT
+   417             88  CM-LF-POLICY-IS-ACTIVE       VALUE '1' '2' '3'   ELCCERT
+   418                                                'M' '4' '5' '9'.  ELCCERT
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page   9
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCCERT)
+   419             88  CM-LF-NORMAL-ENTRY           VALUE '1'.          ELCCERT
+   420             88  CM-LF-POLICY-PENDING         VALUE '2'.          ELCCERT
+   421             88  CM-LF-POLICY-IS-RESTORE      VALUE '3'.          ELCCERT
+   422             88  CM-LF-CONVERSION-ENTRY       VALUE '4'.          ELCCERT
+   423             88  CM-LF-POLICY-IS-REISSUE      VALUE '5'.          ELCCERT
+   424             88  CM-LF-POLICY-IS-CASH         VALUE 'C'.
+   425             88  CM-LF-POLICY-IS-MONTHLY      VALUE 'M'.          ELCCERT
+   426             88  CM-LF-LUMP-SUM-DISAB         VALUE '6'.          ELCCERT
+   427             88  CM-LF-DEATH-CLAIM-APPLIED    VALUE '7'.          ELCCERT
+   428             88  CM-LF-CANCEL-APPLIED         VALUE '8'.          ELCCERT
+   429             88  CM-LF-IS-REIN-ONLY           VALUE '9'.          ELCCERT
+   430             88  CM-LF-DECLINED               VALUE 'D'.          ELCCERT
+   431             88  CM-LF-VOIDED                 VALUE 'V'.          ELCCERT
+   432                                                                  ELCCERT
+   433         16  CM-AH-STATUS-AT-CANCEL        PIC X.                 ELCCERT
+   434         16  CM-AH-CANCEL-DT               PIC XX.                ELCCERT
+   435         16  CM-AH-CANCEL-EXIT-DT          PIC XX.                ELCCERT
+   436                                                                  ELCCERT
+   437         16  CM-AH-STATUS-AT-SETTLEMENT    PIC X.                 ELCCERT
+   438         16  CM-AH-SETTLEMENT-DT           PIC XX.                ELCCERT
+   439         16  CM-AH-SETTLEMENT-EXIT-DT      PIC XX.                ELCCERT
+   440                                                                  ELCCERT
+   441         16  CM-AH-CURRENT-STATUS          PIC X.                 ELCCERT
+   442             88  CM-AH-POLICY-IS-ACTIVE       VALUE '1' '2' '3'   ELCCERT
+   443                                                'M' '4' '5' '9'.  ELCCERT
+   444             88  CM-AH-NORMAL-ENTRY           VALUE '1'.          ELCCERT
+   445             88  CM-AH-POLICY-PENDING         VALUE '2'.          ELCCERT
+   446             88  CM-AH-POLICY-IS-RESTORE      VALUE '3'.          ELCCERT
+   447             88  CM-AH-CONVERSION-ENTRY       VALUE '4'.          ELCCERT
+   448             88  CM-AH-POLICY-IS-REISSUE      VALUE '5'.          ELCCERT
+   449             88  CM-AH-POLICY-IS-CASH         VALUE 'C'.
+   450             88  CM-AH-POLICY-IS-MONTHLY      VALUE 'M'.          ELCCERT
+   451             88  CM-AH-LUMP-SUM-DISAB         VALUE '6'.          ELCCERT
+   452             88  CM-AH-DEATH-CLAIM-APPLIED    VALUE '7'.          ELCCERT
+   453             88  CM-AH-CANCEL-APPLIED         VALUE '8'.          ELCCERT
+   454             88  CM-AH-IS-REIN-ONLY           VALUE '9'.          ELCCERT
+   455             88  CM-AH-DECLINED               VALUE 'D'.          ELCCERT
+   456             88  CM-AH-VOIDED                 VALUE 'V'.          ELCCERT
+   457                                                                  ELCCERT
+   458         16  CM-CLAIM-INTERFACE-SW         PIC X.                 ELCCERT
+   459             88  NO-CLAIM-ATTACHED            VALUE SPACE.        ELCCERT
+   460             88  CERT-AND-CLAIM-ONLINE        VALUE '1'.          ELCCERT
+   461             88  CERT-WAS-CREATED-FOR-CLAIM   VALUE '2'.          ELCCERT
+   462         16  CM-CLAIM-ATTACHED-COUNT       PIC S9(4)     COMP.    ELCCERT
+   463                                                                  ELCCERT
+   464         16  CM-ENTRY-BATCH                PIC X(6).              ELCCERT
+   465         16  CM-LF-EXIT-BATCH              PIC X(6).              ELCCERT
+   466         16  CM-AH-EXIT-BATCH              PIC X(6).              ELCCERT
+   467         16  CM-LAST-MONTH-END             PIC XX.                ELCCERT
+   468                                                                  ELCCERT
+   469     12  CM-NOTE-SW                        PIC X.                 ELCCERT
+   470         88  CERT-NOTES-ARE-NOT-PRESENT       VALUE ' '.          ELCCERT
+   471         88  CERT-NOTES-PRESENT               VALUE '1'.          ELCCERT
+   472         88  BILLING-NOTES-PRESENT            VALUE '2'.          ELCCERT
+   473         88  CERT-BILLING-NOTES-PRESENT       VALUE '3'.          ELCCERT
+   474         88  CLAIM-NOTES-PRESENT              VALUE '4'.
+   475         88  CLAIM-CERT-NOTES-PRESENT         VALUE '5'.
+   476         88  CLAIM-BILLING-NOTES-PRESENT      VALUE '6'.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  10
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCCERT)
+   477         88  CLAIM-CERT-BILL-NOTES-PRESENT    VALUE '7'.
+   478     12  CM-COMP-EXCP-SW                   PIC X.                 ELCCERT
+   479         88  COMPENSATION-SAME-AS-ACCT        VALUE ' '.          ELCCERT
+   480         88  THIS-CERT-HAS-ERCOMM-ENTRY       VALUE '1'.          ELCCERT
+   481     12  CM-INSURED-ADDRESS-SW             PIC X.                 ELCCERT
+   482         88  INSURED-ADDR-NOT-PRESENT         VALUE ' '.          ELCCERT
+   483         88  INSURED-ADDR-PRESENT             VALUE '1'.          ELCCERT
+   484                                                                  ELCCERT
+   485*    12  CM-LF-CEDED-BENEFIT               PIC S9(7)V99   COMP-3. ELCCERT
+   486     12  CM-LF-CLP                         PIC S9(5)V99   COMP-3.
+   487     12  FILLER                            PIC X.
+   488                                                                  ELCCERT
+   489*    12  CM-ISS-MICROFILM-NO               PIC S9(9)      COMP-3. ELCCERT
+   490     12  CM-AH-CLP                         PIC S9(5)V99   COMP-3.
+   491     12  FILLER                            PIC X.
+   492*    12  CM-CAN-MICROFILM-NO               PIC S9(9)      COMP-3. ELCCERT
+   493     12  CM-NH-INT-ON-REFS                 PIC S9(7)V99   COMP-3. ELCCERT
+   494                                                                  ELCCERT
+   495     12  CM-CREDIT-INTERFACE-SW-1          PIC X.                 ELCCERT
+   496         88  CERT-ADDED-BATCH                 VALUE ' '.          ELCCERT
+   497         88  CERT-ADDED-ONLINE                VALUE '1'.          ELCCERT
+   498         88  CERT-PEND-ISSUE-ERROR            VALUE '2'.          ELCCERT
+   499         88  CERT-PURGED-OFFLINE              VALUE '3'.          ELCCERT
+   500         88  CERT-PEND-ISSUE-RETURNED         VALUE '4'.          ELCCERT
+   501     12  CM-CREDIT-INTERFACE-SW-2          PIC X.                 ELCCERT
+   502         88  CERT-AS-LOADED                   VALUE ' '.          ELCCERT
+   503         88  CERT-CANCELLED-ONLINE            VALUE '1'.          ELCCERT
+   504         88  CERT-CLAIM-ONLINE                VALUE '2'.          ELCCERT
+   505         88  CERT-CLAIM-CANCEL-ONLINE         VALUE '3'.          ELCCERT
+   506         88  CERT-PEND-CANCEL-ERROR           VALUE '4'.          ELCCERT
+   507         88  CERT-PEND-CANCEL-VOID            VALUE '5'.          ELCCERT
+   508         88  CERT-PEND-CAN-VOID-ERROR         VALUE '6'.          ELCCERT
+   509         88  CERT-PEND-CANCEL-RETURNED        VALUE '7'.          ELCCERT
+   510                                                                  ELCCERT
+   511     12  CM-ACCOUNT-COMM-PCTS.                                    ELCCERT
+   512         16  CM-LIFE-COMM-PCT              PIC SV9(5)    COMP-3.  ELCCERT
+   513         16  CM-AH-COMM-PCT                PIC SV9(5)    COMP-3.  ELCCERT
+   514                                                                  ELCCERT
+   515     12  CM-USER-FIELD                     PIC X.                 ELCCERT
+   516     12  CM-ADDL-CLP                       PIC S9(5)V99  COMP-3.
+   517     12  CM-CLP-STATE                      PIC XX.
+   518     12  CM-LF-CLASS-CD REDEFINES CM-CLP-STATE PIC XX.
+   519     12  CM-USER-RESERVED                  PIC XXX.
+   520     12  FILLER REDEFINES CM-USER-RESERVED.
+   521         16  CM-AH-CLASS-CD                PIC XX.
+   522         16  F                             PIC X.
+   523******************************************************************ELCCERT
+   524
+   525 FD  ERMAIL.
+*  526                                 COPY ERCMAIL.
+   527******************************************************************
+   528*                                                                *
+   529*                                                                *
+   530*                            ERCMAIL                             *
+   531*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+   532*                            VMOD=2.003                          *
+   533*                                                                *
+   534*   FILE DESCRIPTION = MAILING DATA CAPTURE RECORDS              *
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  11
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ERCMAIL)
+   535*                                                                *
+   536*   FILE TYPE = VSAM,KSDS                                        *
+   537*   RECORD SIZE = 374   RECFORM = FIX                            *
+   538*                                                                *
+   539*   BASE CLUSTER NAME = ERMAIL                 RKP=2,LEN=33      *
+   540*   ALTERNATE PATH    = NOT USED                                 *
+   541*                                                                *
+   542*   LOG = YES                                                    *
+   543*   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+   544******************************************************************
+   545*                   C H A N G E   L O G
+   546*
+   547* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+   548*-----------------------------------------------------------------
+   549*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+   550* EFFECTIVE    NUMBER
+   551*-----------------------------------------------------------------
+   552* 080406    2006051800002  PEMA  ADD POST CARD MAIL INFO
+   553* 090408  CR2008040800002  PEMA  ADD JOINT BIRTH DATE PROCESSING
+   554* 111108                   PEMA  ADD CRED BENE ADDR2
+   555******************************************************************
+   556
+   557 01  MAILING-DATA.
+   558     12  MA-RECORD-ID                      PIC XX.
+   559         88  VALID-MA-ID                       VALUE 'MA'.
+   560
+   561     12  MA-CONTROL-PRIMARY.
+   562         16  MA-COMPANY-CD                 PIC X.
+   563         16  MA-CARRIER                    PIC X.
+   564         16  MA-GROUPING.
+   565             20  MA-GROUPING-PREFIX        PIC XXX.
+   566             20  MA-GROUPING-PRIME         PIC XXX.
+   567         16  MA-STATE                      PIC XX.
+   568         16  MA-ACCOUNT.
+   569             20  MA-ACCOUNT-PREFIX         PIC X(4).
+   570             20  MA-ACCOUNT-PRIME          PIC X(6).
+   571         16  MA-CERT-EFF-DT                PIC XX.
+   572         16  MA-CERT-NO.
+   573             20  MA-CERT-PRIME             PIC X(10).
+   574             20  MA-CERT-SFX               PIC X.
+   575
+   576     12  FILLER                            PIC XX.
+   577
+   578     12  MA-ACCESS-CONTROL.
+   579         16  MA-SOURCE-SYSTEM              PIC XX.
+   580             88  MA-FROM-CREDIT                VALUE 'CR'.
+   581             88  MA-FROM-VSI                   VALUE 'VS'.
+   582             88  MA-FROM-WARRANTY              VALUE 'WA'.
+   583             88  MA-FROM-OTHER                 VALUE 'OT'.
+   584         16  MA-RECORD-ADD-DT              PIC XX.
+   585         16  MA-RECORD-ADDED-BY            PIC XXXX.
+   586         16  MA-LAST-MAINT-DT              PIC XX.
+   587         16  MA-LAST-MAINT-BY              PIC XXXX.
+   588         16  MA-LAST-MAINT-HHMMSS          PIC S9(6)       COMP-3.
+   589
+   590     12  MA-PROFILE-INFO.
+   591         16  MA-QUALIFY-CODE-1             PIC XX.
+   592         16  MA-QUALIFY-CODE-2             PIC XX.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  12
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ERCMAIL)
+   593         16  MA-QUALIFY-CODE-3             PIC XX.
+   594         16  MA-QUALIFY-CODE-4             PIC XX.
+   595         16  MA-QUALIFY-CODE-5             PIC XX.
+   596
+   597         16  MA-INSURED-LAST-NAME          PIC X(15).
+   598         16  MA-INSURED-FIRST-NAME         PIC X(10).
+   599         16  MA-INSURED-MIDDLE-INIT        PIC X.
+   600         16  MA-INSURED-ISSUE-AGE          PIC 99.
+   601         16  MA-INSURED-BIRTH-DT           PIC XX.
+   602         16  MA-INSURED-SEX                PIC X.
+   603             88  MA-SEX-MALE                   VALUE 'M'.
+   604             88  MA-SEX-FEMALE                 VALUE 'F'.
+   605         16  MA-INSURED-SOC-SEC-NO         PIC X(11).
+   606
+   607         16  MA-ADDRESS-CORRECTED          PIC X.
+   608         16  MA-JOINT-BIRTH-DT             PIC XX.
+   609*        16  FILLER                        PIC X(12).
+   610
+   611         16  MA-ADDRESS-LINE-1             PIC X(30).
+   612         16  MA-ADDRESS-LINE-2             PIC X(30).
+   613         16  MA-CITY-STATE.
+   614             20  MA-CITY                   PIC X(28).
+   615             20  MA-ADDR-STATE             PIC XX.
+   616         16  MA-ZIP.
+   617             20  MA-ZIP-CODE.
+   618                 24  MA-ZIP-CODE-1ST       PIC X(1).
+   619                     88  MA-CANADIAN-POST-CODE VALUE 'A' THRU 'Z'.
+   620                 24  FILLER                PIC X(4).
+   621             20  MA-ZIP-PLUS4              PIC X(4).
+   622         16  MA-CANADIAN-POSTAL-CODE REDEFINES MA-ZIP.
+   623             20  MA-CAN-POSTAL-CODE-1      PIC X(3).
+   624             20  MA-CAN-POSTAL-CODE-2      PIC X(3).
+   625             20  FILLER                    PIC X(3).
+   626
+   627         16  MA-PHONE-NO                   PIC 9(11)       COMP-3.
+   628
+   629         16  FILLER                        PIC XXX.
+   630*        16  FILLER                        PIC X(10).
+   631
+   632
+   633     12  MA-CRED-BENE-INFO.
+   634         16  MA-CRED-BENE-NAME                 PIC X(25).
+   635         16  MA-CRED-BENE-ADDR                 PIC X(30).
+   636         16  MA-CRED-BENE-ADDR2                PIC X(30).
+   637         16  MA-CRED-BENE-CTYST.
+   638             20  MA-CRED-BENE-CITY             PIC X(28).
+   639             20  MA-CRED-BENE-STATE            PIC XX.
+   640         16  MA-CRED-BENE-ZIP.
+   641             20  MA-CB-ZIP-CODE.
+   642                 24  MA-CB-ZIP-CODE-1ST        PIC X(1).
+   643                     88  MA-CB-CANADIAN-POST-CODE
+   644                                           VALUE 'A' THRU 'Z'.
+   645                 24  FILLER                    PIC X(4).
+   646             20  MA-CB-ZIP-PLUS4               PIC X(4).
+   647         16  MA-CB-CANADIAN-POSTAL-CODE
+   648                            REDEFINES MA-CRED-BENE-ZIP.
+   649             20  MA-CB-CAN-POSTAL-CODE-1       PIC X(3).
+   650             20  MA-CB-CAN-POSTAL-CODE-2       PIC X(3).
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  13
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ERCMAIL)
+   651             20  FILLER                        PIC X(3).
+   652     12  MA-POST-CARD-MAIL-DATA.
+   653         16  MA-MAIL-DATA OCCURS 7.
+   654             20  MA-MAIL-TYPE              PIC X.
+   655                 88  MA-12MO-MAILING           VALUE '1'.
+   656                 88  MA-EXP-MAILING            VALUE '2'.
+   657             20  MA-MAIL-STATUS            PIC X.
+   658                 88  MA-MAIL-ST-MAILED         VALUE '1'.
+   659                 88  MA-MAIL-ST-RETURNED       VALUE '2'.
+   660                 88  MA-MAIL-ST-NOT-MAILED     VALUE '3'.
+   661             20  MA-MAIL-DATE              PIC XX.
+   662     12  FILLER                            PIC XX.
+   663     12  FILLER                            PIC XX.
+   664*    12  FILLER                            PIC X(30).
+   665******************************************************************
+   666
+   667 WORKING-STORAGE SECTION.
+   668 77  FILLER  PIC X(32) VALUE '********************************'.
+   669 77  FILLER  PIC X(32) VALUE '         WORKING-STORAGE        '.
+   670 77  FILLER  PIC X(32) VALUE '********************************'.
+   671 77  SAVE-CERT                   PIC X(11) VALUE SPACES.
+   672 77  SAVE-EFF-DT                 PIC X(6)  VALUE SPACES.
+   673 77  SAVE-STATE                  PIC XX    VALUE SPACES.
+   674 77  PGM-SUB                     PIC S999  COMP   VALUE +511.
+   675 77  WS-ABEND-FILE-STATUS        PIC XX            VALUE ZERO.
+   676 77  WS-ABEND-MESSAGE            PIC X(80)         VALUE SPACES.
+   677 77  WS-ABEND-PROGRAM            PIC X(8)          VALUE SPACES.
+   678 77  WS-RETURN-CODE              PIC S9(4)         VALUE +0.
+   679 77  WS-ZERO                     PIC S9     COMP-3 VALUE +0.
+   680 77  IN-CNT                 PIC 9999999   VALUE ZEROS.
+   681 77  CERT-CNT               PIC 9999      VALUE ZEROS.
+   682 77  S1                     PIC S999      VALUE +0 COMP-3.
+   683 77  C1                     PIC S999      VALUE +0 COMP-3.
+   684 77  WS-WORK-SEQ                 PIC S9(7) COMP-3 VALUE +0.
+   685 77  ELCERT-FILE-STATUS          PIC XX  VALUE LOW-VALUES.
+   686     88  ELCERT-FOUND                    VALUE '00'.
+   687 77  ERMAIL-FILE-STATUS          PIC XX  VALUE LOW-VALUES.
+   688 77  AGT-SUB                     PIC S999 COMP-3 VALUE +0.
+   689 77  WS-CURRENT-BIN-DATE         PIC XX VALUE LOW-VALUES.
+   690 77  WS-BIN-COMPARE-DT           PIC XX VALUE LOW-VALUES.
+   691 77  WS-COMPARE-TYPE             PIC X  VALUE SPACES.
+   692 77  WS-COMPARE-STATUS           PIC X  VALUE SPACES.
+   693 77  WS-DUP-SW                   PIC X  VALUE SPACES.
+   694     88  DUPLICATE-MAILING              VALUE 'Y'.
+   695 77  WS-CERT-CANCELLED-SW        PIC X  VALUE SPACES.
+   696     88  CERT-ALREADY-CANCELLED         VALUE 'Y'.
+   697 77  WS-ADDRESS-ONLY-SW          PIC X  VALUE SPACES.
+   698     88  UPDATE-ADDRESS-ONLY        VALUE 'Y'.
+   699 77  ws-address-fix-sw           pic x  value spaces.
+   700     88  address-upd                 value 'Y'.
+   701 01  WS-WORK-CITY-STATE.
+   702     05  WS-WORK-CITY            PIC X(28).
+   703     05  WS-WORK-STATE           PIC XX.
+   704 01  ws-address-line-1           pic x(30).
+   705 01  ws-address-line-2           pic x(30).
+   706 01  ws-city-state               pic x(30).
+   707 01  ws-zip                      pic x(9).
+   708 01  ws-dis-date                 pic x(8).
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  14
+* DCCMABPC.cbl
+   709 01  W-MISC.
+   710     05  WORK-DATE-X.
+   711         10  WORK-MO-X       PIC XX.
+   712         10  WORK-DA-X       PIC XX.
+   713         10  WORK-YR-X       PIC XX.
+   714     05  WORK-DATE-N    REDEFINES   WORK-DATE-X.
+   715         10  WORK-MO-N       PIC 99.
+   716         10  WORK-DA-N       PIC 99.
+   717         10  WORK-YR-N       PIC 99.
+   718     05  WS-WORK-DT             PIC 9(11).
+   719     05  WS-WORK-DT-A REDEFINES WS-WORK-DT.
+   720         10  FILLER             PIC XXX.
+   721         10  V-ISS-CCYR         PIC X(4).
+   722         10  V-ISS-MO           PIC XX.
+   723         10  V-ISS-DA           PIC XX.
+   724     05  WS-WORK-DATE          PIC 9(11).
+   725     05  FILLER REDEFINES WS-WORK-DATE.
+   726         10  FILLER            PIC X(5).
+   727         10  WS-WORK-DATE-YR   PIC XX.
+   728         10  WS-WORK-DATE-MO   PIC XX.
+   729         10  WS-WORK-DATE-DA   PIC XX.
+   730     05  CERT-KEY.
+   731         10  CERT-STATE         PIC XX.
+   732         10  CERT-DATE          PIC 9(11).
+   733         10  CERT-CERT          PIC X(11).
+   734     05  WS-DATE-ALPH.
+   735         10  FILLER             PIC XXX VALUE '000'.
+   736         10  WS-WORK-CENT       PIC XX.
+   737         10  WS-WORK-YR         PIC XX.
+   738         10  WS-WORK-MO         PIC XX.
+   739         10  WS-WORK-DA         PIC XX.
+   740     05  WS-DATE-NUM REDEFINES WS-DATE-ALPH
+   741                                PIC 9(11).
+   742
+   743     05  WS-BIN-EFF             PIC XX VALUE LOW-VALUES.
+   744     05  EXTR-IN-CNT            PIC 9(7) VALUE ZEROS.
+   745     05  ELCERT-IN-CNT          PIC 9(7) VALUE ZEROS.
+   746     05  ERMAIL-DP-CNT          PIC 9(7) VALUE ZEROS.
+   747     05  ERMAIL-OT-CNT          PIC 9(7) VALUE ZEROS.
+   748     05  ERMAIL-UD-CNT          PIC 9(7) VALUE ZEROS.
+   749     05  ELCERT-UD-CNT          PIC 9(7) VALUE ZEROS.
+   750     05  ELCERT-AC-CNT          PIC 9(7) VALUE ZEROS.
+   751     05  WS-INPUT-SW            PIC X VALUE ' '.
+   752         88  END-OF-INPUT             VALUE 'Y'.
+*  753                                 COPY ELCDTECX.
+   754******************************************************************06/05/98
+   755*                                                                *ELCDTECX
+   756*                            ELCDTECX.                           *   LV005
+   757*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL**2
+   758*                            VMOD=2.015                          *ELCDTECX
+   759*                                                                *ELCDTECX
+   760*      WORKING STORAGE COPY CODE FOR APPLICATIONS CALLING        *ELCDTECX
+   761*      THE DATE CARD DISK FILE. ( READ ROUTINE = ELCDTERX,       *ELCDTECX
+   762*      AND DISK FILE FD = ELCDTEFX)                              *ELCDTECX
+   763*                                                                *ELCDTECX
+   764******************************************************************ELCDTECX
+   765******************************************************************
+   766*                   C H A N G E   L O G
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  15
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTECX)
+   767*
+   768* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+   769*-----------------------------------------------------------------
+   770*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+   771* EFFECTIVE    NUMBER
+   772*-----------------------------------------------------------------
+   773* 092602    2002091900008  PEMA  INCREASE NUMBER OF MAXIMUM
+   774*                                  BENEFIT CODES FROM 300 TO 900
+   775* 090803    2003080800002  PEMA  ADD CATEGORY FOR SUPER GAP
+   776* 051304    2003080800002  SMVA  ADD REFUND METHOD
+   777* 071714    2013100100002  PEMA  FIX CRIT PERIOD EDITS
+   778******************************************************************
+   779 01  DATE-CARD.                                                   ELCDTECX
+   780     12  DATX-COD                    PIC  X(4).                   ELCDTECX
+   781     12  RUN-DATE                    PIC  9(11)  COMP-3.          ELCDTECX
+   782     12  ALPH-DATE                   PIC  X(18).                  ELCDTECX
+   783     12  EP-DT                       PIC  9(11)  COMP-3.          ELCDTECX
+   784     12  PEND-ACT-FILE               PIC  XX.                     ELCDTECX
+   785     12  EP-SW                       PIC  X.                      ELCDTECX
+   786         88  NO-EP-EXTRACTS          VALUE SPACE.                 ELCDTECX
+   787     12  TAPE-BATCHES                PIC  X.                      ELCDTECX
+   788         88  TP-PREL-BAL             VALUE '1'.                   ELCDTECX
+   789     12  BIN-RUN-DATE                PIC  XX.                     ELCDTECX
+   790     12  RUN-CENTURY.                                             ELCDTECX
+   791         16 RUN-CENTURY-N            PIC  99.                        CL**4
+   792     12  FILLER                      PIC  X.                         CL**4
+   793     12  CLAS-MORT-OVRD              PIC  X(4).                   ELCDTECX
+   794     12  FILLER                      PIC  XXX.                    ELCDTECX
+   795     12  COMPANY-NAME                PIC  X(30).                  ELCDTECX
+   796                                                                  ELCDTECX
+   797 01  FILLER                          PIC  X(7)                       CL**6
+   798                                          VALUE 'OPTIONS'.        ELCDTECX
+   799 01  DATE-CARD-OPTIONS.                                           ELCDTECX
+   800     12  DATE-OPTIONS-ID             PIC  X(4).                   ELCDTECX
+   801     12  DTE-MIN-PREM                PIC  99V99.                  ELCDTECX
+   802     12  DTE-LANGUAGE-IND            PIC  X.                      ELCDTECX
+   803         88  DTE-LANGUAGE-IS-FR           VALUE 'F'.              ELCDTECX
+   804         88  DTE-LANGUAGE-IS-ENG          VALUE 'E'.              ELCDTECX
+   805     12  DTE-MIN-AGE                 PIC  99.                     ELCDTECX
+   806     12  DTE-DEFAULT-AGE             PIC  99.                     ELCDTECX
+   807     12  FILLER                      PIC  X.                      ELCDTECX
+   808     12  DTE-MAX-TERM                PIC  999.                    ELCDTECX
+   809     12  DTE-COMP-VG                 PIC  X.                      ELCDTECX
+   810     12  DTE-REM-TRM                 PIC  X.                      ELCDTECX
+   811     12  DTE-PRM-CK                  PIC S99V99.                  ELCDTECX
+   812     12  DTE-PRORATA                 PIC  X.                      ELCDTECX
+   813     12  DTE-CLM-REJ                 PIC  X.                      ELCDTECX
+   814     12  DTE-REF-REJ                 PIC  X.                      ELCDTECX
+   815     12  DTE-COM-TBL-USED            PIC  X.                      ELCDTECX
+   816     12  FILLER                      PIC  X.                      ELCDTECX
+   817     12  DTE-QTR-CO                  PIC  X.                      ELCDTECX
+   818     12  DTE-REF-CK                  PIC S99V99.                  ELCDTECX
+   819     12  DTE-CLM-CK                  PIC S99V99.                  ELCDTECX
+   820     12  DTE-CONV-DT                 PIC 9(11) COMP-3.               CL**2
+   821     12  DTE-DEFAULT-SEX             PIC  X.                      ELCDTECX
+   822     12  DTE-EPL-FORMAT              PIC  X.                      ELCDTECX
+   823     12  FILLER                      PIC  X.                      ELCDTECX
+   824     12  DTE-JT-AGE                  PIC  X.                      ELCDTECX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  16
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTECX)
+   825     12  DTE-KEY-BIRTH               PIC  X.                      ELCDTECX
+   826     12  DTE-REINSURANCE             PIC  X.                      ELCDTECX
+   827     12  DTE-CLAIM-SORT              PIC  X.                      ELCDTECX
+   828     12  DTE-WRT-OFF                 PIC  S99V99.                 ELCDTECX
+   829     12  DTE-R78                     PIC  X.                      ELCDTECX
+   830     12  DTE-DLY-BILL                PIC  X.                      ELCDTECX
+   831     12  DTE-ALT-MORT-CODE           PIC  X(4).                   ELCDTECX
+   832     12  DTE-CLAIM-PAID-THRU-TO      PIC  X.                      ELCDTECX
+   833     12  DTE-COMPENSATION-ACCESS     PIC  X.                      ELCDTECX
+   834     12  DTE-MORTG-ACCESS-CNTL       PIC  X.                      ELCDTECX
+   835     12  DTE-MP-ALT-MORT-CODE        PIC  X(4).                   ELCDTECX
+   836     12  DTE-MORTALITY-AGE-CALC-METHOD                            ELCDTECX
+   837                                     PIC  X.                      ELCDTECX
+   838         88  DTE-USE-TABLE-ASSIGNED-METHOD VALUE '1'              ELCDTECX
+   839                                                 ' '.             ELCDTECX
+   840         88  DTE-USE-ALL-AGE-LAST          VALUE '2'.             ELCDTECX
+   841         88  DTE-USE-ALL-AGE-NEAR          VALUE '3'.             ELCDTECX
+   842     12  DTE-RESERVE-OPTION-SWITCH   PIC  X.                      ELCDTECX
+   843         88  DTE-OPT-RESERVE-METHOD-AUTH       VALUE 'Y'.         ELCDTECX
+   844         88  DTE-OPT-RESERVE-METHOD-UNAUTH     VALUE 'N' ' '.     ELCDTECX
+   845     12  DTE-REM-TRM-CALC-OPTION     PIC  X.                      ELCDTECX
+   846     12  DTE-EXPERIENCE-RETENTION-AGE                             ELCDTECX
+   847                                     PIC  9.                         CL**4
+   848     12  DTE-SYSTEM.                                              ELCDTECX
+   849         16  DTE-SYS-A-CREDIT        PIC  X.                      ELCDTECX
+   850         16  DTE-SYS-B-PEND-CLAIM    PIC  X.                      ELCDTECX
+   851         16  DTE-SYS-C-CONFIRMATIONS PIC  X.                      ELCDTECX
+   852         16  DTE-SYS-D-DEMAND-BILL   PIC  X.                      ELCDTECX
+   853         16  DTE-SYS-E-CLASIC-CLAIMS PIC  X.                      ELCDTECX
+   854         16  DTE-SYS-F-CLASIC-CREDIT PIC  X.                      ELCDTECX
+   855         16  DTE-SYS-G-AR-USED       PIC  X.                      ELCDTECX
+   856         16  DTE-SYS-H               PIC  X.                      ELCDTECX
+   857         16  DTE-SYS-I               PIC  X.                      ELCDTECX
+   858         16  DTE-SYS-J               PIC  X.                      ELCDTECX
+   859         16  DTE-SYS-K               PIC  X.                      ELCDTECX
+   860         16  DTE-SYS-L               PIC  X.                      ELCDTECX
+   861         16  DTE-SYS-M               PIC  X.                      ELCDTECX
+   862         16  DTE-SYS-N               PIC  X.                      ELCDTECX
+   863         16  DTE-SYS-O               PIC  X.                      ELCDTECX
+   864         16  DTE-SYS-P               PIC  X.                      ELCDTECX
+   865         16  DTE-SYS-Q               PIC  X.                      ELCDTECX
+   866         16  DTE-SYS-R               PIC  X.                      ELCDTECX
+   867         16  DTE-SYS-S               PIC  X.                      ELCDTECX
+   868         16  DTE-SYS-T               PIC  X.                      ELCDTECX
+   869         16  DTE-SYS-U               PIC  X.                      ELCDTECX
+   870         16  DTE-SYS-V               PIC  X.                      ELCDTECX
+   871         16  DTE-SYS-W               PIC  X.                      ELCDTECX
+   872         16  DTE-SYS-X               PIC  X.                      ELCDTECX
+   873         16  DTE-SYS-Y               PIC  X.                      ELCDTECX
+   874         16  DTE-SYS-Z               PIC  X.                      ELCDTECX
+   875     12  FILLER                      REDEFINES DTE-SYSTEM.        ELCDTECX
+   876         16  DTE-SYS-CODE            OCCURS 26 TIMES              ELCDTECX
+   877                                     PIC  X.                      ELCDTECX
+   878     12  DTE-CLIENT                  PIC  XXX.                    ELCDTECX
+   879                                                                  ELCDTECX
+   880 01  CLASIC-SYSTEM-CODES.                                         ELCDTECX
+   881     12  DTE-COLC-ID                 PIC  X(4).                   ELCDTECX
+   882     12  DTE-CLASIC-COMPANY-CD       PIC  X.                      ELCDTECX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  17
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTECX)
+   883     12  DTE-CLASIC-COMPANY-NUMBER   PIC  999.                    ELCDTECX
+   884*    12  DTE-CLASIC-CLAIM-ACCESS     PIC  X.                      ELCDTECX
+   885     12  FILLER                      PIC  X.                      ELCDTECX
+   886     12  CLASIC-REIN-MAINT           PIC  XX.                     ELCDTECX
+   887     12  CLASIC-COMP-MAINT           PIC  XX.                     ELCDTECX
+   888     12  CLASIC-ACCT-MAINT           PIC  XX.                     ELCDTECX
+   889     12  CLASIC-CTBL-MAINT           PIC  XX.                     ELCDTECX
+   890     12  CLASIC-RATE-MAINT           PIC  XX.                     ELCDTECX
+   891     12  CLASIC-CREDIT-EOM-DT        PIC  XX.                     ELCDTECX
+   892     12  CLASIC-CLAIMS-EOM-DT        PIC  XX.                     ELCDTECX
+   893                                                                  ELCDTECX
+   894     12  LIFE-OVERRIDE-L1            PIC  X.                      ELCDTECX
+   895     12  LIFE-OVERRIDE-L2            PIC  XX.                     ELCDTECX
+   896     12  LIFE-OVERRIDE-L6            PIC  X(6).                   ELCDTECX
+   897     12  LIFE-OVERRIDE-L12           PIC  X(12).                  ELCDTECX
+   898                                                                  ELCDTECX
+   899     12  AH-OVERRIDE-L1              PIC  X.                      ELCDTECX
+   900     12  AH-OVERRIDE-L2              PIC  XX.                     ELCDTECX
+   901     12  AH-OVERRIDE-L6              PIC  X(6).                   ELCDTECX
+   902     12  AH-OVERRIDE-L12             PIC  X(12).                  ELCDTECX
+   903                                                                  ELCDTECX
+   904     12  CLAS-REPORT-CD1-CAPTION     PIC  X(10).                  ELCDTECX
+   905     12  CLAS-REPORT-CD2-CAPTION     PIC  X(10).                  ELCDTECX
+   906                                                                  ELCDTECX
+   907     12  CLASIC-MORTG-EOM-DT         PIC  XX.                     ELCDTECX
+   908     12  CLASIC-AR-EOM-DT            PIC  XX.                     ELCDTECX
+   909                                                                  ELCDTECX
+   910     12  FILLER                      PIC  X(11)      VALUE SPACE. ELCDTECX
+   911                                                                  ELCDTECX
+   912 01  DATE-CARD-FACTORS.                                           ELCDTECX
+   913     12  DATE-FACTOR-ID              PIC  X(4).                   ELCDTECX
+   914     12  FAC-1                       PIC S999V9(5).               ELCDTECX
+   915     12  FAC-2                       PIC S999V9(5).               ELCDTECX
+   916     12  FAC-3                       PIC S999V9(5).               ELCDTECX
+   917     12  FAC-4                       PIC S999V9(5).               ELCDTECX
+   918     12  FAC-5                       PIC S999V9(5).               ELCDTECX
+   919     12  FAC-6                       PIC S999V9(5).               ELCDTECX
+   920                                                                  ELCDTECX
+   921 01  FILLER                          PIC  X(12)                   ELCDTECX
+   922                                          VALUE 'COMPANY NAME'.   ELCDTECX
+   923 01  COMPANY-NAME-TABLE.                                          ELCDTECX
+   924     12  C-N-TBL                     OCCURS 6 TIMES.              ELCDTECX
+   925         16  CNT-ID                  PIC  X.                      ELCDTECX
+   926         16  CNT-NAME                PIC  X(30).                  ELCDTECX
+   927                                                                  ELCDTECX
+   928 01  FILLER                          PIC  X(11)                   ELCDTECX
+   929                                          VALUE 'STATE NAMES'.    ELCDTECX
+   930 01  STATE-NAMES.                                                 ELCDTECX
+   931     12  STATE-NAME-FLD              OCCURS 75 TIMES.             ELCDTECX
+   932         16  STATE-SUB               PIC  XX.                     ELCDTECX
+   933         16  STATE-PIC1.                                          ELCDTECX
+   934             20  STATE-ABBR          PIC  XX.                     ELCDTECX
+   935             20  FILLER              PIC  XXX.                    ELCDTECX
+   936             20  STATE-PIC           PIC  X(20).                  ELCDTECX
+   937             20  STATE-CALL-EARN     PIC  X.                      ELCDTECX
+   938             20  STATE-CALL-BREAK    PIC  X.                      ELCDTECX
+   939             20  STATE-PRIM-FAC-DEV  PIC  XXX.                    ELCDTECX
+   940                                                                  ELCDTECX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  18
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTECX)
+   941 01  FILLER                          PIC  X(13)                   ELCDTECX
+   942                                          VALUE 'CARRIER NAMES'.  ELCDTECX
+   943 01  CARRIER-NAMES.                                               ELCDTECX
+   944     12  CARRIER-NAME-FLD            OCCURS 25 TIMES.             ELCDTECX
+   945         16  CARRIER-SUB             PIC  X.                      ELCDTECX
+   946         16  CARRIER-DOM-ST          PIC  XX.                     ELCDTECX
+   947         16  CARRIER-PIC             PIC  X(30).                  ELCDTECX
+   948         16  CARRIER-UEP-PCT         PIC  S9V9(4) COMP-3.            CL**6
+   949         16  CARRIER-R78-PCT         PIC  S9V9(4) COMP-3.            CL**6
+   950         16  CARRIER-PRO-PCT         PIC  S9V9(4) COMP-3.            CL**6
+   951*        16  FILLER                  PIC  X.                      ELCDTECX
+   952         16  CARRIER-SEC-PAY         PIC  X.
+   953             88  SEC-PAY-CARRIER          VALUE 'Y'.
+   954                                                                  ELCDTECX
+   955 01  FILLER                          PIC  X(9)                       CL**6
+   956                                          VALUE 'INS TYPES'.      ELCDTECX
+   957 01  CLAS-INS-TYPES.                                              ELCDTECX
+   958*    12 CLAS-ALL-TYPES               OCCURS 300 TIMES.            ELCDTECX
+   959     12 CLAS-ALL-TYPES               OCCURS 900 TIMES.            ELCDTECX
+   960         16  CLAS-I-BEN              PIC  XX.                     ELCDTECX
+   961         16  CLAS-I-AB3.                                          ELCDTECX
+   962             20  FILLER              PIC  X.                      ELCDTECX
+   963             20  CLAS-I-AB2.                                      ELCDTECX
+   964                 24  FILLER          PIC  X.                      ELCDTECX
+   965                 24  CLAS-I-AB1      PIC  X.                      ELCDTECX
+   966         16  CLAS-I-AB3-AH REDEFINES CLAS-I-AB3.                  ELCDTECX
+   967             20  CLAS-EXCLUSION      PIC  XX.                        CL**4
+   968             20  FILLER              PIC  X.                         CL**4
+   969         16  CLAS-I-AB10.                                         ELCDTECX
+   970             20  FILLER              PIC  X(9).                   ELCDTECX
+   971             20  CLAS-I-REIN-YN      PIC  X.                      ELCDTECX
+   972         16  CLAS-I-COMMENT          PIC  X(10).                  ELCDTECX
+   973         16  CLAS-I-JOINT            PIC  X.                      ELCDTECX
+   974         16  CLAS-I-RL-AH            PIC  X.                      ELCDTECX
+   975         16  CLAS-I-CALC-TYPE.                                    ELCDTECX
+   976             20  CLAS-I-BAL          PIC  X.                      ELCDTECX
+   977         16  CLAS-I-EP               PIC  X.                      ELCDTECX
+   978         16  CLAS-CO-BEN-I-G-CD      PIC  X.                      ELCDTECX
+   979         16  CLAS-CO-REM-TERM-CALC   PIC  X.                      ELCDTECX
+   980         16  CLAS-I-BEN-CATEGORY     PIC  X.
+   981         16  CLAS-I-REFUND-METHOD    PIC  X.
+   982         16  CLAS-I-MAX-BENEFITS     PIC 99.
+   983         16  FILLER                  PIC  XXX.
+   984                                                                  ELCDTECX
+   985 01  FILLER                          PIC  X(16)                   ELCDTECX
+   986                                     VALUE 'MORTALITY TABLES'.    ELCDTECX
+   987 01  CLAS-MORTALITY-CODES.                                        ELCDTECX
+   988     12  CLAS-MORT-FLD               OCCURS 99 TIMES              ELCDTECX
+   989                                     INDEXED BY CLAS-MORT-NDX.    ELCDTECX
+   990         16  CLAS-MORT-CODE          PIC  X(4).                      CL**6
+   991         16  CLAS-MORT-J-CODE        PIC  X.                         CL**5
+   992         16  CLAS-MORT-J-FACT        PIC S9V9(4).                    CL**6
+   993         16  CLAS-MORT-DESC.                                      ELCDTECX
+   994             20  CLAS-RESERVE-ADJ    PIC  999.                       CL**6
+   995             20  FILLER              PIC  XX.                        CL**5
+   996             20  CLAS-YEAR           PIC  X(4).                      CL**6
+   997             20  FILLER              PIC  X.                         CL**5
+   998             20  CLAS-TABLE-TYPE     PIC  XXX.                       CL**6
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  19
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTECX)
+   999             20  FILLER              PIC  X.                         CL**5
+  1000             20  CLAS-AGE-METHOD     PIC  XX.                        CL**5
+  1001             20  FILLER              PIC  X.                         CL**5
+  1002             20  CLAS-INTEREST       PIC  99.99.                     CL**5
+  1003             20  FILLER              PIC  X(5).                      CL**6
+  1004                                                                  ELCDTECX
+  1005 01  FILLER                          PIC  X(15)                   ELCDTECX
+  1006                                     VALUE 'BUSINESS TABLES'.     ELCDTECX
+  1007 01  CLAS-BUSINESS-CLASSES.                                       ELCDTECX
+  1008     12  CLAS-BUSC-FLD               OCCURS 50 TIMES.             ELCDTECX
+  1009         16  CLAS-BUSC-CODE          PIC  99.                     ELCDTECX
+  1010         16  CLAS-BUSC-GROUP         PIC  X.                      ELCDTECX
+  1011         16  CLAS-BUSC-DESC          PIC  X(19).                  ELCDTECX
+  1012         16  CLAS-BUSC-EXCL          PIC  X.                         CL**5
+  1013         16  FILLER                  PIC  X(4).                      CL**6
+  1014                                                                  ELCDTECX
+  1015 01  FILLER                          PIC  X(7)                       CL**6
+  1016                                     VALUE 'INDEXES'.             ELCDTECX
+  1017 01  CLAS-INDEX-TBL.                                              ELCDTECX
+  1018     12  CLAX-ID                     PIC  X(4).                   ELCDTECX
+  1019     12  CLAS-STARTC                 PIC S9(4) COMP.              ELCDTECX
+  1020     12  CLAS-MAXC                   PIC S9(4) COMP.              ELCDTECX
+  1021     12  CLAS-STARTL                 PIC S9(4) COMP.              ELCDTECX
+  1022     12  CLAS-MAXL                   PIC S9(4) COMP.              ELCDTECX
+  1023     12  CLAS-STARTA                 PIC S9(4) COMP.              ELCDTECX
+  1024     12  CLAS-MAXA                   PIC S9(4) COMP.              ELCDTECX
+  1025     12  CLAS-STARTM                 PIC S9(4) COMP.              ELCDTECX
+  1026     12  CLAS-MAXM                   PIC S9(4) COMP.              ELCDTECX
+  1027     12  CLAS-STARTB                 PIC S9(4) COMP.              ELCDTECX
+  1028     12  CLAS-MAXB                   PIC S9(4) COMP.              ELCDTECX
+  1029     12  CLAS-STARTS                 PIC S9(4) COMP.              ELCDTECX
+  1030     12  CLAS-MAXS                   PIC S9(4) COMP.              ELCDTECX
+  1031     12  CLAS-STARTE                 PIC S9(4) COMP.              ELCDTECX
+  1032     12  CLAS-MAXE                   PIC S9(4) COMP.              ELCDTECX
+  1033     12  CLAS-STARTCN                PIC S9(4) COMP.              ELCDTECX
+  1034     12  CLAS-MAXCN                  PIC S9(4) COMP.              ELCDTECX
+  1035                                                                  ELCDTECX
+  1036 01  CLAS-TYPE-MISC.                                              ELCDTECX
+  1037     12  CLAS-INDEXC                 PIC S9(4) COMP.              ELCDTECX
+  1038     12  CLAS-INDEXL                 PIC S9(4) COMP.              ELCDTECX
+  1039     12  CLAS-INDEXA                 PIC S9(4) COMP.              ELCDTECX
+  1040     12  CLAS-INDEXM                 PIC S9(4) COMP.              ELCDTECX
+  1041     12  CLAS-INDEXB                 PIC S9(4) COMP.              ELCDTECX
+  1042     12  CLAS-INDEXS                 PIC S9(4) COMP.              ELCDTECX
+  1043     12  CLAS-INDEXE                 PIC S9(4) COMP.              ELCDTECX
+  1044     12  CLAS-INDEX                  PIC S9(4) COMP.              ELCDTECX
+  1045     12  CLAS-INDEXEN                PIC S9(4) COMP.              ELCDTECX
+  1046     12  CLAS-INDEXCN                PIC S9(4) COMP.              ELCDTECX
+  1047     12  CLAS-INDEXON                PIC S9(4) COMP.              ELCDTECX
+  1048                                                                  ELCDTECX
+  1049 01  FILLER                          PIC  X(13)                   ELCDTECX
+  1050                                     VALUE 'MISCELLANEOUS'.       ELCDTECX
+  1051 01  CLAS-MISC.                                                   ELCDTECX
+  1052     12  DTE-FICH                    PIC  X.                      ELCDTECX
+  1053         88  FICH-NO                 VALUE SPACE.                 ELCDTECX
+  1054         88  FICH-ONLY               VALUE '1'.                   ELCDTECX
+  1055         88  FICH-BOTH               VALUE '2'.                   ELCDTECX
+  1056     12  FICH-OPEN                   PIC  X.                      ELCDTECX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  20
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTECX)
+  1057     12  REPT-OPEN                   PIC  X.                      ELCDTECX
+  1058     12  DTE-PGM-OPT                 PIC  9.                         CL**5
+  1059     12  DTE-PRT-OPT                 PIC  X.                      ELCDTECX
+  1060     12  DTE-FMT-OPT                 PIC  9.                      ELCDTECX
+  1061     12  DTE-PRC-OPT                 PIC  9.                      ELCDTECX
+  1062     12  DTE-TOT-OPT                 PIC  9.                      ELCDTECX
+  1063     12  CLAS-LOOK                   PIC  XX.                     ELCDTECX
+  1064     12  DTE-TOT-LINES               PIC S9(8)      COMP.         ELCDTECX
+  1065     12  STATE-L                     PIC  XX.                     ELCDTECX
+  1066     12  CLAS-CN                     PIC  99.                     ELCDTECX
+  1067     12  CLAS-CO                     PIC  99.                     ELCDTECX
+  1068     12  DTE-VSAM-FLAGS                              VALUE ZERO.  ELCDTECX
+  1069         16  DTE-F-1                 PIC  X.                      ELCDTECX
+  1070         16  DTE-F-2                 PIC  X.                      ELCDTECX
+  1071     12  DTE-ABEND-WORK.                                          ELCDTECX
+  1072         16  DTE-ABEND-CD-1          PIC  XX         VALUE SPACES.ELCDTECX
+  1073         16  DTE-ABEND-CD-2          PIC  XX         VALUE SPACES.ELCDTECX
+  1074                                                                  ELCDTECX
+  1075 01  FILLER                          PIC  X(12)                   ELCDTECX
+  1076                                     VALUE 'WORKING DATE'.        ELCDTECX
+  1077 01  WS-DATE-AND-TIME.                                            ELCDTECX
+  1078     12  WS-ACCEPT-DATE.                                          ELCDTECX
+  1079         16  WS-AD-YY                PIC  99.                     ELCDTECX
+  1080         16  WS-AD-MM                PIC  99.                     ELCDTECX
+  1081         16  WS-AD-DD                PIC  99.                     ELCDTECX
+  1082     12  WS-CURRENT-DATE.                                         ELCDTECX
+  1083         16  WS-CD-MM                PIC  99.                     ELCDTECX
+  1084         16  FILLER                  PIC  X          VALUE '/'.   ELCDTECX
+  1085         16  WS-CD-DD                PIC  99.                     ELCDTECX
+  1086         16  FILLER                  PIC  X          VALUE '/'.   ELCDTECX
+  1087         16  WS-CD-YY                PIC  99.                     ELCDTECX
+  1088     12  WS-TIME-OF-DAY.                                          ELCDTECX
+  1089         16  WS-TIME                 PIC  9(6).                   ELCDTECX
+  1090         16  WS-HUN-SEC              PIC  99.                     ELCDTECX
+  1091                                                                  ELCDTECX
+  1092 01  FILLER                          PIC  X(12)                   ELCDTECX
+  1093                                     VALUE 'CARRIER CLMS'.        ELCDTECX
+  1094 01  CARRIER-OPT-CLAIM-DATA.                                      ELCDTECX
+  1095     12  CARRIER-FLDS                OCCURS 25 TIMES.             ELCDTECX
+  1096         16  CARRIER-IBNR-SWITCH     PIC  X.                         CL**5
+  1097         16  CARRIER-IBNR-PERCENT    PIC S9V9(4) COMP-3.             CL**6
+  1098         16  CARRIER-CIDA-DISCOUNT   PIC S9V9(4) COMP-3.             CL**6
+  1099                                                                  ELCDTECX
+  1100 01  FILLER                          PIC  X(10)                   ELCDTECX
+  1101                                     VALUE 'STATE TLRS'.          ELCDTECX
+  1102 01  STATE-TARGET-LOSS-RATIOS.                                    ELCDTECX
+  1103     12  STATE-TLR-FLD               OCCURS 75 TIMES.             ELCDTECX
+  1104         16  STATE-TARGET-LOSS-RATIO PIC S9V9(4) COMP-3.             CL**6
+  1105         16  STATE-CALC-INTEREST     PIC S9V9(4) COMP-3.             CL**6
+  1106                                                                  ELCDTECX
+  1107 01  FILLER                          PIC  X(13)                   ELCDTECX
+  1108                                     VALUE 'BUSINESS TLRS'.       ELCDTECX
+  1109 01  BUSINESS-TRGT-LOSS-RATIO-MODS.                               ELCDTECX
+  1110     12  BUS-TLRM-FLD                OCCURS 99 TIMES.             ELCDTECX
+  1111         16  BUS-TRGT-LOSS-RATIO-MOD PIC S9V9(4) COMP-3.             CL**6
+  1112                                                                  ELCDTECX
+  1113 01  FILLER                          PIC  X(13)                   ELCDTECX
+  1114                                     VALUE 'MISC CLM DATA'.       ELCDTECX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  21
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTECX)
+  1115 01  MISC-OPT-CLM-RSV-DATA.                                       ELCDTECX
+  1116     12  COMPANY-CALC-INTEREST       PIC S9V9(4) COMP-3.             CL**6
+  1117     12  COMPANY-CIDA-DISCOUNT       PIC S9V9(4) COMP-3.             CL**6
+  1118     12  COMPANY-CRDB-TABLE-SELECTION                             ELCDTECX
+  1119                                     PIC  X.                         CL**5
+  1120     12  COMPANY-IBNR-AH-FACTOR      PIC S9V9(4) COMP-3.             CL**6
+  1121     12  COMPANY-IBNR-LAG-MONTH      PIC S999    COMP-3.             CL**6
+  1122     12  COMPANY-IBNR-LIFE-FACTOR    PIC S9V9(4) COMP-3.             CL**6
+  1123     12  COMPANY-OPTION-START-DATE   PIC  XX.                        CL**5
+  1124     12  INDEXBS                     PIC S9(4)   COMP.               CL**6
+  1125     12  INDEXCA                     PIC S9(4)   COMP.               CL**6
+  1126     12  INDEXST                     PIC S9(4)   COMP.               CL**6
+  1127     12  FILLER                      PIC  X(75).                  ELCDTECX
+  1128******************************************************************ELCDTECX
+  1129*01  MISC-CARR-PCT-DATA.                                          00001521
+  1130*    12  DD-CARR1-UEP-PCT            PIC S9V9(4) COMP-3.          00001522
+  1131*    12  DD-CARR1-R78-PCT            PIC S9V9(4) COMP-3.          00001522
+  1132*    12  DD-CARR1-PRO-PCT            PIC S9V9(4) COMP-3.          00001522
+  1133*    12  DD-CARR2-UEP-PCT            PIC S9V9(4) COMP-3.          00001522
+  1134*    12  DD-CARR2-R78-PCT            PIC S9V9(4) COMP-3.          00001522
+  1135*    12  DD-CARR2-PRO-PCT            PIC S9V9(4) COMP-3.          00001522
+  1136******************************************************************ELCDTECX
+  1137
+* 1138                                 COPY ELCDTEVR.
+  1139***************************************************************** 04/15/98
+  1140*                                                                *ELCDTEVR
+  1141*                                                                *ELCDTEVR
+  1142*                            ELCDTEVR.                           *   LV003
+  1143*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL**3
+  1144*                            VMOD=2.001                          *   CL**2
+  1145*                                                                *ELCDTEVR
+  1146*   WORKING STORAGE FOR DATE VARIABLES CREATED                   *ELCDTEVR
+  1147*   FOR THE YEAR 2000 DATE MODIFICATION                          *ELCDTEVR
+  1148*                                                                *ELCDTEVR
+  1149******************************************************************ELCDTEVR
+  1150 01  WS-DATE-CARD-DATE.                                           ELCDTEVR
+  1151     05  WS-RUN-DATE.                                             ELCDTEVR
+  1152         10  FILLER                  PIC  9(03).                  ELCDTEVR
+  1153         10  RUN-CCYY                PIC  9(04).                  ELCDTEVR
+  1154         10  RUN-CCYR  REDEFINES  RUN-CCYY.                       ELCDTEVR
+  1155             15  RUN-CC              PIC  99.                     ELCDTEVR
+  1156             15  RUN-YR              PIC  99.                     ELCDTEVR
+  1157         10  RUN-MO                  PIC  99.                     ELCDTEVR
+  1158         10  RUN-DA                  PIC  99.                     ELCDTEVR
+  1159     05  WS-RUN-DATE-N REDEFINES                                     CL**2
+  1160            WS-RUN-DATE              PIC 9(11).                      CL**2
+  1161     05  WS-EP-DT.                                                ELCDTEVR
+  1162         10  FILLER                  PIC  9(03).                  ELCDTEVR
+  1163         10  EP-CCYY                 PIC  9(04).                  ELCDTEVR
+  1164         10  EP-CCYR  REDEFINES  EP-CCYY.                         ELCDTEVR
+  1165             15  EP-CC               PIC  99.                     ELCDTEVR
+  1166             15  EP-YR               PIC  99.                     ELCDTEVR
+  1167         10  EP-MO                   PIC  99.                     ELCDTEVR
+  1168         10  EP-DA                   PIC  99.                     ELCDTEVR
+  1169     05  WS-EP-DT-N REDEFINES                                        CL**2
+  1170            WS-EP-DT                 PIC 9(11).                      CL**2
+  1171     05  WS-DTE-CONV-DT.                                             CL**4
+  1172         10  FILLER                  PIC  9(03).                     CL**4
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  22
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTEVR)
+  1173         10  DTE-CONV-CCYY           PIC  9(04).                     CL**4
+  1174         10  DTE-CONV-CCYR  REDEFINES  DTE-CONV-CCYY.                CL**4
+  1175             15  DTE-CONV-CC         PIC  99.                        CL**4
+  1176             15  DTE-CONV-YR         PIC  99.                        CL**4
+  1177         10  DTE-CONV-MO             PIC  99.                        CL**4
+  1178         10  DTE-CONV-DA             PIC  99.                        CL**4
+  1179     05  WS-DTE-CONV-DT-N REDEFINES                                  CL**4
+  1180            WS-DTE-CONV-DT           PIC  9(11).                     CL**4
+  1181 01  WS-BALANCE-FORWARD-DATE.                                     ELCDTEVR
+  1182     05  WS-BF-LAST-ACTIVITY-DATE.                                ELCDTEVR
+  1183         10  FILLER                            PIC 999.           ELCDTEVR
+  1184         10  BF-ACT-CCYY                       PIC 9(04).         ELCDTEVR
+  1185         10  BF-ACT-CCYR  REDEFINES  BF-ACT-CCYY.                 ELCDTEVR
+  1186             15  BF-ACT-CC                     PIC 99.            ELCDTEVR
+  1187             15  BF-ACT-YEAR                   PIC 99.            ELCDTEVR
+  1188         10  BF-ACT-MONTH                      PIC 99.            ELCDTEVR
+  1189         10  BF-ACT-DAY                        PIC 99.            ELCDTEVR
+  1190     05  WS-BF-LAST-ACTIVITY-DATE-N REDEFINES                        CL**2
+  1191            WS-BF-LAST-ACTIVITY-DATE           PIC 9(11).            CL**2
+  1192     05  WS-BF-CURRENT-LAST-STMT-DT.                              ELCDTEVR
+  1193         10  FILLER                            PIC 999.           ELCDTEVR
+  1194         10  BF-CURRENT-LAST-STMT-CEN          PIC 99.            ELCDTEVR
+  1195         10  BF-CURRENT-LAST-STMT-YEAR         PIC 99.            ELCDTEVR
+  1196         10  BF-CURRENT-LAST-STMT-MONTH        PIC 99.            ELCDTEVR
+  1197         10  BF-CURRENT-LAST-STMT-DAY          PIC 99.            ELCDTEVR
+  1198     05  WS-BF-CURRENT-LAST-STMT-DT-N REDEFINES                      CL**2
+  1199            WS-BF-CURRENT-LAST-STMT-DT        PIC 9(11).             CL**2
+  1200 01  WS-ADD-CONF-TRANSACTIONS-DTE.                                ELCDTEVR
+  1201     05  WS-AC-CERT-EFF-DATE.                                     ELCDTEVR
+  1202         10  FILLER                            PIC 999.           ELCDTEVR
+  1203         10  AC-CERT-CCYY                      PIC 9(04).         ELCDTEVR
+  1204         10  AC-CERT-CCYR  REDEFINES  AC-CERT-CCYY.               ELCDTEVR
+  1205             15  AC-CERT-CC                    PIC 99.            ELCDTEVR
+  1206             15  AC-CERT-YR                    PIC 99.            ELCDTEVR
+  1207         10  AC-CERT-MO                        PIC 99.            ELCDTEVR
+  1208         10  AC-CERT-DA                        PIC 99.            ELCDTEVR
+  1209     05  WS-AC-CERT-EFF-DATE-N REDEFINES                             CL**2
+  1210            WS-AC-CERT-EFF-DATE                PIC 9(11).            CL**2
+  1211     05  WS-AC-LIFE-CANCEL-DATE.                                  ELCDTEVR
+  1212         10  FILLER                            PIC 999.           ELCDTEVR
+  1213         10  AC-LIFE-CANCEL-CCYY               PIC 9(04).         ELCDTEVR
+  1214         10  AC-LIFE-CANCEL-CCYR REDEFINES AC-LIFE-CANCEL-CCYY.   ELCDTEVR
+  1215             15  AC-LIFE-CANCEL-CC             PIC 99.            ELCDTEVR
+  1216             15  AC-LIFE-CANCEL-YR             PIC 99.            ELCDTEVR
+  1217         10  AC-LIFE-CANCEL-MO                 PIC 99.            ELCDTEVR
+  1218         10  AC-LIFE-CANCEL-DA                 PIC 99.            ELCDTEVR
+  1219     05  WS-AC-LIFE-CANCEL-DATE-N REDEFINES                          CL**2
+  1220            WS-AC-LIFE-CANCEL-DATE             PIC 9(11).            CL**2
+  1221     05  WS-AC-AH-CANCEL-DATE.                                    ELCDTEVR
+  1222         10  FILLER                            PIC 999.           ELCDTEVR
+  1223         10  AC-AH-CANCEL-CCYY                 PIC 9(04).         ELCDTEVR
+  1224         10  AC-AH-CANCEL-CCYR  REDEFINES  AC-AH-CANCEL-CCYY.     ELCDTEVR
+  1225             15  AC-AH-CANCEL-CC               PIC 99.            ELCDTEVR
+  1226             15  AC-AH-CANCEL-YR               PIC 99.            ELCDTEVR
+  1227         10  AC-AH-CANCEL-MO                   PIC 99.            ELCDTEVR
+  1228         10  AC-AH-CANCEL-DA                   PIC 99.            ELCDTEVR
+  1229     05  WS-AC-AH-CANCEL-DATE-N REDEFINES                            CL**2
+  1230            WS-AC-AH-CANCEL-DATE               PIC 9(11).            CL**2
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  23
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTEVR)
+  1231 01  WS-RATE-RECORD.                                              ELCDTEVR
+  1232         05  WS-RT-EXPIRY-DATE.                                   ELCDTEVR
+  1233             10  FILLER                        PIC 999.           ELCDTEVR
+  1234             10  RT-EXP-CCYY                   PIC 9(04).         ELCDTEVR
+  1235             10  RT-EXP-CCYR  REDEFINES  RT-EXP-CCYY.             ELCDTEVR
+  1236                 15  RT-EXP-CC                 PIC 99.            ELCDTEVR
+  1237                 15  RT-EXP-YR                 PIC 99.            ELCDTEVR
+  1238             10  RT-EXP-MO                     PIC 99.            ELCDTEVR
+  1239             10  RT-EXP-DA                     PIC 99.            ELCDTEVR
+  1240         05  WS-RT-EXPIRY-DATE-N REDEFINES                           CL**2
+  1241                WS-RT-EXPIRY-DATE              PIC 9(11).            CL**2
+  1242
+* 1243                                 COPY ELCDATE.
+  1244******************************************************************06/11/98
+  1245*                                                                *ELCDATE
+  1246*                                                                *ELCDATE
+  1247*                            ELCDATE.                            *   LV023
+  1248*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL*16
+  1249*                            VMOD=2.003                           ELCDATE
+  1250*                                                                *ELCDATE
+  1251*                                                                *ELCDATE
+  1252*   DESCRIPTION:  DATA PASSED TO DATE CONVERSION ROUTINE.        *ELCDATE
+  1253*                 LENGTH = 200                                   *   CL*19
+  1254******************************************************************ELCDATE
+  1255                                                                  ELCDATE
+  1256 01  DATE-CONVERSION-DATA.                                        ELCDATE
+  1257     12  DC-COMM-LENGTH                PIC S9(4) COMP VALUE +200.    CL*19
+  1258     12  DC-OPTION-CODE                PIC X.                        CL*15
+  1259         88  BIN-TO-GREG                VALUE ' '.                ELCDATE
+  1260         88  ELAPSED-BETWEEN-BIN        VALUE '1'.                ELCDATE
+  1261         88  EDIT-GREG-TO-BIN           VALUE '2'.                ELCDATE
+  1262         88  YMD-GREG-TO-BIN            VALUE '3'.                ELCDATE
+  1263         88  MDY-GREG-TO-BIN            VALUE '4'.                ELCDATE
+  1264         88  JULIAN-TO-BIN              VALUE '5'.                ELCDATE
+  1265         88  BIN-PLUS-ELAPSED           VALUE '6'.                ELCDATE
+  1266         88  FIND-CENTURY               VALUE '7'.                   CL*22
+  1267         88  ELAPSED-BETWEEN-BIN-3      VALUE '8'.                ELCDATE
+  1268         88  EDIT-GREG-TO-BIN-3         VALUE '9'.                ELCDATE
+  1269         88  YMD-GREG-TO-BIN-3          VALUE 'A'.                ELCDATE
+  1270         88  MDY-GREG-TO-BIN-3          VALUE 'B'.                ELCDATE
+  1271         88  JULIAN-TO-BIN-3            VALUE 'C'.                ELCDATE
+  1272         88  BIN-PLUS-ELAPSED-3         VALUE 'D'.                ELCDATE
+  1273         88  JULIAN-EXPANDED-TO-BIN     VALUE 'E'.                   CL*14
+  1274         88  JULIAN-EXPANDED-TO-BIN-3   VALUE 'F'.                   CL*14
+  1275         88  BIN-TO-JULIAN-EXPANDED     VALUE 'G'.                   CL*14
+  1276         88  JULIAN-EXPANDED            VALUE 'E', 'F', 'G'.         CL*14
+  1277         88  CHECK-LEAP-YEAR            VALUE 'H'.                   CL*14
+  1278         88  BIN-3-TO-GREG              VALUE 'I'.                   CL*14
+  1279         88  CYMD-GREG-TO-BIN-3         VALUE 'J'.                   CL*14
+  1280         88  MDCY-GREG-TO-BIN-3         VALUE 'K'.                   CL*14
+  1281         88  CYMD-GREG-TO-BIN           VALUE 'L'.                   CL*14
+  1282         88  MDCY-GREG-TO-BIN           VALUE 'M'.                   CL*14
+  1283         88  MDY-GREG-TO-JULIAN         VALUE 'N'.                   CL*14
+  1284         88  MDCY-GREG-TO-JULIAN        VALUE 'O'.                   CL*14
+  1285         88  YMD-GREG-TO-JULIAN         VALUE 'P'.                   CL*14
+  1286         88  CYMD-GREG-TO-JULIAN        VALUE 'Q'.                   CL*14
+  1287         88  THREE-CHARACTER-BIN                                  ELCDATE
+  1288                  VALUES  '8' '9' 'A' 'B' 'C' 'D' 'I' 'J' 'K'.       CL*14
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  24
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDATE)
+  1289         88  GREGORIAN-TO-BIN                                        CL**2
+  1290                  VALUES '2' '3' '4' '9' 'A' 'B' 'J' 'K' 'L' 'M'.    CL*14
+  1291         88  BIN-TO-GREGORIAN                                        CL**2
+  1292                  VALUES ' ' '1' 'I' '8' 'G'.                        CL*14
+  1293         88  JULIAN-TO-BINARY                                        CL**2
+  1294                  VALUES '5' 'C' 'E' 'F'.                            CL*14
+  1295     12  DC-ERROR-CODE                 PIC X.                        CL*15
+  1296         88  NO-CONVERSION-ERROR        VALUE ' '.                   CL**3
+  1297         88  DATE-CONVERSION-ERROR                                ELCDATE
+  1298                  VALUES '1' '2' '3' '4' '5' '9' 'A' 'B' 'C'.        CL*14
+  1299         88  DATE-IS-ZERO               VALUE '1'.                ELCDATE
+  1300         88  DATE-IS-NON-NUMERIC        VALUE '2'.                ELCDATE
+  1301         88  DATE-IS-INVALID            VALUE '3'.                ELCDATE
+  1302         88  DATE1-GREATER-DATE2        VALUE '4'.                ELCDATE
+  1303         88  ELAPSED-PLUS-NEGATIVE      VALUE '5'.                ELCDATE
+  1304         88  DATE-INVALID-OPTION        VALUE '9'.                ELCDATE
+  1305         88  INVALID-CENTURY            VALUE 'A'.                ELCDATE
+  1306         88  ONLY-CENTURY               VALUE 'B'.                ELCDATE
+  1307         88  ONLY-LEAP-YEAR             VALUE 'C'.                ELCDATE
+  1308         88  VALID-CENTURY-LEAP-YEAR    VALUE 'B', 'C'.              CL**3
+  1309     12  DC-END-OF-MONTH               PIC X.                        CL*15
+  1310         88  CALCULATE-END-OF-MONTH     VALUE '1'.                ELCDATE
+  1311     12  DC-CENTURY-ADJUSTMENT         PIC X   VALUE SPACES.         CL*15
+  1312         88  USE-NORMAL-PROCESS         VALUE ' '.                ELCDATE
+  1313         88  ADJUST-DOWN-100-YRS        VALUE '1'.                ELCDATE
+  1314         88  ADJUST-UP-100-YRS          VALUE '2'.                ELCDATE
+  1315     12  FILLER                        PIC X.                        CL*15
+  1316     12  DC-CONVERSION-DATES.                                        CL*15
+  1317         16  DC-BIN-DATE-1             PIC XX.                       CL*15
+  1318         16  DC-BIN-DATE-2             PIC XX.                       CL*15
+  1319         16  DC-GREG-DATE-1-EDIT       PIC X(08).                    CL*15
+  1320         16  DC-GREG-DATE-1-EDIT-R REDEFINES                         CL*15
+  1321                       DC-GREG-DATE-1-EDIT.                       ELCDATE
+  1322             20  DC-EDIT1-MONTH        PIC 99.                       CL*15
+  1323             20  SLASH1-1              PIC X.                        CL*15
+  1324             20  DC-EDIT1-DAY          PIC 99.                       CL*15
+  1325             20  SLASH1-2              PIC X.                        CL*15
+  1326             20  DC-EDIT1-YEAR         PIC 99.                       CL*15
+  1327         16  DC-GREG-DATE-2-EDIT       PIC X(08).                    CL*15
+  1328         16  DC-GREG-DATE-2-EDIT-R REDEFINES                         CL*15
+  1329                     DC-GREG-DATE-2-EDIT.                         ELCDATE
+  1330             20  DC-EDIT2-MONTH        PIC 99.                       CL*15
+  1331             20  SLASH2-1              PIC X.                        CL*15
+  1332             20  DC-EDIT2-DAY          PIC 99.                       CL*15
+  1333             20  SLASH2-2              PIC X.                        CL*15
+  1334             20  DC-EDIT2-YEAR         PIC 99.                       CL*15
+  1335         16  DC-GREG-DATE-1-YMD        PIC 9(06).                    CL*15
+  1336         16  DC-GREG-DATE-1-YMD-R  REDEFINES                         CL*15
+  1337                     DC-GREG-DATE-1-YMD.                          ELCDATE
+  1338             20  DC-YMD-YEAR           PIC 99.                       CL*15
+  1339             20  DC-YMD-MONTH          PIC 99.                       CL*15
+  1340             20  DC-YMD-DAY            PIC 99.                       CL*15
+  1341         16  DC-GREG-DATE-1-MDY        PIC 9(06).                    CL*15
+  1342         16  DC-GREG-DATE-1-MDY-R REDEFINES                          CL*15
+  1343                      DC-GREG-DATE-1-MDY.                         ELCDATE
+  1344             20  DC-MDY-MONTH          PIC 99.                       CL*15
+  1345             20  DC-MDY-DAY            PIC 99.                       CL*15
+  1346             20  DC-MDY-YEAR           PIC 99.                       CL*15
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  25
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDATE)
+  1347         16  DC-GREG-DATE-1-ALPHA.                                   CL*15
+  1348             20  DC-ALPHA-MONTH        PIC X(10).                    CL*15
+  1349             20  DC-ALPHA-DAY          PIC 99.                       CL*15
+  1350             20  FILLER                PIC XX.                       CL*15
+  1351             20  DC-ALPHA-CENTURY.                                   CL*15
+  1352                 24 DC-ALPHA-CEN-N     PIC 99.                       CL*15
+  1353             20  DC-ALPHA-YEAR         PIC 99.                       CL*15
+  1354         16  DC-ELAPSED-MONTHS         PIC S9(4)     COMP.           CL*15
+  1355         16  DC-ODD-DAYS-OVER          PIC S9(4)     COMP.           CL*15
+  1356         16  DC-ELAPSED-DAYS           PIC S9(4)     COMP.           CL*15
+  1357         16  DC-JULIAN-DATE            PIC 9(05).                    CL*15
+  1358         16  DC-JULIAN-YYDDD REDEFINES DC-JULIAN-DATE                CL*20
+  1359                                       PIC 9(05).                    CL*20
+  1360         16  DC-JULIAN-DT REDEFINES DC-JULIAN-DATE.                  CL*15
+  1361             20  DC-JULIAN-YEAR        PIC 99.                       CL*15
+  1362             20  DC-JULIAN-DAYS        PIC 999.                      CL*15
+  1363         16  DC-DAYS-IN-MONTH          PIC S9(3)       COMP-3.       CL*15
+  1364         16  DC-DAY-OF-WEEK            PIC S9  VALUE ZERO COMP-3.    CL*15
+  1365         16  DC-DAY-OF-WEEK2           PIC S9  VALUE ZERO COMP-3.    CL*15
+  1366     12  DATE-CONVERSION-VARIBLES.                                   CL*15
+  1367         16  HOLD-CENTURY-1            PIC 9(11) VALUE 0.            CL*15
+  1368         16  HOLD-CENTURY-1-SPLIT REDEFINES HOLD-CENTURY-1.          CL*15
+  1369             20  FILLER                PIC 9(3).                     CL*15
+  1370             20  HOLD-CEN-1-CCYY.                                    CL*15
+  1371                 24  HOLD-CEN-1-CC     PIC 99.                       CL*17
+  1372                 24  HOLD-CEN-1-YY     PIC 99.                       CL*17
+  1373             20  HOLD-CEN-1-MO         PIC 99.                       CL*17
+  1374             20  HOLD-CEN-1-DA         PIC 99.                       CL*17
+  1375         16  HOLD-CENTURY-1-R   REDEFINES HOLD-CENTURY-1.            CL*15
+  1376             20  HOLD-CEN-1-R-MO       PIC 99.                       CL*17
+  1377             20  HOLD-CEN-1-R-DA       PIC 99.                       CL*17
+  1378             20  HOLD-CEN-1-R-CCYY.                                  CL*15
+  1379                 24  HOLD-CEN-1-R-CC   PIC 99.                       CL*17
+  1380                 24  HOLD-CEN-1-R-YY   PIC 99.                       CL*17
+  1381             20  FILLER                PIC 9(3).                     CL*15
+  1382         16  HOLD-CENTURY-1-X.                                       CL*15
+  1383             20  FILLER                PIC X(3)  VALUE SPACES.       CL*15
+  1384             20  HOLD-CEN-1-X-CCYY.                                  CL*15
+  1385                 24  HOLD-CEN-1-X-CC   PIC XX VALUE SPACES.          CL*17
+  1386                 24  HOLD-CEN-1-X-YY   PIC XX VALUE SPACES.          CL*17
+  1387             20  HOLD-CEN-1-X-MO       PIC XX VALUE SPACES.          CL*17
+  1388             20  HOLD-CEN-1-X-DA       PIC XX VALUE SPACES.          CL*17
+  1389         16  HOLD-CENTURY-1-R-X REDEFINES HOLD-CENTURY-1-X.          CL*15
+  1390             20  HOLD-CEN-1-R-X-MO     PIC XX.                       CL*17
+  1391             20  HOLD-CEN-1-R-X-DA     PIC XX.                       CL*17
+  1392             20  HOLD-CEN-1-R-X-CCYY.                                CL*15
+  1393                 24  HOLD-CEN-1-R-X-CC PIC XX.                       CL*17
+  1394                 24  HOLD-CEN-1-R-X-YY PIC XX.                       CL*17
+  1395             20  FILLER                PIC XXX.                      CL*23
+  1396         16  DC-BIN-DATE-EXPAND-1      PIC XXX.                      CL*15
+  1397         16  DC-BIN-DATE-EXPAND-2      PIC XXX.                      CL*15
+  1398         16  DC-JULIAN-DATE-1          PIC 9(07).                    CL*15
+  1399         16  DC-JULIAN-DATE-1-R REDEFINES DC-JULIAN-DATE-1.          CL*15
+  1400             20  DC-JULIAN-1-CCYY.                                   CL*15
+  1401                 24  DC-JULIAN-1-CC    PIC 99.                       CL*15
+  1402                 24  DC-JULIAN-1-YR    PIC 99.                       CL*15
+  1403             20  DC-JULIAN-DA-1        PIC 999.                      CL*15
+  1404         16  DC-JULIAN-DATE-2          PIC 9(07).                    CL*15
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  26
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDATE)
+  1405         16  DC-JULIAN-DATE-2-R REDEFINES DC-JULIAN-DATE-2.          CL*15
+  1406             20  DC-JULIAN-2-CCYY.                                   CL*15
+  1407                 24  DC-JULIAN-2-CC    PIC 99.                       CL*15
+  1408                 24  DC-JULIAN-2-YR    PIC 99.                       CL*15
+  1409             20  DC-JULIAN-DA-2        PIC 999.                      CL*15
+  1410         16  DC-GREG-DATE-A-EDIT.                                    CL*15
+  1411             20  DC-EDITA-MONTH        PIC 99.                       CL*15
+  1412             20  SLASHA-1              PIC X VALUE '/'.              CL*15
+  1413             20  DC-EDITA-DAY          PIC 99.                       CL*15
+  1414             20  SLASHA-2              PIC X VALUE '/'.              CL*15
+  1415             20  DC-EDITA-CCYY.                                      CL*15
+  1416                 24  DC-EDITA-CENT     PIC 99.                       CL*15
+  1417                 24  DC-EDITA-YEAR     PIC 99.                       CL*15
+  1418         16  DC-GREG-DATE-B-EDIT.                                    CL*15
+  1419             20  DC-EDITB-MONTH        PIC 99.                       CL*15
+  1420             20  SLASHB-1              PIC X VALUE '/'.              CL*15
+  1421             20  DC-EDITB-DAY          PIC 99.                       CL*15
+  1422             20  SLASHB-2              PIC X VALUE '/'.              CL*15
+  1423             20  DC-EDITB-CCYY.                                      CL*15
+  1424                 24  DC-EDITB-CENT     PIC 99.                       CL*15
+  1425                 24  DC-EDITB-YEAR     PIC 99.                       CL*15
+  1426         16  DC-GREG-DATE-CYMD         PIC 9(08).                    CL*15
+  1427         16  DC-GREG-DATE-CYMD-R REDEFINES                           CL*15
+  1428                              DC-GREG-DATE-CYMD.                  ELCDATE
+  1429             20  DC-CYMD-CEN           PIC 99.                       CL*15
+  1430             20  DC-CYMD-YEAR          PIC 99.                       CL*15
+  1431             20  DC-CYMD-MONTH         PIC 99.                       CL*15
+  1432             20  DC-CYMD-DAY           PIC 99.                       CL*15
+  1433         16  DC-GREG-DATE-MDCY         PIC 9(08).                    CL*15
+  1434         16  DC-GREG-DATE-MDCY-R REDEFINES                           CL*15
+  1435                              DC-GREG-DATE-MDCY.                  ELCDATE
+  1436             20  DC-MDCY-MONTH         PIC 99.                       CL*15
+  1437             20  DC-MDCY-DAY           PIC 99.                       CL*15
+  1438             20  DC-MDCY-CEN           PIC 99.                       CL*15
+  1439             20  DC-MDCY-YEAR          PIC 99.                       CL*15
+  1440    12  DC-FORCE-EL310-DATE-SW         PIC X    VALUE SPACE.      ELCDATE
+  1441        88  DC-FORCE-EL310-DATE                 VALUE 'Y'.        ELCDATE
+  1442    12  DC-EL310-DATE                  PIC X(21).                    CL*26
+  1443    12  FILLER                         PIC X(28).                    CL*26
+  1444
+  1445 PROCEDURE DIVISION.
+  1446
+* 1447                                 COPY ELCDTERX.
+  1448******************************************************************04/15/98
+  1449*                                                                *ELCDTERX
+  1450*                                                                *ELCDTERX
+  1451*                            ELCDTERX.                           *   LV002
+  1452*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL**2
+  1453*                            VMOD=2.007                          *ELCDTERX
+  1454*                                                                *ELCDTERX
+  1455*      LOAD DATE CARD DISK FILE INTO WORKING STORAGE AREA        *ELCDTERX
+  1456*      (COPY CODE FOR W/S = ELCDTECX AND COPY CODE FOR FD        *ELCDTERX
+  1457*      = ELCDTEFD)                                               *ELCDTERX
+  1458*                                                                *ELCDTERX
+  1459******************************************************************ELCDTERX
+  1460                                                                  ELCDTERX
+  1461     ACCEPT WS-ACCEPT-DATE       FROM  DATE.                      ELCDTERX
+  1462                                                                  ELCDTERX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  27
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTERX)
+  1463     MOVE WS-AD-YY               TO  WS-CD-YY.                    ELCDTERX
+  1464     MOVE WS-AD-MM               TO  WS-CD-MM.                    ELCDTERX
+  1465     MOVE WS-AD-DD               TO  WS-CD-DD.                    ELCDTERX
+  1466                                                                  ELCDTERX
+  1467     ACCEPT WS-TIME-OF-DAY       FROM  TIME.                      ELCDTERX
+  1468                                                                  ELCDTERX
+  1469******************************************************************ELCDTERX
+  1470*    NOTE: THE FOLLOWING STATEMENT IS USED TO ELIMINATE COB II    ELCDTERX
+  1471*          WARNING MESSAGES.                                      ELCDTERX
+  1472******************************************************************ELCDTERX
+  1473     IF WS-CD-YY = LOW-VALUES                                     ELCDTERX
+  1474         COMPUTE PGM-SUB = PGM-SUB + 1.                           ELCDTERX
+  1475                                                                  ELCDTERX
+  1476     OPEN INPUT DISK-DATE.                                        ELCDTERX
+  1477                                                                  ELCDTERX
+  1478     MOVE SPACE TO DATE-CARD         CLAS-BUSINESS-CLASSES        ELCDTERX
+  1479                   STATE-NAMES       CLAS-MORTALITY-CODES         ELCDTERX
+  1480                   CLAS-INS-TYPES    COMPANY-NAME-TABLE           ELCDTERX
+  1481                   DATE-CARD-OPTIONS DATE-CARD-FACTORS            ELCDTERX
+  1482                   CLAX-ID           CLAS-MISC                    ELCDTERX
+  1483                   CARRIER-NAMES     CLASIC-SYSTEM-CODES          ELCDTERX
+  1484                   CARRIER-OPT-CLAIM-DATA                         ELCDTERX
+  1485                   STATE-TARGET-LOSS-RATIOS                       ELCDTERX
+  1486                   BUSINESS-TRGT-LOSS-RATIO-MODS                  ELCDTERX
+  1487                   MISC-OPT-CLM-RSV-DATA.                         ELCDTERX
+  1488                                                                  ELCDTERX
+  1489     MOVE LOW-VALUES TO CLAS-INDEX-TBL CLAS-TYPE-MISC.            ELCDTERX
+  1490                                                                  ELCDTERX
+  1491     MOVE ZERO TO CLAS-CN DTE-TOT-LINES CLAS-CO                   ELCDTERX
+  1492                  INDEXCA INDEXBS INDEXST.                        ELCDTERX
+  1493                                                                  ELCDTERX
+  1494     COMPUTE CLAS-CN = PGM-SUB / +50.                             ELCDTERX
+  1495     COMPUTE CLAS-CO = PGM-SUB / +20.                             ELCDTERX
+  1496     COMPUTE CLAS-INDEXEN = PGM-SUB - (CLAS-CN * +50).            ELCDTERX
+  1497     COMPUTE CLAS-INDEXON = PGM-SUB - (CLAS-CO * +20).            ELCDTERX
+  1498                                                                  ELCDTERX
+  1499     IF CLAS-INDEXEN = ZERO                                       ELCDTERX
+  1500         MOVE +50               TO CLAS-INDEXEN                   ELCDTERX
+  1501     ELSE                                                         ELCDTERX
+  1502         ADD +1                 TO CLAS-CN.                       ELCDTERX
+  1503                                                                  ELCDTERX
+  1504     IF CLAS-INDEXON = ZERO                                       ELCDTERX
+  1505         MOVE +20               TO CLAS-INDEXON                   ELCDTERX
+  1506     ELSE                                                         ELCDTERX
+  1507         ADD +1                 TO CLAS-CO.                       ELCDTERX
+  1508                                                                  ELCDTERX
+  1509 0005-READ--CARD.                                                 ELCDTERX
+  1510     READ DISK-DATE                                               ELCDTERX
+  1511         AT END CLOSE DISK-DATE                                   ELCDTERX
+  1512             GO TO 0060-READ--TEST.                               ELCDTERX
+  1513                                                                  ELCDTERX
+  1514     MOVE ZERO                   TO CLAS-INDEX.                   ELCDTERX
+  1515                                                                  ELCDTERX
+  1516     IF DD-ID = 'CLAS' OR 'LIFE' OR 'GLED'                        ELCDTERX
+  1517         MOVE DATE-DISK          TO DATE-CARD                     ELCDTERX
+  1518         MOVE RUN-DATE           TO WS-RUN-DATE-N                    CL**2
+  1519         MOVE EP-DT              TO WS-EP-DT-N                       CL**2
+  1520         GO TO 0005-READ--CARD.                                   ELCDTERX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  28
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTERX)
+  1521                                                                  ELCDTERX
+  1522     IF DD-ID = 'CLAD'                                            ELCDTERX
+  1523         MOVE DATE-DISK          TO DATE-CARD-OPTIONS             ELCDTERX
+  1524         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1525                                                                  ELCDTERX
+  1526     IF DD-ID = 'CLAX'                                            ELCDTERX
+  1527         MOVE DATE-DISK          TO CLAS-INDEX-TBL                ELCDTERX
+  1528         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1529                                                                  ELCDTERX
+  1530     IF DD-ID = 'CLAF'                                            ELCDTERX
+  1531         MOVE DATE-DISK          TO DATE-CARD-FACTORS             ELCDTERX
+  1532         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1533                                                                  ELCDTERX
+  1534     IF DD-ID = 'CLAC'                                            ELCDTERX
+  1535         GO TO 0010-READ--CLAC.                                   ELCDTERX
+  1536                                                                  ELCDTERX
+  1537     IF DD-ID = 'CARR'                                            ELCDTERX
+  1538         GO TO 0015-READ--CARR.                                   ELCDTERX
+  1539                                                                  ELCDTERX
+  1540     IF DD-ID = 'STAT'                                            ELCDTERX
+  1541         GO TO 0020-READ--STAT.                                   ELCDTERX
+  1542                                                                  ELCDTERX
+  1543     IF DD-ID = 'BUSC'                                            ELCDTERX
+  1544         GO TO 0025-READ--BUSC.                                   ELCDTERX
+  1545                                                                  ELCDTERX
+  1546     IF DD-ID = 'MORT'                                            ELCDTERX
+  1547         GO TO 0030-READ--MORT.                                   ELCDTERX
+  1548                                                                  ELCDTERX
+  1549     IF DD-ID = 'CLAI'                                            ELCDTERX
+  1550         GO TO 0040-READ--CLAI.                                   ELCDTERX
+  1551                                                                  ELCDTERX
+  1552     IF DD-ID = 'COLC'                                            ELCDTERX
+  1553         GO TO 0065-READ--COLC.                                   ELCDTERX
+  1554                                                                  ELCDTERX
+  1555     IF DD-IDX NUMERIC AND                                        ELCDTERX
+  1556        DD-IDA = 'CL'                                             ELCDTERX
+  1557         GO TO 0035-READ--CLXX.                                   ELCDTERX
+  1558                                                                  ELCDTERX
+  1559     IF DD-IDX NUMERIC AND                                        ELCDTERX
+  1560        DD-IDA = 'PO'                                             ELCDTERX
+  1561         GO TO 0050-READ--POXX.                                   ELCDTERX
+  1562                                                                  ELCDTERX
+  1563     IF DD-ID = 'OPCA'                                            ELCDTERX
+  1564         GO TO 0070-READ--OPCA.                                   ELCDTERX
+  1565                                                                  ELCDTERX
+  1566     IF DD-ID = 'OPST'                                            ELCDTERX
+  1567         GO TO 0072-READ--OPST.                                   ELCDTERX
+  1568                                                                  ELCDTERX
+  1569     IF DD-ID = 'OPBS'                                            ELCDTERX
+  1570         GO TO 0074-READ--OPBS.                                   ELCDTERX
+  1571                                                                  ELCDTERX
+  1572     IF DD-ID = 'OPMS'                                            ELCDTERX
+  1573         MOVE DD-MISC-DATA       TO MISC-OPT-CLM-RSV-DATA.        ELCDTERX
+  1574                                                                  ELCDTERX
+  1575     GO TO 0005-READ--CARD.                                       ELCDTERX
+  1576                                                                  ELCDTERX
+  1577 0010-READ--CLAC.                                                 ELCDTERX
+  1578     ADD 1                       TO CLAS-INDEXC.                  ELCDTERX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  29
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTERX)
+  1579     MOVE DD-CR1                 TO CNT-ID (CLAS-INDEXC).         ELCDTERX
+  1580     MOVE DD-CR1N                TO CNT-NAME (CLAS-INDEXC).       ELCDTERX
+  1581     ADD 1                       TO CLAS-INDEXC.                  ELCDTERX
+  1582     MOVE DD-CR2                 TO CNT-ID (CLAS-INDEXC).         ELCDTERX
+  1583     MOVE DD-CR2N                TO CNT-NAME (CLAS-INDEXC).       ELCDTERX
+  1584     GO TO 0005-READ--CARD.                                       ELCDTERX
+  1585                                                                  ELCDTERX
+  1586 0015-READ--CARR.                                                 ELCDTERX
+  1587     ADD 1  TO  CLAS-INDEXCN.                                     ELCDTERX
+  1588     IF CLAS-INDEXCN LESS THAN +26                                ELCDTERX
+  1589        MOVE DD-CARR1         TO CARRIER-SUB (CLAS-INDEXCN)
+  1590        MOVE DD-CARR1S        TO CARRIER-DOM-ST (CLAS-INDEXCN)
+  1591        MOVE DD-CARR1N        TO CARRIER-PIC (CLAS-INDEXCN)
+  1592        MOVE DD-CARR1-UEP-PCT TO CARRIER-UEP-PCT (CLAS-INDEXCN)
+  1593        MOVE DD-CARR1-R78-PCT TO CARRIER-R78-PCT (CLAS-INDEXCN)
+  1594        MOVE DD-CARR1-PRO-PCT TO CARRIER-PRO-PCT (CLAS-INDEXCN)
+  1595        MOVE DD-CARR1-SECPAY-SW
+  1596                               TO CARRIER-SEC-PAY (CLAS-INDEXCN)
+  1597     END-IF
+  1598                                                                  ELCDTERX
+  1599     ADD 1  TO  CLAS-INDEXCN.                                     ELCDTERX
+  1600     IF CLAS-INDEXCN LESS THAN +26                                ELCDTERX
+  1601        MOVE DD-CARR2         TO CARRIER-SUB (CLAS-INDEXCN)
+  1602        MOVE DD-CARR2S        TO CARRIER-DOM-ST (CLAS-INDEXCN)
+  1603        MOVE DD-CARR2N        TO CARRIER-PIC (CLAS-INDEXCN)
+  1604        MOVE DD-CARR2-UEP-PCT TO CARRIER-UEP-PCT (CLAS-INDEXCN)
+  1605        MOVE DD-CARR2-R78-PCT TO CARRIER-R78-PCT (CLAS-INDEXCN)
+  1606        MOVE DD-CARR2-PRO-PCT TO CARRIER-PRO-PCT (CLAS-INDEXCN)
+  1607        MOVE DD-CARR2-SECPAY-SW
+  1608                              TO CARRIER-SEC-PAY (CLAS-INDEXCN)
+  1609     END-IF
+  1610                                                                  ELCDTERX
+  1611                                                                  ELCDTERX
+  1612     GO TO 0005-READ--CARD.                                       ELCDTERX
+  1613                                                                  ELCDTERX
+  1614 0020-READ--STAT.                                                 ELCDTERX
+  1615     ADD 1                       TO CLAS-INDEX.                   ELCDTERX
+  1616     IF CLAS-INDEX GREATER 3  OR                                  ELCDTERX
+  1617        DD-ST (CLAS-INDEX) = SPACE                                ELCDTERX
+  1618         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1619                                                                  ELCDTERX
+  1620     ADD 1                       TO CLAS-INDEXS.                  ELCDTERX
+  1621     MOVE DD-ST (CLAS-INDEX)     TO STATE-NAME-FLD (CLAS-INDEXS). ELCDTERX
+  1622     GO TO 0020-READ--STAT.                                       ELCDTERX
+  1623                                                                  ELCDTERX
+  1624 0025-READ--BUSC.                                                 ELCDTERX
+  1625     ADD 1                       TO CLAS-INDEX.                   ELCDTERX
+  1626     IF CLAS-INDEX GREATER 3  OR                                  ELCDTERX
+  1627        DD-ST (CLAS-INDEX) = SPACE                                ELCDTERX
+  1628         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1629                                                                  ELCDTERX
+  1630     ADD 1                       TO CLAS-INDEXB.                  ELCDTERX
+  1631     MOVE DD-ST (CLAS-INDEX)     TO CLAS-BUSC-FLD (CLAS-INDEXB).  ELCDTERX
+  1632     GO TO 0025-READ--BUSC.                                       ELCDTERX
+  1633                                                                  ELCDTERX
+  1634 0030-READ--MORT.                                                 ELCDTERX
+  1635     ADD 1                       TO CLAS-INDEX.                   ELCDTERX
+  1636     IF CLAS-INDEX GREATER 2  OR                                  ELCDTERX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  30
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTERX)
+  1637        DD-MORT (CLAS-INDEX) = SPACE                              ELCDTERX
+  1638         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1639                                                                  ELCDTERX
+  1640     ADD 1                       TO CLAS-INDEXM.                  ELCDTERX
+  1641     MOVE DD-MORT (CLAS-INDEX)   TO CLAS-MORT-FLD (CLAS-INDEXM).  ELCDTERX
+  1642     GO TO 0030-READ--MORT.                                       ELCDTERX
+  1643                                                                  ELCDTERX
+  1644 0035-READ--CLXX.                                                 ELCDTERX
+  1645     IF DD-IDX NOT = CLAS-CN                                      ELCDTERX
+  1646          GO TO 0005-READ--CARD.                                  ELCDTERX
+  1647                                                                  ELCDTERX
+  1648     IF DD-PS-PIC (CLAS-INDEXEN) = 'X'                            ELCDTERX
+  1649         DISPLAY '***********************************************'ELCDTERX
+  1650         DISPLAY 'PROGRAM ECS-', PGM-SUB, ' NOT SCHEDULED TO RUN' ELCDTERX
+  1651         DISPLAY '***********************************************'ELCDTERX
+  1652         GO TO 0055-READ--STOP.                                   ELCDTERX
+  1653                                                                  ELCDTERX
+  1654     IF DD-PS-PIC (CLAS-INDEXEN) NOT LESS 'A'  AND                ELCDTERX
+  1655        DD-PS-PIC (CLAS-INDEXEN) NOT GREATER 'I'                  ELCDTERX
+  1656         MOVE '1'                TO DTE-FICH.                     ELCDTERX
+  1657                                                                  ELCDTERX
+  1658     IF DD-PS-PIC (CLAS-INDEXEN) NOT LESS 'J'  AND                ELCDTERX
+  1659        DD-PS-PIC (CLAS-INDEXEN) NOT GREATER 'R'                  ELCDTERX
+  1660         MOVE '2'                TO DTE-FICH.                     ELCDTERX
+  1661                                                                  ELCDTERX
+  1662*    MOVE DD-PS-PIC (CLAS-INDEXEN) TO DTE-PGM-OPT.                ELCDTERX
+  1663     GO TO 0005-READ--CARD.                                       ELCDTERX
+  1664                                                                  ELCDTERX
+  1665 0040-READ--CLAI.                                                 ELCDTERX
+  1666     ADD 1                       TO CLAS-INDEX.                   ELCDTERX
+  1667     IF CLAS-INDEX GREATER 2  OR                                  ELCDTERX
+  1668        DD-TYPE (CLAS-INDEX) = SPACE                              ELCDTERX
+  1669         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1670                                                                  ELCDTERX
+  1671     ADD 1                       TO CLAS-INDEXA.                  ELCDTERX
+  1672     MOVE DD-TYPE (CLAS-INDEX) TO CLAS-ALL-TYPES (CLAS-INDEXA).   ELCDTERX
+  1673     GO TO 0040-READ--CLAI.                                       ELCDTERX
+  1674                                                                  ELCDTERX
+  1675 0045-READ--DUMP.                                                 ELCDTERX
+  1676     MOVE +999 TO WS-RETURN-CODE                                  ELCDTERX
+  1677     MOVE 'MISSING AND/OR INVALID CLAS DATE CARD'                 ELCDTERX
+  1678                                 TO  WS-ABEND-MESSAGE             ELCDTERX
+  1679     PERFORM ABEND-PGM.                                           ELCDTERX
+  1680                                                                  ELCDTERX
+  1681 0050-READ--POXX.                                                 ELCDTERX
+  1682     IF DD-IDX NOT = CLAS-CO                                      ELCDTERX
+  1683         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1684                                                                  ELCDTERX
+  1685     IF DD-PS-PRC (CLAS-INDEXON) = 'X'                            ELCDTERX
+  1686         DISPLAY '***********************************************'ELCDTERX
+  1687         DISPLAY 'ECS - ', PGM-SUB, ' IS NOT SCHEDULED TO RUN'    ELCDTERX
+  1688         DISPLAY '***********************************************'ELCDTERX
+  1689         GO TO 0055-READ--STOP.                                   ELCDTERX
+  1690                                                                  ELCDTERX
+  1691     MOVE DD-PS-PRT (CLAS-INDEXON) TO DTE-PRT-OPT.                ELCDTERX
+  1692     MOVE DD-PS-FMT (CLAS-INDEXON) TO DTE-FMT-OPT.                ELCDTERX
+  1693     MOVE DD-PS-PRC (CLAS-INDEXON) TO DTE-PRC-OPT DTE-PGM-OPT.    ELCDTERX
+  1694     MOVE DD-PS-TOT (CLAS-INDEXON) TO DTE-TOT-OPT.                ELCDTERX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  31
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTERX)
+  1695                                                                  ELCDTERX
+  1696     IF DTE-PRT-OPT = 'B'                                         ELCDTERX
+  1697         MOVE '2'                  TO DTE-FICH.                   ELCDTERX
+  1698     IF DTE-PRT-OPT = 'F'                                         ELCDTERX
+  1699         MOVE '1'                  TO DTE-FICH.                   ELCDTERX
+  1700                                                                  ELCDTERX
+  1701     GO TO 0005-READ--CARD.                                       ELCDTERX
+  1702                                                                  ELCDTERX
+  1703 0055-READ--STOP.                                                 ELCDTERX
+  1704     GOBACK.                                                      ELCDTERX
+  1705                                                                  ELCDTERX
+  1706 0060-READ--TEST.                                                 ELCDTERX
+  1707     IF DATX-COD        = SPACE  OR                               ELCDTERX
+  1708        CLAX-ID         = SPACE  OR                               ELCDTERX
+  1709        DATE-OPTIONS-ID = SPACE                                   ELCDTERX
+  1710         GO TO 0045-READ--DUMP.                                   ELCDTERX
+  1711                                                                  ELCDTERX
+  1712     MOVE LOW-VALUE TO CLAS-TYPE-MISC.                            ELCDTERX
+  1713     GO TO 0079-READ--EXIT.                                       ELCDTERX
+  1714                                                                  ELCDTERX
+  1715 0065-READ--COLC.                                                 ELCDTERX
+  1716     MOVE DATE-DISK              TO CLASIC-SYSTEM-CODES.          ELCDTERX
+  1717     GO TO 0005-READ--CARD.                                       ELCDTERX
+  1718                                                                  ELCDTERX
+  1719 0070-READ--OPCA.                                                 ELCDTERX
+  1720                                                                  ELCDTERX
+  1721     ADD 1                       TO CLAS-INDEX.                   ELCDTERX
+  1722                                                                  ELCDTERX
+  1723     IF  CLAS-INDEX GREATER 13                                    ELCDTERX
+  1724             OR                                                   ELCDTERX
+  1725         DD-CARR-FLDS (CLAS-INDEX) = SPACE                        ELCDTERX
+  1726         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1727                                                                  ELCDTERX
+  1728     ADD 1                       TO INDEXCA.                      ELCDTERX
+  1729     MOVE DD-CARR-FLDS (CLAS-INDEX)                               ELCDTERX
+  1730                                 TO CARRIER-FLDS (INDEXCA).       ELCDTERX
+  1731     GO TO 0070-READ--OPCA.                                       ELCDTERX
+  1732                                                                  ELCDTERX
+  1733 0072-READ--OPST.                                                 ELCDTERX
+  1734                                                                  ELCDTERX
+  1735     ADD 1                       TO CLAS-INDEX.                   ELCDTERX
+  1736                                                                  ELCDTERX
+  1737     IF  CLAS-INDEX GREATER 16                                    ELCDTERX
+  1738             OR                                                   ELCDTERX
+  1739         DD-TLR (CLAS-INDEX) = SPACE                              ELCDTERX
+  1740         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1741                                                                  ELCDTERX
+  1742     ADD 1                       TO INDEXST.                      ELCDTERX
+  1743     MOVE DD-STATE-FLDS (CLAS-INDEX)                              ELCDTERX
+  1744                                 TO STATE-TLR-FLD (INDEXST).      ELCDTERX
+  1745     GO TO 0072-READ--OPST.                                       ELCDTERX
+  1746                                                                  ELCDTERX
+  1747 0074-READ--OPBS.                                                 ELCDTERX
+  1748                                                                  ELCDTERX
+  1749     ADD 1                       TO CLAS-INDEX.                   ELCDTERX
+  1750                                                                  ELCDTERX
+  1751     IF  CLAS-INDEX GREATER 32                                    ELCDTERX
+  1752             OR                                                   ELCDTERX
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  32
+* DCCMABPC.cbl (/apps/prod/cid1p/copy/ELCDTERX)
+  1753         DD-TLR (CLAS-INDEX) = SPACE                              ELCDTERX
+  1754         GO TO 0005-READ--CARD.                                   ELCDTERX
+  1755                                                                  ELCDTERX
+  1756     ADD 1                       TO INDEXBS.                      ELCDTERX
+  1757     MOVE DD-TLR (CLAS-INDEX)    TO BUS-TLRM-FLD (INDEXBS).       ELCDTERX
+  1758     GO TO 0074-READ--OPBS.                                       ELCDTERX
+  1759                                                                  ELCDTERX
+  1760 0079-READ--EXIT.                                                 ELCDTERX
+  1761*    EXIT.                                                        ELCDTERX
+  1762******************************************************************ELCDTERX
+  1763
+  1764     PERFORM 0040-OPEN-FILES     THRU 0040-EXIT
+  1765     PERFORM 0050-INIT           THRU 0050-EXIT
+  1766
+  1767     PERFORM 0020-PROCESS        THRU 0020-EXIT UNTIL
+  1768        (END-OF-INPUT)
+  1769*       OR (IN-CNT > 10)
+  1770     PERFORM 0060-CLOSE-FILES    THRU 0060-EXIT
+  1771
+  1772     DISPLAY ' EXTR RECS READ       ' EXTR-IN-CNT
+  1773     DISPLAY ' ELCERT RECS FOUND    ' ELCERT-IN-CNT
+  1774     DISPLAY ' ERMAIL RECS DUPS     ' ERMAIL-DP-CNT
+  1775     DISPLAY ' ERMAIL RECS ADDED    ' ERMAIL-OT-CNT
+  1776     DISPLAY ' ERMAIL RECS UPDATED  ' ERMAIL-UD-CNT
+  1777     DISPLAY ' ELCERT RECS UPDATED  ' ELCERT-UD-CNT
+  1778     DISPLAY ' ELCERT RECS PREV CAN ' ELCERT-AC-CNT
+  1779
+  1780     GOBACK
+  1781
+  1782     .
+  1783 0015-READ-ELCERT.
+  1784
+  1785     MOVE DTE-CLASIC-COMPANY-CD  TO CM-COMPANY-CD
+  1786     MOVE EX-CARRIER-GRP-ST      TO CM-CONTROL-PRIMARY (2:9)
+  1787     MOVE EX-ACCOUNT             TO CM-ACCOUNT
+  1788     MOVE EX-CERT                TO CM-CERT-NO
+  1789
+  1790     MOVE EX-EFF (7:4)           TO DC-GREG-DATE-CYMD-R (1:4)
+  1791     MOVE EX-EFF (1:2)           TO DC-GREG-DATE-CYMD-R (5:2)
+  1792     MOVE EX-EFF (4:2)           TO DC-GREG-DATE-CYMD-R (7:2)
+  1793     MOVE 'L'                    TO DC-OPTION-CODE
+  1794     PERFORM 8500-DATE-CONVERT   THRU 8500-EXIT
+  1795     IF NOT NO-CONVERSION-ERROR
+  1796        DISPLAY ' INVALID EFF DATE ' EX-EFF '  ' EX-CERT
+  1797        PERFORM ABEND-PGM
+  1798     ELSE
+  1799        MOVE DC-BIN-DATE-1       TO CM-CERT-EFF-DT
+  1800     END-IF
+  1801
+  1802     MOVE SPACES                 TO WS-CERT-CANCELLED-SW
+  1803     READ ELCERT
+  1804
+  1805     IF ELCERT-FILE-STATUS = '00'
+  1806        ADD 1                    TO ELCERT-IN-CNT
+  1807        IF (CM-LF-CANCEL-APPLIED OR CM-AH-CANCEL-APPLIED)
+  1808           AND (CERT-AS-LOADED)
+  1809           SET CERT-ALREADY-CANCELLED
+  1810                                 TO TRUE
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  33
+* DCCMABPC.cbl
+  1811           DISPLAY ' CERT ALREADY CANCELLED ' CM-CERT-NO
+  1812        END-IF
+  1813     ELSE
+  1814        IF (ELCERT-FILE-STATUS = '23' OR '10')
+  1815           OR (CM-COMPANY-CD > DTE-CLASIC-COMPANY-CD)
+  1816*          DISPLAY ' NO ELCERT    ' EX-ACCOUNT '  ' EX-CERT
+  1817           CONTINUE
+  1818        ELSE
+  1819           DISPLAY ' BAD READ ELCERT ' CM-CONTROL-PRIMARY '  '
+  1820              ELCERT-FILE-STATUS
+  1821           PERFORM ABEND-PGM
+  1822        END-IF
+  1823     END-IF
+  1824
+  1825     .
+  1826 0015-EXIT.
+  1827     EXIT.
+  1828
+  1829 0017-READ-INPUT.
+  1830
+  1831     READ POST-CARD-IN AT END
+  1832        SET END-OF-INPUT         TO TRUE
+  1833     END-READ
+  1834
+  1835     IF NOT END-OF-INPUT
+  1836        ADD 1                    TO EXTR-IN-CNT
+  1837     END-IF
+  1838
+  1839     .
+  1840 0017-EXIT.
+  1841     EXIT.
+  1842
+  1843 0020-PROCESS.
+  1844
+  1845     IF SPACES = EX-MAIL-DATE AND EX-MAIL-STATUS AND EX-MAIL-TYPE
+  1846        SET UPDATE-ADDRESS-ONLY  TO TRUE
+  1847        DISPLAY ' ADDRESS ONLY ' EX-STATE ' ' EX-ACCOUNT ' '
+  1848           EX-CERT
+  1849     ELSE
+  1850        MOVE SPACES              TO WS-ADDRESS-ONLY-SW
+  1851     END-IF
+  1852
+  1853     PERFORM 0015-READ-ELCERT    THRU 0015-EXIT
+  1854     PERFORM 0070-BUILD-ERMAIL   THRU 0070-EXIT
+  1855
+  1856     IF ELCERT-FOUND
+  1857        PERFORM 0030-REWRITE-ELCERT
+  1858                                 THRU 0030-EXIT
+  1859     END-IF
+  1860
+  1861     PERFORM 0017-READ-INPUT     THRU 0017-EXIT
+  1862
+  1863     .
+  1864 0020-EXIT.
+  1865      EXIT.
+  1866
+  1867 0030-REWRITE-ELCERT.
+  1868
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  34
+* DCCMABPC.cbl
+  1869     IF CM-INSURED-ADDRESS-SW NOT = '1'
+  1870        MOVE '1'                 TO CM-INSURED-ADDRESS-SW
+  1871*       MOVE '00'                TO ELCERT-FILE-STATUS
+  1872        REWRITE CERTIFICATE-MASTER
+  1873        IF ELCERT-FILE-STATUS = '00'
+  1874*          DISPLAY ' REWRITE CERT ' EX-ACCOUNT '  ' EX-CERT
+  1875           ADD 1                 TO ELCERT-UD-CNT
+  1876        ELSE
+  1877           DISPLAY ' BAD REWRITE ELCERT ' CM-CONTROL-PRIMARY
+  1878              '  ' ELCERT-FILE-STATUS
+  1879           PERFORM ABEND-PGM
+  1880        END-IF
+  1881     END-IF
+  1882
+  1883     .
+  1884 0030-EXIT.
+  1885      EXIT.
+  1886
+  1887 0040-OPEN-FILES.
+  1888
+  1889     OPEN INPUT POST-CARD-IN
+  1890*               ELCERT ERMAIL
+  1891     OPEN I-O ELCERT
+  1892
+  1893     IF ELCERT-FILE-STATUS NOT = '00'
+  1894        DISPLAY ' ELCERT OPEN ' ELCERT-FILE-STATUS
+  1895        PERFORM ABEND-PGM
+  1896     END-IF
+  1897
+  1898     OPEN I-O ERMAIL
+  1899
+  1900     IF ERMAIL-FILE-STATUS NOT = '00'
+  1901        DISPLAY ' ERMAIL OPEN ' ERMAIL-FILE-STATUS
+  1902        PERFORM ABEND-PGM
+  1903     END-IF
+  1904
+  1905     .
+  1906 0040-EXIT.
+  1907     EXIT.
+  1908
+  1909 0050-INIT.
+  1910
+  1911     DISPLAY ' ACCEPT DATE ' WS-ACCEPT-DATE
+  1912
+  1913     MOVE WS-ACCEPT-DATE         TO DC-GREG-DATE-1-YMD
+  1914     MOVE '3'                    TO DC-OPTION-CODE
+  1915     PERFORM 8500-DATE-CONVERT   THRU 8500-EXIT
+  1916     IF NO-CONVERSION-ERROR
+  1917        MOVE DC-BIN-DATE-1       TO WS-CURRENT-BIN-DATE
+  1918     ELSE
+  1919        DISPLAY ' ERROR CONVERTING CURRENT DATE '
+  1920     END-IF
+  1921
+  1922     PERFORM 0017-READ-INPUT     THRU 0017-EXIT
+  1923
+  1924     .
+  1925 0050-EXIT.
+  1926     EXIT.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  35
+* DCCMABPC.cbl
+  1927
+  1928 0060-CLOSE-FILES.
+  1929
+  1930     CLOSE ELCERT
+  1931           ERMAIL
+  1932           POST-CARD-IN
+  1933
+  1934     IF ELCERT-FILE-STATUS NOT = '00'
+  1935        DISPLAY ' ELCERT CLOSE ' ELCERT-FILE-STATUS
+  1936        PERFORM ABEND-PGM
+  1937     END-IF
+  1938
+  1939     IF ERMAIL-FILE-STATUS NOT = '00'
+  1940        DISPLAY ' ERMAIL CLOSE ' ERMAIL-FILE-STATUS
+  1941        PERFORM ABEND-PGM
+  1942     END-IF
+  1943
+  1944     .
+  1945 0060-EXIT.
+  1946     EXIT.
+  1947
+  1948 0070-BUILD-ERMAIL.
+  1949
+  1950     PERFORM 0071-BUILD-ERMAIL-KEY
+  1951                                 THRU 0071-EXIT
+  1952     READ ERMAIL
+  1953
+  1954     IF ERMAIL-FILE-STATUS = '00'
+  1955        PERFORM 0077-CHECK-FOR-DUPS
+  1956                                 THRU 0077-EXIT
+  1957        IF DUPLICATE-MAILING
+  1958           ADD 1                 TO ERMAIL-DP-CNT
+  1959           DISPLAY ' DUPLICATES FOUND ' EX-CERT
+  1960        ELSE
+  1961           PERFORM 0075-UPDATE-ERMAIL-BODY
+  1962                                 THRU 0075-EXIT
+  1963           PERFORM 0073-REWRITE-ERMAIL
+  1964                                 THRU 0073-EXIT
+  1965        END-IF
+  1966     ELSE
+  1967        IF ERMAIL-FILE-STATUS = '23' OR '10'
+  1968           MOVE SPACES           TO MAILING-DATA
+  1969           PERFORM 0071-BUILD-ERMAIL-KEY
+  1970                                 THRU 0071-EXIT
+  1971           PERFORM 0072-BUILD-ERMAIL-BODY
+  1972                                 THRU 0072-EXIT
+  1973           PERFORM 0075-UPDATE-ERMAIL-BODY
+  1974                                 THRU 0075-EXIT
+  1975           MOVE ' '              TO MA-ADDRESS-CORRECTED
+  1976           PERFORM 0074-WRITE-ERMAIL
+  1977                                 THRU 0074-EXIT
+  1978        ELSE
+  1979           DISPLAY ' BAD READ ERMAIL ' MA-CONTROL-PRIMARY '  '
+  1980              DC-GREG-DATE-CYMD '  ' ERMAIL-FILE-STATUS
+  1981           PERFORM ABEND-PGM
+  1982        END-IF
+  1983     END-IF
+  1984
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  36
+* DCCMABPC.cbl
+  1985     .
+  1986 0070-EXIT.
+  1987      EXIT.
+  1988
+  1989 0071-BUILD-ERMAIL-KEY.
+  1990
+  1991     MOVE CM-CONTROL-PRIMARY     TO MA-CONTROL-PRIMARY
+  1992
+  1993     .
+  1994 0071-EXIT.
+  1995     EXIT.
+  1996
+  1997 0072-BUILD-ERMAIL-BODY.
+  1998
+  1999     DISPLAY ' BUILDING ERMAIL REC ' EX-STATE ' ' EX-ACCOUNT
+  2000        ' ' EX-CERT
+  2001     MOVE 'CR'                   TO MA-SOURCE-SYSTEM
+  2002     MOVE ZEROS                  TO MA-INSURED-ISSUE-AGE
+  2003                                    MA-PHONE-NO
+  2004     PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+  2005        S1 > +7
+  2006        MOVE LOW-VALUES          TO MA-MAIL-DATE (S1)
+  2007     END-PERFORM
+  2008
+  2009     MOVE WS-CURRENT-BIN-DATE    TO MA-RECORD-ADD-DT
+  2010                                    MA-LAST-MAINT-DT
+  2011     MOVE 'POST'                 TO MA-RECORD-ADDED-BY
+  2012     MOVE +190000                TO MA-LAST-MAINT-HHMMSS
+  2013
+  2014     .
+  2015 0072-EXIT.
+  2016     EXIT.
+  2017
+  2018 0073-REWRITE-ERMAIL.
+  2019
+  2020     PERFORM 0076-CHK-FOR-HEX7E  THRU 0076-EXIT
+  2021
+  2022     move ma-cert-eff-dt         to dc-bin-date-1
+  2023     move ' '                    to dc-option-code
+  2024     PERFORM 8500-DATE-CONVERT   THRU 8500-EXIT
+  2025     IF NO-CONVERSION-ERROR
+  2026        move dc-greg-date-1-edit to ws-dis-date
+  2027     else
+  2028        move 'INVALID'           to ws-dis-date
+  2029     end-if
+  2030
+  2031     if address-upd
+  2032        display ' upding address for ' ma-carrier ' ' ma-state
+  2033           ' ' ma-account ' ' ws-dis-date ' ' ma-cert-no
+  2034        display '*** ' ws-address-line-1 '*' ws-address-line-2
+  2035           '*' ws-city-state '*' ws-zip
+  2036        display '*** ' ma-address-line-1 '*' ma-address-line-2
+  2037           '*' ma-city-state '*' ma-zip
+  2038     else
+  2039        display ' upding mailing for ' ma-carrier ' ' ma-state
+  2040           ' ' ma-account ' ' ws-dis-date ' ' ma-cert-no
+  2041        display '*** ' ex-mail-type ' ' ex-mail-status ' '
+  2042           ex-mail-date
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  37
+* DCCMABPC.cbl
+  2043     end-if
+  2044
+  2045*    MOVE '00'                   TO ERMAIL-FILE-STATUS
+  2046     REWRITE MAILING-DATA
+  2047
+  2048     IF ERMAIL-FILE-STATUS = '00'
+  2049        ADD 1                    TO ERMAIL-UD-CNT
+  2050     ELSE
+  2051        DISPLAY ' BAD REWRITE ERMAIL ' MA-CONTROL-PRIMARY '  '
+  2052           DC-GREG-DATE-CYMD '  ' ERMAIL-FILE-STATUS
+  2053        PERFORM ABEND-PGM
+  2054     END-IF
+  2055
+  2056     .
+  2057 0073-EXIT.
+  2058     EXIT.
+  2059
+  2060 0074-WRITE-ERMAIL.
+  2061
+  2062     PERFORM 0076-CHK-FOR-HEX7E  THRU 0076-EXIT
+  2063
+  2064     MOVE 'MA'                   TO MA-RECORD-ID
+  2065
+  2066     move ma-cert-eff-dt         to dc-bin-date-1
+  2067     move ' '                    to dc-option-code
+  2068     PERFORM 8500-DATE-CONVERT   THRU 8500-EXIT
+  2069     IF NO-CONVERSION-ERROR
+  2070        move dc-greg-date-1-edit to ws-dis-date
+  2071     else
+  2072        move 'INVALID'           to ws-dis-date
+  2073     end-if
+  2074
+  2075     if address-upd
+  2076        display ' adding address for ' ma-carrier ' ' ma-state
+  2077           ' ' ma-account ' ' ws-dis-date ' ' ma-cert-no
+  2078        display '*** ' ma-address-line-1 '*' ma-address-line-2
+  2079           '*' ma-city-state '*' ma-zip
+  2080     else
+  2081        display ' adding mailing for ' ma-carrier ' ' ma-state
+  2082           ' ' ma-account ' ' ws-dis-date ' ' ma-cert-no
+  2083        display '*** ' ex-mail-type ' ' ex-mail-status ' '
+  2084           ex-mail-date
+  2085     end-if
+  2086
+  2087*    MOVE '00'                   TO ERMAIL-FILE-STATUS
+  2088     WRITE MAILING-DATA
+  2089
+  2090     IF ERMAIL-FILE-STATUS = '00'
+  2091        ADD 1                    TO ERMAIL-OT-CNT
+  2092     ELSE
+  2093        DISPLAY ' BAD WRITE ERMAIL ' MA-CONTROL-PRIMARY '  '
+  2094           DC-GREG-DATE-CYMD '  ' ERMAIL-FILE-STATUS
+  2095        PERFORM ABEND-PGM
+  2096     END-IF
+  2097
+  2098     .
+  2099 0074-EXIT.
+  2100     EXIT.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  38
+* DCCMABPC.cbl
+  2101
+  2102 0075-UPDATE-ERMAIL-BODY.
+  2103
+  2104     IF CERT-ALREADY-CANCELLED
+  2105        ADD 1                    TO ELCERT-AC-CNT
+  2106     END-IF
+  2107
+  2108     IF UPDATE-ADDRESS-ONLY
+  2109        GO TO 0075-ADDRESS-ONLY
+  2110     END-IF
+  2111
+  2112     PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+  2113        (S1 > +7)
+  2114        OR (MA-MAIL-TYPE (S1) = SPACES)
+  2115     END-PERFORM
+  2116
+  2117     IF S1 > +7
+  2118        DISPLAY ' POST CARD INFO FULL FOR ' MA-ACCOUNT
+  2119        '  ' MA-CERT-NO
+  2120        DISPLAY ' OR MAYBE IT ALREADY GOT UPDATED '
+  2121        display ' dropping off 1st occurrence '
+  2122        perform varying s1 from +2 by +1 until s1 > +7
+  2123           move ma-mail-data (s1) to ma-mail-data (s1 - 1)
+  2124        end-perform
+  2125        move +7                  to s1
+  2126     end-if
+  2127
+  2128     MOVE WS-CURRENT-BIN-DATE    TO MA-LAST-MAINT-DT
+  2129     MOVE 'POST'                 TO MA-LAST-MAINT-BY
+  2130     IF EX-MAIL-TYPE (1:1) = 'E'
+  2131        MOVE '2'                 TO MA-MAIL-TYPE (S1)
+  2132     ELSE
+  2133        MOVE '1'                 TO MA-MAIL-TYPE (S1)
+  2134     END-IF
+  2135     IF EX-MAIL-STATUS = 'M '
+  2136        MOVE '1'                 TO MA-MAIL-STATUS (S1)
+  2137     ELSE
+  2138        IF EX-MAIL-STATUS = 'R '
+  2139           MOVE '2'              TO MA-MAIL-STATUS (S1)
+  2140        ELSE
+  2141           MOVE '3'              TO MA-MAIL-STATUS (S1)
+  2142        END-IF
+  2143     END-IF
+  2144     IF EX-MAIL-STATUS = 'M ' OR 'R '
+  2145        MOVE EX-MAIL-DATE (7:4)  TO V-ISS-CCYR
+  2146        MOVE EX-MAIL-DATE (1:2)  TO V-ISS-MO
+  2147        MOVE EX-MAIL-DATE (4:2)  TO V-ISS-DA
+  2148        MOVE WS-WORK-DT          TO DC-GREG-DATE-CYMD
+  2149        MOVE 'L'                 TO DC-OPTION-CODE
+  2150        PERFORM 8500-DATE-CONVERT
+  2151                                 THRU 8500-EXIT
+  2152        IF NOT NO-CONVERSION-ERROR
+  2153           DISPLAY ' INVALID MAIL DATE ' EX-MAIL-DATE
+  2154              '  ' EX-CERT
+  2155           PERFORM ABEND-PGM
+  2156        ELSE
+  2157           MOVE DC-BIN-DATE-1    TO MA-MAIL-DATE (S1)
+  2158        END-IF
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  39
+* DCCMABPC.cbl
+  2159     ELSE
+  2160        MOVE LOW-VALUES          TO MA-MAIL-DATE (S1)
+  2161     END-IF
+  2162
+  2163     .
+  2164 0075-ADDRESS-ONLY.
+  2165
+  2166     move spaces                 to ws-address-line-1
+  2167                                    ws-address-line-2
+  2168                                    ws-city-state
+  2169                                    ws-zip
+  2170                                    ws-address-fix-sw
+  2171                                    ws-dis-date
+  2172
+  2173     move ma-address-line-1      to ws-address-line-1
+  2174     move ma-address-line-2      to ws-address-line-2
+  2175     move ma-city-state          to ws-city-state
+  2176     move ma-zip                 to ws-zip
+  2177     IF EX-ADDRESS1 NOT = MA-ADDRESS-LINE-1
+  2178        MOVE EX-ADDRESS1         TO MA-ADDRESS-LINE-1
+  2179        MOVE 'Y'                 TO MA-ADDRESS-CORRECTED
+  2180                                    ws-address-fix-sw
+  2181     END-IF
+  2182     IF EX-ADDRESS2 NOT = MA-ADDRESS-LINE-2
+  2183        MOVE EX-ADDRESS2         TO MA-ADDRESS-LINE-2
+  2184        MOVE 'Y'                 TO MA-ADDRESS-CORRECTED
+  2185                                    ws-address-fix-sw
+  2186     END-IF
+  2187     MOVE SPACES                 TO WS-WORK-CITY-STATE
+  2188     PERFORM VARYING C1 FROM +32 BY -1 UNTIL
+  2189        (C1 < +2)
+  2190        OR (EX-CITY-STATE (C1:1) NOT = ' ' AND '.' AND ',')
+  2191     END-PERFORM
+  2192     IF C1 < +2
+  2193        CONTINUE
+  2194     ELSE
+  2195        MOVE EX-CITY-STATE (C1 - 1:2)
+  2196                                 TO WS-WORK-STATE
+  2197        MOVE EX-CITY-STATE (1:C1 - 2)
+  2198                                 TO WS-WORK-CITY
+  2199        IF WS-WORK-CITY-STATE NOT = MA-CITY-STATE
+  2200           MOVE WS-WORK-CITY-STATE
+  2201                                 TO MA-CITY-STATE
+  2202           MOVE 'Y'              TO MA-ADDRESS-CORRECTED
+  2203                                    ws-address-fix-sw
+  2204        END-IF
+  2205     END-IF
+  2206     IF EX-ZIP (1:9) NOT = MA-ZIP
+  2207        MOVE EX-ZIP (1:9)        TO MA-ZIP
+  2208        MOVE 'Y'                 TO MA-ADDRESS-CORRECTED
+  2209                                    ws-address-fix-sw
+  2210     END-IF
+  2211
+  2212     .
+  2213 0075-EXIT.
+  2214     EXIT.
+  2215
+  2216 0076-CHK-FOR-HEX7E.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  40
+* DCCMABPC.cbl
+  2217
+  2218*  I KNOW, I KNOW, UR ASKING Y I ADDED THIS.
+  2219*  WELL, I WAS GETTING SOME ~ CHARACTERS FROM THE
+  2220*  EXTRACT FILE FROM SDGA, SO I ADDED THIS CODE
+  2221
+  2222     INSPECT MA-ADDRESS-LINE-1
+  2223        REPLACING ALL X'7E' BY SPACES
+  2224     INSPECT MA-ADDRESS-LINE-2
+  2225        REPLACING ALL X'7E' BY SPACES
+  2226     INSPECT MA-CITY-STATE
+  2227        REPLACING ALL X'7E' BY SPACES
+  2228     INSPECT MA-ZIP
+  2229        REPLACING ALL X'7E' BY SPACES
+  2230
+  2231     .
+  2232 0076-EXIT.
+  2233     EXIT.
+  2234
+  2235 0077-CHECK-FOR-DUPS.
+  2236
+  2237     MOVE SPACES                 TO WS-DUP-SW
+  2238
+  2239     IF UPDATE-ADDRESS-ONLY
+  2240        GO TO 0077-EXIT
+  2241     END-IF
+  2242
+  2243     MOVE EX-MAIL-DATE (7:4)     TO V-ISS-CCYR
+  2244     MOVE EX-MAIL-DATE (1:2)     TO V-ISS-MO
+  2245     MOVE EX-MAIL-DATE (4:2)     TO V-ISS-DA
+  2246     MOVE WS-WORK-DT             TO DC-GREG-DATE-CYMD
+  2247     MOVE 'L'                    TO DC-OPTION-CODE
+  2248     PERFORM 8500-DATE-CONVERT
+  2249                                 THRU 8500-EXIT
+  2250     IF NO-CONVERSION-ERROR
+  2251        MOVE DC-BIN-DATE-1       TO WS-BIN-COMPARE-DT
+  2252     ELSE
+  2253        DISPLAY ' ERROR DURING DT CONV FOR DUPS ' EX-CERT
+  2254        MOVE LOW-VALUES          TO WS-BIN-COMPARE-DT
+  2255     END-IF
+  2256     EVALUATE EX-MAIL-TYPE (1:1)
+  2257        WHEN 'E'
+  2258           MOVE '2'              TO WS-COMPARE-TYPE
+  2259        WHEN OTHER
+  2260           MOVE '1'              TO WS-COMPARE-TYPE
+  2261     END-EVALUATE
+  2262
+  2263     EVALUATE EX-MAIL-STATUS
+  2264        WHEN 'M '
+  2265           MOVE '1'              TO WS-COMPARE-STATUS
+  2266        WHEN 'R '
+  2267           MOVE '2'              TO WS-COMPARE-STATUS
+  2268        WHEN OTHER
+  2269           MOVE '3'              TO WS-COMPARE-STATUS
+  2270     END-EVALUATE
+  2271
+  2272     PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+  2273        (S1 > +7)
+  2274        OR (MA-MAIL-TYPE (S1) = SPACES)
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  41
+* DCCMABPC.cbl
+  2275        OR (DUPLICATE-MAILING)
+  2276        IF (WS-BIN-COMPARE-DT = MA-MAIL-DATE (S1))
+  2277           AND (WS-COMPARE-TYPE = MA-MAIL-TYPE (S1))
+  2278           AND (WS-COMPARE-STATUS = MA-MAIL-STATUS (S1))
+  2279           SET DUPLICATE-MAILING TO TRUE
+  2280        END-IF
+  2281     END-PERFORM
+  2282
+  2283     .
+  2284 0077-EXIT.
+  2285     EXIT.
+  2286
+  2287 8500-DATE-CONVERT.
+  2288
+  2289     CALL 'ELDATCX'              USING DATE-CONVERSION-DATA.
+  2290
+  2291 8500-EXIT.
+  2292     EXIT.
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:18 Page  42
+* DCCMABPC.cbl
+  2294
+  2295 ABEND-PGM.
+*                   COPY ELCABEND.
+  2296***************************************************************** 04/14/98
+  2297*                                                               * ELCABEND
+  2298*                            ELCABEND.                          *    LV003
+  2299*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL**3
+  2300*                            VMOD 2.002                              CL**2
+  2301*                                                               * ELCABEND
+  2302*                THIS SECTION DISPLAYS THE NECESSARY MESSAGES   * ELCABEND
+  2303*            AND THEN ABENDS.                                   * ELCABEND
+  2304*                                                               * ELCABEND
+  2305*  NO  CID  MODS  IN  COPYBOOK  ELCABEND                        * ELCABEND
+  2306*                                                               * ELCABEND
+  2307***************************************************************** ELCABEND
+  2308*APS-010.                                                         ELCABEND
+  2309     DISPLAY WS-ABEND-MESSAGE.                                    ELCABEND
+  2310     DISPLAY WS-ABEND-MESSAGE UPON CONSOLE.                       ELCABEND
+  2311                                                                  ELCABEND
+  2312     IF WS-ABEND-FILE-STATUS NOT = ZERO                           ELCABEND
+  2313         DISPLAY 'FILE STATUS = ' WS-ABEND-FILE-STATUS            ELCABEND
+  2314         DISPLAY 'FILE STATUS = ' WS-ABEND-FILE-STATUS            ELCABEND
+  2315                                 UPON CONSOLE.                    ELCABEND
+  2316                                                                  ELCABEND
+  2317     IF WS-RETURN-CODE NOT = ZERO                                 ELCABEND
+  2318         DISPLAY 'RETURN CODE = '  WS-RETURN-CODE                 ELCABEND
+  2319         DISPLAY 'RETURN CODE = '  WS-RETURN-CODE                 ELCABEND
+  2320                                 UPON CONSOLE.                    ELCABEND
+  2321                                                                  ELCABEND
+  2322     DISPLAY 'PROGRAM WILL NOW ABEND **************'              ELCABEND
+  2323     DISPLAY 'PROGRAM WILL NOW ABEND **************'              ELCABEND
+  2324                                 UPON CONSOLE.                    ELCABEND
+  2325                                                                  ELCABEND
+  2326     DIVIDE WS-ZERO BY WS-ZERO GIVING WS-ZERO.                    ELCABEND
+  2327     CALL 'ABORTME'.
+  2328                                                                  ELCABEND
+  2329 APS-EXIT.                                                        ELCABEND
+  2330     EXIT.                                                        ELCABEND
+  2331
+* Micro Focus Server Express         V5.1 revision 000 Compiler
+* Copyright (C) Micro Focus IP Development Limited 1984-2012.
+*                                                        REF GNR-008065005AF
+* Total Messages:     0
+* Data:       49616     Code:        6948

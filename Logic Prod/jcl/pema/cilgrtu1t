@@ -1,0 +1,38 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job aborting, not TEST"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=FTP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+##ftp -n ntcso1 < /export/home/cidftp/data/ftp-getcidrates
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+################################################################################
+LABEL name=TRANS
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+tr -d '\015' < $SEQFILES/logic_dos_cid_rates.csv > $SEQFILES/logic_cid_rates.csv
+!
+EXECPGM pgmname='BPXBATCH' stepname='TRANS' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/cps_convert_rates.pl $SEQFILES/logic_cid_rates.csv $SEQFILES/Logic_Rates1
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+#   "smtp -f slunikix -t pema -s 'CID Rate File Load Complete' -mf /apps/prod/cid1p/emails/cilgrtu1.txt"
+else
+  echo " Job aborted, print not released"
+endif
+
+ENDJOB 

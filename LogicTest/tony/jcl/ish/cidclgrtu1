@@ -1,0 +1,84 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+if ($EBMSYS != "cid1t") then
+   echo "Job aborting, not TEST"
+   exit 1
+endif
+
+################################################################################
+LABEL name=REMOVE
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/DCC_Logic_Rates*.csv
+!
+EXECPGM pgmname='BPXBATCH' stepname='REMOVE' parm='SH'
+
+################################################################################
+LABEL name=FTP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < $HOME/misc/ftp-getdccratest
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+################################################################################
+LABEL name=CAT1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cat $SEQFILES/DCC_Logic_Rates*.csv > $SEQFILES/DCC_Logic_Dos_Rates
+!
+EXECPGM pgmname='BPXBATCH' stepname='CAT1' parm='SH'
+
+################################################################################
+LABEL name=TRANS
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+tr -d '\015' < $SEQFILES/DCC_Logic_Dos_Rates > $SEQFILES/DCC_Logic_Unix_Rates
+!
+EXECPGM pgmname='BPXBATCH' stepname='TRANS' parm='SH'
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERRATE -s $SEQFILES/$JOBNAME.errate.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/cps_convert_rates.pl $SEQFILES/DCC_Logic_Unix_Rates $SEQFILES/DCC_Logic_Rates
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=DCCRTU1 
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/DCC_Logic_Rates' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'
+ASSGNDD ddname='ERRATE' type='VS' filename='ERRATE' disp='i-o'
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/DC.DD.EL517.DATECARD' disp='i-o'
+
+EXECPGM pgmname='CPSRTU1' stepname='DCCRTU1' 
+
+################################################################################
+LABEL name=CPYFILE
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M'
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/DCCRTU1/SYS008_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.DL.CIADM.FICHRTU1' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+EXECPGM pgmname='CIB009L' stepname='CPYFILE' parm='ALL'
+
+if ($JOBSTATUS == 0) then
+   "smtp -f slunikix -t pema -s 'DCC Rate File Test Load Complete' -mf $SEQFILES/DC.DL.CIADM.FICHRTU1"
+else
+  echo " Job aborted, print not released"
+endif
+
+ENDJOB 

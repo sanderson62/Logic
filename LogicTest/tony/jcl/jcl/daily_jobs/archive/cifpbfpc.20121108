@@ -1,0 +1,160 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+#
+################################################################################
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job Aborted, Not CID1T"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=FTP1
+################################################################################
+#
+# This step gets file LAS185M.TXT from ntcso1/userdata/wrk_grp/ci/adm/alwa
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < $JCLLIB/ftp-getcifpbfpc
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+################################################################################
+LABEL name=CIFPBCNV 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                     
+#  *  CONVERT ACCOUNT NUMBERS ON FIRST PREMIER BANK FILE TO CSO          
+#  *  ACCOUNT NUMBERS FOR INPUT TO THE LOGIC SYSTEM.                     
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/LAS185M.TXT' disp='i' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/CI.DD.FPB.CNV' disp='o' normal='k' abend='d' recfmt='F' recsize='936' 
+
+EXECPGM pgmname='CIFPBCNV' stepname='CIFPBCNV' 
+
+################################################################################
+LABEL name=SORTFPB
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.DD.FPB.CNV' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.DD.FPB.CNV.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='936'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 16)(250 03)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTFPB'
+
+################################################################################
+LABEL name=CIFPB511
+################################################################################
+#  ********************************************************************* 
+#  *                                                                     
+#  *  EXTRACT TRANSACTIONS FROM COMMERCIAL FEDERAL FILE FOR INPUT        
+#  *  TO LOGIC AND THE PP&A RECORDS FOR DOWNLOADING TO A PC FILE.        
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.DD.FPB.CNV.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/CI.DD.FPB.LOGIC' disp='o' normal='k' abend='d' recsize='90' recfmt='F' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+
+EXECPGM pgmname='CIFPB511' stepname='CIFPB511' 
+
+################################################################################
+LABEL name=CPY511
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/$JOBNAME/CIFPB511/SYS013_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH511.FPB' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY511' parm='ALL' 
+
+################################################################################
+LABEL name=SORTLGX 
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.DD.FPB.LOGIC.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.DD.FPB.LOGIC' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 10)(1 10)(79 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTLGX'
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                   * 
+#  *   PREPARE COMFD800 REFORMATTED RECORDS TO LOAD TO PEND. BUS. FILE * 
+#  *                                                                   * 
+#  ********************************************************************* 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.DD.FPB.LOGIC.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DD.FPB.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='CFCNTL' disp='i-o' normal='k' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL512/SYS008_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH512.FPB' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL' 
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/CI.DL.CIADM.FICH512.FPB $SEQFILES/CI.EL512.FPB.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+#   "smtp -f slunikix -t klsc,alwa,amwa,pema -s '$JOBNAME is complete' -mf /apps/prod/cid1p/emails/$JOBNAME.txt"
+#   "smtp -f slunikix -t tpta,klsc,alwa,pema -s 'EL512 FOR FIRST PREMIER IS COMPLETE' -mf $SEQFILES/CI.DL.CIADM.FICH512.FPB"
+    "uuencode $SEQFILES/CI.EL512.FPB.pdf FPB.EL512.Rpt.pdf|mailx -s 'FPB EL512 Rpt Attached' -r 'pema@cso.com' pema@cso.com,alwa@cso.com"
+else
+   echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

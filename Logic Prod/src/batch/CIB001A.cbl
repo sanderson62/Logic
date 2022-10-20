@@ -1,0 +1,284 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CIB001A.
+       AUTHOR.     PABLO.
+       DATE-COMPILED.
+
+      *REMARKS.
+      *        This program reads files from CIB002, CIB007 etc,
+      *        and removes the insertion machine barcodes and
+      *        at the same time places page number and page count
+      *        on each page where an insertion barcode needs to be.
+      *        
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      * 092513  CR2013062000003  PEMA NEW PROGRAM
+100213* 100213  IR2013100300002  AJRA PGM NOT HANDLING CLAIM ACTIVITY 
+      ******************************************************************
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+                                                                        
+
+           SELECT BILLING-STATEMENTS   ASSIGN TO SYS010.
+
+           SELECT DISK-DATE            ASSIGN TO SYS019.
+
+           SELECT STMTS-OUT            ASSIGN TO SYS012.
+
+       DATA DIVISION.                                                   
+
+       FILE SECTION.                                                    
+                                                                        
+       FD  BILLING-STATEMENTS                                           
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  STMT-RECORD                 PIC X(133).
+
+       FD  DISK-DATE                                                    
+                                       COPY ELCDTEFD.
+                                                                        
+       FD  STMTS-OUT  
+           LABEL RECORDS ARE STANDARD
+           RECORDING MODE IS F
+           BLOCK CONTAINS 0 RECORDS.
+       01  STMTS-OUT-REC               PIC X(133).
+
+       WORKING-STORAGE SECTION.                                         
+       copy "ctypes.cpy".
+
+       77  WS-HEADING-SW               PIC X   VALUE SPACES.
+           88  WS-HEADING                  VALUE 'Y'.
+       77  WS-NEW-ACCT-SW              PIC X   VALUE SPACES.
+           88  WS-NEW-ACCT                 VALUE 'Y'.
+       77  WS-EOF-SW                   PIC X   VALUE SPACES.
+           88  END-OF-INPUT                VALUE 'Y'.
+       77  WS-STMT-SW                  PIC X   VALUE SPACES.
+           88  END-OF-STMTS                VALUE 'Y'.
+       77  WS-SUMM-SW                  PIC X   VALUE SPACES.
+           88  END-OF-SUMM                 VALUE 'Y'.
+       77  s1-IN-CNT                   PIC 9(7)  VALUE ZEROS.
+       77  stmts-OUT-CNT               PIC 9(7)  VALUE ZEROS.
+       77  A1                          PIC S999  VALUE +0 COMP-3.
+       77  WS-PREV-SUMM-KEY            PIC X(27) VALUE SPACES.
+       77  p1                          pic s9(5) value +0 comp-3.
+       77  t1                          pic s9(5) value +0 comp-3.
+       77  g1                          pic s9(7) value +0 comp-3.
+       77  ws-tot-pages                pic 99    value zeros.
+       77  ws-page-cnt                 pic 99    value zeros.
+       77  ws-total-pages              pic 99    value zeros.
+       77  ws-tot-prt-pages            pic 99    value zeros.
+       77  ws-current-page             pic 99    value zeros.
+       77  WK1                         PIC S9(7) comp-3  VALUE +0.
+       77  WK2                         PIC S9(7) comp-3  VALUE +0.
+       77  bc-cnt                      pic 9(5) value zeros.
+       77  ws-c-record-sw              pic x    value ' '.
+           88  processed-c                 value 'Y'.
+
+       01  ws-hold-print-line          pic x(133).
+       01  ws-line-to-table            pic x(133).
+       01  ws-print-table.
+           05  filler occurs 5000.
+               10  ws-print-line      pic x(133).
+
+       01  ws-prev-stmt-key.
+           05  ws-pk-carrier           pic x.
+           05  ws-pk-grouping          pic x(6).
+           05  ws-pk-resp-no           pic x(10).
+           05  ws-pk-acct-no           pic x(10).
+
+       01  ws-stmt-key.
+           05  ws-sk-carrier           pic x.
+           05  ws-sk-grouping          pic x(6).
+           05  ws-sk-resp-no           pic x(10).
+           05  ws-sk-acct-no           pic x(10).
+       01  FILLER.
+           05  WS-RETURN-CODE          PIC S9(4)  COMP  VALUE ZEROS.    
+           05  WS-ZERO                 PIC S9     VALUE +0  COMP-3.
+           05  WS-ABEND-MESSAGE        PIC X(80)  VALUE SPACES.         
+           05  WS-ABEND-FILE-STATUS    PIC XX     VALUE ZEROS.          
+           05  PGM-SUB             PIC S999   COMP-3  VALUE +061.   
+           05  WS-HDG  OCCURS 4 TIMES PIC X(133).                       
+
+                                       COPY ELCDATE.
+                                       COPY ELCDTECX.
+                                       COPY ELCDTEVR.
+
+       PROCEDURE DIVISION.
+
+                                       COPY ELCDTERX.
+
+           PERFORM 0010-OPEN-FILES     THRU 0010-EXIT
+           PERFORM 0020-INIT           THRU 0020-INIT
+           PERFORM 0100-PROCESS-INPUT  THRU 0100-EXIT until
+              end-of-input
+
+           perform 0125-empty-table    thru 0125-exit
+
+           perform 0400-close-files    thru 0400-exit
+
+           display ' stmts in          ' s1-in-cnt
+           display ' statments out     ' stmts-OUT-CNT
+
+           goback
+
+           .
+       0010-OPEN-FILES.
+
+           OPEN INPUT BILLING-STATEMENTS
+               output stmts-out
+
+           .
+       0010-EXIT.
+           EXIT.
+
+       0020-INIT.
+
+           PERFORM 0140-READ-INPUT     THRU 0140-EXIT
+
+           .
+       0020-EXIT.
+           EXIT.
+
+       0100-PROCESS-INPUT.
+
+           if stmt-record (1:5) = '1PDUE'
+              perform 0125-empty-table thru 0125-exit
+              move +0                  to ws-total-pages
+                                          ws-tot-prt-pages
+                                          p1
+              move zeros               to ws-current-page
+              move spaces              to ws-print-table
+           end-if
+
+           if stmt-record (1:1) = '1'
+              add +1                   to ws-total-pages
+           end-if
+
+           add +1                      to p1
+                                          g1
+           move stmt-record            to ws-print-line (p1)
+
+           PERFORM 0140-READ-INPUT     THRU 0140-EXIT
+
+           .
+       0100-EXIT.
+           EXIT.
+
+
+       0125-empty-table.
+
+           if g1 = +0
+              go to 0125-exit
+           end-if
+
+           divide ws-total-pages by 2 giving ws-tot-prt-pages
+              remainder wk2
+           add 1                       to ws-tot-prt-pages
+           move spaces                 to ws-c-record-sw
+
+           move +0 to bc-cnt
+
+           perform varying t1 from +1 by +1 until t1 > p1
+              if t1 = +2
+                 move '*XXXX*'         to ws-print-line (t1) (2:50)
+                 move ws-tot-prt-pages to ws-print-line (t1) (5:2)
+                 move 01               to ws-print-line (t1) (3:2)
+              end-if
+              if ws-print-line (t1) (1:1) = 'C'
+                 set processed-c to true
+      ***  must be summary page on Remit statements  ***
+                 divide bc-cnt by 2 giving wk1
+                    remainder wk2
+                 if wk2 not = 1
+                    move '*XXXX*'        to ws-print-line (t1) (2:6)
+                    move ws-current-page  to ws-print-line (t1)(3:2)
+                    move ws-tot-prt-pages to ws-print-line (t1) (5:2)
+100213              add 1                 to ws-current-page
+                 end-if
+              end-if
+             
+              if ws-print-line (t1) (1:1) = '1'
+                 add 1                 to bc-cnt
+                 evaluate true
+      ****  bc-cnt of 1 means we are at the pdue
+                    when processed-c
+                       move spaces     to ws-c-record-sw
+                    when bc-cnt = +1
+                       move bc-cnt           to ws-current-page
+                    when bc-cnt = +2
+      *                move ' *XXXX*'        to stmts-out-rec
+      *                move ws-current-page  to stmts-out-rec (3:2)
+      *                move ws-tot-prt-pages to stmts-out-rec (5:2)
+      *                write stmts-out-rec
+                       move bc-cnt           to ws-current-page
+                    when bc-cnt > +2
+                       divide bc-cnt by 2 giving wk1
+                          remainder wk2
+                       if wk2 = 1
+                          move 'C*XXXX*'        to stmts-out-rec
+                          move ws-current-page  to stmts-out-rec (3:2)
+                          move ws-tot-prt-pages to stmts-out-rec (5:2)
+                          write stmts-out-rec
+                          add 1        to ws-current-page
+                       end-if
+                 end-evaluate
+              end-if
+              write stmts-out-rec from ws-print-line (t1)
+           end-perform
+
+           add 1 to bc-cnt
+           divide bc-cnt by 2 giving wk1
+              remainder wk2
+           if (wk2 = 1)
+              and (not processed-c)
+              move 'C*XXXX*'        to stmts-out-rec
+              move ws-current-page  to stmts-out-rec (3:2)
+              move ws-tot-prt-pages to stmts-out-rec (5:2)
+              write stmts-out-rec
+              add 1        to ws-current-page
+           end-if
+
+           .
+       0125-exit.
+           exit.
+
+       0140-READ-INPUT.
+
+           READ BILLING-STATEMENTS AT END
+              SET END-OF-INPUT         TO TRUE
+           END-READ
+
+           IF NOT END-OF-INPUT
+              ADD 1                    TO s1-IN-CNT
+           END-IF
+
+           .
+       0140-EXIT.
+           EXIT.
+
+       0400-CLOSE-FILES.
+
+           CLOSE  STMTS-OUT BILLING-STATEMENTS
+
+           .
+       0400-EXIT.
+           EXIT.
+
+       8500-DATE-CONVERT.
+
+           CALL 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+       8500-EXIT.
+           EXIT.
+
+       ABEND-PGM.
+                           COPY ELCABEND.
+                                                                        

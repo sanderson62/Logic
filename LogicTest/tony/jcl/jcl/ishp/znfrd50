@@ -1,0 +1,73 @@
+BEGINJOB mode='MVS' jobclass='Y' 
+
+SETPRINT printid='OUT1' scope='JOB' groupid='CO' 
+
+################################################################################
+LABEL name=FNB164 
+################################################################################
+
+#  DATE MMDDYYYY 
+#  FROM CILGEXTR
+ASSGNDD ddname='SYS010' filename='\${ESEQFILES}/CI.WW.LG.DFTACT' disp='i-o' 
+ASSGNDD                 filename='\${ESEQFILES}/zI.WW.LG.DFTACT' disp='i-o' 
+#  DOWNLOAD
+ASSGNDD ddname='SYS011' filename='\${ESEQFILES}/zN.DL.FX.CIDCLMS' disp='o' normal='k' abend='d' 
+SETPRINT ddname='SYSOUT' forms='STD1' 
+ASSGNDD  ddname='SYSOUT' type='SYSOUT' class='A' printid='OUT1' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSABOUT' type='SYSOUT' class='JOBCLASS' 
+
+EXECPGM pgmname='FNB164' stepname='FNB164' parm='07082002' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+
+ASSGNDD ddname='SYS007' filename='\${USEQFILES}/zNFRD50' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='\${ESEQFILES}/zN.DL.FX.CIDCLMS' disp='i-o' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSABOUT' type='SYSOUT' class='JOBCLASS' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' 
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+#  ***                                                                   
+ASSGNDD ddname='SYSUT1' filename='\${USEQFILES}/zNFRD50' disp='i-o' 
+SETPRINT ddname='SYSUT2' forms='STD1' copies='1' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' printid='OUT1' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+################################################################################
+LABEL name=PRINT2 
+################################################################################
+#  ***                                                                   
+ASSGNDD ddname='SYSUT1' filename='\${USEQFILES}/zNFRD50' disp='i-o' 
+SETPRINT ddname='SYSUT2' forms='STD1' copies='1' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='T' printid='OUT1' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+EXECPGM pgmname='IEBGENER' stepname='PRINT2' 
+################################################################################
+LABEL name=COPY   
+################################################################################
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSUT1' filename='\${ESEQFILES}/zN.DL.FX.CIDCLMS' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${FREEFILES}/CIDDownload/CIDCLMS_07-08-02.DAT' disp='o' abend='d' normal='k'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+if ($jobstatus == 0) then
+   "pdpr -p IS_OPS -X e:/cid1p/jcl/l133std.parms -x department-text=CO e:/cid1p/sysout/sysoutdir/znfrd50/print1/sysut2_$jon"
+else
+   echo "Job aborted print not released "
+endif
+ENDJOB 

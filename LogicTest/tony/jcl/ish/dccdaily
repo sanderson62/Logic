@@ -1,0 +1,60 @@
+cd /apps/prod/cid1p/jcl
+
+#########################  B E G I N  S T E P  01   #########################
+echo "Begin Cycle Date Tests "
+
+setenv prevcydte `cat $SEQFILES/PrevCycleDate`
+setenv curcydte `cat $SEQFILES/CurCycleDate`
+
+if (`date +%Y%m%d` != 20221018) then
+   echo "Cycle Date NOT equal Current date, aborting "
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'Bad Current cycle date'"
+   exit 1
+endif
+
+if (`cat $SEQFILES/PrevCycleDate` != 20221017) then
+   echo " Previous cycle date not = last cycle date "
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'Bad Prev cycle date'"
+   exit 1
+endif
+
+if (`cat $SEQFILES/CurCycleDate` == 20221018) then
+   echo " Current cycle already ran "
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'Cycle already ran for today'"
+   exit 1
+endif
+
+echo "Cycle Date Tests Complete"
+
+#########################    E N D    S T E P  01   #########################
+
+echo "dccdaily1 is about to start"
+unikixjob dccdaily1 -w -ca
+if ($status != 0) then
+    echo "dccdaily1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'In DCCDAILY1'"
+    exit 1
+endif
+echo "dccdaily1 terminated successfully"
+
+if (`date +%Y%m%d` == 20221027 || `date +%Y%m%d` == 20221028) then
+   echo "cidclgedit is about to start"
+   unikixjob cidclgedit -w -ca
+   if ($status != 0) then
+       echo "cidclgedit aborted"
+      "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'In CIDCLGEDIT'"
+       exit 1
+   endif
+   echo "cidclgedit terminated successfully"
+endif
+
+"smtp -f slunikix -t pager.pema,cycle,pager.sdga -s 'DCC Daily Cycle Complete' -ml 'DCC Daily Cycle Complete'"
+
+#########################    E N D    S T E P  05   #########################
+
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 071516 CR2016030300001 PEMA   NEW JOB Designed for Active Batch

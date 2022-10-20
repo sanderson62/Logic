@@ -1,0 +1,48 @@
+################################################################################
+#                       
+#     JOB: dccbal331
+#       This job checks the totals from job cidclg331 step EL331.
+#                      
+################################################################################
+BEGINJOB mode='MVS'
+################################################################################
+# 
+# PERL1 Checks EL331 Against Totals from cidclgm15 ECS010     
+#
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/cpschkbal2.pl $SEQFILES/cidclgm15.ECS010.ME50.BAL.AMTS $SEQFILES/cidclg331.EL331.ME50.BAL.AMTS $SEQFILES/dccafter50.@YYYYMMDD.txt $SEQFILES/cpschkbal2.@YYYYMMDD.msgs
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+################################################################################
+LABEL name=FTPPUT1
+################################################################################
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < $JCLLIB/ftp-dccbal331
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTPPUT1' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "smtp -f slunikix -t tpta,pema -s 'Results of DCC Post50 Balancing' -mf /apps/prod/cid1p/emails/dccbal331.txt"
+else
+    "cat $SEQFILES/cidclgm15.ECS010.ME50.BAL.AMTS $SEQFILES/cidclg331.EL331.ME50.BAL.AMTS > $SEQFILES/dc.el331.out.bal.txt"
+    "mutt -s ' DCC EL331 IS OUT OF BALANCE' -i $SEQFILES/dc.el331.out.bal.txt -e 'my_hdr FROM:pema@cso.com' lgoncall@cso.com < /dev/null"
+    echo " Job aborted, print not released "
+    echo " Balancing may be outside of tolerance"
+    echo " Results file is dccafter50.@YYYYMMDD.txt"
+endif
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 061704   2004050700001 SMVA   NEW MONTHLY JOB FOR AUTOMATION OF BALANCING

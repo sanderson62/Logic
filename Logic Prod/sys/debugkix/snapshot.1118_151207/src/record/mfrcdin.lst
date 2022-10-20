@@ -1,0 +1,181 @@
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   1
+* /apps/mtp/mtp/src/record/mfrcdin.cbl
+     1$SET OSVS
+     2 IDENTIFICATION DIVISION.
+     3 PROGRAM-ID.    MFRECORDIN.
+     4***             ================
+     5 AUTHOR.        CLERITY.
+     6 DATE-WRITTEN.  JUNE 1991.
+     7 DATE-COMPILED. 25-Sep-12 12:03.
+     9 REMARKS.
+    10*****************************************************************
+    11*                                                               *
+    12* Copyright (c) 2007 by Clerity Solutions, Inc.                 *
+    13* All rights reserved.                                          *
+    14*                                                               *
+    15* If 'Large File' (>2G) is anticipated be sure to consult the   *
+    16* Merant (MicroFocus) COBOL documentation on File Handling      *
+    17* For Server Express.                                           *
+    18* Especially the discussion of the:                             *
+    19*            EXTFH environment variable                         *
+    20*            FILEMAXSIZE=8 argument                             *
+    21*                                                               *
+    22*****************************************************************
+    23* $Workfile:   mfrcdin.cbl  $ $Revision:   1.0  $
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   2
+* /apps/mtp/mtp/src/record/mfrcdin.cbl
+    24/
+    25 ENVIRONMENT DIVISION.
+    26 CONFIGURATION SECTION.
+    27 SOURCE-COMPUTER.                CLERITY.
+    28 OBJECT-COMPUTER.                CLERITY.
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   3
+* /apps/mtp/mtp/src/record/mfrcdin.cbl
+    29/
+    30 INPUT-OUTPUT SECTION.
+    31******************************************************************
+    32******************************************************************
+    33***                                                            ***
+    34***                F I L E   C O N T R O L                     ***
+    35***                                                            ***
+    36******************************************************************
+    37******************************************************************
+    38 FILE-CONTROL.
+    39
+    40     SELECT  INREC   ASSIGN TO  DYNAMIC MFIN
+    41         ORGANIZATION IS RECORD SEQUENTIAL
+    42         FILE STATUS IS CHK.
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   4
+* /apps/mtp/mtp/src/record/mfrcdin.cbl
+    43/
+    44 DATA DIVISION.
+    45******************************************************************
+    46******************************************************************
+    47***                                                            ***
+    48***                 F I L E   S E C T I O N                    ***
+    49***                                                            ***
+    50******************************************************************
+    51******************************************************************
+    52 FILE SECTION.
+    53
+    54 FD  INREC
+    55     LABEL RECORDS ARE OMITTED
+    56     RECORD IS VARYING IN SIZE FROM 4 TO 32767 CHARACTERS
+    57                   DEPENDING ON LEN
+    58     DATA RECORD IS INMASTER.
+    59
+    60 01  INMASTER.
+    61     05  VARLRCD   PIC X OCCURS 4 TO 32767 DEPENDING ON LEN.
+    62
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   5
+* /apps/mtp/mtp/src/record/mfrcdin.cbl
+    63/
+    64******************************************************************
+    65******************************************************************
+    66***                                                            ***
+    67***             W O R K I N G  -  S T O R A G E                ***
+    68***                                                            ***
+    69******************************************************************
+    70******************************************************************
+    71 WORKING-STORAGE SECTION.
+    72
+    73 01  CHK                    PIC 9(02) VALUE ZEROES.
+    74 01  LEN                    PIC 9(9)  COMP VALUE 4.
+    75 01  ERR-CODE               PIC S9(9) COMP.
+    76 01  EOF-FLAG               PIC X(1)  VALUE ' '.
+    77     88  EOF-FLG            VALUE 'X'.
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   6
+* /apps/mtp/mtp/src/record/mfrcdin.cbl
+    78/
+    79******************************************************************
+    80******************************************************************
+    81***                                                            ***
+    82***           P R O C E D U R E   D I V I S I O N              ***
+    83***                                                            ***
+    84******************************************************************
+    85******************************************************************
+    86 PROCEDURE DIVISION.
+    87
+    88
+    89 0000-PROGRAM-ENTRY.
+    90*------------------*
+    91
+    92*** THE FOLLOWING STATEMENT IS TO GET THE NAME OF THE INPUT ***
+    93***                  SEQUENTIAL FILE.                       ***
+    94     CALL "kxread" USING
+    95         BY REFERENCE LEN,
+    96         BY REFERENCE INMASTER.
+    97
+    98     IF VARLRCD (LEN) < '0' THEN
+    99         MOVE ' ' TO VARLRCD (LEN)
+   100         SUBTRACT 1 FROM LEN.
+   101     MOVE INMASTER TO MFIN.
+   102
+   103     OPEN INPUT INREC.
+   104     IF CHK NOT = ZERO
+   105         MOVE -2 TO ERR-CODE
+   106         PERFORM CHKRTN.
+   107     MOVE ZERO TO ERR-CODE.
+   108     CALL "kxwrite" USING
+   109         BY REFERENCE ERR-CODE,
+   110         BY REFERENCE INMASTER.
+   111     IF RETURN-CODE NOT = ZERO
+   112         MOVE RETURN-CODE TO ERR-CODE
+   113         PERFORM CHKRTN.
+   114     PERFORM READ-RECORD.
+   115     PERFORM WRT-RECORD UNTIL EOF-FLG.
+   116     PERFORM EOF-CLOSE.
+   117     MOVE ZERO TO RETURN-CODE.
+   118     STOP RUN.
+   119
+   120**** READ A VAR LEN RECORD FROM FILE, IF ERROR RETURN ERRNO ****
+   121
+   122 READ-RECORD.
+   123     READ INREC INTO INMASTER
+   124         AT END SET EOF-FLG TO TRUE.
+   125     IF CHK NOT = 00 AND CHK NOT = 10
+   126         MOVE -3 TO ERR-CODE
+   127         PERFORM CHKRTN.
+   128
+   129**** CALL C ROUTINE TO WRITE A VAR LEN RECORD TO PIPE ****
+   130
+   131 WRT-RECORD.
+   132     CALL "kxwrite" USING
+   133         BY REFERENCE LEN,
+   134         BY REFERENCE INMASTER.
+   135     IF RETURN-CODE NOT = ZERO
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   7
+* /apps/mtp/mtp/src/record/mfrcdin.cbl
+   136         MOVE RETURN-CODE TO ERR-CODE
+   137         PERFORM CHKRTN.
+   138
+   139     PERFORM READ-RECORD.
+   140
+   141
+   142**** EOF ENCOUNTERED, CLOSE OUTPUT FILE ****
+   143
+   144 EOF-CLOSE.
+   145     CLOSE INREC
+   146     MOVE ZERO TO ERR-CODE
+   147     CALL "kxwrite" USING
+   148         BY REFERENCE ERR-CODE,
+   149         BY REFERENCE INMASTER
+   150     MOVE ZERO TO RETURN-CODE
+   151     STOP RUN.
+   152
+   153**** I/O ERROR OCCURED, RETURN ERROR CODE AND ABORT ****
+   154
+   155 CHKRTN.
+   156     CALL "kxwrite" USING
+   157         BY REFERENCE ERR-CODE,
+   158         BY REFERENCE INMASTER
+   159     STOP RUN.
+   160
+   161******************************************************************
+   162***               E N D   O F   P R O G R A M                  ***
+   163******************************************************************
+* Micro Focus Server Express         V5.1 revision 000 Compiler
+* Copyright (C) Micro Focus IP Development Limited 1984-2012.
+*                                                        REF GNR-008065005AF
+* Total Messages:     0
+* Data:       33768     Code:         631

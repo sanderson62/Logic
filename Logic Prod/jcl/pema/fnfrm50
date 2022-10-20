@@ -1,0 +1,167 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#                                                                              #
+#     JOB: FNFRM50               Translated  : Tue May 22 09:54:26 2001        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' 
+
+################################################################################
+#  *-------------------------------------------------------------------  
+#  *         FREEDOM INTERFACE FOR CID PREMIUM & COMMISSION              
+#  *-------------------------------------------------------------------  
+################################################################################
+LABEL name=FNB166 
+################################################################################
+#  DATE: MMDDYYYY   
+#  FROM CILGM15     
+ASSGNDD ddname='SYS010' dataset='CI.XX.DET010' gdg='0' filename='\${SEQFILES}/CI.XX.DET010' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' dataset='FN.DD.FX.CIDPRCM' filename='\${SEQFILES}/FN.DD.FX.CIDPRCM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+
+EXECPGM pgmname='FNB166' stepname='FNB166' parm='10312007' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' dataset='FN.DD.PRINT.DATA' member='FNFRM50' filename='\${SEQFILES}/FNFRM50' disp='i-o' 
+ASSGNDD ddname='SYS010' dataset='FN.DD.FX.CIDPRCM' filename='\${SEQFILES}/FN.DD.FX.CIDPRCM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='CIDPRCM'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' dataset='FN.DD.PRINT.DATA' member='FNFRM50' filename='\${SEQFILES}/FNFRM50' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=SPLIT 
+################################################################################
+#  *-------------------------------------------------------------------  
+#  *         SPLIT INTO PREMIUM FILE AND COMMISSION FILE                 
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  DELETE FN.DL.FX.CIDPREM                                               
+  DELETE FN.DL.FX.CIDCOMM                                               
+  SET MAXCC=0                                                           
+!
+
+EXECPGM pgmname='IDCAMS' stepname='SPLIT' 
+
+################################################################################
+LABEL name=SPLIT1 
+################################################################################
+ASSGNDD ddname='SORTIN' dataset='FN.DD.FX.CIDPRCM' filename='\${SEQFILES}/FN.DD.FX.CIDPRCM' disp='i-o' normal='k' abend='k' recfmt='F' recsize='250' 
+ASSGNDD ddname='SORTOUT' dataset='FN.DD.FX.CIDPREM' filename='\${SEQFILES}/FN.DD.FX.CIDPREM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+     INCLUDE=(19 2 EQ '40')
+     KEYS=(1 3)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SPLIT1' 
+
+################################################################################
+LABEL name=SPLIT2 
+################################################################################
+ASSGNDD ddname='SORTIN' dataset='FN.DD.FX.CIDPRCM' filename='\${SEQFILES}/FN.DD.FX.CIDPRCM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTOUT' dataset='FN.DD.FX.CIDCOMM' filename='\${SEQFILES}/FN.DD.FX.CIDCOMM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+	 INCLUDE=(19 2 EQ '50')
+	 KEYS=(1 3)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SPLIT2' 
+
+################################################################################
+LABEL name=FNBLSA
+################################################################################
+ASSGNDD ddname='SYS010' dataset='FN.DD.FX.CIDCOMM' filename='\${SEQFILES}/FN.DD.FX.CIDCOMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' dataset='FN.DL.FX.CIDCOMM' filename='\${SEQFILES}/FN.DL.FX.CIDCOMM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+
+EXECPGM pgmname='FNBLS' stepname='FNBLSA'
+
+################################################################################
+LABEL name=FNBLSB
+################################################################################
+ASSGNDD ddname='SYS010' dataset='FN.DD.FX.CIDPREM' filename='\${SEQFILES}/FN.DD.FX.CIDPREM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' dataset='FN.DL.FX.CIDPREM' filename='\${SEQFILES}/FN.DL.FX.CIDPREM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+
+EXECPGM pgmname='FNBLS' stepname='FNBLSB'
+
+################################################################################
+LABEL name=COPY1   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID CLAIMS 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' dataset='FN.DL.FX.CIDPREM' filename='\${SEQFILES}/FN.DL.FX.CIDPREM' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/CIDPREM_10-31-07.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY1'   
+
+################################################################################
+LABEL name=COPY2   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID CLAIMS 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' dataset='FN.DL.FX.CIDCOMM' filename='\${SEQFILES}/FN.DL.FX.CIDCOMM' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/CIDCOMM_10-31-07.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY2'   
+
+################################################################################
+
+##ftp -n ntfree2 < /apps/prod/cid1p/jcl/ish/ftp-fnfrm50
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+##     "exelpr.sh l133std.parms '-ode=CO -ocopies=2' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+else
+  echo " Job aborted, print not released "
+endif
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#100303                 PEMA  Add DD SYS019 TO FNB166
+#013104                 SMVA  ADD PARM TO FNB170 STEP
+#063004                 SMVA  REMOVE DELETE STEP

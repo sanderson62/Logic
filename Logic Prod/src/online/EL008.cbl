@@ -1,0 +1,11208 @@
+00001  IDENTIFICATION DIVISION.
+00002
+00003  PROGRAM-ID.                 EL008 .
+00004 *              PROGRAM CONVERTED BY
+00005 *              COBOL CONVERSION AID PO 5785-ABJ
+00006 *              CONVERSION DATE 09/26/95 15:49:18.
+00007 *                            VMOD=2.019.
+00008 *
+00009 *AUTHOR.     LOGIC INC.
+00010 *            DALLAS, TEXAS.
+00023 *REMARKS.
+00024 *         THIS PROGRAM IS STARTED EITHER FROM EL150, EL130, EL1602
+00025 *         OR EL180-  IF START IS MADE FROM EL150 OR EL130,
+00026 *         A SINGLE CLAIM (IN INTERFACE BLOCK) IS PRINTED
+00027 *         IF START IS MADE FROM EL180, ELACTQ FILE IS SCANNED
+00028 *         AND ALL CLAIMS LEFT IN QUE FOR PRINTING WILL BE
+00029 *         PRINTED AND THE PRINT FLAG IS TURNED OFF FROM ACTQ.
+00030
+00031 *       INPUT FILES-   ELMSTR-   CLAIM MASTER
+00032 *                      ELACTQ-   ACTIVITY QUE
+00033 *                      ELTRLR-   ACTIVITY TRAILERS
+00034 *                      ELCNTL-   CONTROL FILE
+00035 *                      ELCERT-   CERTIFICATE MASTER
+00036 *                      ERACCT-   ACCOUNT MASTER
+00037 *                      ELBENE-   BENEFICIARY MASTER
+00038
+00039 *       OUTPUT-                  CLAIM STATUS REPORT
+00040 *                                (OPEN/CLOSE HISTORY)
+00041 *                      ELACTQ-   ACTIVITY QUE
+00042
+00043 *       COMMARERA-     RECEIVED FROM THE CALLING PROGRAM
+00044 *                      EL130 OR EL150 HAS THE CLAIM TO BE PRINTED,
+00045 *                      AND ENTRY CODE 1 FOR SHORT FORM AND
+00046 *                      2  FOR THE LONG FORM--
+00047 *                      EL180 WILL DIRECT THE PRGRAM TO SCAN
+00048 *                      THE ACTQ FILE FOR ALL CLAIMS TO BE PRINTED.
+00049 *                      EL1602 - ?????
+121802******************************************************************
+121802*                   C H A N G E   L O G
+121802*
+121802* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+121802*-----------------------------------------------------------------
+121802*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+121802* EFFECTIVE    NUMBER
+121802*-----------------------------------------------------------------
+121802* 121802    2001061800003  SMVA  ADD PROCESSING FOR NEW CLM TYPE I
+091113* 091113    2013091100001  AJRA  CHANGE ACTION TYPE LIKE SCREEN
+101713* 101713    2013091100001  AJRA  SPECIAL 95 TRLR FOR DCC
+052614* 052614    2014022100001  AJRA  ADD FAMILY LEAVE CLAIM TYPE
+020816* 020816  CR2015082500001  PEMA  ADD PROCESSING FOR NEW COMP VPP
+100518* 100518  CR2017061500001  TANA  ADD OTHER CLAIM TYPE
+080322* 080322  CR2021100800003  TANA  Add B and H claim types
+121802******************************************************************
+00050      EJECT
+00051  ENVIRONMENT DIVISION.
+00052  DATA DIVISION.
+00053  WORKING-STORAGE SECTION.
+       01  DFH-START PIC X(04).
+00054  77  FILLER  PIC X(32) VALUE '********************************'.
+00055  77  FILLER  PIC X(32) VALUE '     EL008  WORKING-STORAGE     '.
+00056  77  FILLER  PIC X(32) VALUE '********* VMOD=2.019 ***********'.
+00057
+00058  77  THIS-PGM               PIC X(5) VALUE 'EL008'.
+00059
+00060  77  WS-ELMSTR-EOF-SW       PIC X    VALUE SPACE.
+00061      88  END-OF-MSTR-FILE            VALUE 'E'.
+00062
+00063  77  WS-ELACTQ-EOF-SW       PIC X    VALUE SPACE.
+00064      88  END-OF-ACTQ-FILE            VALUE 'E'.
+00065
+00066  77  WS-ELTRLR-EOF-SW       PIC X    VALUE SPACE.
+00067      88  END-OF-TRLR-FILE            VALUE 'E'.
+00068
+00069  77  WS-FULL-PRINT-SW       PIC X    VALUE SPACE.
+00070      88  FULL-PRINT-REQUIRED         VALUE 'X'.
+00071
+00072  77  WS-TRAILER-KEY-CHG-SW  PIC X    VALUE SPACE.
+00073      88  TRAILER-KEY-CHANGED         VALUE 'X'.
+00074
+00075  77  END-OC-TABLE-SW        PIC X    VALUE SPACE.
+00076      88  END-OC-TABLE                VALUE 'E'.
+00077      88  OC-TABLE-LOADED             VALUE 'X'.
+00078
+00079  77  END-AD-TABLE-SW        PIC X    VALUE SPACE.
+00080      88  END-AD-TABLE                VALUE 'E'.
+00081      88  AD-TABLE-LOADED             VALUE 'X'.
+00082
+00083  77  END-AP-TABLE-SW        PIC X    VALUE SPACE.
+00084      88  END-AP-TABLE                VALUE 'E'.
+00085      88  AP-TABLE-LOADED             VALUE 'X'.
+00086
+00087  77  WS-ACTQ-READ-ERROR-SW PIC X    VALUE SPACE.
+00088      88  ACTQ-READ-ERROR           VALUE 'X'.
+00089
+00090  77  WS-CNTL-ERROR-SW      PIC X    VALUE SPACE.
+00091      88  NO-COMPANY-RECORD         VALUE 'X'.
+00092
+00093  77  WS-MSTR-READ-ERROR-SW PIC X    VALUE SPACE.
+00094      88  MSTR-READ-ERROR           VALUE 'X'.
+00095
+00096  77  WS-CERT-READ-ERROR-SW PIC X    VALUE SPACE.
+00097      88  CERT-READ-ERROR           VALUE 'X'.
+00098
+00099  77  WS-PLCY-READ-ERROR-SW   PIC X    VALUE SPACE.
+00100      88  PLCY-READ-ERROR              VALUE 'X'.
+00101
+00102  77  WS-PLAN-READ-ERROR-SW   PIC X    VALUE SPACE.
+00103      88  PLAN-READ-ERROR              VALUE 'X'.
+00104
+00105  77  WS-TRLR-BROWSE-ERROR-SW PIC X    VALUE SPACE.
+00106      88  TRLR-BROWSE-ERROR           VALUE 'X'.
+00107
+00108  77  WS-ACCT-BROWSE-SW       PIC X    VALUE SPACE.
+00109      88  ACCT-BROWSE-OKAY            VALUE 'X'.
+00110
+00111  77  WS-BENE-BROWSE-SW       PIC X    VALUE SPACE.
+00112      88  BENE-BROWSE-OKAY            VALUE 'X'.
+00113
+00114  77  WS-PRODUCER-BROWSE-SW   PIC X    VALUE SPACE.
+00115      88  PRODUCER-BROWSE-OKAY         VALUE 'X'.
+00116
+00117  77  WS-LN-SW               PIC X    VALUE SPACE.
+00118      88  LAST-NAME-LOADED            VALUE 'X'.
+00119
+00120  77  WS-FN-SW               PIC X    VALUE SPACE.
+00121      88  FIRST-NAME-LOADED           VALUE 'X'.
+00122
+00123  77  WS-CANC-DT             PIC XX   VALUE LOW-VALUES.
+00124  77  WS-STATUS              PIC X    VALUE SPACES.
+00125
+00126  77  OC-SUB                 PIC  S9(4)  VALUE ZEROS COMP.
+00127
+00128  77  SUB1                   PIC S9(4)   VALUE ZEROS COMP.
+091113
+091113 77  WS-SUB                 PIC 9       VALUE 0.
+101713
+101713 77  A1                     PIC S999 COMP-3 VALUE +0.
+00129
+00130  77  WS-RECORD-TYPE         PIC X     VALUE SPACE.
+00131
+00132  77  WS-SAVED-FORM-NO       PIC X(12) VALUE SPACE.
+00133
+00134  77  WS-SAVED-PI-COMPANY-ID PIC X(04) VALUE SPACE.
+00135
+00136  01  WS-DATE-AREA.
+00137      05  SAVE-DATE           PIC X(8)    VALUE SPACES.
+00138      05  SAVE-BIN-DATE       PIC X(2)    VALUE SPACES.
+00139
+00140      05  WS-PHONE-BRKDN              PIC 9(11).
+00141      05  FILLER   REDEFINES WS-PHONE-BRKDN.
+00142          10  FILLER                  PIC 9.
+00143          10  WS-PH-1                 PIC 999.
+00144          10  WS-PH-2                 PIC 999.
+00145          10  WS-PH-3                 PIC 9999.
+00146
+00147      05  WS-PHONE-EDIT.
+00148          10  WS-PH-ED-1              PIC XXX.
+00149          10  FILLER                  PIC X   VALUE '-'.
+00150          10  WS-PH-ED-2              PIC XXX.
+00151          10  FILLER                  PIC X   VALUE '-'.
+00152          10  WS-PH-ED-3              PIC XXXX.
+00153
+00154      05  WS-ZIP-WORK.
+00155          10  WS-ZIP-PRIME        PIC X(5).
+00156          10  WS-ZIP-DASH         PIC X.
+00157          10  WS-ZIP-PLUS4        PIC X(4).
+00158      05  WS-CANADIAN-ZIP-WORK  REDEFINES  WS-ZIP-WORK.
+00159          10  WS-CAN-POSTAL-1     PIC XXX.
+00160          10  FILLER              PIC X.
+00161          10  WS-CAN-POSTAL-2     PIC XXX.
+00162          10  FILLER              PIC XXX.
+00163      05  WS-WORK-PHONE           PIC X(10)  VALUE ZEROS.
+00164      05  WS-NUMERIC-PHONE REDEFINES WS-WORK-PHONE
+00165                                  PIC 9(10).
+00166      05  SSP                         PIC X  VALUE ' '.
+00167      05  DSP                         PIC X  VALUE '0'.
+00168      05  TSP                         PIC X  VALUE '-'.
+00169      05  TPG                         PIC X  VALUE '1'.
+00170
+00171      05  WS-NEXT-TRAN            PIC X(4).
+00172      05  WS-TERMINAL-ID.
+00173          10  WS-TERM-PREFIX      PIC XX.
+00174          10  FILLER              PIC XX.
+00175
+00176      05  WS-LAST-NAME    PIC X(15).
+00177      05  FILLER REDEFINES WS-LAST-NAME.
+00178          10  WS-L-BYTE   PIC X  OCCURS 15
+00179                          INDEXED BY L-IND.
+00180      05  WS-FIRST-NAME   PIC X(12).
+00181      05  FILLER REDEFINES WS-FIRST-NAME.
+00182          10  WS-F-BYTE   PIC X  OCCURS 12
+00183                          INDEXED BY F-IND.
+00184      05  PREVIOUS-BYTE          PIC X  VALUE SPACES.
+00185
+00186      05  WS-AGE             PIC 9(04)  VALUE ZEROS.
+00187      05  WS-AGE-R REDEFINES WS-AGE.
+00188          10  WS-AGE-1-2     PIC 9(02).
+00189          10  WS-AGE-3-4     PIC 9(02).
+00190
+00191      05  WS-ACCESS.
+00192          10  FILLER         PIC XX  VALUE SPACES.
+00193          10  WS-BEN-CODE    PIC XX.
+00194
+00195      05  WS-AT-CONTROL-PRIMARY.
+00196          10  WS-AT-CONTROL-WO-SEQ.
+00197              15  WS-AT-COMPANY-CD   PIC X.
+00198              15  WS-AT-CARRIER      PIC X.
+00199              15  WS-AT-CLAIM-NO     PIC X(7).
+00200              15  WS-AT-CERT-NO      PIC X(11).
+00201          10  WS-AT-SEQ-NO           PIC S9(4) COMP.
+00202
+00203      05  WS-NEW-AT-CONTROL-PRIMARY.
+00204          10  WS-NEW-AT-CONTROL-WO-SEQ  PIC X(20).
+00205          10  FILLER                    PIC S9(4) COMP.
+00206
+00207      05  WS-AT-CONTROL-SAVED.
+00208          10  WS-AT-CONTROL-SAVED-WO-SEQ  PIC X(20).
+00209          10  FILLER                    PIC S9(4) COMP.
+00210
+00211      05  WS-CF-CONTROL-PRIMARY.
+00212          10  WS-CF-COMPANY-ID   PIC XXX.
+00213          10  WS-CF-RECORD-TYPE  PIC X.
+00214          10  WS-CF-PROCESSOR    PIC X(4).
+00215          10  WS-CF-SEQUENCE-NO  PIC S9(4) COMP.
+00216
+00217      05  WS-CL-CONTROL-PRIMARY.
+00218          10  WS-CL-COMPANY-CD   PIC X.
+00219          10  WS-CL-CARRIER      PIC X.
+00220          10  WS-CL-CLAIM-NO     PIC X(7).
+00221          10  WS-CL-CERT-NO      PIC X(11).
+00222
+00223      05  WS-LAST-AQ-KEY         PIC X(20) VALUE SPACES.
+00224      05  WS-AQ-CONTROL-PRIMARY.
+00225          10  WS-AQ-COMPANY-CD   PIC X.
+00226          10  WS-AQ-CARRIER      PIC X.
+00227          10  WS-AQ-CLAIM-NO     PIC X(7).
+00228          10  WS-AQ-CERT-NO      PIC X(11).
+00229
+00230      05  WS-CM-CONTROL-PRIMARY.
+00231          10  WS-CM-COMPANY-CD   PIC X.
+00232          10  WS-CM-CERT-DATA    PIC X(21).
+00233          10  WS-CM-CERT-NO      PIC X(11).
+00234
+00235      05  WS-AM-CONTROL-PRIMARY.
+00236          10  WS-AM-COMPANY-CD    PIC X(1).
+00237          10  WS-AM-CARRIER       PIC X(1).
+00238          10  WS-AM-GROUPING      PIC X(6).
+00239          10  WS-AM-STATE         PIC X(2).
+00240          10  WS-AM-ACCOUNT       PIC X(10).
+00241          10  WS-AM-EXPIRATION-DT PIC X(2).
+00242
+00243      05  WS-BE-CONTROL-PRIMARY.
+00244          10  WS-BE-COMPANY-CD    PIC X(01).
+00245          10  WS-BE-RECORD-TYPE   PIC X(01).
+00246          10  WS-BE-BENEFICIARY   PIC X(10).
+00247
+00248      05  WS-PM-CONTROL-PRIMARY.
+00249          10  WS-PM-COMPANY-CD    PIC X(01).
+00250          10  WS-PM-POLICY-DATA   PIC X(21).
+00251          10  WS-PM-REFERENCE-NO  PIC X(20).
+00252
+00253      05  WS-PP-CONTROL-PRIMARY.
+00254          10  WS-PP-COMPANY-CD    PIC X(01).
+00255          10  WS-PP-CARRIER       PIC X(01).
+00256          10  WS-PP-GROUPING      PIC X(06).
+00257          10  WS-PP-STATE         PIC X(02).
+00258          10  WS-PP-PRODUCER      PIC X(10).
+00259          10  WS-PP-PLAN-CODE     PIC X(02).
+00260          10  WS-PP-REV-NO        PIC 9(03).
+00261
+00262      05  WS-PD-CONTROL-PRIMARY.
+00263          10  WS-PD-COMPANY-CD    PIC X(01).
+00264          10  WS-PD-CARRIER       PIC X(01).
+00265          10  WS-PD-GROUPING      PIC X(06).
+00266          10  WS-PD-STATE         PIC X(02).
+00267          10  WS-PD-PRODUCER      PIC X(10).
+00268          10  WS-PD-EXPIRATION-DT PIC X(02).
+CIDMOD*---- THIS IS USED SO THAT EL008 WILL COMPILE, THE
+CIDMOD*---- PI-PRINTER-ID IS USED BY THE CHECK WRITER EL176 AND
+CIDMOD*---- EL177
+CIDMOD     05  WS-CHECK-ID.
+CIDMOD         10  PI-PRINTER-ID PIC X(04).
+00269
+00270      EJECT
+00271  01  PRINT-CONTROL-WORK-AREA.
+00272      05  WS-MM-DD-YY.
+00273          10  WS-MM     PIC 99.
+00274          10  WS-DD     PIC 99.
+00275          10  WS-YY     PIC 99.
+00276
+00277      05  WS-TERM-DATE.
+00278          10  WS-TERM-MM   PIC 999  VALUE ZEROS.
+00279          10  WS-TERM-YY   PIC 999  VALUE ZEROS.
+00280
+00281      05  WS-REM-DATE.
+00282          10  WS-REM-MM    PIC S999  VALUE ZEROS.
+00283
+00284      05  WS-PAGE-CNT      PIC 9(4)   VALUE 1.
+00285
+00286      05  WS-BIN-CURRENT-DT    PIC XX.
+00287
+00288  01  HEAD-LINE-2.
+00289      05  FILLER             PIC X(31) VALUE SPACE.
+00290      05  FILLER             PIC X(16) VALUE
+00291                             '- CLAIM STATUS -'.
+00292      05  FILLER             PIC X(19) VALUE SPACES.
+00293      05  HEAD-REPORT-NO     PIC X(10) VALUE SPACES.
+00294
+00295  01  HEAD-LINE-3.
+00296      05  FILLER             PIC X(25) VALUE SPACE.
+00297      05  HEAD-COMPANY       PIC X(30) VALUE SPACES.
+00298      05  FILLER             PIC X(12) VALUE SPACES.
+00299      05  HEAD-RUN-DATE      PIC X(8).
+00300
+00301  01  HEAD-LINE-4.
+00302      05  FILLER             PIC X(31) VALUE SPACE.
+00303      05  HEAD-RUN-DATE-FULL PIC X(18).
+00304      05  FILLER             PIC X(18) VALUE SPACES.
+00305      05  FILLER             PIC X(4) VALUE 'PAGE'.
+00306      05  HEAD-PAGE-NO       PIC ZZZ9.
+00307
+00308  01  HEAD-LINE-7.
+00309      05  FILLER             PIC X(40) VALUE
+00310         'CLAIM NO CARR  CERT NO    TYPE  STATUS'.
+00311      05  FILLER             PIC X(40) VALUE
+00312         'NAME OF INSURED                PROCESSOR'.
+00313
+00314  01  LINE-9.
+00315      05  FILLER             PIC X     VALUE SPACES.
+00316      05  P-CLAIM-NO         PIC X(7).
+00317      05  FILLER             PIC X(3)  VALUE SPACES.
+00318      05  P-CARR             PIC X.
+00319      05  FILLER             PIC X(2)  VALUE SPACES.
+00320      05  P-CERT-NO          PIC X(11).
+00321      05  FILLER             PIC XX    VALUE SPACES.
+00322      05  P-TYPE             PIC XXXX.
+00323      05  FILLER             PIC XX    VALUE  SPACES.
+00324      05  P-STATUS           PIC X(6).
+00325      05  FILLER             PIC X(2)  VALUE   SPACES.
+00326      05  P-NAME-GRP         PIC X(31).
+00327      05  P-NAME-ARR REDEFINES P-NAME-GRP
+00328                             OCCURS 31  INDEXED BY P-IND.
+00329          10  P-NAME         PIC X.
+00330      05  FILLER             PIC X(3) VALUE  SPACES.
+00331      05  P-PROCESSOR        PIC X(4).
+00332
+00333  01  HEAD-LINE-10.
+00334      05  FILLER             PIC X(20) VALUE
+00335         'CREDIT CARD NUMBER:'.
+00336      05  HEAD-CREDIT-CARD   PIC X(16).
+00337
+00338  01  LINE-12.
+00339      05  L-12-PD-THRU       PIC X(13) VALUE
+00340          'PAID THRU  - '.
+00341      05  P-PAID-THRU-DT     PIC X(8).
+00342      05  FILLER             PIC X(5)  VALUE  SPACES.
+00343      05  FILLER             PIC X(15) VALUE
+00344          'LAST PMT AMT - '.
+00345      05  P-LAST-PMT-AMT     PIC Z(7).99.
+00346      05  FILLER             PIC X(3)  VALUE  SPACES.
+00347      05  FILLER             PIC X(16) VALUE
+00348          'LAST PMT DATE - '.
+00349      05  P-LAST-PMT-DT      PIC X(8).
+00350
+00351  01  LINE-13.
+00352      05  FILLER             PIC X(13) VALUE
+00353          'INCURRED   - '.
+00354      05  P-INCURRED-DT      PIC X(8).
+00355      05  FILLER             PIC X(5) VALUE  SPACES.
+00356      05  FILLER             PIC X(15) VALUE
+00357          'REPORTED     - '.
+00358      05  P-REPORTED-DT      PIC X(8).
+00359      05  FILLER             PIC X(5) VALUE  SPACES.
+00360      05  FILLER             PIC X(16) VALUE
+00361          'ESTABLISHED   - '.
+00362      05  P-ESTAB-DT         PIC X(8).
+00363
+00364  01  LINE-14.
+00365      05  FILLER             PIC X(13) VALUE
+00366          'NEXT AUTO  - '.
+00367      05  P-NEXT-AUTO-DT     PIC X(8).
+00368      05  FILLER             PIC X(5) VALUE  SPACES.
+00369      05  FILLER             PIC X(15) VALUE
+00370          'PMTS MADE    - '.
+00371      05  P-PMTS-MADE        PIC XXX.
+00372      05  FILLER             PIC X(10) VALUE  SPACES.
+00373      05  FILLER             PIC X(16) VALUE
+00374          'PREMIUM TYPE  - '.
+00375      05  P-PREM-TYPE        PIC X(7).
+00376
+00377  01  LINE-15.
+00378      05  FILLER             PIC X(13) VALUE
+00379          'COVERAGE   - '.
+00380      05  P-COVERAGE         PIC X(10).
+00381      05  FILLER             PIC X(3) VALUE   SPACES.
+00382      05  L15-ISSUE-LIT      PIC X(15) VALUE
+00383          'CERT ISSUE   - '.
+00384      05  P-CERT-ISSUE-DT    PIC X(8).
+00385      05  FILLER             PIC X(5) VALUE  SPACES.
+00386      05  FILLER             PIC X(15) VALUE
+00387          'ORIG BENEFIT  -'.
+00388      05  P-ORIG-BENEF-AMT   PIC Z(8).99.
+00389
+00390  01  LINE-16.
+00391      05  FILLER             PIC X(13) VALUE
+00392          'EXPIRE DATE- '.
+00393      05  P-EXPIRE           PIC X(12).
+00394      05  FILLER             PIC X(1)  VALUE  SPACES.
+00395      05  FILLER             PIC X(15) VALUE
+00396          'TERM/REMAIN  - '.
+00397      05  P-TERM             PIC ZZ9.
+00398      05  FILLER             PIC X     VALUE '/'.
+00399      05  P-REM              PIC ZZ9.
+00400      05  FILLER             PIC X(6)  VALUE  SPACES.
+00401      05  L16-STATUS-LIT     PIC X(16) VALUE
+00402          'CERT STATUS   - '.
+00403      05  P-CERT-STAT        PIC X(8).
+00404
+00405  01  LINE-17.
+00406      05  FILLER             PIC X(13) VALUE
+00407          'TOTAL PAID - '.
+00408      05  P-TOT-PAID         PIC Z(8).99.
+00409      05  FILLER             PIC X(2)  VALUE  SPACES.
+00410      05  FILLER             PIC X(15) VALUE
+00411          'CAUSE/DIAG   - '.
+00412      05  P-CAUSE-DIAG       PIC X(26).
+00413
+00414  01  LINE-19.
+00415      05  FILLER             PIC X(13) VALUE
+00416          'TOT EXPENSE- '.
+00417      05  P-TOT-EXPENSE      PIC ZZZZZZZ.99.
+00418      05  FILLER             PIC X(3)  VALUE  SPACES.
+00419      05  FILLER             PIC X(15) VALUE
+00420          'ORIG MANUAL  - '.
+00421      05  P-ORIG-MANUAL      PIC ZZZZZZ.99.
+00422      05  FILLER             PIC X(4)  VALUE  SPACES.
+00423      05  L19-ACCT-LIT       PIC X(16) VALUE
+00424          'ACCOUNT       - '.
+00425      05  P-ACCT             PIC X(10).
+00426
+00427  01  LINE-20.
+00428      05  FILLER             PIC X(13) VALUE
+00429          'CHG EXPENSE- '.
+00430      05  P-CHG-EXPENSE      PIC ZZZZZZ.99.
+00431      05  FILLER             PIC X(4)  VALUE  SPACES.
+00432      05  FILLER             PIC X(15) VALUE
+00433          'REM MANUAL   - '.
+00434      05  P-REM-MANUAL       PIC ZZZZZZ.99.
+00435      05  FILLER             PIC X(4)  VALUE  SPACES.
+00436      05  FILLER             PIC X(16) VALUE
+00437          'STATE         - '.
+00438      05  P-STATE            PIC X(8).
+00439
+00440  01  LINE-21.
+00441      05  L21-CANC-LIT       PIC X(13) VALUE
+00442          'CERT CANCEL- '.
+00443      05  P-CERT-CANC-DT     PIC X(8).
+00444      05  FILLER             PIC X(5)  VALUE  SPACES.
+00445      05  FILLER             PIC X(15) VALUE
+00446          'ADDL RESERVE - '.
+00447      05  P-ADD-RESERVE      PIC ZZZZZZ.99.
+00448      05  FILLER             PIC X(4)  VALUE  SPACES.
+00449      05  FILLER             PIC X(16) VALUE
+00450          'GROUPING      - '.
+00451      05  P-GROUP            PIC X(8).
+00452
+00453  01  LINE-22.
+00454      05  FILLER             PIC X(13) VALUE
+00455          'REIN CODE  - '.
+00456      05  P-REIN-CODE        PIC X(3).
+00457      05  FILLER             PIC X(10) VALUE  SPACES.
+00458      05  FILLER             PIC X(15) VALUE
+00459          'CERT BATCH   - '.
+00460      05  P-CERT-BATCH       PIC X(6).
+00461      05  FILLER             PIC X(7)  VALUE  SPACES.
+00462      05  L22-ENTRY-LIT      PIC X(16) VALUE
+00463          'CERT ENTRY    - '.
+00464      05  P-CERT-ENTRY.
+00465          10  P-CERT-ENTRY-MM  PIC XX.
+00466          10  P-CERT-SL        PIC X   VALUE '/'.
+00467          10  P-CERT-ENTRY-YY  PIC XX.
+00468
+00469  01  LINE-23.
+00470      05  FILLER             PIC X(13) VALUE
+00471          'MEMBER NO. - '.
+00472      05  P-MEMBER-NO        PIC X(12).
+00473      05  FILLER             PIC X(16) VALUE
+00474          ' INSURED AGE  - '.
+00475      05  P-INSURED-AGE      PIC XX.
+00476      05  FILLER             PIC X(11) VALUE SPACES.
+00477      05  FILLER             PIC X(16) VALUE
+00478          'INSURED SEX   - '.
+00479      05  P-INSURED-SEX      PIC XX.
+00480
+00481  01  LINE-23A.
+00482      05  P-USER-HD          PIC X(13) VALUE
+00483          'USER CODE  - '.
+00484      05  P-USER-CODE        PIC X.
+00485      05  FILLER             PIC X(12) VALUE SPACES.
+00486      05  P-PURGED-STMT      PIC X(15) VALUE 'PURGED DATE  - '.
+00487      05  P-PURGED-DATE      PIC X(08) VALUE SPACES.
+00488
+00489  01  LINE-25.
+00490      05  FILLER             PIC X(41) VALUE
+00491          '- - CHRONOLOGICAL LISTING OF ACTIVITY - -'.
+00492
+00493  01  LINE-26.
+00494      05  FILLER             PIC X(20) VALUE
+00495          'TYPE    RECORDED  BY'.
+00496 ****************
+091113 01  PAYMENT-DESCRIPTION-TABLE.
+091113     12  FILLER              PIC X(11)   VALUE 'PARTIAL PMT'.
+091113     12  FILLER              PIC X(11)   VALUE 'FINAL PMT  '.
+091113     12  FILLER              PIC X(11)   VALUE 'LUMP SM PMT'.
+091113     12  FILLER              PIC X(11)   VALUE 'ADDITNL PMT'.
+091113     12  FILLER              PIC X(11)   VALUE 'CHGABLE EXP'.
+091113     12  FILLER              PIC X(11)   VALUE 'NON-CHG EXP'.
+091113     12  FILLER              PIC X(11)   VALUE 'LF PRM RFND'.
+091113     12  FILLER              PIC X(11)   VALUE 'AH PRM RFND'.
+091113     12  FILLER              PIC X(11)   VALUE 'ENTRY CORR '.
+091113 01  PAYMENT-DESC-R   REDEFINES PAYMENT-DESCRIPTION-TABLE.
+091113     12  PAY-DESC            PIC X(11)   OCCURS 9.
+00497  01  P-PAY-LINE-1.
+091113     05  P-PAY-ACT-TYPE     PIC X(11) VALUE SPACES.
+091113*        'PAYMENT '.
+091113     05  FILLER             PIC X(1)  VALUE SPACE.
+00500      05  P-PAY-PMT-DT       PIC X(8).
+00501      05  FILLER             PIC X     VALUE SPACES.
+00502      05  P-PAY-BY           PIC X(4).
+00503      05  FILLER             PIC X(10) VALUE
+00504          '  PAYEE - '.
+00505      05  P-PAY-PAYEE        PIC X(30).
+00506      05  FILLER             PIC X(13) VALUE
+00507          '  PAYEE CD - '.
+00508      05  P-PAY-PAYEE-CD     PIC X(02).
+00509
+00510  01  P-PAY-LINE-2.
+00511      05  FILLER             PIC X(23) VALUE  SPACES.
+00512      05  FILLER             PIC X(9)  VALUE
+00513          'AMOUNT - '.
+00514      05  P-PAY-PMT-AMT      PIC Z(7).99.
+00515      05  FILLER             PIC X(10) VALUE
+00516          '  CHECK - '.
+00517      05  P-PAY-CHECK        PIC X(7).
+00518      05  FILLER             PIC X(12) VALUE
+00519          '  WRITTEN - '.
+00520      05  P-PAY-WRIT-DT      PIC X(8).
+00521
+00522  01  P-PAY-LINE-3.
+00523      05  FILLER             PIC X(23) VALUE  SPACES.
+00524      05  FILLER             PIC X(9)  VALUE
+00525          'TYPE   - '.
+00526      05  P-PAY-TYPE         PIC X(22).
+00527      05  FILLER             PIC X(11) VALUE
+00528          '  ORIGIN - '.
+00529      05  P-PAY-ORIGIN       PIC X(7).
+00530
+00531  01  P-PAY-LINE-4.
+00532      05  FILLER             PIC X(23) VALUE  SPACES.
+00533      05  FILLER             PIC X(9)  VALUE
+00534          'RESERVE- '.
+00535      05  P-PAY-RESERVE      PIC Z(6).99.
+00536      05  FILLER             PIC X(12) VALUE
+00537          '  EXPENSE - '.
+00538      05  P-PAY-EXPEN        PIC Z(5).99.
+00539      05  FILLER             PIC X(11) VALUE
+00540          '  CREDIT - '.
+00541      05  P-PAY-CREDIT-DT    PIC X(8).
+00542
+00543  01  P-PAY-LINE-5A.
+00544      05  FILLER             PIC X(23) VALUE  SPACES.
+00545      05  FILLER             PIC X(7)  VALUE
+00546          'VOID - '.
+00547      05  P-PAY-VOID-DT      PIC X(8).
+00548      05  FILLER             PIC X(11) VALUE
+00549          '  REASON - '.
+00550      05  P-PAY-REASON       PIC X(30).
+00551
+00552  01  P-PAY-LINE-5B.
+00553      05  FILLER             PIC X(23) VALUE  SPACES.
+00554      05  FILLER             PIC X(7)  VALUE
+00555          'FROM - '.
+00556      05  P-PAY-FROM-DT      PIC X(8).
+00557      05  L-5B-PD-THRU       PIC X(8)  VALUE
+00558          ' THRU - '.
+00559      05  P-PAY-THRU-DT      PIC X(8).
+00560      05  FILLER             PIC X(8)  VALUE
+00561          '  DAYS -'.
+00562      05  P-PAY-DAYS         PIC ZZZ9.
+00563      05  FILLER             PIC X(8)  VALUE
+00564          '  RATE -'.
+00565      05  P-PAY-RATE         PIC ZZ9.99.
+00566
+00567  01  P-PAY-LINE-5C.
+00568      05  FILLER             PIC X(23) VALUE  SPACES.
+00569      05  FILLER             PIC X(15) VALUE 'EXPENSE TYPE - '.
+00570      05  P-EXP-TYPE         PIC X.
+00571      05  FILLER             PIC X(41) VALUE SPACES.
+00572
+00573  01  P-LET-LINE-1.
+091113     05  P-LET-ACT-TYPE     PIC X(11) VALUE SPACES.
+091113*        'LETTER  '.
+091113     05  FILLER             PIC X     VALUE  SPACE.
+00576      05  P-LET-LET-DT       PIC X(8).
+00577      05  FILLER             PIC X     VALUE SPACE.
+00578      05  P-LET-BY           PIC X(4).
+00579      05  FILLER             PIC X(14) VALUE
+00580          '  ADDRESSEE - '.
+00581      05  P-LET-ADSEE        PIC X(30).
+00582      05  FILLER             PIC X(8) VALUE
+00583          ' CODE - '.
+091113     05  P-LET-ADSEE-CD     PIC X(3).
+00585
+00586  01  P-LET-LINE-2.
+00587      05  FILLER             PIC X(23) VALUE  SPACES.
+00588      05  FILLER             PIC X(7)  VALUE
+00589          'FORM - '.
+00590      05  P-LET-FORM         PIC X(4).
+00591      05  FILLER             PIC X(9)  VALUE
+00592          '  SENT - '.
+00593      05  P-LET-SENT-DT      PIC X(8).
+00594      05  FILLER             PIC X(12) VALUE
+00595          '  RE-SEND - '.
+00596      05  P-LET-SEND-DT      PIC X(8).
+00597
+00598  01  P-LET-LINE-3.
+00599      05  FILLER             PIC X(23) VALUE  SPACES.
+00600      05  FILLER             PIC X(12) VALUE
+00601          'FOLLOW UP - '.
+00602      05  P-LET-FOL-DT       PIC X(8).
+00603      05  FILLER             PIC X(13) VALUE
+00604          '  ANSWERED - '.
+00605      05  P-LET-ANS-DT       PIC X(8).
+00606
+00607  01  P-LET-LINE-4.
+00608      05  FILLER             PIC X(23) VALUE  SPACES.
+00609      05  FILLER             PIC X(9)  VALUE
+00610          'ORIGIN - '.
+00611      05  P-LET-ORIGIN       PIC X(7).
+00612      05  FILLER             PIC X(12) VALUE
+00613          '  ARCHIVE - '.
+00614      05  P-LET-ARCH         PIC 9(6).
+00615
+00616  01  P-LET-LINE-5.
+00617      05  FILLER             PIC X(10) VALUE
+00618          '     RE - '.
+00619      05  P-LET-RE           PIC X(70).
+00620
+00621  01  P-NOT-LINE-1.
+091113     05  P-NOT-ACT-TYPE     PIC X(11) VALUE  SPACES.
+091113*        'NOTES   '.
+091113     05  FILLER             PIC X     VALUE  SPACE.
+00624      05  P-NOT-NOTE-DT      PIC X(8).
+00625      05  FILLER             PIC X     VALUE  SPACE.
+00626      05  P-NOT-BY           PIC X(4).
+00627
+00628  01  P-NOT-LINE-2.
+00629      05  FILLER             PIC X(10) VALUE  SPACES.
+00630      05  P-NOT-TEXT-1       PIC X(70).
+00631
+00632  01  P-NOT-LINE-3.
+00633      05  FILLER             PIC X(10) VALUE  SPACES.
+00634      05  P-NOT-TEXT-2       PIC X(70).
+00635
+00636  01  P-PRO-LINE-1.
+091113     05  FILLER             PIC X(11) VALUE
+091113         'REMINDER   '.
+091113     05  FILLER             PIC X     VALUE  SPACE.
+00639      05  P-PRO-NOTE-DT      PIC X(8).
+00640      05  FILLER             PIC X     VALUE  SPACE.
+00641      05  P-PRO-BY           PIC X(4).
+00642      05  FILLER             PIC X(17) VALUE
+00643          '  START NOTIFY - '.
+00644      05  P-PRO-START-DT     PIC X(8).
+00645      05  FILLER             PIC X(15) VALUE
+00646          '  END NOTIFY - '.
+00647      05  P-PRO-END-DT       PIC X(8).
+00648
+00649  01  P-PRO-LINE-2.
+00650      05  FILLER             PIC X(10) VALUE  SPACES.
+00651      05  P-PRO-TEXT-1       PIC X(70).
+00652
+00653  01  P-PRO-LINE-3.
+00654      05  FILLER             PIC X(10) VALUE  SPACES.
+00655      05  P-PRO-TEXT-2       PIC X(70).
+00656
+00657  01  P-DEN-LINE-1.
+091113     05  FILLER             PIC X(11) VALUE
+091113         'DENIAL     '.
+091113     05  FILLER             PIC X     VALUE  SPACE.
+00660      05  P-DEN-DEN-DT       PIC X(8).
+00661      05  FILLER             PIC X     VALUE  SPACE.
+00662      05  P-DEN-BY           PIC X(4).
+00663      05  FILLER             PIC X(17) VALUE
+00664          '  RECONSIDERED - '.
+00665      05  P-DEN-RECON-DT     PIC X(8).
+00666      05  FILLER             PIC X(7)  VALUE
+00667          '  CODE-'.
+00668      05  P-DEN-CODE         PIC X(4).
+00669
+00670  01  P-DEN-LINE-2.
+00671      05  FILLER             PIC X(10) VALUE  SPACES.
+00672      05  P-DEN-TEXT-1       PIC X(60).
+00673
+00674  01  P-DEN-LINE-3.
+00675      05  FILLER             PIC X(10) VALUE  SPACES.
+00676      05  P-DEN-TEXT-2       PIC X(60).
+00677
+00678  01  P-CHG-LINE-1.
+091113     05  FILLER             PIC X(11) VALUE
+091113         'INCUR CHG  '.
+091113     05  FILLER             PIC X     VALUE  SPACE.
+00681      05  P-CHG-REC-DT       PIC X(8).
+00682      05  FILLER             PIC X     VALUE SPACES.
+00683      05  P-CHG-BY           PIC X(4).
+00684      05  FILLER             PIC X(1)  VALUE  SPACES.
+00685      05  FILLER             PIC X(8)  VALUE
+00686          'INCURED-'.
+00687      05  P-CHG-INC-DT       PIC X(8).
+00688      05  FILLER             PIC X     VALUE  SPACES.
+00689      05  L-1-PD-THRU        PIC X(8)  VALUE
+00690          'PD THRU-'.
+00691      05  P-CHG-PAID-TO-DT   PIC X(8).
+00692      05  FILLER             PIC X(15) VALUE
+00693          '  INIT MAN RES-'.
+00694      05  P-CHG-INIT-RES     PIC Z(7).99.
+00695
+00696  01  P-CHG-LINE-2.
+00697      05  FILLER             PIC X(22) VALUE  SPACES.
+00698      05  FILLER             PIC X(9)  VALUE
+00699          'REPORTED-'.
+00700      05  P-CHG-REP-DT       PIC X(8).
+00701      05  FILLER             PIC X(9)  VALUE
+00702          ' TOT PD -'.
+00703      05  P-CHG-TOT-PD       PIC Z(5).99.
+00704      05  FILLER             PIC X(14) VALUE
+00705          ' CUR MAN RES -'.
+00706      05  P-CHG-CUR-RES      PIC Z(7).99.
+00707
+00708  01  P-CHG-LINE-3.
+00709      05  FILLER             PIC X(13) VALUE
+00710          'TOT EXPENSE -'.
+00711      05  P-CHG-TOT-EXP      PIC Z(6).99.
+00712      05  FILLER             PIC X(10) VALUE
+00713          ' CREATED -'.
+00714      05  P-CHG-CREAT-DT     PIC X(8).
+00715      05  FILLER             PIC X(10) VALUE
+00716          '  DAYS PD-'.
+00717      05  P-CHG-DAYS-PD      PIC Z(5).
+00718      05  FILLER             PIC X(5)  VALUE  SPACE.
+00719      05  FILLER             PIC X(10) VALUE
+00720          'ADD- RES -'.
+00721      05  P-CHG-ADD-RES      PIC Z(7).99.
+00722
+00723  01  P-CHG-LINE-4.
+00724      05  FILLER             PIC X(13) VALUE
+00725          'CHG EXPENSE -'.
+00726      05  P-CHG-CHG-EXP      PIC Z(6).99.
+00727      05  FILLER             PIC X(10) VALUE
+00728          ' LAST PMT-'.
+00729      05  P-CHG-LAST-PMT-DT  PIC X(8).
+00730      05  FILLER             PIC X     VALUE  SPACES.
+00731      05  FILLER             PIC X(8)  VALUE
+00732          'PMTS   -'.
+00733      05  P-CHG-PMTS         PIC ZZ9.
+00734      05  FILLER             PIC X(7)  VALUE   SPACES.
+00735      05  FILLER             PIC X(17) VALUE
+00736          'TOT TRLRS   -    '.
+00737      05  P-CHG-TOT-TRLRS    PIC ZZZ9.
+00738
+00739  01  P-2-LINE-6.
+00740      05  FILLER             PIC X(28) VALUE
+00741          '- - OPEN / CLOSE HISTORY - -'.
+00742
+00743  01  P-2-LINE-8.
+00744      05  FILLER             PIC X(27) VALUE
+00745          '  DATE    OPEN/CLOSE  CAUSE'.
+00746
+00747  01  P-2-HIS-DETAIL.
+00748      05  P-2-HIS-DATE       PIC X(8).
+00749      05  FILLER             PIC X(4)  VALUE SPACES.
+00750      05  P-2-HIS-OPCL       PIC X(6).
+00751      05  FILLER             PIC X(4)  VALUE SPACES.
+00752      05  P-2-HIS-CAUSE      PIC X(10).
+00753
+00754  01  P-2-AUT-LINE-1.
+00755      05  FILLER             PIC X(35) VALUE
+00756          '- - AUTOMATIC PAYMENT SCHEDULES - -'.
+00757
+00758  01  P-2-AUT-LINE-2.
+00759      05  FILLER             PIC X(22) VALUE
+00760          'ESTABLISHED ON      - '.
+00761      05  P-2-EST-DT         PIC X(8).
+00762      05  FILLER             PIC X(10)   VALUE SPACES.
+00763      05  FILLER             PIC X(22)   VALUE
+00764          'ESTABLISHED BY      - '.
+00765      05  P-2-EST-BY         PIC X(8).
+00766
+00767  01  P-2-AUT-LINE-3.
+00768      05  FILLER             PIC X(22)   VALUE
+00769          'EFFECTIVE DATE      - '.
+00770      05  P-2-EFF-DT         PIC X(8).
+00771      05  FILLER             PIC X(10)   VALUE SPACES.
+00772      05  FILLER             PIC X(22)   VALUE
+00773          'ENDED / REPLACED    - '.
+00774      05  P-2-END-DT         PIC X(8).
+00775
+00776  01  P-2-AUT-LINE-4.
+00777      05  P-2-1ST-PMT-DT     PIC X(22)   VALUE
+00778          'FIRST PAYMENT DATE  - '.
+00779      05  P-2-1ST-PMT-ON     PIC X(8).
+00780      05  FILLER             PIC X(10)   VALUE SPACES.
+00781      05  P-2-LST-PMT-DT     PIC X(22)   VALUE
+00782          'LAST PAYMENT ON     - '.
+00783      05  P-2-LST-PMT-ON     PIC X(8).
+00784
+00785  01  P-2-AUT-LINE-5.
+00786      05  FILLER             PIC X(22)   VALUE
+00787          'FIRST PAYMENT AMT   - '.
+00788      05  P-2-1ST-PMT        PIC ZZZZ,ZZZ.99.
+00789      05  FILLER             PIC X(7)    VALUE SPACES.
+00790      05  FILLER             PIC X(22)   VALUE
+00791          'REGULAR PAYMENT AMT - '.
+00792      05  P-2-REG-PMT        PIC ZZZZ,ZZZ.99.
+00793
+00794  01  P-2-AUT-LINE-6.
+00795      05  FILLER             PIC X(22)   VALUE
+00796          'DAYS IN 1ST PERIOD  - '.
+00797      05  P-2-DAYS-1ST       PIC 9(4).
+00798 *    05  FILLER             PIC X(14)   VALUE SPACES.
+00799 *    05  FILLER             PIC X(22)   VALUE
+00800 *        'DAYS IN REGULAR PMT - '.
+00801 *    05  P-2-DAYS-REG       PIC X(3).
+00802
+00803  01  P-2-AUT-LINE-7.
+00804      05  FILLER             PIC X(22)   VALUE
+00805          'LAST PAYMENT FINAL  - '.
+00806      05  P-2-LAST-FINAL     PIC X(3).
+00807      05  FILLER             PIC X(15)   VALUE SPACES.
+00808      05  FILLER             PIC X(22)   VALUE
+00809          'PAYEE               - '.
+00810      05  P-2-PAYEE          PIC X(17).
+00811
+00812  01  P-2-AUT-LINE-8.
+00813      05  FILLER             PIC X(40)   VALUE  SPACES.
+00814      05  FILLER             PIC X(22)   VALUE
+00815          'MONTHS BETWEEN PMTS - '.
+00816      05  P-2-MOS-BET        PIC 9(3).
+00817
+00818  01  P-2-ADD-LINE-1.
+00819      05  FILLER             PIC X(25)   VALUE
+00820          '- - ADDRESSES ON FILE - -'.
+00821
+00822  01  P-2-ADD-LINE-2.
+00823      05  FILLER             PIC X(7)    VALUE
+00824          'TYPE - '.
+00825      05  P-2-ADD-TYPE       PIC X(15).
+00826      05  FILLER             PIC X(2)    VALUE SPACES.
+00827      05  FILLER             PIC X(7)    VALUE
+00828          'CODE - '.
+00829      05  P-2-ADD-CODE       PIC X.
+00830      05  FILLER             PIC X(02)   VALUE SPACES.
+00831      05  FILLER             PIC X(15)   VALUE
+00832          'MAIL TO NAME - '.
+00833      05  P-2-ADD-NAME       PIC X(30).
+00834
+00835  01  P-2-ADD-LINE-3.
+00836      05  FILLER             PIC X(34)   VALUE  SPACES.
+00837      05  FILLER             PIC X(13)   VALUE
+00838          'ADDRESS 1  - '.
+00839      05  P-2-ADD-ADDR-1     PIC X(30).
+00840
+00841  01  P-2-ADD-LINE-4.
+00842      05  FILLER             PIC X(34)   VALUE  SPACES.
+00843      05  FILLER             PIC X(13)   VALUE
+00844          'ADDRESS 2  - '.
+00845      05  P-2-ADD-ADDR-2     PIC X(30).
+00846
+00847  01  P-2-ADD-LINE-5.
+00848      05  FILLER             PIC X(34)   VALUE  SPACES.
+00849      05  FILLER             PIC X(13)   VALUE
+00850          'CITY STATE - '.
+00851      05  P-2-ADD-CITY       PIC X(30).
+00852
+00853  01  P-2-ADD-LINE-6.
+00854      05  FILLER             PIC X(34)   VALUE  SPACES.
+00855      05  FILLER             PIC X(13)   VALUE
+00856          'ZIP  PHONE - '.
+00857      05  P-2-ADD-ZIP        PIC X(10).
+00858      05  FILLER             PIC X(8)    VALUE   SPACES.
+00859      05  P-2-ADD-PHONE      PIC X(12).
+00860
+00861
+00862  01  P-FORM-LINE-1.
+091113     05  FILLER              PIC X(11)  VALUE
+091113         'FORM CTL'.
+091113     05  FILLER             PIC X     VALUE  SPACE.
+00865      05  P-FORM-LET-DT       PIC X(8).
+00866      05  FILLER              PIC X      VALUE SPACE.
+00867      05  P-FORM-BY           PIC X(4).
+00868      05  FILLER              PIC X(14)  VALUE
+00869          '  ADDRESSEE - '.
+00870      05  P-FORM-ADSEE        PIC X(30).
+00871      05  FILLER              PIC X(8)   VALUE
+00872          ' CODE - '.
+091113     05  P-FORM-ADSEE-CD     PIC X(3).
+00874
+00875  01  P-FORM-LINE-2.
+00876      05  FILLER              PIC X(23)  VALUE  SPACES.
+00877      05  FILLER              PIC X(7)   VALUE
+00878          'FORM - '.
+00879      05  P-FORM-FORM         PIC X(4).
+00880      05  FILLER              PIC X(9)   VALUE
+00881          '  SENT - '.
+00882      05  P-FORM-SENT-DT      PIC X(8).
+00883      05  FILLER              PIC X(12)  VALUE
+00884          '  RE-SEND - '.
+00885      05  P-FORM-SEND-DT      PIC X(8).
+00886
+00887  01  P-FORM-LINE-3.
+00888      05  FILLER              PIC X(23)  VALUE  SPACES.
+00889      05  FILLER              PIC X(12)  VALUE
+00890          'FOLLOW UP - '.
+00891      05  P-FORM-FOL-DT       PIC X(8).
+00892      05  FILLER              PIC X(25)  VALUE
+00893          '     CLAIMANT ANSWERED - '.
+00894      05  P-CLM-FORM-ANS-DT   PIC X(8).
+00895
+00896  01  P-FORM-LINE-4.
+00897      05  FILLER              PIC X(23)  VALUE  SPACES.
+00898      05  P-PHY-FORM-COMM     PIC X(17)  VALUE
+00899          'PHY.  ANSWERED - '.
+00900      05  P-PHY-FORM-ANS-DT   PIC X(8).
+00901      05  P-EMP-FORM-COMM     PIC X(20)  VALUE
+00902          '   EMP.  ANSWERED - '.
+00903      05  P-EMP-FORM-ANS-DT   PIC X(8).
+00904
+00905  01  P-FORM-LINE-5.
+00906      05  FILLER             PIC X(23)   VALUE SPACES.
+00907      05  FILLER             PIC X(15)   VALUE
+00908          'INSTRUCTIONS - '.
+00909      05  P-FORM-INSTRUCT    PIC X(28).
+00910
+00911  01  P-FORM-LINE-6.
+00912      05  FILLER             PIC X(38)   VALUE SPACES.
+00913      05  P-FORM-INSTRUCT-1  PIC X(28).
+00914
+00915  01  P-FORM-LINE-7.
+00916      05  FILLER             PIC X(23)   VALUE SPACES.
+00917      05  FILLER             PIC X(16)   VALUE
+00918          'RELATED CLAIM - '.
+00919      05  P-FORM-CLAIM       PIC X(7).
+00920      05  FILLER             PIC X(12)   VALUE
+00921          '  CARRIER - '.
+00922      05  P-FORM-CARRIER     PIC X.
+00923      05  FILLER             PIC X(9)    VALUE
+00924          '  CERT - '.
+00925      05  P-FORM-CERT        PIC X(8).
+00926
+00927  01  AUTO-PAY-TABLE.
+00928      05  AUTO-PAY-RECORD    OCCURS 10 TIMES  INDEXED BY AP-INDEX.
+00929          10  AP-TBL-EST-DT             PIC XX.
+00930          10  AP-TBL-EST-BY             PIC XXXX.
+00931          10  AP-TBL-SCHED-START-DT     PIC XX.
+00932          10  AP-TBL-SCHED-END-DT       PIC XX.
+00933          10  AP-TBL-TERM-DT            PIC XX.
+00934          10  AP-TBL-LAST-TYPE          PIC X.
+00935          10  AP-TBL-FIRST-AMT          PIC S9(7)V99 COMP-3.
+00936          10  AP-TBL-FIRST-DAYS         PIC S9(4) COMP.
+00937          10  AP-TBL-FIRST-DT           PIC XX.
+00938          10  AP-TBL-REG-AMT            PIC S9(7)V99  COMP-3.
+00939          10  AP-TBL-REG-MO             PIC S9(4) COMP.
+00940          10  AP-TBL-INT-MO             PIC XX.
+00941
+00942  01  ADDRESS-TABLE.
+00943      05  ADDRESS-RECORD    OCCURS 60 TIMES  INDEXED BY AD-INDEX.
+00944          10  AD-TBL-TYPE               PIC X.
+00945          10  AD-TBL-NAME               PIC X(30).
+00946          10  AD-TBL-ADDR-1             PIC X(30).
+00947          10  AD-TBL-ADDR-2             PIC X(30).
+00948          10  AD-TBL-CITY               PIC X(30).
+00949          10  AD-TBL-ZIP                PIC X(10).
+00950          10  AD-TBL-PHONE              PIC 9(11) COMP-3.
+00951
+00952  01  OPEN-CLOSE-TABLE.
+00953      05  AUTO-PAY-RECORD    OCCURS 6 TIMES  INDEXED BY OC-INDEX.
+00954          10  OC-TBL-OPCL-DT            PIC XX.
+00955          10  OC-TBL-OPCL-TYPE          PIC X.
+00956          10  OC-TBL-OPCL-REASON        PIC X(5).
+00957      EJECT
+00958 *                                    COPY ELCDMD34.
+00001 ******************************************************************
+00002 *                                                                *
+00002 *                                                                *
+00003 *                            ELCDMD34.                           *
+00004 *                            VMOD=2.001                          *
+00005 *                                                                *
+00006 *   FILE DESCRIPTION = DMD DLO034 PARAMETER AREA                 *
+00007 *                                                                *
+00008 *    LENGTH = 272    RECFRM = FIXED                              *
+00009 *                                                                *
+00010 ******************************************************************
+00011  01  DLO034-COMMUNICATION-AREA.
+00012      12  DL34-PROCESS-TYPE             PIC X.
+00013      12  DL34-COMPANY-ID               PIC XXX.
+00014      12  DL34-PRINT-PROGRAM-ID         PIC X(8).
+00015      12  DL34-USERID                   PIC X(4).
+00016      12  DL34-PRINT-LINE               PIC X(250).
+00017      12  DL34-OVERRIDE-PRINTER-ID      PIC X(4).
+00018      12  DL34-RETURN-CODE              PIC XX.
+00019  01  DLO034-REC-LENGTH                 PIC S9(4) COMP VALUE +272.
+00959      EJECT
+00960 *                                    COPY ELCAID.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            ELCAID.                             *
+00004 *                            VMOD=2.001                          *
+00005 *                                                                *
+00006 *   DESCRIPTION:  ATTENTION IDENTIFER CHARACTERS.                *
+CIDMOD*                                                                *
+CIDMOD*  NO  CID  MODS  IN  COPYBOOK  ELCAID                           *
+051007*  051007  2007041300002 Change PF22 from x'D5' to x'5B'
+00007 ******************************************************************
+00008
+00009  01  DFHAID.
+00010    02  DFHNULL   PIC  X  VALUE  ' '.
+00011    02  DFHENTER  PIC  X  VALUE  QUOTE.
+00012    02  DFHCLEAR  PIC  X  VALUE  '_'.
+00013    02  DFHPEN    PIC  X  VALUE  '='.
+00014    02  DFHOPID   PIC  X  VALUE  'W'.
+00015    02  DFHPA1    PIC  X  VALUE  '%'.
+00016    02  DFHPA2    PIC  X  VALUE  '>'.
+00017    02  DFHPA3    PIC  X  VALUE  ','.
+00018    02  DFHPF1    PIC  X  VALUE  '1'.
+00019    02  DFHPF2    PIC  X  VALUE  '2'.
+00020    02  DFHPF3    PIC  X  VALUE  '3'.
+00021    02  DFHPF4    PIC  X  VALUE  '4'.
+00022    02  DFHPF5    PIC  X  VALUE  '5'.
+00023    02  DFHPF6    PIC  X  VALUE  '6'.
+00024    02  DFHPF7    PIC  X  VALUE  '7'.
+00025    02  DFHPF8    PIC  X  VALUE  '8'.
+00026    02  DFHPF9    PIC  X  VALUE  '9'.
+00027    02  DFHPF10   PIC  X  VALUE  ':'.
+00028    02  DFHPF11   PIC  X  VALUE  '#'.
+00029    02  DFHPF12   PIC  X  VALUE  '@'.
+00030    02  DFHPF13   PIC  X  VALUE  'A'.
+00031    02  DFHPF14   PIC  X  VALUE  'B'.
+00032    02  DFHPF15   PIC  X  VALUE  'C'.
+00033    02  DFHPF16   PIC  X  VALUE  'D'.
+00034    02  DFHPF17   PIC  X  VALUE  'E'.
+00035    02  DFHPF18   PIC  X  VALUE  'F'.
+00036    02  DFHPF19   PIC  X  VALUE  'G'.
+00037    02  DFHPF20   PIC  X  VALUE  'H'.
+00038    02  DFHPF21   PIC  X  VALUE  'I'.
+051007*00039    02  DFHPF22   PIC  X  VALUE  'Õ'.
+051007   02  DFHPF22   PIC  X  VALUE  '['.
+00040    02  DFHPF23   PIC  X  VALUE  '.'.
+00041    02  DFHPF24   PIC  X  VALUE  '<'.
+00042    02  DFHMSRE   PIC  X  VALUE  'X'.
+00043    02  DFHSTRF   PIC  X  VALUE  'h'.
+00044    02  DFHTRIG   PIC  X  VALUE  '"'.
+00961  01  PF-AID REDEFINES DFHAID.
+00962      05  FILLER                      PIC X(8).
+00963      05  PF-VALUES  OCCURS 24    PIC X.
+00964      EJECT
+00965 *                                COPY ELCALGND.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            ELCALGND.                           *
+00004 *                            VMOD=2.001                          *
+00005 *                                                                *
+CIDMOD*  NO  CID  MODS  IN  COPYBOOK  ELCALGND                         *
+00006 ******************************************************************
+00007 ***   WORK AREAS  FOR FIELD ALIGN  ROUTINE
+00008 ***                 -ELALGND-
+00009 ***   TO BE USED WITH PROCEDURE COPY MEMBER -ELALGNP-
+00010 ***   SEE DESCRIPTION OF FUNCTION AND INSTRUCTIONS IN -ELALGNP-
+00011 ******************************************************************
+00012
+00013  01  REQUIRED-FIELDS.
+00014 ***         WS-UNALIGNED-FIELD    (PRESET TO BLANKS)
+00015 ***         WS-ALIGNED-FIELD      (THE FIELD TO BE ALIGNED)
+00016 ***         WS-NAME-LENGTH      (LENGTH OF FIELD TO BE ALIGNED)
+00017 *************************************
+00018 *************************************
+00019      05  WS-UNALIGNED-FIELD              PIC X(30) VALUE SPACES.
+00020      05  WS-UNALIGNED-BYTE  REDEFINES WS-UNALIGNED-FIELD
+00021                   OCCURS 30  INDEXED BY NAME-IND  PIC X.
+00022
+00023      05  WS-ALIGNED-FIELD             PIC X(30) VALUE SPACES.
+00024      05  WS-UNALIGNED-BYTE-A  REDEFINES WS-ALIGNED-FIELD
+00025                   OCCURS 30  INDEXED BY NAME-IND-A  PIC X.
+00026
+00027      05  WS-LENGTH-FOUND-SW          PIC X   VALUE LOW-VALUES.
+00028          88  LENGTH-FOUND            VALUE HIGH-VALUES.
+00029
+00030      05  WS-SPACE-COUNTER            PIC S9(4)       VALUE ZEROS.
+00031
+00032      05  WS-NAME-LENGTH              PIC S9(4)       VALUE +30.
+00033
+00034      05  WS-ACTUAL-NAME-LENGTH       PIC S9(4)       VALUE ZEROS.
+00035
+00036      05  WS-HALF-BLANKS              PIC S9(4)       VALUE ZEROS.
+00037
+00038 ******************************************************************
+00966      EJECT
+00967 *                                COPY ELPRTCVD.
+00001 *****************************************************************
+00002 *                                                               *
+00003 *                            ELPRTCVD.                          *
+00004 *                            VMOD=2.001                         *
+00005 *****************************************************************.
+00006
+00007 ******************************************************************
+00008 ***   WORK AREAS  FOR TERMINAL ONLINE PRINT ROUTINE
+00009 ***                 -ELPRTCVD-
+00010 ***   TO BE USED WITH PROCEDURE COPY MEMBER -ELPRTCVP-
+00011 ******************************************************************
+00012
+00013  01  S-WORK-AREA                     SYNC.
+00014      12  WS-LINE-LEN                 PIC S9(4)       VALUE +80
+00015                                      COMP.
+00016
+00017      12  WS-LINE-LENGTH              PIC S9(4)       VALUE ZERO
+00018                                      COMP.
+00019
+00020      12  WS-BUFFER-SIZE              PIC S9(4)       VALUE +1916
+00021                                      COMP.
+00022
+00023      12  WS-BUFFER-LENGTH            PIC S9(4)       VALUE ZERO
+00024                                      COMP.
+00025
+00026      12  WS-PROG-END                 PIC X           VALUE SPACES.
+00027
+00028      12  WS-PRINT-AREA.
+00029          16  WS-PASSED-CNTL-CHAR     PIC X           VALUE SPACES.
+00030            88  SINGLE-SPACE                          VALUE ' '.
+00031            88  DOUBLE-SPACE                          VALUE '0'.
+00032            88  TRIPLE-SPACE                          VALUE '-'.
+00033            88  TOP-PAGE                              VALUE '1'.
+00034
+00035          16  WS-PASSED-DATA.
+00036              20  WS-PRINT-BYTE       PIC X
+00037                  OCCURS 132 TIMES    INDEXED BY PRT-INDEX.
+00038
+00039      12  WS-LINE-CNT                 PIC S9(3)        VALUE ZERO
+00040                                      COMP-3.
+00041      12  WS-WCC-CNTL                 PIC X(1)         VALUE 'H'.
+00042
+00043      12  WS-EM                       PIC S9(4)        VALUE +25
+00044                                      COMP.
+00045      12  FILLER   REDEFINES WS-EM.
+00046          16  FILLER                  PIC X.
+00047          16  T-EM                    PIC X.
+00048
+00049 *    12  WS-SS                       PIC S9(4)        VALUE +21
+00049      12  WS-SS                       PIC S9(4)        VALUE +10
+00050                                      COMP.
+00051      12  FILLER   REDEFINES WS-SS.
+00052          16  FILLER                  PIC X.
+00053          16  T-SS                    PIC X.
+00054
+00055      12  WS-TP                       PIC S9(4)      VALUE +12
+00056                                      COMP.
+00057      12  FILLER   REDEFINES WS-TP.
+00058          16  FILLER                  PIC X.
+00059          16  T-TP                    PIC X.
+00060
+00061      12  WS-FIRST-TIME-SW            PIC X           VALUE '1'.
+00062          88  FIRST-TIME                              VALUE '1'.
+00063          88  FIRST-LINE-NEXT-BUFFER                  VALUE '2'.
+00064
+00065      12  WS-BUFFER-AREA.
+00066          16  WS-BUFFER-BYTE          PIC X
+00067              OCCURS 1920 TIMES       INDEXED BY BUFFER-INDEX
+00068                                                 BUFFER-INDEX2.
+00069
+00070 ******************************************************************
+00968      EJECT
+00969 *                                COPY ELCINTF.
+00001 ******************************************************************
+00002 *                                                                *
+00002 *                                                                *
+00003 *                            ELCINTF.                            *
+00004 *                            VMOD=2.017                          *
+00005 *                                                                *
+00006 *   FILE DESCRIPTION = C.I.C.S. COMMON DATA AREA                 *
+00007 *                                                                *
+00008 *       LENGTH = 1024                                            *
+00009 *                                                                *
+00010 ******************************************************************
+011812*                   C H A N G E   L O G
+011812*
+011812* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+011812*-----------------------------------------------------------------
+011812*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+011812* EFFECTIVE    NUMBER
+011812*-----------------------------------------------------------------
+011812* 011812    2011022800001  AJRA  ADD CSR IND TO USER SECURITY
+011812******************************************************************
+00011  01  PROGRAM-INTERFACE-BLOCK.
+00012      12  PI-COMM-LENGTH                PIC S9(4) COMP VALUE +1024.
+00013      12  PI-CALLING-PROGRAM              PIC X(8).
+00014      12  PI-SAVED-PROGRAM-1              PIC X(8).
+00015      12  PI-SAVED-PROGRAM-2              PIC X(8).
+00016      12  PI-SAVED-PROGRAM-3              PIC X(8).
+00017      12  PI-SAVED-PROGRAM-4              PIC X(8).
+00018      12  PI-SAVED-PROGRAM-5              PIC X(8).
+00019      12  PI-SAVED-PROGRAM-6              PIC X(8).
+00020      12  PI-RETURN-TO-PROGRAM            PIC X(8).
+00021      12  PI-COMPANY-ID                   PIC XXX.
+00022      12  PI-COMPANY-CD                   PIC X.
+00023
+00024      12  PI-COMPANY-PASSWORD             PIC X(8).
+00025
+00026      12  PI-JOURNAL-FILE-ID              PIC S9(4) COMP.
+00027
+00028      12  PI-CONTROL-IN-PROGRESS.
+00029          16  PI-CARRIER                  PIC X.
+00030          16  PI-GROUPING                 PIC X(6).
+00031          16  PI-STATE                    PIC XX.
+00032          16  PI-ACCOUNT                  PIC X(10).
+00033          16  PI-PRODUCER REDEFINES PI-ACCOUNT
+00034                                          PIC X(10).
+00035          16  PI-CLAIM-CERT-GRP.
+00036              20  PI-CLAIM-NO             PIC X(7).
+00037              20  PI-CERT-NO.
+00038                  25  PI-CERT-PRIME       PIC X(10).
+00039                  25  PI-CERT-SFX         PIC X.
+00040              20  PI-CERT-EFF-DT          PIC XX.
+00041          16  PI-PLAN-DATA REDEFINES PI-CLAIM-CERT-GRP.
+00042              20  PI-PLAN-CODE            PIC X(2).
+00043              20  PI-REVISION-NUMBER      PIC X(3).
+00044              20  PI-PLAN-EFF-DT          PIC X(2).
+00045              20  PI-PLAN-EXP-DT          PIC X(2).
+00046              20  FILLER                  PIC X(11).
+00047          16  PI-OE-REFERENCE-1 REDEFINES PI-CLAIM-CERT-GRP.
+00048              20  PI-OE-REFERENCE-1.
+00049                  25  PI-OE-REF-1-PRIME   PIC X(18).
+00050                  25  PI-OE-REF-1-SUFF    PIC XX.
+00051
+00052      12  PI-SESSION-IN-PROGRESS          PIC X.
+00053          88  CLAIM-SESSION                   VALUE '1'.
+00054          88  CREDIT-SESSION                  VALUE '2'.
+00055          88  WARRANTY-SESSION                VALUE '3'.
+00056          88  MORTGAGE-SESSION                VALUE '4'.
+00057          88  GENERAL-LEDGER-SESSION          VALUE '5'.
+00058
+00059
+00060 *THE FOLLOWING TWO FIELDS ARE USED ONLY WITH MULTI COMPANY CLIENTS
+00061
+00062      12  PI-ORIGINAL-COMPANY-ID          PIC X(3).
+00063      12  PI-ORIGINAL-COMPANY-CD          PIC X.
+00064
+00065      12  PI-CREDIT-USER                  PIC X.
+00066          88  PI-NOT-CREDIT-USER              VALUE 'N'.
+00067          88  PI-HAS-CLAS-IC-CREDIT           VALUE 'Y'.
+00068
+00069      12  PI-CLAIM-USER                   PIC X.
+00070          88  PI-NOT-CLAIM-USER               VALUE 'N'.
+00071          88  PI-HAS-CLAS-IC-CLAIM            VALUE 'Y'.
+00072
+00073      12  PI-PROCESSOR-SYS-ACCESS         PIC X.
+00074          88  PI-ACCESS-TO-BOTH-SYSTEMS       VALUE ' '.
+00075          88  PI-ACCESS-TO-ALL-SYSTEMS        VALUE ' '.
+00076          88  PI-ACCESS-TO-CLAIM-ONLY         VALUE '1'.
+00077          88  PI-ACCESS-TO-CREDIT-ONLY        VALUE '2'.
+00078          88  PI-ACCESS-TO-MORTGAGE-ONLY      VALUE '3'.
+00079
+00080      12  PI-PROCESSOR-ID                 PIC X(4).
+00081
+00082      12  PI-PROCESSOR-PASSWORD           PIC X(11).
+00083
+00084      12  PI-MEMBER-CAPTION               PIC X(10).
+00085
+00086      12  PI-PROCESSOR-USER-ALMIGHTY      PIC X.
+00087          88  PI-USER-ALMIGHTY-YES            VALUE 'Y'.
+00088
+00089      12  PI-LIFE-OVERRIDE-L1             PIC X.
+00090      12  PI-LIFE-OVERRIDE-L2             PIC XX.
+00091      12  PI-LIFE-OVERRIDE-L6             PIC X(6).
+00092      12  PI-LIFE-OVERRIDE-L12            PIC X(12).
+00093
+00094      12  PI-AH-OVERRIDE-L1               PIC X.
+00095      12  PI-AH-OVERRIDE-L2               PIC XX.
+00096      12  PI-AH-OVERRIDE-L6               PIC X(6).
+00097      12  PI-AH-OVERRIDE-L12              PIC X(12).
+00098
+00099      12  PI-NEW-SYSTEM                   PIC X(2).
+00100
+00101      12  PI-PRIMARY-CERT-NO              PIC X(11).
+00102      12  PI-CLAIM-PAID-THRU-TO           PIC X(01).
+00103          88  PI-USES-PAID-TO                 VALUE '1'.
+00104      12  PI-CRDTCRD-SYSTEM.
+00105          16  PI-CRDTCRD-USER             PIC X.
+00106              88  PI-NOT-CRDTCRD-USER         VALUE 'N'.
+00107              88  PI-HAS-CLAS-IC-CRDTCRD      VALUE 'Y'.
+00108          16  PI-CC-MONTH-END-DT          PIC XX.
+00109      12  PI-PROCESSOR-PRINTER            PIC X(4).
+00110
+00111      12  PI-OE-REFERENCE-2.
+00112          16  PI-OE-REF-2-PRIME           PIC X(10).
+00113          16  PI-OE-REF-2-SUFF            PIC X.
+00114
+00115      12  PI-REM-TRM-CALC-OPTION          PIC X.
+00116
+00117      12  PI-LANGUAGE-TYPE                PIC X.
+00118              88  PI-LANGUAGE-IS-ENG          VALUE 'E'.
+00119              88  PI-LANGUAGE-IS-FR           VALUE 'F'.
+00120              88  PI-LANGUAGE-IS-SPAN         VALUE 'S'.
+00121
+00122      12  PI-POLICY-LINKAGE-IND           PIC X.
+00123          88  PI-USE-POLICY-LINKAGE           VALUE 'Y'.
+00124          88  PI-POLICY-LINKAGE-NOT-USED      VALUE 'N'
+00125                                                    LOW-VALUES.
+00126
+00127      12  PI-ALT-DMD-PRT-ID               PIC X(4).
+00128      12  PI-CLAIM-PW-SESSION             PIC X(1).
+00129          88  PI-CLAIM-CREDIT                 VALUE '1'.
+00130          88  PI-CLAIM-CONVEN                 VALUE '2'.
+011812
+011812     12  PI-PROCESSOR-CSR-IND            PIC X.
+011812         88  PI-PROCESSOR-IS-CSR             VALUE 'Y' 'S'.
+011812         88  PI-PROCESSOR-IS-CSR-SUPER       VALUE 'S'.
+011812
+011812     12  FILLER                          PIC X(3).
+00132
+00133      12  PI-SYSTEM-LEVEL                 PIC X(145).
+00134
+00135      12  PI-CLAIMS-CREDIT-LEVEL          REDEFINES
+00136          PI-SYSTEM-LEVEL.
+00137
+00138          16  PI-ENTRY-CODES.
+00139              20  PI-ENTRY-CD-1           PIC X.
+00140              20  PI-ENTRY-CD-2           PIC X.
+00141
+00142          16  PI-RETURN-CODES.
+00143              20  PI-RETURN-CD-1          PIC X.
+00144              20  PI-RETURN-CD-2          PIC X.
+00145
+00146          16  PI-UPDATE-STATUS-SAVE.
+00147              20  PI-UPDATE-BY            PIC X(4).
+00148              20  PI-UPDATE-HHMMSS        PIC S9(7)     COMP-3.
+00149
+00150          16  PI-LOWER-CASE-LETTERS       PIC X.
+00151              88  LOWER-CASE-LETTERS-USED     VALUE 'Y'.
+00152
+00153 *        16  PI-CLAIM-ACCESS-CONTROL     PIC X.
+00154 *            88  CLAIM-NO-UNIQUE             VALUE '1'.
+00155 *            88  CARRIER-CLM-CNTL            VALUE '2'.
+00156
+00157          16  PI-CERT-ACCESS-CONTROL      PIC X.
+00158              88  ST-ACCNT-CNTL               VALUE ' '.
+00159              88  CARR-GROUP-ST-ACCNT-CNTL    VALUE '1'.
+00160              88  CARR-ST-ACCNT-CNTL          VALUE '2'.
+00161              88  ACCNT-CNTL                  VALUE '3'.
+00162              88  CARR-ACCNT-CNTL             VALUE '4'.
+00163
+00164          16  PI-PROCESSOR-CAP-LIST.
+00165              20  PI-SYSTEM-CONTROLS.
+00166                 24 PI-SYSTEM-DISPLAY     PIC X.
+00167                  88  SYSTEM-DISPLAY-CAP      VALUE 'Y'.
+00168                 24 PI-SYSTEM-MODIFY      PIC X.
+00169                  88  SYSTEM-MODIFY-CAP       VALUE 'Y'.
+00170              20  FILLER                  PIC XX.
+00171              20  PI-DISPLAY-CAP          PIC X.
+00172                  88  DISPLAY-CAP             VALUE 'Y'.
+00173              20  PI-MODIFY-CAP           PIC X.
+00174                  88  MODIFY-CAP              VALUE 'Y'.
+00175              20  PI-MSG-AT-LOGON-CAP     PIC X.
+00176                  88  MSG-AT-LOGON-CAP        VALUE 'Y'.
+00177              20  PI-FORCE-CAP            PIC X.
+00178                  88  FORCE-CAP               VALUE 'Y'.
+00179
+00180          16  PI-PROGRAM-CONTROLS.
+00181              20  PI-PGM-PRINT-OPT        PIC X.
+00182              20  PI-PGM-FORMAT-OPT       PIC X.
+00183              20  PI-PGM-PROCESS-OPT      PIC X.
+00184              20  PI-PGM-TOTALS-OPT       PIC X.
+00185
+00186          16  PI-HELP-INTERFACE.
+00187              20  PI-LAST-ERROR-NO        PIC X(4).
+00188              20  PI-CURRENT-SCREEN-NO    PIC X(4).
+00189
+00190          16  PI-CARRIER-CONTROL-LEVEL    PIC X.
+00191              88  CONTROL-IS-ACTUAL-CARRIER   VALUE SPACE.
+00192
+00193          16  PI-CR-CONTROL-IN-PROGRESS.
+00194              20  PI-CR-CARRIER           PIC X.
+00195              20  PI-CR-GROUPING          PIC X(6).
+00196              20  PI-CR-STATE             PIC XX.
+00197              20  PI-CR-ACCOUNT           PIC X(10).
+00198              20  PI-CR-FIN-RESP          PIC X(10).
+00199              20  PI-CR-TYPE              PIC X.
+00200
+00201          16  PI-CR-BATCH-NUMBER          PIC X(6).
+00202
+00203          16  PI-CR-MONTH-END-DT          PIC XX.
+00204
+00205          16  PI-CAR-GROUP-ACCESS-CNTL    PIC X.
+00206              88  PI-USE-ACTUAL-CARRIER       VALUE ' '.
+00207              88  PI-ZERO-CARRIER             VALUE '1'.
+00208              88  PI-ZERO-GROUPING            VALUE '2'.
+00209              88  PI-ZERO-CAR-GROUP           VALUE '3'.
+00210
+00211          16  PI-CARRIER-SECURITY         PIC X.
+00212              88  PI-NO-CARRIER-SECURITY      VALUE ' '.
+00213
+00214          16  PI-ACCOUNT-SECURITY         PIC X(10).
+00215              88  PI-NO-ACCOUNT-SECURITY      VALUE SPACES.
+00216              88  PI-NO-PRODUCER-SECURITY     VALUE SPACES.
+00217
+00218          16  PI-CODE-SECURITY REDEFINES PI-ACCOUNT-SECURITY.
+00219              20  PI-ACCESS-CODE          OCCURS 10 TIMES
+00220                                          INDEXED BY PI-ACCESS-NDX
+00221                                          PIC X.
+00222
+00223          16  PI-GA-BILLING-CONTROL       PIC X.
+00224              88  PI-GA-BILLING               VALUE '1'.
+00225
+00226          16  PI-MAIL-PROCESSING          PIC X.
+00227              88  PI-MAIL-YES                 VALUE 'Y'.
+00228
+00229          16  PI-SECURITY-TEMP-STORE-ID   PIC X(8).
+00230
+00231          16  PI-AR-SYSTEM.
+00232              20  PI-AR-PROCESSING-CNTL   PIC X.
+00233                  88  PI-AR-PROCESSING        VALUE 'Y'.
+00234              20  PI-AR-SUMMARY-CODE      PIC X(6).
+00235              20  PI-AR-MONTH-END-DT      PIC XX.
+00236
+00237          16  PI-MP-SYSTEM.
+00238              20  PI-MORTGAGE-USER            PIC X.
+00239                  88  PI-NOT-MORTGAGE-USER            VALUE 'N'.
+00240                  88  PI-HAS-CLAS-IC-MORTGAGE         VALUE 'Y'.
+00241              20  PI-MORTGAGE-ACCESS-CONTROL  PIC X.
+00242                  88  PI-MP-ST-PROD-CNTL              VALUE ' '.
+00243                  88  PI-MP-CARR-GRP-ST-PROD-CNTL     VALUE '1'.
+00244                  88  PI-MP-CARR-ST-PROD-CNTL         VALUE '2'.
+00245                  88  PI-MP-PROD-CNTL                 VALUE '3'.
+00246                  88  PI-MP-CARR-PROD-CNTL            VALUE '4'.
+00247              20  PI-MP-MONTH-END-DT          PIC XX.
+00248              20  PI-MP-REFERENCE-NO.
+00249                  24  PI-MP-REFERENCE-PRIME   PIC X(18).
+00250                  24  PI-MP-REFERENCE-SFX     PIC XX.
+00251
+00252          16  PI-LABEL-CONTROL            PIC X(01).
+00253              88  PI-CREATE-LABELS                    VALUE 'Y'.
+00254              88  PI-BYPASS-LABELS                    VALUE 'N'.
+00255
+00256          16  PI-BILL-GROUPING-CODE       PIC X(01).
+00257              88  PI-CO-HAS-BILL-GROUPING             VALUE 'Y'.
+00258
+00259          16  PI-RATE-DEV-AUTHORIZATION   PIC X(01).
+00260              88  PI-RATE-DEV-AUTHORIZED              VALUE 'Y'.
+00261              88  PI-RATE-DEV-NOT-AUTHORIZED          VALUE 'N'.
+00262
+00263          16  FILLER                      PIC X(14).
+00264
+00265      12  PI-PROGRAM-WORK-AREA            PIC X(640).
+00266 ******************************************************************
+00970      12  WS-INT-BLK REDEFINES PI-PROGRAM-WORK-AREA.
+00971          16  FILLER                 PIC X.
+00972          16  WS-PI-NAME             PIC X(30).
+00973          16  FILLER                 PIC X(609).
+00974
+00975      EJECT
+00976 *                                COPY ELCATTR.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            ELCATTR.                            *
+00004 *                            VMOD=2.001                          *
+00005 *                                                                *
+00006 *             LIST OF STANDARD ATTRIBUTE VALUES                  *
+00007 *                                                                *
+00008 *   THE DATA NAMES IN THIS COPY BOOK WERE ASSIGNED AS FOLLOWS:   *
+00009 *                                                                *
+00010 *                   POS 1   P=PROTECTED                          *
+00011 *                           U=UNPROTECTED                        *
+00012 *                           S=ASKIP                              *
+00013 *                   POS 2   A=ALPHA/NUMERIC                      *
+00014 *                           N=NUMERIC                            *
+00015 *                   POS 3   N=NORMAL                             *
+00016 *                           B=BRIGHT                             *
+00017 *                           D=DARK                               *
+00018 *                   POS 4-5 ON=MODIFIED DATA TAG ON              *
+00019 *                           OF=MODIFIED DATA TAG OFF             *
+00020 *                                                                *
+CIDMOD*  NO  CID  MODS  IN  COPYBOOK  ELCATTR                          *
+00021 ******************************************************************
+00022  01  ATTRIBUTE-LIST.
+00023      12  AL-PABOF            PIC X       VALUE 'Y'.
+00024      12  AL-PABON            PIC X       VALUE 'Z'.
+00025      12  AL-PADOF            PIC X       VALUE '%'.
+00026      12  AL-PADON            PIC X       VALUE '_'.
+00027      12  AL-PANOF            PIC X       VALUE '-'.
+00028      12  AL-PANON            PIC X       VALUE '/'.
+00029      12  AL-SABOF            PIC X       VALUE '8'.
+00030      12  AL-SABON            PIC X       VALUE '9'.
+00031      12  AL-SADOF            PIC X       VALUE '@'.
+00032      12  AL-SADON            PIC X       VALUE QUOTE.
+00033      12  AL-SANOF            PIC X       VALUE '0'.
+00034      12  AL-SANON            PIC X       VALUE '1'.
+00035      12  AL-UABOF            PIC X       VALUE 'H'.
+00036      12  AL-UABON            PIC X       VALUE 'I'.
+00037      12  AL-UADOF            PIC X       VALUE '<'.
+00038      12  AL-UADON            PIC X       VALUE '('.
+00039      12  AL-UANOF            PIC X       VALUE ' '.
+00040      12  AL-UANON            PIC X       VALUE 'A'.
+00041      12  AL-UNBOF            PIC X       VALUE 'Q'.
+00042      12  AL-UNBON            PIC X       VALUE 'R'.
+00043      12  AL-UNDOF            PIC X       VALUE '*'.
+00044      12  AL-UNDON            PIC X       VALUE ')'.
+00045      12  AL-UNNOF            PIC X       VALUE '&'.
+00046      12  AL-UNNON            PIC X       VALUE 'J'.
+00977      EJECT
+00978 *                                COPY ELCDATE.
+00001 ******************************************************************
+00002 *                                                                *
+00002 *                                                                *
+00003 *                            ELCDATE.                            *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+00005 *                            VMOD=2.003
+00006 *                                                                *
+00007 *                                                                *
+00008 *   DESCRIPTION:  DATA PASSED TO DATE CONVERSION ROUTINE.        *
+00009 *                 LENGTH = 200                                   *
+00010 ******************************************************************
+00011
+00012  01  DATE-CONVERSION-DATA.
+00013      12  DC-COMM-LENGTH                PIC S9(4) COMP VALUE +200.
+00014      12  DC-OPTION-CODE                PIC X.
+00015          88  BIN-TO-GREG                VALUE ' '.
+00016          88  ELAPSED-BETWEEN-BIN        VALUE '1'.
+00017          88  EDIT-GREG-TO-BIN           VALUE '2'.
+00018          88  YMD-GREG-TO-BIN            VALUE '3'.
+00019          88  MDY-GREG-TO-BIN            VALUE '4'.
+00020          88  JULIAN-TO-BIN              VALUE '5'.
+00021          88  BIN-PLUS-ELAPSED           VALUE '6'.
+00022          88  FIND-CENTURY               VALUE '7'.
+00023          88  ELAPSED-BETWEEN-BIN-3      VALUE '8'.
+00024          88  EDIT-GREG-TO-BIN-3         VALUE '9'.
+00025          88  YMD-GREG-TO-BIN-3          VALUE 'A'.
+00026          88  MDY-GREG-TO-BIN-3          VALUE 'B'.
+00027          88  JULIAN-TO-BIN-3            VALUE 'C'.
+00028          88  BIN-PLUS-ELAPSED-3         VALUE 'D'.
+00029          88  JULIAN-EXPANDED-TO-BIN     VALUE 'E'.
+00030          88  JULIAN-EXPANDED-TO-BIN-3   VALUE 'F'.
+00031          88  BIN-TO-JULIAN-EXPANDED     VALUE 'G'.
+00032          88  JULIAN-EXPANDED            VALUE 'E', 'F', 'G'.
+00033          88  CHECK-LEAP-YEAR            VALUE 'H'.
+00034          88  BIN-3-TO-GREG              VALUE 'I'.
+00035          88  CYMD-GREG-TO-BIN-3         VALUE 'J'.
+00036          88  MDCY-GREG-TO-BIN-3         VALUE 'K'.
+00037          88  CYMD-GREG-TO-BIN           VALUE 'L'.
+00038          88  MDCY-GREG-TO-BIN           VALUE 'M'.
+00039          88  MDY-GREG-TO-JULIAN         VALUE 'N'.
+00040          88  MDCY-GREG-TO-JULIAN        VALUE 'O'.
+00041          88  YMD-GREG-TO-JULIAN         VALUE 'P'.
+00042          88  CYMD-GREG-TO-JULIAN        VALUE 'Q'.
+00043          88  THREE-CHARACTER-BIN
+00044                   VALUES  '8' '9' 'A' 'B' 'C' 'D' 'I' 'J' 'K'.
+00045          88  GREGORIAN-TO-BIN
+00046                   VALUES '2' '3' '4' '9' 'A' 'B' 'J' 'K' 'L' 'M'.
+00047          88  BIN-TO-GREGORIAN
+00048                   VALUES ' ' '1' 'I' '8' 'G'.
+00049          88  JULIAN-TO-BINARY
+00050                   VALUES '5' 'C' 'E' 'F'.
+00051      12  DC-ERROR-CODE                 PIC X.
+00052          88  NO-CONVERSION-ERROR        VALUE ' '.
+00053          88  DATE-CONVERSION-ERROR
+00054                   VALUES '1' '2' '3' '4' '5' '9' 'A' 'B' 'C'.
+00055          88  DATE-IS-ZERO               VALUE '1'.
+00056          88  DATE-IS-NON-NUMERIC        VALUE '2'.
+00057          88  DATE-IS-INVALID            VALUE '3'.
+00058          88  DATE1-GREATER-DATE2        VALUE '4'.
+00059          88  ELAPSED-PLUS-NEGATIVE      VALUE '5'.
+00060          88  DATE-INVALID-OPTION        VALUE '9'.
+00061          88  INVALID-CENTURY            VALUE 'A'.
+00062          88  ONLY-CENTURY               VALUE 'B'.
+00063          88  ONLY-LEAP-YEAR             VALUE 'C'.
+00064          88  VALID-CENTURY-LEAP-YEAR    VALUE 'B', 'C'.
+00065      12  DC-END-OF-MONTH               PIC X.
+00066          88  CALCULATE-END-OF-MONTH     VALUE '1'.
+00067      12  DC-CENTURY-ADJUSTMENT         PIC X   VALUE SPACES.
+00068          88  USE-NORMAL-PROCESS         VALUE ' '.
+00069          88  ADJUST-DOWN-100-YRS        VALUE '1'.
+00070          88  ADJUST-UP-100-YRS          VALUE '2'.
+00071      12  FILLER                        PIC X.
+00072      12  DC-CONVERSION-DATES.
+00073          16  DC-BIN-DATE-1             PIC XX.
+00074          16  DC-BIN-DATE-2             PIC XX.
+00075          16  DC-GREG-DATE-1-EDIT       PIC X(08).
+00076          16  DC-GREG-DATE-1-EDIT-R REDEFINES
+00077                        DC-GREG-DATE-1-EDIT.
+00078              20  DC-EDIT1-MONTH        PIC 99.
+00079              20  SLASH1-1              PIC X.
+00080              20  DC-EDIT1-DAY          PIC 99.
+00081              20  SLASH1-2              PIC X.
+00082              20  DC-EDIT1-YEAR         PIC 99.
+00083          16  DC-GREG-DATE-2-EDIT       PIC X(08).
+00084          16  DC-GREG-DATE-2-EDIT-R REDEFINES
+00085                      DC-GREG-DATE-2-EDIT.
+00086              20  DC-EDIT2-MONTH        PIC 99.
+00087              20  SLASH2-1              PIC X.
+00088              20  DC-EDIT2-DAY          PIC 99.
+00089              20  SLASH2-2              PIC X.
+00090              20  DC-EDIT2-YEAR         PIC 99.
+00091          16  DC-GREG-DATE-1-YMD        PIC 9(06).
+00092          16  DC-GREG-DATE-1-YMD-R  REDEFINES
+00093                      DC-GREG-DATE-1-YMD.
+00094              20  DC-YMD-YEAR           PIC 99.
+00095              20  DC-YMD-MONTH          PIC 99.
+00096              20  DC-YMD-DAY            PIC 99.
+00097          16  DC-GREG-DATE-1-MDY        PIC 9(06).
+00098          16  DC-GREG-DATE-1-MDY-R REDEFINES
+00099                       DC-GREG-DATE-1-MDY.
+00100              20  DC-MDY-MONTH          PIC 99.
+00101              20  DC-MDY-DAY            PIC 99.
+00102              20  DC-MDY-YEAR           PIC 99.
+00103          16  DC-GREG-DATE-1-ALPHA.
+00104              20  DC-ALPHA-MONTH        PIC X(10).
+00105              20  DC-ALPHA-DAY          PIC 99.
+00106              20  FILLER                PIC XX.
+00107              20  DC-ALPHA-CENTURY.
+00108                  24 DC-ALPHA-CEN-N     PIC 99.
+00109              20  DC-ALPHA-YEAR         PIC 99.
+00110          16  DC-ELAPSED-MONTHS         PIC S9(4)     COMP.
+00111          16  DC-ODD-DAYS-OVER          PIC S9(4)     COMP.
+00112          16  DC-ELAPSED-DAYS           PIC S9(4)     COMP.
+00113          16  DC-JULIAN-DATE            PIC 9(05).
+00114          16  DC-JULIAN-YYDDD REDEFINES DC-JULIAN-DATE
+00115                                        PIC 9(05).
+00116          16  DC-JULIAN-DT REDEFINES DC-JULIAN-DATE.
+00117              20  DC-JULIAN-YEAR        PIC 99.
+00118              20  DC-JULIAN-DAYS        PIC 999.
+00119          16  DC-DAYS-IN-MONTH          PIC S9(3)       COMP-3.
+00120          16  DC-DAY-OF-WEEK            PIC S9  VALUE ZERO COMP-3.
+00121          16  DC-DAY-OF-WEEK2           PIC S9  VALUE ZERO COMP-3.
+00122      12  DATE-CONVERSION-VARIBLES.
+00123          16  HOLD-CENTURY-1            PIC 9(11) VALUE 0.
+00124          16  HOLD-CENTURY-1-SPLIT REDEFINES HOLD-CENTURY-1.
+00125              20  FILLER                PIC 9(3).
+00126              20  HOLD-CEN-1-CCYY.
+00127                  24  HOLD-CEN-1-CC     PIC 99.
+00128                  24  HOLD-CEN-1-YY     PIC 99.
+00129              20  HOLD-CEN-1-MO         PIC 99.
+00130              20  HOLD-CEN-1-DA         PIC 99.
+00131          16  HOLD-CENTURY-1-R   REDEFINES HOLD-CENTURY-1.
+00132              20  HOLD-CEN-1-R-MO       PIC 99.
+00133              20  HOLD-CEN-1-R-DA       PIC 99.
+00134              20  HOLD-CEN-1-R-CCYY.
+00135                  24  HOLD-CEN-1-R-CC   PIC 99.
+00136                  24  HOLD-CEN-1-R-YY   PIC 99.
+00137              20  FILLER                PIC 9(3).
+00138          16  HOLD-CENTURY-1-X.
+00139              20  FILLER                PIC X(3)  VALUE SPACES.
+00140              20  HOLD-CEN-1-X-CCYY.
+00141                  24  HOLD-CEN-1-X-CC   PIC XX VALUE SPACES.
+00142                  24  HOLD-CEN-1-X-YY   PIC XX VALUE SPACES.
+00143              20  HOLD-CEN-1-X-MO       PIC XX VALUE SPACES.
+00144              20  HOLD-CEN-1-X-DA       PIC XX VALUE SPACES.
+00145          16  HOLD-CENTURY-1-R-X REDEFINES HOLD-CENTURY-1-X.
+00146              20  HOLD-CEN-1-R-X-MO     PIC XX.
+00147              20  HOLD-CEN-1-R-X-DA     PIC XX.
+00148              20  HOLD-CEN-1-R-X-CCYY.
+00149                  24  HOLD-CEN-1-R-X-CC PIC XX.
+00150                  24  HOLD-CEN-1-R-X-YY PIC XX.
+00151              20  FILLER                PIC XXX.
+00152          16  DC-BIN-DATE-EXPAND-1      PIC XXX.
+00153          16  DC-BIN-DATE-EXPAND-2      PIC XXX.
+00154          16  DC-JULIAN-DATE-1          PIC 9(07).
+00155          16  DC-JULIAN-DATE-1-R REDEFINES DC-JULIAN-DATE-1.
+00156              20  DC-JULIAN-1-CCYY.
+00157                  24  DC-JULIAN-1-CC    PIC 99.
+00158                  24  DC-JULIAN-1-YR    PIC 99.
+00159              20  DC-JULIAN-DA-1        PIC 999.
+00160          16  DC-JULIAN-DATE-2          PIC 9(07).
+00161          16  DC-JULIAN-DATE-2-R REDEFINES DC-JULIAN-DATE-2.
+00162              20  DC-JULIAN-2-CCYY.
+00163                  24  DC-JULIAN-2-CC    PIC 99.
+00164                  24  DC-JULIAN-2-YR    PIC 99.
+00165              20  DC-JULIAN-DA-2        PIC 999.
+00166          16  DC-GREG-DATE-A-EDIT.
+00167              20  DC-EDITA-MONTH        PIC 99.
+00168              20  SLASHA-1              PIC X VALUE '/'.
+00169              20  DC-EDITA-DAY          PIC 99.
+00170              20  SLASHA-2              PIC X VALUE '/'.
+00171              20  DC-EDITA-CCYY.
+00172                  24  DC-EDITA-CENT     PIC 99.
+00173                  24  DC-EDITA-YEAR     PIC 99.
+00174          16  DC-GREG-DATE-B-EDIT.
+00175              20  DC-EDITB-MONTH        PIC 99.
+00176              20  SLASHB-1              PIC X VALUE '/'.
+00177              20  DC-EDITB-DAY          PIC 99.
+00178              20  SLASHB-2              PIC X VALUE '/'.
+00179              20  DC-EDITB-CCYY.
+00180                  24  DC-EDITB-CENT     PIC 99.
+00181                  24  DC-EDITB-YEAR     PIC 99.
+00182          16  DC-GREG-DATE-CYMD         PIC 9(08).
+00183          16  DC-GREG-DATE-CYMD-R REDEFINES
+00184                               DC-GREG-DATE-CYMD.
+00185              20  DC-CYMD-CEN           PIC 99.
+00186              20  DC-CYMD-YEAR          PIC 99.
+00187              20  DC-CYMD-MONTH         PIC 99.
+00188              20  DC-CYMD-DAY           PIC 99.
+00189          16  DC-GREG-DATE-MDCY         PIC 9(08).
+00190          16  DC-GREG-DATE-MDCY-R REDEFINES
+00191                               DC-GREG-DATE-MDCY.
+00192              20  DC-MDCY-MONTH         PIC 99.
+00193              20  DC-MDCY-DAY           PIC 99.
+00194              20  DC-MDCY-CEN           PIC 99.
+00195              20  DC-MDCY-YEAR          PIC 99.
+CIDMOD    12  DC-FORCE-EL310-DATE-SW         PIC X    VALUE SPACE.
+CIDMOD        88  DC-FORCE-EL310-DATE                 VALUE 'Y'.
+CIDMOD    12  DC-EL310-DATE                  PIC X(21).
+CIDMOD    12  FILLER                         PIC X(28).
+00979      EJECT
+00980 *                                COPY ELCEMIB.
+00001 ******************************************************************
+00002 *                                                                *
+00002 *                                                                *
+00003 *                            ELCEMIB.                            *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+00005 *                            VMOD=2.005                          *
+00006 *                                                                *
+00007 *    STANDARD CLAS-IC ERROR MESSAGE COMMUNICATIONS AREA          *
+00008 *                                                                *
+00009 ******************************************************************
+00010  01  ERROR-MESSAGE-INTERFACE-BLOCK.
+00011      12  EMI-COMM-LENGTH         PIC S9(4)    VALUE +400 COMP.
+00012      12  EMI-NUMBER-OF-LINES     PIC 9        VALUE 1.
+00013      12  EMI-ERROR               PIC 9(4)     VALUE ZEROS.
+00014      12  EMI-SUB                 PIC 99       VALUE 1 COMP-3.
+00015      12  EMI-NOTE-CTR            PIC 999      VALUE 0 COMP-3.
+00016      12  EMI-WARNING-CTR         PIC 999      VALUE 0 COMP-3.
+00017      12  EMI-FORCABLE-CTR        PIC 999      VALUE 0 COMP-3.
+00018      12  EMI-FATAL-CTR           PIC 999      VALUE 0 COMP-3.
+00019      12  EMI-SWITCH1             PIC X        VALUE '1'.
+00020          88  EMI-NO-ERRORS                    VALUE '1'.
+00021          88  EMI-ERRORS-NOT-COMPLETE          VALUE '2'.
+00022          88  EMI-ERRORS-COMPLETE              VALUE '3'.
+00023      12  EMI-SWITCH2             PIC X        VALUE '1'.
+00024          88  EMI-FORMAT-CODES-ONLY            VALUE '2'.
+00025      12  EMI-SWITCH-AREA-1       PIC X        VALUE '1'.
+00026          88  EMI-AREA1-EMPTY                  VALUE '1'.
+00027          88  EMI-AREA1-FULL                   VALUE '2'.
+00028      12  EMI-SWITCH-AREA-2       PIC X        VALUE '1'.
+00029          88  EMI-AREA2-EMPTY                  VALUE '1'.
+00030          88  EMI-AREA2-FULL                   VALUE '2'.
+00031      12  EMI-ACTION-SWITCH       PIC X        VALUE ' '.
+00032          88  EMI-PROCESS-ALL-ERRORS           VALUE ' '.
+00033          88  EMI-BYPASS-NOTES                 VALUE 'N'.
+00034          88  EMI-BYPASS-WARNINGS              VALUE 'W'.
+00035          88  EMI-BYPASS-FORCABLES             VALUE 'F'.
+00036          88  EMI-BYPASS-FATALS                VALUE 'X'.
+00037      12  EMI-ERROR-LINES.
+00038          16  EMI-LINE1           PIC X(72)   VALUE SPACES.
+00039          16  EMI-LINE2           PIC X(72)   VALUE SPACES.
+00040          16  EMI-LINE3           PIC X(72)   VALUE SPACES.
+00041          16  EMI-CODE-LINE REDEFINES EMI-LINE3.
+00042              20  EMI-ERR-CODES OCCURS 10 TIMES.
+00043                  24  EMI-ERR-NUM         PIC X(4).
+00044                  24  EMI-FILLER          PIC X.
+00045                  24  EMI-SEV             PIC X.
+00046                  24  FILLER              PIC X.
+00047              20  FILLER                  PIC X(02).
+00048      12  EMI-ERR-LINES REDEFINES EMI-ERROR-LINES.
+00049          16  EMI-MESSAGE-AREA OCCURS 3 TIMES INDEXED BY EMI-INDX.
+00050              20  EMI-ERROR-NUMBER    PIC X(4).
+00051              20  EMI-FILL            PIC X.
+00052              20  EMI-SEVERITY        PIC X.
+00053              20  FILLER              PIC X.
+00054              20  EMI-ERROR-TEXT.
+00055                  24  EMI-TEXT-VARIABLE   PIC X(10).
+00056                  24  FILLER          PIC X(55).
+00057      12  EMI-SEVERITY-SAVE           PIC X.
+00058          88  EMI-NOTE                    VALUE 'N'.
+00059          88  EMI-WARNING                 VALUE 'W'.
+00060          88  EMI-FORCABLE                VALUE 'F'.
+00061          88  EMI-FATAL                   VALUE 'X'.
+00062      12  EMI-MESSAGE-FLAG            PIC X.
+00063          88  EMI-MESSAGE-FORMATTED       VALUE 'Y'.
+00064          88  EMI-NO-MESSAGE-FORMATTED    VALUE 'N'.
+00065      12  EMI-ROLL-SWITCH             PIC X       VALUE SPACES.
+00066      12  EMI-LANGUAGE-IND            PIC X       VALUE SPACES.
+00067          88  EMI-LANGUAGE-IS-FR                  VALUE 'F'.
+00068          88  EMI-LANGUAGE-IS-ENG                 VALUE 'E'.
+00069          88  EMI-LANGUAGE-IS-SPAN                VALUE 'S'.
+           12  emi-claim-no                pic x(7).
+           12  emi-claim-type              pic x(6).
+00070      12  FILLER                      PIC X(124)  VALUE SPACES.
+00071      12  EMI-DATE-FIELD              PIC X(06)   VALUE SPACES.
+00072      12  EMI-CLIENT-ID               PIC X(3)    VALUE SPACES.
+00073      12  EMI-LIFE-OVERRIDE-L6        PIC X(6).
+00074      12  EMI-AH-OVERRIDE-L6          PIC X(6).
+00981      EJECT
+00982 *                                COPY ELCCALC.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                           ELCCALC.                            *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+00005 *                            VMOD=2.025                          *
+00006 *                                                                *
+00007 *   DESCRIPTION:  DATA TO BE PASSED TO REMAINING TERM ROUTINE    *
+00008 *                 REMAINING AMOUNT ROUTINE, LOSS RESERVE ROUTINE *
+00009 *                 REFUND CALCULATIONS ROUTINE, EARNINGS CALCU -  *
+00010 *                 LATIONS ROUTINE, AND THE RATING ROUTINE.       *
+00011 *                                                                *
+00012 *  PASSED TO ELRTRM                                              *
+00013 *  -----------------                                             *
+00014 *  METHOD CODE (I.E. FULL MONTH, HALF ADJ, ETC)                  *
+00015 *  ORIGINAL TERM                                                 *
+00016 *  BEGINNING DATE                                                *
+00017 *  ENDING DATE                                                   *
+00018 *  COMPANY I.D.                                                  *
+00019 *  ACCOUNT MASTER USER FIELD                                     *
+00020 *  PROCESS SWITCH (CANCEL, CLAIM)                                *
+00021 *  FREE LOOK DAYS                                                *
+00022 *                                                                *
+00023 *  RETURNED FROM ELRTRM                                          *
+00024 *  ---------------------                                         *
+00025 *  REMAINING TERM 1 - USED FOR EARNINGS                          *
+00026 *  REMAINING TERM 2 - USED FOR BENEFIT CALCULATIONS              *
+00027 *  REMAINING TERM 3 - USED FOR CLAIM BENEFITS                    *
+00028 *  ODD DAYS - REMAINING DAYS PAST FULL MONTHS                    *
+00029 *----------------------------------------------------------------*
+00030 *  PASSED TO ELRAMT                                              *
+00031 *  ----------------                                              *
+00032 *  REMAINING TERM 1 OR 2 OR 3 (FROM ELRTRM)                      *
+00033 *  ORIGINAL TERM (ADJUSTED IF SKIP MONTHS ARE USED)              *
+00034 *  ORIGINAL AMOUNT                                               *
+00035 *  ALTERNATE BENEFIT (BALLON)                                    *
+00036 *  A.P.R. - NET PAY ONLY                                         *
+00037 *  METHOD
+00038 *  PAYMENT FREQUENCY - FOR FARM PLAN                             *
+00039 *  COMPANY I.D.                                                  *
+00040 *  BENEFIT TYPE                                                  *
+00041 *                                                                *
+00042 *  RETURNED FROM ELRAMT                                          *
+00043 *  --------------------                                          *
+00044 *  REMAINING AMOUNT 1 - CURRENT                                  *
+00045 *  REMAINING AMOUNT 2 - PREVIOUS MONTH                           *
+00046 *  REMAINING AMOUNT FACTOR
+00047 *----------------------------------------------------------------*
+00048 *  PASSED TO ELRESV                                              *
+00049 *  -----------------                                             *
+00050 *  CERTIFICATE EFFECTIVE DATE                                    *
+00051 *  VALUATION DATE                                                *
+00052 *  PAID THRU DATE                                                *
+00053 *  BENEFIT                                                       *
+00054 *  INCURRED DATE                                                 *
+00055 *  REPORTED DATE                                                 *
+00056 *  ISSUE AGE                                                     *
+00057 *  TERM                                                          *
+00058 *  CDT PERCENT                                                   *
+00059 *  CDT METHOD (I.E. INTERPOLATED, AVERAGE, ETC)                  *
+00060 * *CLAIM TYPE (LIFE, A/H)                                        *
+00061 * *REMAINING BENEFIT (FROM ELRAMT)                               *
+00062 * *ONLY FIELDS REQUIRED FOR LIFE CLAIMS                          *
+00063 *                                                                *
+00064 *  RETURNED FROM ELRESV                                          *
+00065 *  --------------------                                          *
+00066 *  CDT TABLE USED                                                *
+00067 *  CDT FACTOR USED                                               *
+00068 *  PAY TO CURRENT RESERVE                                        *
+00069 *  I.B.N.R. - A/H ONLY                                           *
+00070 *  FUTURE (ACCRUED) AH ONLY                                      *
+00071 *----------------------------------------------------------------*
+00072 *  PASSED TO ELRATE                                              *
+00073 *  ----------------                                              *
+00074 *  CERT ISSUE DATE                                               *
+00075 *  ORIGINAL TERM (ADJUSTED IF SKIP MONTHS ARE USED)              *
+00076 *  TERM OR EXT DAYS  (DAY TERM FOR SP CALC = 'D', ELSE EXT DAYS) *
+00077 *  CAPPED TERM   (ONLY FOR TRUNCATED LIFE)                       *
+00078 *  STATE CODE (CLIENT DEFINED)                                   *
+00079 *  STATE CODE (STANDARD P.O. ABBRV)                              *
+00080 *  CLASS CODE (FROM CERT OR ACCOUNT IF CERT ZERO OR SPACES)      *
+00081 *  DEVIATION CODE                                                *
+00082 *  ISSUE AGE                                                     *
+00083 *  ORIGINAL BENEFIT AMOUNT                                       *
+00084 *  RATING BENEFIT AMT (TOTAL BENEFIT AMT FOR BALLOONS)           *
+00085 *  PROCESS TYPE (ISSUE OR CANCEL)                                *
+00086 *  BENEFIT KIND (LIFE OR A/H)                                    *
+00087 *  A.P.R.                                                        *
+00088 *  METHOD
+00089 *  SPECIAL METHOD - (SPECIAL CODE FROM BENEFIT RECORD)           *
+00090 *  PAYMENT FREQUENCY  (FOR TEXAS IRREGULAR)                      *
+00091 *  COMPANY I.D. (3 CHARACTER)                                    *
+00092 *  BENEFIT CODE                                                  *
+00093 *  BENEFIT OVERRIDE CODE                                         *
+00094 *  MAXIMUM MONTHLY BENEFIT (FROM ACCT MASTER - CSL ONLY)         *
+00095 *  MAXIMUM TOTAL BENEFIT (FROM ACCT MASTER - CSL ONLY)           *
+00096 *  JOINT INDICATOR (CSL ONLY)                                    *
+00097 *  FIRST PAYMENT DATE (CSL ONLY)                                 *
+00098 *  PERIODIC PAYMENT AMOUNT (IN CP-REMAINING-TERM - CSL ONLY)     *
+00099 *                                                                *
+00100 *  RETURNED FROM ELRATE                                          *
+00101 *  --------------------                                          *
+00102 *  CALCULATED PREMIUM                                            *
+00103 *  PREMIUM RATE                                                  *
+00104 *  MORTALITY CODE                                                *
+00105 *  MAX ATTAINED AGE                                              *
+00106 *  MAX AGE                                                       *
+00107 *  MAX TERM                                                      *
+00108 *  MAX MONTHLY BENEFIT                                           *
+00109 *  MAX TOTAL BENIFIT                                             *
+00110 *  COMPOSITE RATE (OPEN-END ONLY)                                *
+00111 *----------------------------------------------------------------*
+00112 *  PASSED TO ELRFND                                              *
+00113 *  ----------------                                              *
+00114 *  CERT ISSUE DATE                                               *
+00115 *  REFUND DATE                                                   *
+00116 *  RULE OF 78 OPTION (FROM CONTROL RECORD)                       *
+00117 *  ORIGINAL TERM (ADJUSTED IF SKIP MONTHS ARE USED)              *
+00118 *  TERM OR EXT DAYS  (DAY TERM FOR SP CALC = 'D', ELSE EXT DAYS) *
+00119 *  REMAINING TERM (REMAINING TERM 1 FROM ELTERM)                 *
+00120 *  STATE CODE (CLIENT DEFINED)                                   *
+00121 *  STATE CODE (STANDARD P.O. ABBRV)                              *
+00122 *  CLASS CODE (FROM CERT OR ACCOUNT IF CERT ZERO OR SPACES)      *
+00123 *  DEVIATION CODE                                                *
+00124 *  ISSUE AGE                                                     *
+00125 *  ORIGINAL BENEFIT AMOUNT                                       *
+00126 *  RATING BENEFIT AMT (TOTAL BENEFIT AMT FOR BALLOONS)           *
+00127 *  PROCESS TYPE (CANCEL)                                         *
+00128 *  BENEFIT KIND (LIFE OR A/H)                                    *
+00129 *  A.P.R.                                                        *
+00130 *  EARNING METHOD - (CODE FROM BENEFIT, STATE OR ACCOUNT RECORD) *
+00131 *  RATING METHOD -  (CODE FROM BENEFIT)                          *
+00132 *  SPECIAL METHOD - (SPECIAL CODE FROM BENEFIT RECORD)           *
+00133 *  PAYMENT FREQUENCY  (FOR TEXAS IRREGULAR)                      *
+00134 *  COMPANY I.D. (3 CHARACTER)                                    *
+00135 *  BENEFIT CODE                                                  *
+00136 *  BENEFIT OVERRIDE CODE                                         *
+00137 *                                                                *
+00138 *  RETURNED FROM ELRFND                                          *
+00139 *  --------------------                                          *
+00140 *  CALCULATED REFUND                                             *
+00141 *----------------------------------------------------------------*
+00142 *  PASSED TO ELEARN                                              *
+00143 *  ----------------                                              *
+00144 *  CERT ISSUE DATE                                               *
+00145 *  ORIGINAL TERM (ADJUSTED IF SKIP MONTHS ARE USED)              *
+00146 *  REMAINING TERM (REMAINING TERM 1 FROM ELTERM)                 *
+00147 *  RULE OF 78 OPTION (FROM CONTROL RECORD)                       *
+00148 *  STATE CODE (CLIENT DEFINED)                                   *
+00149 *  STATE CODE (STANDARD P.O. ABBRV)                              *
+00150 *  CLASS CODE (FROM CERT OR ACCOUNT IF CERT ZERO OR SPACES)      *
+00151 *  DEVIATION CODE                                                *
+00152 *  ISSUE AGE                                                     *
+00153 *  ORIGINAL BENEFIT AMOUNT                                       *
+00154 *  BENEFIT KIND (LIFE OR A/H)                                    *
+00155 *  A.P.R.                                                        *
+00156 *  METHOD - (EARNING CODE FROM BENEFIT RECORD)                   *
+00157 *  SPECIAL METHOD - (SPECIAL CODE FROM BENEFIT RECORD)           *
+00158 *  PAYMENT FREQUENCY  (FOR TEXAS IRREGULAR)                      *
+00159 *  COMPANY I.D. (3 CHARACTER)                                    *
+00160 *  BENEFIT CODE                                                  *
+00161 *  BENEFIT OVERRIDE CODE                                         *
+00162 *                                                                *
+00163 *  RETURNED FROM ELEARN                                          *
+00164 *  --------------------                                          *
+00165 *  INDICATED  EARNINGS                                           *
+00166 *----------------------------------------------------------------*
+00167 *                 LENGTH = 450                                   *
+00168 *                                                                *
+00169 ******************************************************************
+010303******************************************************************
+010303*                   C H A N G E   L O G
+010303*
+010303* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+010303*-----------------------------------------------------------------
+010303*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+010303* EFFECTIVE    NUMBER
+010303*-----------------------------------------------------------------
+010303* 010303    2001061800003  PEMA  ADD DCC/MONTHLY PROCESSING
+033104* 033104    2003080800002  PEMA  ADD GAP NON REFUNDABLE OPTION
+101807* 101807    2007100100007  PEMA  EXPAND CLM RESERVE FIELDS
+010410* 010410    2008021200005  PEMA  ADD FIELDS FOR MN NET PAY BALLOON
+010410* 010410    2009050700003  PEMA  ADD FIELDS FOR SPP-DD
+041310* 041310  CR2008021200005  PEMA  ADD CODE FOR MN LEVEL
+041710* 041710    2007111300001  AJRA  ADD CLAIM CALC SW FOR SC NP+6
+101110* 101110  CR2010012700001  PEMA ADD DDF REFUND/UEP PROCESSING
+071211* 071211  CR2009050700003  PEMA  ADD SPP DEALER DIRECT
+040615* 040615  CR2013072200002  PEMA  ADD EXTRA PERIODS
+010716* 010716    2015082500001  PEMA CHG POLICY FEE TO CANCEL FEE
+012820* 012820  CR2020012800001  PEMA ADD MIN LOAN TERM FOR EXT TERM.
+010303******************************************************************
+00170
+00171  01  CALCULATION-PASS-AREA.
+00172      12  CP-COMM-LENGTH            PIC S9(4)         VALUE +450
+00173                                      COMP.
+00174
+00175      12  CP-RETURN-CODE            PIC X             VALUE ZERO.
+00176        88  NO-CP-ERROR                             VALUE ZERO.
+00177        88  CP-ERROR-OCCURED VALUE '1' '2' '3' '4' '5' '6' '7' '8'
+012820                                  '9' 'A' 'B' 'C' 'D' 'E' 'H' 'I'.
+00179        88  CP-ERROR-IN-AMOUNTS                     VALUE '1'.
+00180        88  CP-ERROR-IN-DATES                       VALUE '2'.
+00181        88  CP-ERROR-IN-OPTIONS                     VALUE '3'.
+00182        88  CP-ERROR-IN-TERMS                       VALUE '4'.
+00183        88  CP-ERROR-IN-FREQUENCY                   VALUE '5'.
+00184        88  CP-ERROR-RATE-NOT-FOUND                 VALUE '6'.
+00185        88  CP-ERROR-RATE-IS-ZERO                   VALUE '7'.
+00186        88  CP-ERROR-AMT-OUTSIDE-LIMIT              VALUE '8'.
+00187        88  CP-ERROR-TERM-OUTSIDE-LIMIT             VALUE '9'.
+00188        88  CP-ERROR-AGE-OUTSIDE-LIMIT              VALUE 'A'.
+00189        88  CP-ERROR-ATT-OUTSIDE-LIMIT              VALUE 'B'.
+00190        88  CP-ERROR-TOT-OUTSIDE-LIMIT              VALUE 'C'.
+00191        88  CP-ERROR-RATE-FILE-NOTOPEN              VALUE 'D'.
+00192        88  CP-ERROR-ISSUE-AGE-ZERO                 VALUE 'E'.
+00193        88  CP-ERROR-NO-LIMITS-CRI                  VALUE 'F'.
+00194        88  CP-ERROR-DIV-BY-ZERO                    VALUE 'G'.
+00195        88  CP-ERROR-LOAN-TERM                      VALUE 'H'.
+012820       88  CP-ERROR-TERM-BELOW-MINIMUM             VALUE 'I'.
+00196
+00197      12  CP-RETURN-CODE-2          PIC X             VALUE ZERO.
+00198        88  NO-CP-ERROR-2                           VALUE ZERO.
+00199 ***********************  INPUT AREAS ****************************
+00200
+00201      12  CP-CALCULATION-AREA.
+00202          16  CP-ACCOUNT-NUMBER     PIC X(10)       VALUE SPACES.
+00203          16  CP-CERT-EFF-DT        PIC XX.
+00204          16  CP-VALUATION-DT       PIC XX.
+00205          16  CP-PAID-THRU-DT       PIC XX.
+00206          16  CP-BENEFIT-TYPE       PIC X.
+00207            88  CP-AH                               VALUE 'A' 'D'
+00208                                                    'I' 'U'.
+00209            88  CP-REDUCING-LIFE                    VALUE 'R'.
+00210            88  CP-LEVEL-LIFE                       VALUE 'L' 'P'.
+00211          16  CP-INCURRED-DT        PIC XX.
+00212          16  CP-REPORTED-DT        PIC XX.
+00213          16  CP-ACCT-FLD-5         PIC XX            VALUE SPACE.
+00214          16  CP-COMPANY-ID         PIC XXX           VALUE SPACE.
+00215          16  CP-ISSUE-AGE          PIC S9(3)         VALUE ZERO
+00216                                      COMP-3.
+00217          16  CP-CDT-PERCENT        PIC S9(3)V99      VALUE ZERO
+00218                                      COMP-3.
+00219          16  CP-CDT-METHOD         PIC X.
+00220            88  CP-CDT-ROUND-NEAR                   VALUE '1'.
+00221            88  CP-CDT-ROUND-HIGH                   VALUE '2'.
+00222            88  CP-CDT-INTERPOLATED                 VALUE '3'.
+00223          16  CP-CLAIM-TYPE         PIC X.
+00224            88  CP-AH-CLAIM                         VALUE 'A'.
+00225            88  CP-LIFE-CLAIM                       VALUE 'L'.
+00226          16  CP-ORIGINAL-TERM      PIC S9(3)         VALUE ZERO
+00227                                      COMP-3.
+00228          16  CP-ORIGINAL-BENEFIT   PIC S9(9)V99      VALUE ZERO
+00229                                      COMP-3.
+00230          16  CP-ORIGINAL-PREMIUM   PIC S9(7)V99      VALUE ZERO
+00231                                      COMP-3.
+00232          16  CP-REMAINING-TERM     PIC S9(3)V99      VALUE ZERO
+00233                                      COMP-3.
+00234          16  CP-REMAINING-BENEFIT  PIC S9(9)V99      VALUE ZERO
+00235                                      COMP-3.
+00236          16  CP-LOAN-APR           PIC S9(3)V9(4)    VALUE ZERO
+00237                                      COMP-3.
+00238          16  CP-PAY-FREQUENCY      PIC S9(3)         VALUE ZERO
+00239                                      COMP-3.
+00240          16  CP-REM-TERM-METHOD    PIC X.
+00241            88  CP-EARN-AFTER-15TH                  VALUE '1'.
+00242            88  CP-EARN-ON-HALF-MONTH               VALUE '2'.
+00243            88  CP-EARN-ON-1ST-DAY                  VALUE '3'.
+00244            88  CP-EARN-ON-FULL-MONTH               VALUE '4'.
+00245            88  CP-EARN-WITH-NO-DAYS                VALUE '5'.
+00246            88  CP-EARN-AFTER-14TH                  VALUE '6'.
+00247            88  CP-EARN-AFTER-16TH                  VALUE '7'.
+00248          16  CP-EARNING-METHOD     PIC X.
+00249            88  CP-EARN-BY-R78                      VALUE '1' 'R'.
+00250            88  CP-EARN-BY-PRORATA                  VALUE '2' 'P'.
+00251            88  CP-EARN-AS-CALIF                    VALUE '3' 'C'.
+00252            88  CP-EARN-AS-TEXAS                    VALUE '4' 'T'.
+00253            88  CP-EARN-AS-FARM-PLAN                VALUE '4' 'T'.
+00254            88  CP-EARN-AS-NET-PAY                  VALUE '5' 'N'.
+00255            88  CP-EARN-ANTICIPATION                VALUE '6' 'A'.
+00256            88  CP-EARN-AS-MEAN                     VALUE '8' 'M'.
+00257            88  CP-EARN-AS-SUM-OF-DIGITS            VALUE '9'.
+00258            88  CP-EARN-AS-REG-BALLOON              VALUE 'B'.
+033104           88  CP-GAP-NON-REFUNDABLE               VALUE 'G'.
+033104           88  CP-GAP-ACTUARIAL                    VALUE 'S'.
+092310           88  CP-DCC-SPP-DDF                      VALUE 'D' 'I'.
+                 88  CP-DCC-SPP-DDF-IU                   VALUE 'I'.
+00259          16  CP-PROCESS-TYPE       PIC X.
+00260            88  CP-CLAIM                            VALUE '1'.
+00261            88  CP-CANCEL                           VALUE '2'.
+00262            88  CP-ISSUE                            VALUE '3'.
+00263          16  CP-SPECIAL-CALC-CD    PIC X.
+00264            88  CP-OUTSTANDING-BAL              VALUE 'O'.
+00265            88  CP-1-MTH-INTEREST               VALUE ' '.
+00266            88  CP-0-MTH-INTEREST               VALUE 'A'.
+00267            88  CP-OB-OFFLINE-RESERVED          VALUE 'B'.
+00268            88  CP-CRITICAL-PERIOD              VALUE 'C'.
+00269            88  CP-TERM-IS-DAYS                 VALUE 'D'.
+00270            88  CP-USE-PREM-AS-ENTERED          VALUE 'E'.
+00271            88  CP-FARM-PLAN                    VALUE 'F'.
+00272            88  CP-RATE-AS-STANDARD             VALUE 'G'.
+00273            88  CP-2-MTH-INTEREST               VALUE 'I'.
+00274            88  CP-3-MTH-INTEREST               VALUE 'J'.
+00275            88  CP-4-MTH-INTEREST               VALUE 'K'.
+00276            88  CP-BALLOON-LAST-PMT             VALUE 'L'.
+00277            88  CP-MORTGAGE-REC                 VALUE 'M'.
+00278            88  CP-OUTSTANDING-BALANCE          VALUE 'O'.
+00279            88  CP-NET-PAY-PRUDENTIAL           VALUE 'P'.
+00280            88  CP-NET-PAY-SIMPLE               VALUE 'S'.
+00281            88  CP-TRUNCATED-LIFE               VALUE 'T' 'U' 'V'
+00282                                                      'W' 'X'.
+00283            88  CP-TRUNCATE-0-MTH               VALUE 'T'.
+00284            88  CP-TRUNCATE-1-MTH               VALUE 'U'.
+00285            88  CP-TRUNCATE-2-MTH               VALUE 'V'.
+00286            88  CP-TRUNCATE-3-MTH               VALUE 'W'.
+00287            88  CP-TRUNCATE-4-MTH               VALUE 'X'.
+00288            88  CP-SUMMARY-REC                  VALUE 'Z'.
+00289            88  CP-PROPERTY-BENEFIT             VALUE '2'.
+00290            88  CP-UNEMPLOYMENT-BENEFIT         VALUE '3'.
+00291            88  CP-AD-D-BENEFIT                 VALUE '4'.
+00292            88  CP-CSL-METH-1                   VALUE '5'.
+00293            88  CP-CSL-METH-2                   VALUE '6'.
+00294            88  CP-CSL-METH-3                   VALUE '7'.
+00295            88  CP-CSL-METH-4                   VALUE '8'.
+00296
+00297          16  CP-LOAN-TERM          PIC S9(3)       VALUE ZERO
+00298                                      COMP-3.
+00299          16  CP-CLASS-CODE         PIC XX          VALUE ZERO.
+00300          16  CP-DEVIATION-CODE     PIC XXX         VALUE ZERO.
+00301          16  CP-STATE              PIC XX          VALUE SPACE.
+00302          16  CP-STATE-STD-ABBRV    PIC XX          VALUE SPACE.
+00303          16  CP-BENEFIT-CD         PIC XX          VALUE ZERO.
+00304            88  CP-CSL-VALID-NP-BENEFIT-CD VALUES '12' '13'
+00305                '34' '35' '36' '37' '44' '45' '46' '47' '72' '73'.
+00306          16  CP-R78-OPTION         PIC X.
+00307            88  CP-TERM-TIMES-TERM-PLUS-1           VALUE ' '.
+00308            88  CP-TERM-TIMES-TERM                  VALUE '1'.
+00309
+00310          16  CP-COMPANY-CD         PIC X             VALUE SPACE.
+00311          16  CP-IBNR-RESERVE-SW    PIC X.
+00312          16  CP-CLAIM-STATUS       PIC X.
+00313          16  CP-RATE-FILE          PIC X.
+00314          16  CP-TERM-OR-EXT-DAYS   PIC S9(05)        VALUE ZERO
+00315                                      COMP-3.
+00316
+00317          16  CP-LIFE-OVERRIDE-CODE PIC X.
+00318          16  CP-AH-OVERRIDE-CODE   PIC X.
+00319
+00320          16  CP-RATE-DEV-PCT       PIC S9V9(6)       VALUE ZERO
+00321                                      COMP-3.
+               16  CP-CLP-RATE-UP        REDEFINES CP-RATE-DEV-PCT
+                                         PIC S9(5)V99 COMP-3.
+00322          16  CP-CRITICAL-MONTHS    PIC S9(3)         VALUE ZERO
+00323                                      COMP-3.
+00324          16  CP-ALTERNATE-BENEFIT  PIC S9(9)V99      VALUE ZERO
+00325                                      COMP-3.
+00326          16  CP-ALTERNATE-PREMIUM  PIC S9(7)V99      VALUE ZERO
+00327                                      COMP-3.
+               16  CP-DDF-CSO-ADMIN-FEE REDEFINES CP-ALTERNATE-PREMIUM
+                                        PIC S9(7)V99 COMP-3.
+00328
+00329          16  CP-PAID-FROM-DATE     PIC X(02).
+00330          16  CP-CLAIM-CALC-METHOD  PIC X(01).
+00331          16  CP-EXT-DAYS-CALC      PIC X.
+00332            88  CP-EXT-NO-CHG                   VALUE ' '.
+00333            88  CP-EXT-CHG-LF                   VALUE '1'.
+00334            88  CP-EXT-CHG-AH                   VALUE '2'.
+00335            88  CP-EXT-CHG-LF-AH                VALUE '3'.
+00336          16  CP-DOMICILE-STATE     PIC XX.
+00337          16  CP-CARRIER            PIC X.
+00338          16  CP-REIN-FLAG          PIC X.
+00339          16  CP-REM-TRM-CALC-OPTION PIC X.
+00340            88  VALID-REM-TRM-CALC-OPTION    VALUE '1'
+00341                       '2' '3' '4' '5'.
+00342            88  CP-CALC-OPTION-DEFAULT       VALUE '4'.
+00343            88  CP-CONSIDER-EXTENSION        VALUE '3' '4' '5'.
+00344            88  CP-30-DAY-MONTH              VALUE '1' '3' '5'.
+00345            88  CP-NO-EXT-30-DAY-MONTH       VALUE '1'.
+00346            88  CP-NO-EXT-ACTUAL-DAYS        VALUE '2'.
+00347            88  CP-EXT-30-DAY-MONTH          VALUE '3'.
+00348            88  CP-EXT-ACTUAL-DAYS           VALUE '4'.
+                 88  CP-USE-EXP-AND-1ST-PMT       VALUE '5'.
+00349          16  CP-SIG-SWITCH         PIC X.
+00350          16  CP-RATING-METHOD      PIC X.
+00351            88  CP-RATE-AS-R78                      VALUE '1' 'R'.
+00352            88  CP-RATE-AS-PRORATA                  VALUE '2' 'P'.
+00353            88  CP-RATE-AS-CALIF                    VALUE '3' 'C'.
+00354            88  CP-RATE-AS-TEXAS                    VALUE '4' 'T'.
+00355            88  CP-RATE-AS-FARM-PLAN                VALUE '4' 'T'.
+00356            88  CP-RATE-AS-NET-PAY                  VALUE '5' 'N'.
+00357            88  CP-RATE-AS-ANTICIPATION             VALUE '6' 'A'.
+00358            88  CP-RATE-AS-MEAN                     VALUE '8' 'M'.
+00359            88  CP-RATE-AS-REG-BALLOON              VALUE 'B'.
+00360          16  CP-SALES-TAX          PIC S9V9999     VALUE  ZEROS
+00361                                      COMP-3.
+090803         16  CP-BEN-CATEGORY       PIC X.
+011904         16  CP-DCC-LF-RATE        PIC S99V9(5) COMP-3 VALUE +0.
+               16  CP-DCC-ACT-COMM REDEFINES CP-DCC-LF-RATE
+                                         PIC S99V9(5) COMP-3.
+011904         16  CP-DCC-AH-RATE        PIC S99V9(5) COMP-3 VALUE +0.
+               16  CP-DCC-PMF-COMM REDEFINES CP-DCC-AH-RATE
+                                         PIC S99V9(5) COMP-3.
+080305         16  CP-DAYS-TO-1ST-PMT    PIC S999     COMP-3 VALUE +0.
+               16  CP-AH-BALLOON-SW      PIC X  VALUE ' '.
+041310         16  CP-EXPIRE-DT          PIC XX.
+041710         16  CP-LF-CLAIM-CALC-SW   PIC X  VALUE ' '.
+               16  CP-DDF-HI-FACT        PIC S9V999   COMP-3 VALUE +0.
+               16  CP-DDF-LO-FACT        PIC S9V999   COMP-3 VALUE +0.
+               16  CP-DDF-CLP            PIC S9(5)V99 COMP-3 VALUE +0.
+               16  CP-DDF-SPEC-CALC      PIC X.
+                   88  CP-CALC-GROSS-FEE        VALUE 'G'.
+                   88  CP-CALC-CLP              VALUE 'C'.
+               16  CP-IU-RATE-UP         PIC S9(5)V99   COMP-3 VALUE +0.
+               16  CP-CANCEL-REASON      PIC X.
+               16  CP-DDF-ADMIN-FEES     PIC S9(5)V99 COMP-3 VALUE +0.
+               16  CP-PMT-MODE           PIC X.
+               16  CP-NO-OF-PMTS         PIC S999 COMP-3 VALUE +0.
+071211         16  CP-1ST-YR-ALLOW       PIC S999V99 COMP-3 VALUE +0.
+               16  CP-DDF-COMM-AND-MFEE  PIC S9(5)V99 COMP-3 VALUE +0.
+               16  CP-DDF-YR1AF          PIC S9(5)V99 COMP-3 VALUE +0.
+071211         16  FILLER                PIC X.
+00363
+00364 ***************    OUTPUT FROM ELRESV   ************************
+00365
+00366          16  CP-CDT-TABLE          PIC 9             VALUE ZERO.
+00367
+00368          16  CP-CDT-FACTOR         PIC S9(5)V9(6)    VALUE ZERO
+00369                                      COMP-3.
+101807         16  CP-PTC-RESERVE        PIC S9(7)V99   VALUE ZERO
+101807                                     COMP-3.
+101807         16  CP-IBNR-RESERVE       PIC S9(7)V99   VALUE ZERO
+101807                                     COMP-3.
+101807         16  CP-FUTURE-RESERVE     PIC S9(7)V99   VALUE ZERO
+101807                                     COMP-3.
+101807         16  FILLER                PIC X(09).
+00377 ***************    OUTPUT FROM ELRTRM   *************************
+00378
+00379          16  CP-REMAINING-TERM-1   PIC S9(4)V9    VALUE ZERO
+00380                                      COMP-3.
+00381          16  CP-REMAINING-TERM-2   PIC S9(4)V9    VALUE ZERO
+00382                                      COMP-3.
+00383          16  CP-REMAINING-TERM-3   PIC S9(4)V9    VALUE ZERO
+00384                                      COMP-3.
+00385          16  CP-ODD-DAYS           PIC S9(3)      VALUE ZERO
+00386                                      COMP-3.
+00387          16  FILLER                PIC X(12).
+00388
+00389 ***************    OUTPUT FROM ELRAMT   *************************
+00390
+00391          16  CP-REMAINING-AMT      PIC S9(9)V99   VALUE ZERO
+00392                                      COMP-3.
+00393          16  CP-REMAINING-AMT-PRV  PIC S9(9)V99   VALUE ZERO
+00394                                      COMP-3.
+00395          16  FILLER                PIC X(12).
+00396
+00397 ***************    OUTPUT FROM ELRATE   *************************
+00398
+00399          16  CP-CALC-PREMIUM       PIC S9(7)V99   VALUE ZERO
+00400                                      COMP-3.
+00401          16  CP-PREMIUM-RATE       PIC S9(2)V9(5) VALUE ZERO
+00402                                      COMP-3.
+00403          16  CP-MORTALITY-CODE     PIC X(4).
+00404          16  CP-RATE-EDIT-FLAG     PIC X.
+00405              88  CP-RATES-NEED-APR                  VALUE '1'.
+00406          16  CP-COMPOSITE-RATE     PIC S99V999    VALUE ZERO
+00407                                      COMP-3.
+010716         16  CP-CANCEL-FEE         PIC S9(3)V99 VALUE +0 COMP-3.
+032905         16  CP-LF-PREM            PIC S9(7)V99 VALUE +0 COMP-3.
+               16  CP-LF-BALLOON-PREM REDEFINES CP-LF-PREM
+                                         PIC S9(7)V99 COMP-3.
+00409          16  FILLER                PIC X(07).
+00410
+00411 ***************    OUTPUT FROM ELRFND   *************************
+00412
+00413          16  CP-CALC-REFUND        PIC S9(7)V99   VALUE ZERO
+00414                                      COMP-3.
+00415          16  CP-REFUND-TYPE-USED   PIC X.
+00416            88  CP-R-AS-R78                         VALUE '1'.
+00417            88  CP-R-AS-PRORATA                     VALUE '2'.
+00418            88  CP-R-AS-CALIF                       VALUE '3'.
+00419            88  CP-R-AS-TEXAS                       VALUE '4'.
+00420            88  CP-R-AS-FARM-PLAN                   VALUE '4'.
+00421            88  CP-R-AS-NET-PAY                     VALUE '5'.
+00422            88  CP-R-AS-ANTICIPATION                VALUE '6'.
+00423            88  CP-R-AS-MEAN                        VALUE '8'.
+00424            88  CP-R-AS-SUM-OF-DIGITS               VALUE '9'.
+033104           88  CP-R-AS-GAP-NON-REFUND              VALUE 'G'.
+033104           88  CP-R-AS-GAP-ACTUARIAL               VALUE 'S'.
+092310           88  CP-R-AS-SPP-DDF                     VALUE 'D'.
+092310           88  CP-R-AS-SPP-DDF-IU                  VALUE 'I'.
+                 88  CP-R-AS-REPOSSESSION                VALUE 'R'.
+00425          16  FILLER                PIC X(12).
+00426
+00427 ***************    OUTPUT FROM ELEARN   *************************
+00428
+00429          16  CP-R78-U-PRM          PIC S9(7)V99   VALUE ZERO
+00430                                      COMP-3.
+00431          16  CP-R78-U-PRM-ALT      PIC S9(7)V99   VALUE ZERO
+00432                                      COMP-3.
+00433          16  CP-PRORATA-U-PRM      PIC S9(7)V99   VALUE ZERO
+00434                                      COMP-3.
+00435          16  CP-PRORATA-U-PRM-ALT  PIC S9(7)V99   VALUE ZERO
+00436                                      COMP-3.
+00437          16  CP-STATE-U-PRM        PIC S9(7)V99   VALUE ZERO
+00438                                      COMP-3.
+00439          16  CP-DOMICILE-U-PRM     PIC S9(7)V99   VALUE ZERO
+00440                                      COMP-3.
+00441          16  CP-EARNING-TYPE-USED  PIC X.
+00442            88  CP-E-AS-SPECIAL                     VALUE 'S'.
+00443            88  CP-E-AS-R78                         VALUE '1'.
+00444            88  CP-E-AS-PRORATA                     VALUE '2'.
+00445            88  CP-E-AS-TEXAS                       VALUE '4'.
+00446            88  CP-E-AS-FARM-PLAN                   VALUE '4'.
+00447            88  CP-E-AS-NET-PAY                     VALUE '5'.
+00448            88  CP-E-AS-ANTICIPATION                VALUE '6'.
+00449            88  CP-E-AS-MEAN                        VALUE '8'.
+00450            88  CP-E-AS-SUM-OF-DIGITS               VALUE '9'.
+00451          16  FILLER                PIC X(12).
+00452
+00453 ***************    OUTPUT FROM ELPMNT   *************************
+00454
+00455          16  CP-ACTUAL-DAYS        PIC S9(05)     VALUE ZERO
+00456                                      COMP-3.
+00457          16  CP-CLAIM-PAYMENT      PIC S9(7)V99   VALUE ZERO
+00458                                      COMP-3.
+00459          16  FILLER                PIC X(12).
+00460
+00461 ***************   MISC WORK AREAS    *****************************
+00462          16  CP-TOTAL-PAID         PIC S9(7)V99   VALUE ZERO
+00463                                      COMP-3.
+00464          16  CP-R-MAX-ATT-AGE      PIC S9(3)      VALUE ZERO
+00465                                      COMP-3.
+00466          16  CP-R-MAX-AGE          PIC S9(3)      VALUE ZERO
+00467                                      COMP-3.
+00468          16  CP-R-MAX-TERM         PIC S9(5)      VALUE ZERO
+00469                                      COMP-3.
+00470          16  CP-R-MAX-TOT-BEN      PIC S9(7)V99   VALUE ZERO
+00471                                      COMP-3.
+00472          16  CP-R-MAX-MON-BEN      PIC S9(7)V99   VALUE ZERO
+00473                                      COMP-3.
+00474          16  CP-IO-FUNCTION        PIC X          VALUE SPACE.
+00475              88  OPEN-RATE-FILE                   VALUE 'O'.
+00476              88  CLOSE-RATE-FILE                  VALUE 'C'.
+00477              88  IO-ERROR                         VALUE 'E'.
+00478
+00479          16  CP-FIRST-PAY-DATE     PIC XX.
+00480
+00481          16  CP-JOINT-INDICATOR    PIC X.
+00482
+00483          16  CP-RESERVE-REMAINING-TERM
+00484                                    PIC S9(4)V9    VALUE ZERO
+00485                                      COMP-3.
+00486
+00487          16  CP-INSURED-BIRTH-DT   PIC XX.
+00488
+00489          16  CP-INCURRED-AGE       PIC S9(3)      VALUE ZERO
+00490                                      COMP-3.
+00491
+00492          16  CP-MONTHLY-PAYMENT    PIC S9(5)V99   VALUE ZERO
+00493                                      COMP-3.
+00494
+00495          16  CP-RATING-BENEFIT-AMT PIC S9(9)V99   VALUE ZERO
+00496                                      COMP-3.
+00497
+00498          16  CP-ODD-DAYS-TO-PMT    PIC S9(3)      VALUE ZERO
+00499                                      COMP-3.
+00500
+00501          16  CP-MNTHS-TO-FIRST-PMT PIC S9(3)      VALUE ZERO
+00502                                      COMP-3.
+00503
+00504          16  CP-REMAMT-FACTOR      PIC S9(4)V9(9) VALUE ZEROS
+00505                                      COMP-3.
+00506
+00507          16  CP-FREE-LOOK          PIC S9(3)      VALUE ZERO
+00508                                      COMP-3.
+00509
+00510          16  CP-ROA-REFUND         PIC X          VALUE 'N'.
+00511              88  CP-ROA-PREM-AT-REFUND            VALUE 'Y'.
+00512
+010303         16  CP-NET-BENEFIT-AMT    PIC S9(9)V99   VALUE ZERO
+010303                                     COMP-3.
+041710         16  CP-SCNP-6MO-AMT       PIC S9(9)V99   VALUE ZERO
+041710                                     COMP-3.
+               16  CP-MONTH              PIC S999     COMP-3 VALUE +0.
+040615         16  cp-extra-periods      pic 9 value zeros.
+070115         16  cp-net-only-state     pic x value spaces.
+041710         16  FILLER                PIC X(13).
+00514 ******************************************************************
+00983      EJECT
+      ****************************************************************
+      *                                                               
+      * Copyright (c) 2007-2013 Dell Inc.                             
+      * All rights reserved.                                          
+      *                                                               
+      ****************************************************************
+       01  DFHEIV.                                                    
+         02  DFHEIV0               PIC X(35).                         
+         02  DFHEIV1               PIC X(08).                         
+         02  DFHEIV2               PIC X(08).                         
+         02  DFHEIV3               PIC X(08).                         
+         02  DFHEIV4               PIC X(06).                         
+         02  DFHEIV5               PIC X(04).                         
+         02  DFHEIV6               PIC X(04).                         
+         02  DFHEIV7               PIC X(02).                         
+         02  DFHEIV8               PIC X(02).                         
+         02  DFHEIV9               PIC X(01).                         
+         02  DFHEIV10              PIC S9(7) COMP-3.                  
+         02  DFHEIV11              PIC S9(4) COMP SYNC.               
+         02  DFHEIV12              PIC S9(4) COMP SYNC.               
+         02  DFHEIV13              PIC S9(4) COMP SYNC.               
+         02  DFHEIV14              PIC S9(4) COMP SYNC.               
+         02  DFHEIV15              PIC S9(4) COMP SYNC.               
+         02  DFHEIV16              PIC S9(9) COMP SYNC.               
+         02  DFHEIV17              PIC X(04).                         
+         02  DFHEIV18              PIC X(04).                         
+         02  DFHEIV19              PIC X(04).                         
+         02  DFHEIV20              USAGE IS POINTER.                  
+         02  DFHEIV21              USAGE IS POINTER.                  
+         02  DFHEIV22              USAGE IS POINTER.                  
+         02  DFHEIV23              USAGE IS POINTER.                  
+         02  DFHEIV24              USAGE IS POINTER.                  
+         02  DFHEIV25              PIC S9(9) COMP SYNC.               
+         02  DFHEIV26              PIC S9(9) COMP SYNC.               
+         02  DFHEIV27              PIC S9(9) COMP SYNC.               
+         02  DFHEIV28              PIC S9(9) COMP SYNC.               
+         02  DFHEIV29              PIC S9(9) COMP SYNC.               
+         02  DFHEIV30              PIC S9(9) COMP SYNC.               
+         02  DFHEIV31              PIC S9(9) COMP SYNC.               
+         02  DFHEIV32              PIC S9(4) COMP SYNC.               
+         02  DFHEIV33              PIC S9(4) COMP SYNC.               
+         02  DFHEIV34              PIC S9(4) COMP SYNC.               
+         02  DFHEIV35              PIC S9(4) COMP SYNC.               
+         02  DFHEIV97              PIC S9(7) COMP-3 VALUE ZERO.       
+         02  DFHEIV98              PIC S9(4) COMP SYNC VALUE ZERO.    
+         02  FILLER                PIC X(02).                         
+         02  DFHEIV99              PIC X(08) VALUE SPACE.             
+         02  DFHEIVL0              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL1              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL2              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL3              PIC X(48) VALUE SPACE.             
+         02  DFHEIVL4              PIC X(255) VALUE SPACE.            
+         02  DFHEIVL5              PIC X(255) VALUE SPACE.            
+       LINKAGE  SECTION.
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2007-2013 Dell Inc.                             *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       01  dfheiblk.
+           02  eibtime          pic s9(7) comp-3.
+           02  eibdate          pic s9(7) comp-3.
+           02  eibtrnid         pic x(4).
+           02  eibtaskn         pic s9(7) comp-3.
+           02  eibtrmid         pic x(4).
+           02  dfheigdi         pic s9(4) comp.
+           02  eibcposn         pic s9(4) comp.
+           02  eibcalen         pic s9(4) comp.
+           02  eibaid           pic x(1).
+           02  eibfiller1       pic x(1).
+           02  eibfn            pic x(2).
+           02  eibfiller2       pic x(2).
+           02  eibrcode         pic x(6).
+           02  eibfiller3       pic x(2).
+           02  eibds            pic x(8).
+           02  eibreqid         pic x(8).
+           02  eibrsrce         pic x(8).
+           02  eibsync          pic x(1).
+           02  eibfree          pic x(1).
+           02  eibrecv          pic x(1).
+           02  eibsend          pic x(1).
+           02  eibatt           pic x(1).
+           02  eibeoc           pic x(1).
+           02  eibfmh           pic x(1).
+           02  eibcompl         pic x(1).
+           02  eibsig           pic x(1).
+           02  eibconf          pic x(1).
+           02  eiberr           pic x(1).
+           02  eibrldbk         pic x(1).
+           02  eiberrcd         pic x(4).
+           02  eibsynrb         pic x(1).
+           02  eibnodat         pic x(1).
+           02  eibfiller5       pic x(2).
+           02  eibresp          pic s9(8) comp.
+           02  eibresp2         pic s9(8) comp.
+           02  dfheigdj         pic s9(4) comp.
+           02  dfheigdk         pic s9(4) comp.
+00985  01  DFHCOMMAREA                 PIC X(1024).
+00986 *01 PARM-LIST .
+00987 *    05  FILLER                  PIC S9(8) COMP.
+00988 *    05  CNTL-POINTER            PIC S9(8) COMP.
+00989 *    05  MSTR-POINTER            PIC S9(8) COMP.
+00990 *    05  TRLR-POINTER            PIC S9(8) COMP.
+00991 *    05  CERT-POINTER            PIC S9(8) COMP.
+00992 *    05  ACTQ-POINTER            PIC S9(8) COMP.
+00993 *    05  ACCT-POINTER            PIC S9(8) COMP.
+00994 *    05  BENE-POINTER            PIC S9(8) COMP.
+00995 *    05  PLCY-POINTER            PIC S9(8) COMP.
+00996 *    05  PLAN-POINTER            PIC S9(8) COMP.
+00997 *    05  PROD-POINTER            PIC S9(8) COMP.
+00998      EJECT
+00999 *                                COPY ELCCNTL.
+00001 ******************************************************************
+00002 *                                                                *
+00002 *                                                                *
+00003 *                            ELCCNTL.                            *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+00005 *                            VMOD=2.059                          *
+00006 *                                                                *
+00007 *   FILE DESCRIPTION = SYSTEM CONTROL FILE                       *
+00008 *                                                                *
+00009 *   FILE TYPE = VSAM,KSDS                                        *
+00010 *   RECORD SIZE = 750  RECFORM = FIXED                           *
+00011 *                                                                *
+00012 *   BASE CLUSTER = ELCNTL                        RKP=2,LEN=10    *
+00013 *       ALTERNATE INDEX = NONE                                   *
+00014 *                                                                *
+00015 *   LOG = YES                                                    *
+00016 *   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+00017 ******************************************************************
+082503*                   C H A N G E   L O G
+082503*
+082503* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+082503*-----------------------------------------------------------------
+082503*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+082503* EFFECTIVE    NUMBER
+082503*-----------------------------------------------------------------
+082503* 082503                   PEMA  ADD BENEFIT GROUP
+100703* 100703    2003080800002  PEMA  ADD SUPERGAP PROCESSING
+033104* 033104    2003080800002  PEMA  ADD GAP NON REFUNDABLE OPTION
+092705* 092705    2005050300006  PEMA  ADD SPP LEASES
+031808* 031808    2006032200004  AJRA  ADD APPROVAL LEVEL 4
+071508* 071508  CR2007110500003  PEMA  ADD NH INTEREST REFUND PROCESSING
+091808* 091808    2008022800002  AJRA  ADD CHECK NUMBER TO STATE CNTL FO
+011410* 011410    2009061500002  AJRA  ADD REFUND IND FOR AH AND DEATH C
+061511* 061511    2011042000002  AJRA  ADD IND TO VERIFY 2ND BENEFICIARY
+011812* 011812    2011022800001  AJRA  ADD CSR IND TO USER SECURITY
+012913* 012913    2012092400007  AJRA  ADD CAUSAL STATE IND
+032813* 032813    2011013100001  AJRA  ADD CLAIM REAUDIT FIELDS
+091813* 091813    2013082900001  AJRA  ADD APPROVAL LEVEL 5
+051414* 051414  CR2013021100002  PEMA  RECURRENT CLAIM CHANGES
+102717* 102717  CR2017062000003  PEMA  COMM CAP CHANGES
+082503******************************************************************
+00018 *
+00019  01  CONTROL-FILE.
+00020      12  CF-RECORD-ID                       PIC XX.
+00021          88  VALID-CF-ID                        VALUE 'CF'.
+00022
+00023      12  CF-CONTROL-PRIMARY.
+00024          16  CF-COMPANY-ID                  PIC XXX.
+00025          16  CF-RECORD-TYPE                 PIC X.
+00026              88  CF-COMPANY-MASTER              VALUE '1'.
+00027              88  CF-PROCESSOR-MASTER            VALUE '2'.
+00028              88  CF-STATE-MASTER                VALUE '3'.
+00029              88  CF-LF-BENEFIT-MASTER           VALUE '4'.
+00030              88  CF-AH-BENEFIT-MASTER           VALUE '5'.
+00031              88  CF-CARRIER-MASTER              VALUE '6'.
+00032              88  CF-MORTALITY-MASTER            VALUE '7'.
+00033              88  CF-BUSINESS-TYPE-MASTER        VALUE '8'.
+00034              88  CF-TERMINAL-MASTER             VALUE '9'.
+00035              88  CF-AH-EDIT-MASTER              VALUE 'A'.
+00036              88  CF-CREDIBILITY-FACTOR-MASTER   VALUE 'B'.
+00037              88  CF-CUSTOM-REPORT-MASTER        VALUE 'C'.
+00038              88  CF-MORTGAGE-HT-WT-CHART        VALUE 'H'.
+00039              88  CF-LIFE-EDIT-MASTER            VALUE 'L'.
+00040              88  CF-MORTGAGE-PLAN-MASTER        VALUE 'M'.
+00041              88  CF-MORTGAGE-COMPANY-MASTER     VALUE 'N'.
+00042              88  CF-REMINDERS-MASTER            VALUE 'R'.
+00043              88  CF-AUTO-ACTIVITY-MASTER        VALUE 'T'.
+00044          16  CF-ACCESS-CD-GENL              PIC X(4).
+00045          16  CF-ACCESS-OF-PROCESSOR  REDEFINES CF-ACCESS-CD-GENL.
+00046              20  CF-PROCESSOR               PIC X(4).
+00047          16  CF-ACCESS-OF-STATE  REDEFINES  CF-ACCESS-CD-GENL.
+00048              20  CF-STATE-CODE              PIC XX.
+00049              20  FILLER                     PIC XX.
+00050          16  CF-ACCESS-OF-BENEFIT  REDEFINES  CF-ACCESS-CD-GENL.
+00051              20  FILLER                     PIC XX.
+00052              20  CF-HI-BEN-IN-REC           PIC XX.
+00053          16  CF-ACCESS-OF-CARRIER  REDEFINES  CF-ACCESS-CD-GENL.
+00054              20  FILLER                     PIC XXX.
+00055              20  CF-CARRIER-CNTL            PIC X.
+00056          16  CF-ACCESS-OF-BUS-TYPE REDEFINES  CF-ACCESS-CD-GENL.
+00057              20  FILLER                     PIC XX.
+00058              20  CF-HI-TYPE-IN-REC          PIC 99.
+00059          16  CF-ACCESS-OF-CRDB-TBL REDEFINES  CF-ACCESS-CD-GENL.
+00060              20  CF-CRDB-TABLE-INDICATOR    PIC X.
+00061                  88  CF-CRDB-NAIC-TABLE         VALUE '9'.
+00062              20  CF-CRDB-BENEFIT-TYPE       PIC X.
+00063              20  CF-CRDB-WAITING-PERIOD     PIC XX.
+00064          16  CF-ACCESS-OF-CUST-RPT REDEFINES  CF-ACCESS-CD-GENL.
+00065              20  FILLER                     PIC X.
+00066              20  CF-CUSTOM-REPORT-NO        PIC 999.
+00067          16  CF-ACCESS-OF-PLAN   REDEFINES  CF-ACCESS-CD-GENL.
+00068              20  FILLER                     PIC XX.
+00069              20  CF-MORTGAGE-PLAN           PIC XX.
+00070          16  CF-SEQUENCE-NO                 PIC S9(4)   COMP.
+00071
+00072      12  CF-LAST-MAINT-DT                   PIC XX.
+00073      12  CF-LAST-MAINT-BY                   PIC X(4).
+00074      12  CF-LAST-MAINT-HHMMSS               PIC S9(6)   COMP-3.
+00075
+00076      12  CF-RECORD-BODY                     PIC X(728).
+00077
+00078
+00079 ****************************************************************
+00080 *             COMPANY MASTER RECORD                            *
+00081 ****************************************************************
+00082
+00083      12  CF-COMPANY-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+00084          16  CF-COMPANY-ADDRESS.
+00085              20  CF-CL-MAIL-TO-NAME         PIC X(30).
+00086              20  CF-CL-IN-CARE-OF           PIC X(30).
+00087              20  CF-CL-ADDR-LINE-1          PIC X(30).
+00088              20  CF-CL-ADDR-LINE-2          PIC X(30).
+00089              20  CF-CL-CITY-STATE           PIC X(30).
+00090              20  CF-CL-ZIP-CODE-NUM         PIC 9(9)    COMP-3.
+00091              20  CF-CL-PHONE-NO             PIC 9(11)   COMP-3.
+00092          16  CF-COMPANY-CD                  PIC X.
+00093          16  CF-COMPANY-PASSWORD            PIC X(8).
+00094          16  CF-SECURITY-OPTION             PIC X.
+00095              88  ALL-SECURITY                   VALUE '1'.
+00096              88  COMPANY-VERIFY                 VALUE '2'.
+00097              88  PROCESSOR-VERIFY               VALUE '3'.
+00098              88  NO-SECURITY                    VALUE '4'.
+00099              88  ALL-BUT-TERM                   VALUE '5'.
+00100          16  CF-CARRIER-CONTROL-LEVEL       PIC X.
+00101              88  USE-ACTUAL-CARRIER             VALUE SPACE.
+00102          16  CF-LGX-INTERFACE-CNTL          PIC X.
+00103              88  LGX-TIME-SHR-COMPANY           VALUE '1'.
+00104          16  CF-INFORCE-LOCATION            PIC X.
+00105              88  CERTS-ARE-ONLINE               VALUE '1'.
+00106              88  CERTS-ARE-OFFLINE              VALUE '2'.
+00107              88  NO-CERTS-AVAILABLE             VALUE '3'.
+00108          16  CF-LOWER-CASE-LETTERS          PIC X.
+00109          16  CF-CERT-ACCESS-CONTROL         PIC X.
+00110              88  CF-ST-ACCNT-CNTL               VALUE ' '.
+00111              88  CF-CARR-GROUP-ST-ACCNT-CNTL    VALUE '1'.
+00112              88  CF-CARR-ST-ACCNT-CNTL          VALUE '2'.
+00113              88  CF-ACCNT-CNTL                  VALUE '3'.
+00114              88  CF-CARR-ACCNT-CNTL             VALUE '4'.
+00115
+00116          16  CF-FORMS-PRINTER-ID            PIC X(4).
+00117          16  CF-CHECK-PRINTER-ID            PIC X(4).
+00118
+00119          16  CF-LGX-CREDIT-USER             PIC X.
+00120              88  CO-IS-NOT-USER                 VALUE 'N'.
+00121              88  CO-HAS-CLAS-IC-CREDIT          VALUE 'Y'.
+00122
+00123          16 CF-CREDIT-CALC-CODES.
+00124              20  CF-CR-REM-TERM-CALC PIC X.
+00125                88  CR-EARN-AFTER-15TH           VALUE '1'.
+00126                88  CR-EARN-ON-HALF-MO           VALUE '2'.
+00127                88  CR-EARN-ON-1ST-DAY           VALUE '3'.
+00128                88  CR-EARN-ON-FULL-MO           VALUE '4'.
+00129                88  CR-EARN-WITH-NO-DAYS         VALUE '5'.
+00130                88  CR-EARN-AFTER-14TH           VALUE '6'.
+00131                88  CR-EARN-AFTER-16TH           VALUE '7'.
+00132              20  CF-CR-R78-METHOD           PIC X.
+00133                88  USE-TERM-PLUS-ONE            VALUE SPACE.
+00134                88  DONT-USE-PLUS-ONE            VALUE '1'.
+00135
+00136          16  CF-CLAIM-CONTROL-COUNTS.
+00137              20  CF-CO-CLAIM-COUNTER        PIC S9(8)   COMP.
+00138                  88  CO-CLM-COUNT-RESET         VALUE +99999.
+00139
+00140              20  CF-CO-ARCHIVE-COUNTER      PIC S9(8)   COMP.
+00141                  88  CO-ARCHIVE-COUNT-RESET     VALUE +999999.
+00142
+00143              20  CF-CO-CHECK-COUNTER        PIC S9(8)   COMP.
+00144                  88  CO-CHECK-COUNT-RESET       VALUE +9999999.
+00145
+00146              20  CF-CO-CHECK-QUE-COUNTER    PIC S9(8)   COMP.
+00147                  88  CO-QUE-COUNT-RESET         VALUE +9999999.
+00148
+00149          16  CF-CURRENT-MONTH-END           PIC XX.
+00150
+00151          16  CF-CO-CALC-QUOTE-TOLERANCE.
+00152              20  CF-CO-TOL-CLAIM            PIC S999V99   COMP-3.
+00153              20  CF-CO-TOL-PREM             PIC S999V99   COMP-3.
+00154              20  CF-CO-TOL-REFUND           PIC S999V99   COMP-3.
+00155              20  CF-CO-CLAIM-REJECT-SW      PIC X.
+00156                  88 CO-WARN-IF-CLAIM-OUT        VALUE SPACE.
+00157                  88 CO-FORCE-IF-CLAIM-OUT       VALUE '1'.
+00158              20  CF-CO-PREM-REJECT-SW       PIC X.
+00159                  88 CO-WARN-IF-PREM-OUT         VALUE SPACE.
+00160                  88 CO-FORCE-IF-PREM-OUT        VALUE '1'.
+00161              20  CF-CO-REF-REJECT-SW        PIC X.
+00162                  88 CO-WARN-IF-REF-OUT          VALUE SPACE.
+00163                  88 CO-FORCE-IF-REF-OUT         VALUE '1'.
+00164
+00165          16  CF-CO-REPORTING-DT             PIC XX.
+00166          16  CF-CO-REPORTING-MONTH-DT       PIC XX.
+00167          16  CF-CO-REPORTING-MONTH-END-SW   PIC X.
+00168            88  CF-CO-NOT-MONTH-END              VALUE SPACES.
+00169            88  CF-CO-MONTH-END                  VALUE '1'.
+00170
+00171          16  CF-LGX-CLAIM-USER              PIC X.
+00172              88  CO-IS-NOT-CLAIM-USER           VALUE 'N'.
+00173              88  CO-HAS-CLAS-IC-CLAIM           VALUE 'Y'.
+00174
+00175          16  CF-CREDIT-EDIT-CONTROLS.
+00176              20  CF-MIN-PREMIUM             PIC S999V99   COMP-3.
+00177              20  CF-MIN-AGE                 PIC 99.
+00178              20  CF-DEFAULT-AGE             PIC 99.
+00179              20  CF-MIN-TERM                PIC S999      COMP-3.
+00180              20  CF-MAX-TERM                PIC S999      COMP-3.
+00181              20  CF-DEFAULT-SEX             PIC X.
+00182              20  CF-JOINT-AGE-INPUT         PIC X.
+00183                  88 CF-JOINT-AGE-IS-INPUT       VALUE '1'.
+00184              20  CF-BIRTH-DATE-INPUT        PIC X.
+00185                  88 CF-BIRTH-DATE-IS-INPUT      VALUE '1'.
+00186              20  CF-CAR-GROUP-ACCESS-CNTL   PIC X.
+00187                  88  CF-USE-ACTUAL-CARRIER      VALUE ' '.
+00188                  88  CF-ZERO-CARRIER            VALUE '1'.
+00189                  88  CF-ZERO-GROUPING           VALUE '2'.
+00190                  88  CF-ZERO-CAR-GROUP          VALUE '3'.
+00191              20  CF-EDIT-SW                 PIC X.
+00192                  88  CF-START-EDIT-TONIGHT      VALUE '1'.
+00193              20  CF-EDIT-RESTART-BATCH      PIC X(6).
+00194              20  CF-CR-PR-METHOD            PIC X.
+00195                88  USE-NORMAL-PR-METHOD         VALUE SPACE.
+00196                88  ADJUST-ORIG-TERM-BY-5        VALUE '1'.
+00197              20  FILLER                     PIC X.
+00198
+00199          16  CF-CREDIT-MISC-CONTROLS.
+00200              20  CF-REIN-TABLE-SW           PIC X.
+00201                  88 REIN-TABLES-ARE-USED        VALUE '1'.
+00202              20  CF-COMP-TABLE-SW           PIC X.
+00203                  88 COMP-TABLES-ARE-USED        VALUE '1'.
+00204              20  CF-EXPERIENCE-RETENTION-AGE
+00205                                             PIC S9        COMP-3.
+00206              20  CF-CONVERSION-DT           PIC XX.
+00207              20  CF-COMP-WRITE-OFF-AMT      PIC S999V99   COMP-3.
+00208              20  CF-RUN-FREQUENCY-SW        PIC X.
+00209                  88 CO-IS-PROCESSED-MONTHLY     VALUE SPACE.
+00210                  88 CO-IS-PROCESSED-ON-QTR      VALUE '1'.
+00211
+00212              20  CF-CR-CHECK-NO-CONTROL.
+00213                  24  CF-CR-CHECK-NO-METHOD    PIC X.
+00214                      88  CR-CHECK-NO-MANUAL       VALUE '1'.
+00215                      88  CR-CHECK-NO-AUTO-SEQ     VALUE '2'.
+00216                      88  CR-CHECK-NO-AT-PRINT     VALUE '4'.
+00217                  24  CF-CR-CHECK-COUNTER      PIC S9(8)   COMP.
+00218                      88  CR-CHECK-CNT-RESET-VALUE VALUE +999999.
+00219
+00220                  24  CF-CR-CHECK-COUNT       REDEFINES
+00221                      CF-CR-CHECK-COUNTER      PIC X(4).
+00222
+00223                  24  CF-CR-CHECK-QUE-COUNTER  PIC S9(8)  COMP.
+00224                      88  CR-QUE-COUNT-RESET      VALUE +9999999.
+00225
+00226                  24  CF-CR-CHECK-QUE-COUNT   REDEFINES
+00227                      CF-CR-CHECK-QUE-COUNTER  PIC X(4).
+00228                  24  CF-MAIL-PROCESSING       PIC X.
+00229                      88  MAIL-PROCESSING          VALUE 'Y'.
+00230
+00231          16  CF-MISC-SYSTEM-CONTROL.
+00232              20  CF-SYSTEM-C                 PIC X.
+00233                  88  CONFIRMATION-SYS-USED       VALUE '1'.
+00234              20  CF-SYSTEM-D                 PIC X.
+00235                  88  DAILY-BILL-SYS-USED         VALUE '1'.
+00236              20  CF-SOC-SEC-NO-SW            PIC X.
+00237                  88  SOC-SEC-NO-USED             VALUE '1'.
+00238              20  CF-MEMBER-NO-SW             PIC X.
+00239                  88  MEMBER-NO-USED              VALUE '1'.
+00240              20  CF-TAX-ID-NUMBER            PIC X(11).
+00241              20  CF-JOURNAL-FILE-ID          PIC S9(4) COMP.
+00242              20  CF-PAYMENT-APPROVAL-SW      PIC X.
+00243                  88  CF-PMT-APPROVAL-USED        VALUE 'Y' 'G'.
+00244                  88  CF-NO-APPROVAL              VALUE ' ' 'N'.
+00245                  88  CF-ALL-APPROVED             VALUE 'Y'.
+00246                  88  CF-GRADUATED-APPROVAL       VALUE 'G'.
+00247              20  CF-SYSTEM-E                 PIC X.
+00248                  88  CF-AR-SYSTEM-USED           VALUE 'Y'.
+00249
+00250          16  CF-LGX-LIFE-USER               PIC X.
+00251              88  CO-IS-NOT-LIFE-USER            VALUE 'N'.
+00252              88  CO-HAS-CLAS-IC-LIFE            VALUE 'Y'.
+00253
+00254          16  CF-CR-MONTH-END-DT             PIC XX.
+00255
+00256          16  CF-FILE-MAINT-DATES.
+00257              20  CF-LAST-BATCH-NO           PIC S9(8)   COMP.
+00258                  88  CF-LAST-BATCH-RESET        VALUE +999999.
+00259              20  CF-LAST-BATCH       REDEFINES
+00260                  CF-LAST-BATCH-NO               PIC X(4).
+00261              20  CF-RATES-FILE-MAINT-DT         PIC XX.
+00262              20  CF-RATES-FILE-CREATE-DT        PIC XX.
+00263              20  CF-COMMISSION-TAB-MAINT-DT     PIC XX.
+00264              20  CF-COMMISSION-TAB-CREATE-DT    PIC XX.
+00265              20  CF-ACCOUNT-MSTR-MAINT-DT       PIC XX.
+00266              20  CF-ACCOUNT-MSTR-CREATE-DT      PIC XX.
+00267              20  CF-REINSURANCE-TAB-MAINT-DT    PIC XX.
+00268              20  CF-REINSURANCE-TAB-CREATE-DT   PIC XX.
+00269              20  CF-COMPENSATION-MSTR-MAINT-DT  PIC XX.
+00270              20  CF-COMPENSATION-MSTR-CREATE-DT PIC XX.
+00271
+00272          16  CF-NEXT-COMPANY-ID             PIC XXX.
+00273          16  FILLER                         PIC X.
+00274
+00275          16  CF-ALT-MORT-CODE               PIC X(4).
+00276          16  CF-MEMBER-CAPTION              PIC X(10).
+00277
+00278          16  CF-LIFE-ACCESS-CONTROL         PIC X.
+00279              88  CF-LIFE-ST-ACCNT-CNTL          VALUE ' '.
+00280              88  CF-LIFE-CARR-GRP-ST-ACCNT-CNTL VALUE '1'.
+00281              88  CF-LIFE-CARR-ST-ACCNT-CNTL     VALUE '2'.
+00282              88  CF-LIFE-ACCNT-CNTL             VALUE '3'.
+00283              88  CF-LIFE-CARR-ACCNT-CNTL        VALUE '4'.
+00284
+00285          16  CF-STARTING-ARCH-NO            PIC S9(8) COMP.
+00286
+00287          16  CF-LIFE-OVERRIDE-L1            PIC X.
+00288          16  CF-LIFE-OVERRIDE-L2            PIC XX.
+00289          16  CF-LIFE-OVERRIDE-L6            PIC X(6).
+00290          16  CF-LIFE-OVERRIDE-L12           PIC X(12).
+00291
+00292          16  CF-AH-OVERRIDE-L1              PIC X.
+00293          16  CF-AH-OVERRIDE-L2              PIC XX.
+00294          16  CF-AH-OVERRIDE-L6              PIC X(6).
+00295          16  CF-AH-OVERRIDE-L12             PIC X(12).
+00296
+00297          16  CF-REPORT-CD1-CAPTION          PIC X(10).
+00298          16  CF-REPORT-CD2-CAPTION          PIC X(10).
+00299
+00300          16  CF-CLAIM-CUTOFF-DATE           PIC XX.
+00301          16  CF-AR-LAST-EL860-DT            PIC XX.
+00302          16  CF-MP-MONTH-END-DT             PIC XX.
+00303
+00304          16  CF-MAX-NUM-PMTS-CHECK          PIC 99.
+00305          16  CF-CLAIM-PAID-THRU-TO          PIC X.
+00306              88  CF-CLAIM-PAID-TO               VALUE '1'.
+00307
+00308          16  CF-AR-MONTH-END-DT             PIC XX.
+00309
+00310          16  CF-CRDTCRD-USER                PIC X.
+00311              88  CO-IS-NOT-CRDTCRD-USER         VALUE 'N'.
+00312              88  CO-HAS-CLAS-IC-CRDTCRD         VALUE 'Y'.
+00313
+00314          16  CF-CC-MONTH-END-DT             PIC XX.
+00315
+00316          16  CF-PRINT-ADDRESS-LABELS        PIC X.
+00317
+00318          16  CF-MORTALITY-AGE-CALC-METHOD   PIC X.
+00319              88  CF-USE-TABLE-ASSIGNED-METHOD   VALUE '1' ' '.
+00320              88  CF-USE-ALL-AGE-LAST            VALUE '2'.
+00321              88  CF-USE-ALL-AGE-NEAR            VALUE '3'.
+00322          16  CF-CO-TOL-PREM-PCT             PIC S9V9(4)   COMP-3.
+00323          16  CF-CO-TOL-REFUND-PCT           PIC S9V9(4)   COMP-3.
+00324          16  CF-CO-TOL-CAP                  PIC S9(3)V99  COMP-3.
+00325          16  CF-CO-RESERVE-OPTION-SWITCH    PIC  X.
+00326              88  OPTIONAL-RESERVE-METHOD-AUTH    VALUE 'Y'.
+00327              88  OPTIONAL-RESERVE-MTHD-NOT-AUTH  VALUE ' ' 'N'.
+00328          16  CF-CO-IBNR-LAG-MONTHS          PIC S9(3)     COMP-3.
+00329          16  CF-CO-CIDA-TABLE-DISCOUNT-PCT  PIC S9V9(4)   COMP-3.
+00330          16  CF-CO-CRDB-TABLE-SELECTION     PIC  X.
+00331              88  NIAC-CREDIBILITY-TABLE          VALUE '9'.
+00332          16  CF-CO-ST-CALL-RPT-CNTL         PIC  X.
+00333
+00334          16  CF-CL-ZIP-CODE.
+00335              20  CF-CL-ZIP-PRIME.
+00336                  24  CF-CL-ZIP-1ST          PIC X.
+00337                      88  CF-CL-CAN-POST-CODE  VALUE 'A' THRU 'Z'.
+00338                  24  FILLER                 PIC X(4).
+00339              20  CF-CL-ZIP-PLUS4            PIC X(4).
+00340          16  CF-CL-CANADIAN-POSTAL-CODE REDEFINES CF-CL-ZIP-CODE.
+00341              20  CF-CL-CAN-POSTAL-1         PIC XXX.
+00342              20  CF-CL-CAN-POSTAL-2         PIC XXX.
+00343              20  FILLER                     PIC XXX.
+00344
+00345          16  CF-CO-CALCULATION-INTEREST     PIC S9V9(4)  COMP-3.
+00346          16  CF-CO-IBNR-AH-FACTOR           PIC S9V9(4)  COMP-3.
+00347          16  CF-CO-IBNR-LIFE-FACTOR         PIC S9V9(4)  COMP-3.
+00348          16  CF-CO-OPTION-START-DATE        PIC XX.
+00349          16  CF-REM-TRM-CALC-OPTION         PIC X.
+00350            88  CF-VALID-REM-TRM-OPTION          VALUE '1' '2'
+00351                                                       '3' '4'.
+00352            88  CF-CONSIDER-EXTENSION            VALUE '3' '4'.
+00353            88  CF-30-DAY-MONTH                  VALUE '1' '3'.
+00354            88  CF-NO-EXT-30-DAY-MONTH           VALUE '1'.
+00355            88  CF-NO-EXT-ACTUAL-DAYS            VALUE '2'.
+00356            88  CF-EXT-30-DAY-MONTH              VALUE '3'.
+00357            88  CF-EXT-ACTUAL-DAYS               VALUE '4'.
+00358
+00359          16  CF-DEFAULT-APR                 PIC S999V9(4) COMP-3.
+00360
+00361          16  CF-PAYMENT-APPROVAL-LEVELS.
+00362              20  CF-LIFE-PAY-APP-LEVEL-1    PIC S9(7)   COMP-3.
+00363              20  CF-LIFE-PAY-APP-LEVEL-2    PIC S9(7)   COMP-3.
+00364              20  CF-LIFE-PAY-APP-LEVEL-3    PIC S9(7)   COMP-3.
+00365              20  CF-AH-PAY-APP-LEVEL-1      PIC S9(7)   COMP-3.
+00366              20  CF-AH-PAY-APP-LEVEL-2      PIC S9(7)   COMP-3.
+00367              20  CF-AH-PAY-APP-LEVEL-3      PIC S9(7)   COMP-3.
+00368
+00369          16  CF-END-USER-REPORTING-USER     PIC X.
+00370              88  CO-NO-END-USER-REPORTING       VALUE 'N'.
+00371              88  CO-USES-END-USER-REPORTING     VALUE 'Y'.
+00372
+00373          16  CF-CLAIMS-CHECK-RECON-USER     PIC X.
+00374              88  CO-NO-USE-CLAIMS-RECON         VALUE 'N'.
+00375              88  CO-USES-CLAIMS-RECON           VALUE 'Y'.
+00376
+00377          16  CF-CLAIMS-LAST-PROCESS-DT      PIC XX.
+00378
+071508         16  CF-CREDIT-REF-SSN-CNT          PIC S9(5)  COMP-3.
+00379          16  FILLER                         PIC X.
+00380
+00381          16  CF-CREDIT-ARCHIVE-CNTL.
+00382              20  CF-CREDIT-LAST-ARCH-NUM    PIC S9(9)  COMP-3.
+00383              20  CF-CREDIT-START-ARCH-NUM   PIC S9(9)  COMP-3.
+00384              20  CF-CREDIT-ARCH-PURGE-YR    PIC S9     COMP-3.
+00385
+00386          16  CF-CR-PRINT-ADDRESS-LABELS     PIC X.
+00387
+00388          16  CF-CLAIMS-AUDIT-CHANGES        PIC X.
+00389              88  CO-NO-USE-AUDIT-CHANGES        VALUE 'N'.
+00390              88  CO-USES-AUDIT-CHANGES          VALUE 'Y'.
+00391
+00392          16  CF-CLAIMS-CREDIT-CARD-INDEX    PIC X.
+00393              88  CO-NO-USE-CREDIT-CARD-INDEX    VALUE 'N'.
+00394              88  CO-USES-CREDIT-CARD-INDEX      VALUE 'Y'.
+00395
+00396          16  CF-CLAIMS-LETTER-MAINT-DAYS    PIC 99.
+00397
+00398          16  CF-CO-ACH-ID-CODE              PIC  X.
+00399              88  CF-CO-ACH-ICD-IRS-EIN          VALUE '1'.
+00400              88  CF-CO-ACH-ICD-DUNS             VALUE '2'.
+00401              88  CF-CO-ACH-ICD-USER-NO          VALUE '3'.
+00402          16  CF-CO-ACH-CLAIM-SEND-NAME      PIC X(23).
+00403          16  CF-CO-ACH-CLAIM-BK-NO          PIC X(09).
+00404          16  CF-CO-ACH-ADMIN-SEND-NAME      PIC X(23).
+00405          16  CF-CO-ACH-ADMIN-NO             PIC X(09).
+00406          16  CF-CO-ACH-RECV-NAME            PIC X(23).
+00407          16  CF-CO-ACH-RECV-NO              PIC X(08).
+00408          16  CF-CO-ACH-ORIGINATOR-NO        PIC X(08).
+00409          16  CF-CO-ACH-COMPANY-ID           PIC X(09).
+00410          16  CF-CO-ACH-TRACE-NO             PIC 9(07) COMP.
+00411                  88  CO-ACH-TRACE-NO-RESET      VALUE 9999999.
+00412          16  CF-CO-ACH-TRACE-SPACE REDEFINES
+00413                  CF-CO-ACH-TRACE-NO         PIC X(4).
+00414
+00415          16  CF-CO-OVER-SHORT.
+00416              20 CF-CO-OVR-SHT-AMT           PIC S999V99   COMP-3.
+00417              20 CF-CO-OVR-SHT-PCT           PIC S9V9(4)   COMP-3.
+00418
+031808*         16  FILLER                         PIC X(102).
+031808         16  CF-PAYMENT-APPROVAL-LEVELS-2.
+031808             20  CF-LIFE-PAY-APP-LEVEL-4    PIC S9(7)   COMP-3.
+031808             20  CF-AH-PAY-APP-LEVEL-4      PIC S9(7)   COMP-3.
+031808
+031808         16  CF-AH-APPROVAL-DAYS.
+031808             20  CF-AH-APP-DAY-LEVEL-1     PIC S9(5)   COMP-3.
+031808             20  CF-AH-APP-DAY-LEVEL-2     PIC S9(5)   COMP-3.
+031808             20  CF-AH-APP-DAY-LEVEL-3     PIC S9(5)   COMP-3.
+031808             20  CF-AH-APP-DAY-LEVEL-4     PIC S9(5)   COMP-3.
+032813
+032813         16  CF-CO-REAUDIT-INTERVAL        PIC S9(5)   COMP-3.
+031808
+091813         16  CF-APPROV-LEV-5.
+091813             20  CF-LIFE-PAY-APP-LEVEL-5    PIC S9(7)   COMP-3.
+091813             20  CF-AH-PAY-APP-LEVEL-5      PIC S9(7)   COMP-3.
+091813             20  CF-AH-APP-DAY-LEVEL-5      PIC S9(5)   COMP-3.
+091813
+091813         16  FILLER                         PIC X(68).
+00421 ****************************************************************
+00422 *             PROCESSOR/USER RECORD                            *
+00423 ****************************************************************
+00424
+00425      12  CF-PROCESSOR-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+00426          16  CF-PROCESSOR-NAME              PIC X(30).
+00427          16  CF-PROCESSOR-PASSWORD          PIC X(11).
+00428          16  CF-PROCESSOR-TITLE             PIC X(26).
+00429          16  CF-MESSAGE-AT-LOGON-CAP        PIC X.
+00430                  88  MESSAGE-YES                VALUE 'Y'.
+00431                  88  MESSAGE-NO                 VALUE ' ' 'N'.
+00432
+00433 *****************************************************
+00434 ****  OCCURRENCE (1) CREDIT APPLICATIONS         ****
+00435 ****  OCCURRENCE (2) CLAIMS APPLICATIONS         ****
+00436 ****  OCCURRENCE (3) CREDIT CARD APPLICATIONS    ****
+00437 ****  OCCURRENCE (4) ACCT RECV APPLICATIONS      ****
+00438 *****************************************************
+00439
+00440          16  CF-SYSTEM-SECURITY  OCCURS  4 TIMES.
+00441              20  CF-ADMINISTRATION-CONTROLS PIC XX.
+00442              20  CF-APPLICATION-FORCE       PIC X.
+00443              20  CF-INDIVIDUAL-APP.
+00444                  24  CF-APP-SWITCHES  OCCURS  44 TIMES.
+00445                      28  CF-BROWSE-APP      PIC X.
+00446                      28  CF-UPDATE-APP      PIC X.
+00447
+00448          16  CF-CURRENT-TERM-ON             PIC X(4).
+00449          16  CF-PROCESSOR-LIMITS-CLAIMS.
+00450              20  CF-PROC-CALC-AMT-TOL       PIC S999V99   COMP-3.
+00451              20  CF-PROC-MAX-REG-PMT        PIC S9(7)V99  COMP-3.
+00452              20  CF-PROC-MAX-REG-DAYS       PIC S999      COMP-3.
+00453              20  CF-PROC-MAX-AUTO-PMT       PIC S9(7)V99  COMP-3.
+00454              20  CF-PROC-MAX-AUTO-MOS       PIC S999      COMP-3.
+00455              20  CF-PROC-CALC-DAYS-TOL      PIC S999      COMP-3.
+00456              20  CF-PROC-MAX-LF-PMT         PIC S9(7)V99  COMP-3.
+00457          16  CF-PROCESSOR-CARRIER           PIC X.
+00458              88  NO-CARRIER-SECURITY            VALUE ' '.
+00459          16  CF-PROCESSOR-ACCOUNT           PIC X(10).
+00460              88  NO-ACCOUNT-SECURITY            VALUE SPACES.
+00461          16  CF-PROCESSOR-LIFE-ACCESS       PIC X.
+00462              88  PROCESSOR-HAS-LIFE-ACCESS      VALUE 'Y'.
+00463          16  CF-PROCESSOR-USER-ALMIGHTY     PIC X.
+00464              88  PROCESSOR-USER-IS-ALMIGHTY     VALUE 'Y'.
+00465
+00466          16  CF-PROC-SYS-ACCESS-SW.
+00467              20  CF-PROC-CREDIT-CLAIMS-SW.
+00468                  24  CF-PROC-SYS-ACCESS-CREDIT  PIC X.
+00469                      88  ACCESS-TO-CREDIT           VALUE 'Y'.
+00470                  24  CF-PROC-SYS-ACCESS-CLAIMS  PIC X.
+00471                      88  ACCESS-TO-CLAIMS           VALUE 'Y'.
+00472              20  CF-PROC-CREDIT-CLAIMS   REDEFINES
+00473                  CF-PROC-CREDIT-CLAIMS-SW       PIC XX.
+00474                  88  ACCESS-TO-CLAIM-CREDIT         VALUE 'YY'.
+00475              20  CF-PROC-LIFE-GNRLDGR-SW.
+00476                  24  CF-PROC-SYS-ACCESS-LIFE    PIC X.
+00477                      88  ACCESS-TO-LIFE             VALUE 'Y'.
+00478                  24  CF-PROC-SYS-ACCESS-GNRLDGR PIC X.
+00479                      88  ACCESS-TO-GNRLDGR          VALUE 'Y'.
+00480              20  CF-PROC-LIFE-GNRLDGR    REDEFINES
+00481                  CF-PROC-LIFE-GNRLDGR-SW        PIC XX.
+00482                  88  ACCESS-TO-LIFE-GNRLDGR         VALUE 'YY'.
+00483          16  CF-PROC-SYS-ACCESS-ALL      REDEFINES
+00484              CF-PROC-SYS-ACCESS-SW              PIC X(4).
+00485              88  ACCESS-TO-ALL-SYSTEMS              VALUE 'YYYY'.
+00486          16  CF-PROCESSOR-PRINTER               PIC X(4).
+00487
+00488          16  CF-APPROVAL-LEVEL                  PIC X.
+00489              88  APPROVAL-LEVEL-1                   VALUE '1'.
+00490              88  APPROVAL-LEVEL-2                   VALUE '2'.
+00491              88  APPROVAL-LEVEL-3                   VALUE '3'.
+031808             88  APPROVAL-LEVEL-4                   VALUE '4'.
+091813             88  APPROVAL-LEVEL-5                   VALUE '5'.
+00492
+00493          16  CF-PROC-MAX-EXP-PMT            PIC S9(7)V99  COMP-3.
+00494
+00495          16  CF-LANGUAGE-TYPE                   PIC X.
+00496              88  CF-LANG-IS-ENG                     VALUE 'E'.
+00497              88  CF-LANG-IS-FR                      VALUE 'F'.
+011812
+011812         16  CF-CSR-IND                         PIC X.
+011812         16  FILLER                             PIC X(239).
+00499
+00500 ****************************************************************
+00501 *             PROCESSOR/REMINDERS RECORD                       *
+00502 ****************************************************************
+00503
+00504      12  CF-PROCESSOR-REMINDER-REC  REDEFINES  CF-RECORD-BODY.
+00505          16  CF-PROCESSOR-REMINDERS  OCCURS 8 TIMES.
+00506              20  CF-START-REMIND-DT         PIC XX.
+00507              20  CF-END-REMIND-DT           PIC XX.
+00508              20  CF-REMINDER-TEXT           PIC X(50).
+00509          16  FILLER                         PIC X(296).
+00510
+00511
+00512 ****************************************************************
+00513 *             STATE MASTER RECORD                              *
+00514 ****************************************************************
+00515
+00516      12  CF-STATE-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+00517          16  CF-STATE-ABBREVIATION          PIC XX.
+00518          16  CF-STATE-NAME                  PIC X(25).
+00519          16  CF-ST-CALC-INTEREST            PIC S9V9(4)   COMP-3.
+00520          16  CF-ST-CALC-QUOTE-TOLERANCE.
+00521              20  CF-ST-TOL-CLAIM            PIC S999V99   COMP-3.
+00522              20  CF-ST-TOL-PREM             PIC S999V99   COMP-3.
+00523              20  CF-ST-TOL-REFUND           PIC S999V99   COMP-3.
+00524              20  CF-ST-CLAIM-REJECT-SW      PIC X.
+00525                  88 ST-WARN-IF-CLAIM-OUT        VALUE SPACE.
+00526                  88 ST-FORCE-IF-CLAIM-OUT       VALUE '1'.
+00527              20  CF-ST-PREM-REJECT-SW       PIC X.
+00528                  88 ST-WARN-IF-PREM-OUT         VALUE SPACE.
+00529                  88 ST-FORCE-IF-PREM-OUT        VALUE '1'.
+00530              20  CF-ST-REF-REJECT-SW        PIC X.
+00531                  88 ST-WARN-IF-REF-OUT          VALUE SPACE.
+00532                  88 ST-FORCE-IF-REF-OUT         VALUE '1'.
+00533          16  CF-ST-LF-EXP-PCT               PIC S999V9(4) COMP-3.
+00534          16  CF-ST-AH-EXP-PCT               PIC S999V9(4) COMP-3.
+00535          16  CF-ST-REFUND-RULES.
+00536              20  CF-ST-REFUND-MIN           PIC S999V99    COMP-3.
+00537              20  CF-ST-REFUND-DAYS-FIRST    PIC 99.
+00538              20  CF-ST-REFUND-DAYS-SUBSEQ   PIC 99.
+00539          16  CF-ST-FST-PMT-EXTENSION.
+00540              20  CF-ST-FST-PMT-DAYS-MAX     PIC 999.
+00541              20  CF-ST-FST-PMT-DAYS-CHG     PIC X.
+00542                  88  CF-ST-EXT-NO-CHG           VALUE ' '.
+00543                  88  CF-ST-EXT-CHG-LF           VALUE '1'.
+00544                  88  CF-ST-EXT-CHG-AH           VALUE '2'.
+00545                  88  CF-ST-EXT-CHG-LF-AH        VALUE '3'.
+00546          16  CF-ST-STATE-CALL.
+00547              20  CF-ST-CALL-UNEARNED        PIC X.
+00548              20  CF-ST-CALL-RPT-CNTL        PIC X.
+00549              20  CF-ST-CALL-RATE-DEV        PIC XXX.
+00550          16  CF-REPLACEMENT-LAW-SW          PIC X.
+00551              88  CF-REPLACEMENT-LAW-APPLIES     VALUE 'Y'.
+00552              88  CF-REPL-LAW-NOT-APPLICABLE     VALUE 'N'.
+00553          16  CF-REPLACEMENT-LETTER          PIC X(4).
+00554          16  CF-ST-TOL-PREM-PCT             PIC S9V9999 COMP-3.
+00555          16  CF-ST-TOL-REF-PCT              PIC S9V9999 COMP-3.
+00556          16  CF-ST-TARGET-LOSS-RATIO        PIC S9V9(4) COMP-3.
+00557          16  CF-ST-SPLIT-PAYMENT            PIC X.
+00558          16  FILLER                         PIC X.
+00559          16  CF-STATE-BENEFIT-CNTL  OCCURS 50 TIMES.
+00560              20  CF-ST-BENEFIT-CD           PIC XX.
+00561              20  CF-ST-BENEFIT-KIND         PIC X.
+00562                  88  CF-ST-LIFE-KIND            VALUE 'L'.
+00563                  88  CF-ST-AH-KIND              VALUE 'A'.
+00564              20  CF-ST-REM-TERM-CALC        PIC X.
+00565                  88  ST-REM-TERM-NOT-USED       VALUE SPACE.
+00566                  88  ST-EARN-AFTER-15TH         VALUE '1'.
+00567                  88  ST-EARN-ON-HALF-MO         VALUE '2'.
+00568                  88  ST-EARN-ON-1ST-DAY         VALUE '3'.
+00569                  88  ST-EARN-ON-FULL-MO         VALUE '4'.
+00570                  88  ST-EARN-WITH-NO-DAYS       VALUE '5'.
+00571                  88  ST-EARN-AFTER-14TH         VALUE '6'.
+00572                  88  ST-EARN-AFTER-16TH         VALUE '7'.
+00573
+00574              20  CF-ST-REFUND-CALC          PIC X.
+00575                  88  ST-REFUND-NOT-USED         VALUE SPACE.
+00576                  88  ST-REFD-BY-R78             VALUE '1'.
+00577                  88  ST-REFD-BY-PRO-RATA        VALUE '2'.
+00578                  88  ST-REFD-AS-CALIF           VALUE '3'.
+00579                  88  ST-REFD-AS-TEXAS           VALUE '4'.
+00580                  88  ST-REFD-IS-NET-PAY         VALUE '5'.
+00581                  88  ST-REFD-ANTICIPATION       VALUE '6'.
+00582                  88  ST-REFD-UTAH               VALUE '7'.
+00583                  88  ST-REFD-SUM-OF-DIGITS      VALUE '9'.
+00584                  88  ST-REFD-REG-BALLOON        VALUE 'B'.
+033104                 88  ST-REFD-GAP-NON-REFUND     VALUE 'G'.
+00585
+00586              20  CF-ST-EARNING-CALC         PIC X.
+00587                  88  ST-EARNING-NOT-USED        VALUE SPACE.
+00588                  88  ST-EARN-BY-R78             VALUE '1'.
+00589                  88  ST-EARN-BY-PRO-RATA        VALUE '2'.
+00590                  88  ST-EARN-AS-CALIF           VALUE '3'.
+00591                  88  ST-EARN-AS-TEXAS           VALUE '4'.
+00592                  88  ST-EARN-IS-NET-PAY         VALUE '5'.
+00593                  88  ST-EARN-ANTICIPATION       VALUE '6'.
+00594                  88  ST-EARN-MEAN               VALUE '8'.
+00595                  88  ST-EARN-REG-BALLOON        VALUE 'B'.
+00596
+00597              20  CF-ST-OVRD-EARNINGS-CALC   PIC X.
+00598                  88  ST-OVERRIDE-NOT-USED       VALUE SPACE.
+00599                  88  ST-OVRD-BY-R78             VALUE '1'.
+00600                  88  ST-OVRD-BY-PRO-RATA        VALUE '2'.
+00601                  88  ST-OVRD-AS-CALIF           VALUE '3'.
+00602                  88  ST-OVRD-AS-TEXAS           VALUE '4'.
+00603                  88  ST-OVRD-IS-NET-PAY         VALUE '5'.
+00604                  88  ST-OVRD-ANTICIPATION       VALUE '6'.
+00605                  88  ST-OVRD-MEAN               VALUE '8'.
+00606                  88  ST-OVRD-REG-BALLOON        VALUE 'B'.
+                   20  cf-st-extra-periods        pic 9.
+00607 *            20  FILLER                     PIC X.
+00608
+00609          16  CF-ST-COMMISSION-CAPS.
+00610              20  CF-ST-COMM-CAP-SL          PIC S9V9(4) COMP-3.
+00611              20  CF-ST-COMM-CAP-JL          PIC S9V9(4) COMP-3.
+00612              20  CF-ST-COMM-CAP-SA          PIC S9V9(4) COMP-3.
+00613              20  CF-ST-COMM-CAP-JA          PIC S9V9(4) COMP-3.
+00614          16  CF-COMM-CAP-LIMIT-TO           PIC X.
+00615                  88  ST-LIMIT-TO-ACCOUNT        VALUE 'A'.
+102717                 88  ST-LIMIT-TO-GA             VALUE 'G'.
+102717                 88  ST-LIMIT-TO-BOTH           VALUE 'B'.
+00616
+00617          16  CF-ST-RES-TAX-PCT              PIC S9V9(4) COMP-3.
+00618
+00619          16  CF-ST-STATUTORY-INTEREST.
+00620              20  CF-ST-STAT-DATE-FROM       PIC X.
+00621                  88  ST-STAT-FROM-INCURRED      VALUE 'I'.
+00622                  88  ST-STAT-FROM-REPORTED      VALUE 'R'.
+00623              20  CF-ST-NO-DAYS-ELAPSED      PIC 99.
+00624              20  CF-ST-STAT-INTEREST        PIC S9V9(4) COMP-3.
+00625              20  CF-ST-STAT-INTEREST-1      PIC S9V9(4) COMP-3.
+00626              20  CF-ST-STAT-INTEREST-2      PIC S9V9(4) COMP-3.
+00627              20  CF-ST-STAT-INTEREST-3      PIC S9V9(4) COMP-3.
+00628
+00629          16  CF-ST-OVER-SHORT.
+00630              20 CF-ST-OVR-SHT-AMT           PIC S999V99 COMP-3.
+00631              20 CF-ST-OVR-SHT-PCT           PIC S9V9(4) COMP-3.
+00632
+00633          16  CF-ST-FREE-LOOK-PERIOD         PIC S9(3)   COMP-3.
+00634
+CIDMOD         16  CF-ST-RT-CALC                  PIC X.
+CIDMOD
+PEMMOD         16  CF-ST-LF-PREM-TAX              PIC S9V9(4) COMP-3.
+PEMMOD         16  CF-ST-AH-PREM-TAX-I            PIC S9V9(4) COMP-3.
+PEMMOD         16  CF-ST-AH-PREM-TAX-G            PIC S9V9(4) COMP-3.
+PEMMOD         16  CF-ST-RF-LR-CALC               PIC X.
+PEMMOD         16  CF-ST-RF-LL-CALC               PIC X.
+PEMMOD         16  CF-ST-RF-LN-CALC               PIC X.
+PEMMOD         16  CF-ST-RF-AH-CALC               PIC X.
+PEMMOD         16  CF-ST-RF-CP-CALC               PIC X.
+PEMMOD*        16  FILLER                         PIC X(206).
+091808*CIDMOD         16  FILLER                         PIC X(192).
+091808         16  CF-ST-CHECK-COUNTER            PIC S9(8)   COMP.
+091808             88  CF-ST-CHECK-CNT-RESET      VALUE +9999999.
+011410         16  CF-ST-REF-AH-DEATH-IND         PIC X.
+061511         16  CF-ST-VFY-2ND-BENE             PIC X.
+012913         16  CF-ST-CAUSAL-STATE             PIC X.
+022415         16  CF-ST-EXTRA-INTEREST-PERIODS   PIC 9.
+022415         16  CF-ST-EXTRA-PAYMENTS           PIC 9.
+040915         16  CF-ST-AGENT-SIG-EDIT           PIC X.
+040915             88  CF-ST-EDIT-FOR-SIG           VALUE 'Y'.
+070115         16  CF-ST-NET-ONLY-STATE           PIC X.
+070115             88  CF-ST-IS-NET-ONLY            VALUE 'Y'.
+102717         16  cf-commission-cap-required     pic x.
+102717         16  CF-ST-GA-COMMISSION-CAPS.
+102717             20  CF-ST-GA-COMM-CAP-SL       PIC S9V9(4) COMP-3.
+102717             20  CF-ST-GA-COMM-CAP-JL       PIC S9V9(4) COMP-3.
+102717             20  CF-ST-GA-COMM-CAP-SA       PIC S9V9(4) COMP-3.
+102717             20  CF-ST-GA-COMM-CAP-JA       PIC S9V9(4) COMP-3.
+102717         16  CF-ST-TOT-COMMISSION-CAPS.
+102717             20  CF-ST-TOT-COMM-CAP-SL      PIC S9V9(4) COMP-3.
+102717             20  CF-ST-TOT-COMM-CAP-JL      PIC S9V9(4) COMP-3.
+102717             20  CF-ST-TOT-COMM-CAP-SA      PIC S9V9(4) COMP-3.
+102717             20  CF-ST-TOT-COMM-CAP-JA      PIC S9V9(4) COMP-3.
+102717         16  FILLER                         PIC X(156).
+00636
+00637 ****************************************************************
+00638 *             BENEFIT MASTER RECORD                            *
+00639 ****************************************************************
+00640
+00641      12  CF-BENEFIT-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+00642          16  CF-BENEFIT-CONTROLS  OCCURS 8 TIMES.
+00643              20  CF-BENEFIT-CODE            PIC XX.
+00644              20  CF-BENEFIT-NUMERIC  REDEFINES
+00645                  CF-BENEFIT-CODE            PIC XX.
+00646              20  CF-BENEFIT-ALPHA           PIC XXX.
+00647              20  CF-BENEFIT-DESCRIP         PIC X(10).
+00648              20  CF-BENEFIT-COMMENT         PIC X(10).
+00649
+00650              20  CF-LF-COVERAGE-TYPE        PIC X.
+00651                  88  CF-REDUCING                VALUE 'R'.
+00652                  88  CF-LEVEL                   VALUE 'L' 'P'.
+00653
+00654              20  CF-SPECIAL-CALC-CD         PIC X.
+00655                  88  CF-ALTERNATE-NET-PAY       VALUE 'A'.
+00656                  88  CF-NP-0-MO-INT             VALUE 'A'.
+00657                  88  CF-OB-OFFLINE-RESERVED     VALUE 'B'.
+00658                  88  CF-CRITICAL-PERIOD         VALUE 'C'.
+00659                  88  CF-TERM-IN-DAYS            VALUE 'D'.
+00660                  88  CF-USE-PREMIUM-AS-ENTERED  VALUE 'E'.
+00661                  88  CF-FARM-PLAN               VALUE 'F'.
+00662                  88  CF-RATE-AS-STANDARD        VALUE 'G'.
+00663                  88  CF-2-MTH-INTEREST          VALUE 'I'.
+00664                  88  CF-3-MTH-INTEREST          VALUE 'J'.
+00665                  88  CF-4-MTH-INTEREST          VALUE 'K'.
+00666                  88  CF-BALLOON-LAST-PMT        VALUE 'L'.
+00667                  88  CF-MORTGAGE-PROCESSING     VALUE 'M'.
+00668                  88  CF-PRUDENTIAL              VALUE 'P'.
+00669                  88  CF-OUTSTANDING-BAL         VALUE 'O'.
+00670                  88  CF-TRUNCATED-LIFE          VALUE 'T'.
+00671                  88  CF-TRUNCATED-LIFE-ONE      VALUE 'U'.
+00672                  88  CF-TRUNCATED-LIFE-TWO      VALUE 'V'.
+00673                  88  CF-NET-PAY-SIMPLE          VALUE 'S'.
+00674                  88  CF-SUMMARY-PROCESSING      VALUE 'Z'.
+00675
+00676              20  CF-JOINT-INDICATOR         PIC X.
+00677                  88  CF-JOINT-COVERAGE          VALUE 'J'.
+00678
+082603*            20  FILLER                     PIC X(12).
+                   20  cf-maximum-benefits        pic s999 comp-3.
+                   20  FILLER                     PIC X(09).
+082503             20  CF-BENEFIT-CATEGORY        PIC X.
+00680              20  CF-LOAN-TYPE               PIC X(8).
+00681
+00682              20  CF-CO-REM-TERM-CALC        PIC X.
+00683                  88  CO-EARN-AFTER-15TH         VALUE '1'.
+00684                  88  CO-EARN-ON-HALF-MO         VALUE '2'.
+00685                  88  CO-EARN-ON-1ST-DAY         VALUE '3'.
+00686                  88  CO-EARN-ON-FULL-MO         VALUE '4'.
+00687                  88  CO-EARN-WITH-NO-DAYS       VALUE '5'.
+00688
+00689              20  CF-CO-EARNINGS-CALC        PIC X.
+00690                  88  CO-EARN-BY-R78             VALUE '1'.
+00691                  88  CO-EARN-BY-PRO-RATA        VALUE '2'.
+00692                  88  CO-EARN-AS-CALIF           VALUE '3'.
+00693                  88  CO-EARN-AS-TEXAS           VALUE '4'.
+00694                  88  CO-EARN-IS-NET-PAY         VALUE '5'.
+00695                  88  CO-EARN-ANTICIPATION       VALUE '6'.
+00696                  88  CO-EARN-AS-MEAN            VALUE '8'.
+00697                  88  CO-EARN-AS-REG-BALLOON     VALUE 'B'.
+00698
+00699              20  CF-CO-REFUND-CALC          PIC X.
+00700                  88  CO-REFUND-NOT-USED         VALUE SPACE.
+00701                  88  CO-REFD-BY-R78             VALUE '1'.
+00702                  88  CO-REFD-BY-PRO-RATA        VALUE '2'.
+00703                  88  CO-REFD-AS-CALIF           VALUE '3'.
+00704                  88  CO-REFD-AS-TEXAS           VALUE '4'.
+00705                  88  CO-REFD-IS-NET-PAY         VALUE '5'.
+00706                  88  CO-REFD-ANTICIPATION       VALUE '6'.
+00707                  88  CO-REFD-MEAN               VALUE '8'.
+00708                  88  CO-REFD-SUM-OF-DIGITS      VALUE '9'.
+00709                  88  CO-REFD-AS-REG-BALLOON     VALUE 'B'.
+033104                 88  CO-REFD-GAP-NON-REFUND     VALUE 'G'.
+00710
+00711              20  CF-CO-OVRD-EARNINGS-CALC   PIC X.
+00712                  88  CO-OVERRIDE-NOT-USED       VALUE SPACE.
+00713                  88  CO-OVRD-BY-R78             VALUE '1'.
+00714                  88  CO-OVRD-BY-PRO-RATA        VALUE '2'.
+00715                  88  CO-OVRD-AS-CALIF           VALUE '3'.
+00716                  88  CO-OVRD-AS-TEXAS           VALUE '4'.
+00717                  88  CO-OVRD-IS-NET-PAY         VALUE '5'.
+00718                  88  CO-OVRD-ANTICIPATION       VALUE '6'.
+00719                  88  CO-OVRD-MEAN               VALUE '8'.
+00720                  88  CO-OVRD-AS-REG-BALLOON     VALUE 'B'.
+00721
+00722              20  CF-CO-BEN-I-G-CD           PIC X.
+00723                  88  CO-BEN-I-G-NOT-USED        VALUE SPACE.
+00724                  88  CO-BEN-I-G-IS-INDV         VALUE 'I'.
+00725                  88  CO-BEN-I-G-IS-GRP          VALUE 'G'.
+00726
+00727          16  FILLER                         PIC X(304).
+00728
+00729
+00730 ****************************************************************
+00731 *             CARRIER MASTER RECORD                            *
+00732 ****************************************************************
+00733
+00734      12  CF-CARRIER-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+00735          16  CF-ADDRESS-DATA.
+00736              20  CF-MAIL-TO-NAME            PIC X(30).
+00737              20  CF-IN-CARE-OF              PIC X(30).
+00738              20  CF-ADDRESS-LINE-1          PIC X(30).
+00739              20  CF-ADDRESS-LINE-2          PIC X(30).
+00740              20  CF-CITY-STATE              PIC X(30).
+00741              20  CF-ZIP-CODE-NUM            PIC 9(9)      COMP-3.
+00742              20  CF-PHONE-NO                PIC 9(11)     COMP-3.
+00743
+00744          16  CF-CLAIM-NO-CONTROL.
+00745              20  CF-CLAIM-NO-METHOD         PIC X.
+00746                  88  CLAIM-NO-MANUAL            VALUE '1'.
+00747                  88  CLAIM-NO-Y-M-SEQ           VALUE '2'.
+00748                  88  CLAIM-NO-SEQ               VALUE '3'.
+00749                  88  CLAIM-NO-ALPHA-SEQ         VALUE '5'.
+00750              20  CF-CLAIM-COUNTER           PIC S9(8)   COMP.
+00751                  88  CLAIM-CNT-RESET-IF-SEQ     VALUE +9999999.
+00752                  88  CLAIM-CNT-RESET-IF-YRMO    VALUE +99999.
+00753                  88  CLAIM-CNT-RESET-IF-YRALPHA VALUE +9999.
+00754
+00755          16  CF-CHECK-NO-CONTROL.
+00756              20  CF-CHECK-NO-METHOD         PIC X.
+00757                  88  CHECK-NO-MANUAL            VALUE '1'.
+00758                  88  CHECK-NO-AUTO-SEQ          VALUE '2'.
+00759                  88  CHECK-NO-CARR-SEQ          VALUE '3'.
+00760                  88  CHECK-NO-AT-PRINT          VALUE '4'.
+00761              20  CF-CHECK-COUNTER           PIC S9(8)   COMP.
+00762                  88  CHECK-CNT-RESET-VALUE      VALUE +999999.
+00763
+00764          16  CF-DOMICILE-STATE              PIC XX.
+00765
+00766          16  CF-EXPENSE-CONTROLS.
+00767              20  CF-EXPENSE-METHOD          PIC X.
+00768                  88  EXPENSE-CALC-MANUAL        VALUE '1'.
+00769                  88  DOLLARS-PER-PMT            VALUE '2'.
+00770                  88  PERCENT-OF-PAYMENT         VALUE '3'.
+00771                  88  DOLLARS-PER-MONTH          VALUE '4'.
+00772              20  CF-EXPENSE-PERCENT         PIC S999V99   COMP-3.
+00773              20  CF-EXPENSE-DOLLAR          PIC S999V99   COMP-3.
+00774
+00775          16  CF-CORRESPONDENCE-CONTROL.
+00776              20  CF-LETTER-RESEND-OPT       PIC X.
+00777                  88  LETTERS-NOT-ARCHIVED       VALUE SPACE.
+00778                  88  LETTERS-ARE-ARCHIVED       VALUE '1'.
+00779              20  FILLER                     PIC X(4).
+00780
+00781          16  CF-RESERVE-CONTROLS.
+00782              20  CF-MANUAL-SW               PIC X.
+00783                  88  CF-MANUAL-RESERVES-USED    VALUE '1'.
+00784              20  CF-FUTURE-SW               PIC X.
+00785                  88  CF-FUTURE-RESERVES-USED    VALUE '1'.
+00786              20  CF-PTC-SW                  PIC X.
+00787                  88  CF-PAY-TO-CURRENT-USED     VALUE '1'.
+00788              20  CF-IBNR-SW                 PIC X.
+00789                  88  CF-IBNR-RESERVES-USED      VALUE '1'.
+00790              20  CF-PTC-LF-SW               PIC X.
+00791                  88  CF-LF-PTC-USED             VALUE '1'.
+00792              20  CF-CDT-ACCESS-METHOD       PIC X.
+00793                  88  CF-CDT-ROUND-NEAR          VALUE '1'.
+00794                  88  CF-CDT-ROUND-HIGH          VALUE '2'.
+00795                  88  CF-CDT-INTERPOLATED        VALUE '3'.
+00796              20  CF-PERCENT-OF-CDT          PIC S999V99   COMP-3.
+00797
+00798          16  CF-CLAIM-CALC-METHOD           PIC X.
+00799              88  360-PLUS-MONTHS                VALUE '1'.
+00800              88  365-PLUS-MONTHS                VALUE '2'.
+00801              88  FULL-MONTHS-ACTUAL-DAY         VALUE '3'.
+00802              88  360-DAILY                      VALUE '4'.
+00803              88  365-DAILY                      VALUE '5'.
+00804
+00805          16  CF-LAST-ALPHA-CHARACTER        PIC X.
+00806          16  FILLER                         PIC X(11).
+00807
+00808          16  CF-LIMIT-AMOUNTS.
+00809              20  CF-CALC-AMT-TOL            PIC S999V99   COMP-3.
+00810              20  CF-MAX-REG-PMT             PIC S9(7)V99  COMP-3.
+00811              20  CF-MAX-REG-DAYS            PIC S999      COMP-3.
+00812              20  CF-MAX-AUTO-PMT            PIC S9(7)V99  COMP-3.
+00813              20  CF-MAX-AUTO-MOS            PIC S999      COMP-3.
+00814              20  CF-CALC-DAYS-TOL           PIC S999      COMP-3.
+00815              20  CF-CR-TOL-PREM             PIC S999V99   COMP-3.
+00816              20  CF-CR-TOL-REFUND           PIC S999V99   COMP-3.
+00817              20  CF-CR-TOL-PREM-PCT         PIC S9V9(4)   COMP-3.
+00818              20  CF-CR-TOL-REFUND-PCT       PIC S9V9(4)   COMP-3.
+00819
+00820          16  CF-DAYS-BEFORE-CLOSED          PIC S999      COMP-3.
+00821          16  CF-MONTHS-BEFORE-PURGED        PIC S999      COMP-3.
+00822          16  CF-IBNR-PERCENT                PIC S9V9(4)   COMP-3.
+00823
+00824          16  CF-ZIP-CODE.
+00825              20  CF-ZIP-PRIME.
+00826                  24  CF-ZIP-1ST             PIC X.
+00827                      88  CF-CANADIAN-POST-CODE VALUE 'A' THRU 'Z'.
+00828                  24  FILLER                 PIC X(4).
+00829              20  CF-ZIP-PLUS4               PIC X(4).
+00830          16  CF-CANADIAN-POSTAL-CODE REDEFINES CF-ZIP-CODE.
+00831              20  CF-CAN-POSTAL-1            PIC XXX.
+00832              20  CF-CAN-POSTAL-2            PIC XXX.
+00833              20  FILLER                     PIC XXX.
+00834
+00835          16  CF-IBNR-UEPRM-PERCENT          PIC S9V9(4) COMP-3.
+00836          16  CF-IBNR-R78-PERCENT            PIC S9V9(4) COMP-3.
+00837          16  CF-IBNR-PRO-PERCENT            PIC S9V9(4) COMP-3.
+00838
+00839          16  CF-RATING-SWITCH               PIC X.
+00840              88  CF-PERFORM-RATING              VALUE ' ' 'Y'.
+00841              88  CF-NO-RATING                   VALUE 'N'.
+00842
+00843          16  CF-BUILD-RETRIEVE-AFTER-MONTHS PIC 99.
+00844
+00845          16  CF-CARRIER-OVER-SHORT.
+00846              20 CF-CR-OVR-SHT-AMT           PIC S999V99   COMP-3.
+00847              20 CF-CR-OVR-SHT-PCT           PIC S9V9(4)   COMP-3.
+00848
+100703         16  CF-CARRIER-CLP-TOL-PCT         PIC S9V9(4)   COMP-3.
+100703         16  CF-SECPAY-SWITCH               PIC X.
+100703             88  CF-SECURE-PAY-CARRIER          VALUE 'Y'.
+100703             88  CF-NO-SECURE-PAY               VALUE ' ' 'N'.
+092705         16  CF-CARRIER-LEASE-COMM          PIC S9(5)V99  COMP-3.
+032813         16  CF-CARRIER-NEXT-AUDIT-CHK-NO   PIC S9(8)     COMP.
+032813         16  FILLER                         PIC X(444).
+100703*        16  FILLER                         PIC X(452).
+00850
+00851
+00852 ****************************************************************
+00853 *             MORTALITY MASTER RECORD                          *
+00854 ****************************************************************
+00855
+00856      12  CF-MORTALITY-MASTER-REC REDEFINES  CF-RECORD-BODY.
+00857          16  CF-MORT-TABLE-LINE OCCURS  9  TIMES
+00858                                 INDEXED BY CF-MORT-NDX.
+00859              20  CF-MORT-TABLE              PIC X(5).
+00860              20  CF-MORT-TABLE-TYPE         PIC X.
+00861                  88  CF-MORT-JOINT              VALUE 'J'.
+00862                  88  CF-MORT-SINGLE             VALUE 'S'.
+00863                  88  CF-MORT-COMBINED           VALUE 'C'.
+00864                  88  CF-MORT-TYPE-VALID-C       VALUE 'J' 'S'.
+00865                  88  CF-MORT-TYPE-VALID-M       VALUE 'J' 'S' 'C'.
+00866              20  CF-MORT-INTEREST           PIC SV9(4)  COMP-3.
+00867              20  CF-MORT-AGE-METHOD         PIC XX.
+00868                  88  CF-AGE-LAST                VALUE 'AL'.
+00869                  88  CF-AGE-NEAR                VALUE 'AN'.
+00870              20  CF-MORT-RESERVE-ADJUSTMENT PIC S9V9(4) COMP-3.
+00871              20  CF-MORT-ADJUSTMENT-DIRECTION
+00872                                             PIC X.
+00873                  88  CF-MINUS                   VALUE '-'.
+00874                  88  CF-PLUS                    VALUE '+'.
+00875              20  CF-MORT-JOINT-FACTOR       PIC S9V9(4) COMP-3.
+00876              20  CF-MORT-JOINT-CODE         PIC X.
+00877                  88  CF-VALID-JOINT-CODE        VALUE 'A' 'V'.
+00878              20  CF-MORT-PC-Q               PIC X.
+00879                  88  CF-VALID-PC-Q              VALUE 'Y' 'N' ' '.
+00880              20  CF-MORT-TABLE-CODE         PIC X(4).
+00881              20  CF-MORT-COMMENTS           PIC X(15).
+00882              20  FILLER                     PIC X(14).
+00883
+00884          16  FILLER                         PIC X(251).
+00885
+00886
+00887 ****************************************************************
+00888 *             BUSSINESS TYPE MASTER RECORD                     *
+00889 ****************************************************************
+00890
+00891      12  CF-BUSINESS-TYPE-MASTER-REC REDEFINES  CF-RECORD-BODY.
+00892 * FIRST ENTRY IS TYPE 01.. LAST IS TYPE 20
+00893 * RECORD 02 IS TYPES 21-40..RECORD 03 IS 41-60..04 IS 61-80
+00894 * AND RECORD 05 IS TYPES 81-99
+00895          16  CF-TYPE-DESCRIPTIONS   OCCURS  20  TIMES.
+00896              20  CF-BUSINESS-TITLE          PIC  X(19).
+00897              20  CF-BUS-MOD-ST-TRGT-LOSS-RATIO
+00898                                             PIC S9V9(4) COMP-3.
+00899              20  CF-BUS-EXCL-ST-CALL        PIC  X.
+00900              20  FILLER                     PIC  X.
+00901          16  FILLER                         PIC  X(248).
+00902
+00903
+00904 ****************************************************************
+00905 *             TERMINAL MASTER RECORD                           *
+00906 ****************************************************************
+00907
+00908      12  CF-TERMINAL-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+00909
+00910          16  CF-COMPANY-TERMINALS.
+00911              20  CF-TERMINAL-ID  OCCURS 120 TIMES
+00912                                   PIC X(4).
+00913          16  FILLER               PIC X(248).
+00914
+00915
+00916 ****************************************************************
+00917 *             LIFE EDIT MASTER RECORD                          *
+00918 ****************************************************************
+00919
+00920      12  CF-LIFE-EDIT-MASTER-REC REDEFINES  CF-RECORD-BODY.
+00921          16  CF-LIFE-EDIT-ENTRIES   OCCURS 120  TIMES.
+00922              20  CF-LIFE-CODE-IN            PIC XX.
+00923              20  CF-LIFE-CODE-OUT           PIC XX.
+00924          16  FILLER                         PIC X(248).
+00925
+00926
+00927 ****************************************************************
+00928 *             AH EDIT MASTER RECORD                            *
+00929 ****************************************************************
+00930
+00931      12  CF-AH-EDIT-MASTER-REC REDEFINES  CF-RECORD-BODY.
+00932          16  CF-AH-EDIT-ENTRIES   OCCURS  96  TIMES.
+00933              20  CF-AH-CODE-IN              PIC XXX.
+00934              20  CF-AH-CODE-OUT             PIC XX.
+00935          16  FILLER                         PIC X(248).
+00936
+00937
+00938 ****************************************************************
+00939 *             CREDIBILITY TABLES                               *
+00940 ****************************************************************
+00941
+00942      12  CF-CREDIBILITY-MASTER-REC REDEFINES  CF-RECORD-BODY.
+00943          16  CF-CRDB-ENTRY   OCCURS 36 TIMES
+00944                              INDEXED BY CF-CRDB-NDX.
+00945              20  CF-CRDB-FROM               PIC S9(7)   COMP-3.
+00946              20  CF-CRDB-TO                 PIC S9(7)   COMP-3.
+00947              20  CF-CREDIBILITY-FACTOR      PIC S9V9(4) COMP-3.
+00948          16  FILLER                         PIC  X(332).
+00949
+00950
+00951 ****************************************************************
+00952 *             REPORT CUSTOMIZATION RECORD                      *
+00953 ****************************************************************
+00954
+00955      12  CF-CUSTOM-REPORT-REC  REDEFINES  CF-RECORD-BODY.
+00956          16  CF-ACCOUNT-MASTER-STATUS       PIC X.
+00957              88  CF-ACTIVE-ACCOUNTS             VALUE 'A'.
+00958              88  CF-INACTIVE-ACCOUNTS           VALUE 'I'.
+121307             88  CF-CANCELLED-ACCOUNTS          VALUE 'C'.
+00959 **** NOTE: INACTIVE WILL INCLUDE ACCOUNT MASTER CODED WITH ****
+00960 ****       A T-TRANSFER.                                   ****
+00961              88  CF-ALL-ACCOUNTS                VALUE 'B'.
+00962
+00963          16  FILLER                         PIC XX.
+00964
+00965          16  CF-CARRIER-CNTL-OPT.
+00966              20  CF-CARRIER-OPT-SEQ         PIC 9.
+00967                  88  CF-CARRIER-OPT-USED        VALUE 1 THRU 6.
+00968                  88  CF-CARRIER-OPT-NOT-USED    VALUE 0.
+00969              20  CF-CARRIER-SELECT OCCURS 3 TIMES
+00970                                             PIC X.
+00971          16  CF-GROUP-CNTL-OPT.
+00972              20  CF-GROUP-OPT-SEQ           PIC 9.
+00973                  88  CF-GROUP-OPT-USED          VALUE 1 THRU 6.
+00974                  88  CF-GROUP-OPT-NOT-USED      VALUE 0.
+00975              20  CF-GROUP-SELECT OCCURS 3 TIMES
+00976                                             PIC X(6).
+00977          16  CF-STATE-CNTL-OPT.
+00978              20  CF-STATE-OPT-SEQ           PIC 9.
+00979                  88  CF-STATE-OPT-USED          VALUE 1 THRU 6.
+00980                  88  CF-STATE-OPT-NOT-USED      VALUE 0.
+00981              20  CF-STATE-SELECT OCCURS 3 TIMES
+00982                                             PIC XX.
+00983          16  CF-ACCOUNT-CNTL-OPT.
+00984              20  CF-ACCOUNT-OPT-SEQ         PIC 9.
+00985                  88  CF-ACCOUNT-OPT-USED        VALUE 1 THRU 6.
+00986                  88  CF-ACCOUNT-OPT-NOT-USED    VALUE 0.
+00987              20  CF-ACCOUNT-SELECT OCCURS 3 TIMES
+00988                                             PIC X(10).
+00989          16  CF-BUS-TYP-CNTL-OPT.
+00990              20  CF-BUS-TYP-OPT-SEQ         PIC 9.
+00991                  88  CF-BUS-TYP-OPT-USED        VALUE 1 THRU 6.
+00992                  88  CF-BUS-TYP-OPT-NOT-USED    VALUE 0.
+00993              20  CF-BUS-TYP-SELECT OCCURS 3 TIMES
+00994                                             PIC XX.
+00995          16  CF-LF-TYP-CNTL-OPT.
+00996              20  CF-LF-TYP-OPT-SEQ          PIC 9.
+00997                  88  CF-LF-TYP-OPT-USED         VALUE 1 THRU 6.
+00998                  88  CF-LF-TYP-OPT-NOT-USED     VALUE 0.
+00999              20  CF-BUS-LF-SELECT OCCURS 3 TIMES
+01000                                             PIC XX.
+01001          16  CF-AH-TYP-CNTL-OPT.
+01002              20  CF-AH-TYP-OPT-SEQ          PIC 9.
+01003                  88  CF-AH-TYP-OPT-USED         VALUE 1 THRU 6.
+01004                  88  CF-AH-TYP-OPT-NOT-USED     VALUE 0.
+01005              20  CF-BUS-AH-SELECT OCCURS 3 TIMES
+01006                                             PIC XX.
+01007          16  CF-REPTCD1-CNTL-OPT.
+01008              20  CF-REPTCD1-OPT-SEQ         PIC 9.
+01009                  88  CF-REPTCD1-OPT-USED        VALUE 1 THRU 6.
+01010                  88  CF-REPTCD1-OPT-NOT-USED    VALUE 0.
+01011              20  CF-REPTCD1-SELECT OCCURS 3 TIMES
+01012                                             PIC X(10).
+01013          16  CF-REPTCD2-CNTL-OPT.
+01014              20  CF-REPTCD2-OPT-SEQ         PIC 9.
+01015                  88  CF-REPTCD2-OPT-USED        VALUE 1 THRU 6.
+01016                  88  CF-REPTCD2-OPT-NOT-USED    VALUE 0.
+01017              20  CF-REPTCD2-SELECT OCCURS 3 TIMES
+01018                                             PIC X(10).
+01019          16  CF-USER1-CNTL-OPT.
+01020              20  CF-USER1-OPT-SEQ           PIC 9.
+01021                  88  CF-USER1-OPT-USED          VALUE 1 THRU 6.
+01022                  88  CF-USER1-OPT-NOT-USED      VALUE 0.
+01023              20  CF-USER1-SELECT OCCURS 3 TIMES
+01024                                             PIC X(10).
+01025          16  CF-USER2-CNTL-OPT.
+01026              20  CF-USER2-OPT-SEQ           PIC 9.
+01027                  88  CF-USER2-OPT-USED          VALUE 1 THRU 6.
+01028                  88  CF-USER2-OPT-NOT-USED      VALUE 0.
+01029              20  CF-USER2-SELECT OCCURS 3 TIMES
+01030                                             PIC X(10).
+01031          16  CF-USER3-CNTL-OPT.
+01032              20  CF-USER3-OPT-SEQ           PIC 9.
+01033                  88  CF-USER3-OPT-USED          VALUE 1 THRU 6.
+01034                  88  CF-USER3-OPT-NOT-USED      VALUE 0.
+01035              20  CF-USER3-SELECT OCCURS 3 TIMES
+01036                                             PIC X(10).
+01037          16  CF-USER4-CNTL-OPT.
+01038              20  CF-USER4-OPT-SEQ           PIC 9.
+01039                  88  CF-USER4-OPT-USED          VALUE 1 THRU 6.
+01040                  88  CF-USER4-OPT-NOT-USED      VALUE 0.
+01041              20  CF-USER4-SELECT OCCURS 3 TIMES
+01042                                             PIC X(10).
+01043          16  CF-USER5-CNTL-OPT.
+01044              20  CF-USER5-OPT-SEQ           PIC 9.
+01045                  88  CF-USER5-OPT-USED          VALUE 1 THRU 6.
+01046                  88  CF-USER5-OPT-NOT-USED      VALUE 0.
+01047              20  CF-USER5-SELECT OCCURS 3 TIMES
+01048                                             PIC X(10).
+01049          16  CF-REINS-CNTL-OPT.
+01050              20  CF-REINS-OPT-SEQ           PIC 9.
+01051                  88  CF-REINS-OPT-USED          VALUE 1 THRU 6.
+01052                  88  CF-REINS-OPT-NOT-USED      VALUE 0.
+01053              20  CF-REINS-SELECT OCCURS 3 TIMES.
+01054                  24  CF-REINS-PRIME         PIC XXX.
+01055                  24  CF-REINS-SUB           PIC XXX.
+01056
+01057          16  CF-AGENT-CNTL-OPT.
+01058              20  CF-AGENT-OPT-SEQ           PIC 9.
+01059                  88  CF-AGENT-OPT-USED          VALUE 1 THRU 6.
+01060                  88  CF-AGENT-OPT-NOT-USED      VALUE 0.
+01061              20  CF-AGENT-SELECT OCCURS 3 TIMES
+01062                                             PIC X(10).
+01063
+01064          16  FILLER                         PIC X(43).
+01065
+01066          16  CF-LOSS-RATIO-SELECT.
+01067              20  CF-SEL-LO-LOSS-RATIO       PIC S999V99  COMP-3.
+01068              20  CF-SEL-HI-LOSS-RATIO       PIC S999V99  COMP-3.
+01069          16  CF-ENTRY-DATE-SELECT.
+01070              20  CF-SEL-LO-ENTRY-DATE       PIC XX.
+01071              20  CF-SEL-HI-ENTRY-DATE       PIC XX.
+01072          16  CF-EFFECTIVE-DATE-SELECT.
+01073              20  CF-SEL-LO-EFFECTIVE-DATE   PIC XX.
+01074              20  CF-SEL-HI-EFFECTIVE-DATE   PIC XX.
+01075
+01076          16  CF-EXCEPTION-LIST-IND          PIC X.
+01077              88  CF-EXCEPTION-LIST-REQUESTED VALUE 'Y'.
+01078
+01079          16  FILLER                         PIC X(318).
+01080
+01081 ****************************************************************
+01082 *                  EXCEPTION REPORTING RECORD                  *
+01083 ****************************************************************
+01084
+01085      12  CF-EXCEPTION-REPORT-REC REDEFINES   CF-RECORD-BODY.
+01086          16  CF-ACCOUNTS-LT-ONE-YEAR        PIC X.
+01087              88  CF-EXCEPTION-ACCTS-WITHIN-ONE  VALUE 'Y'.
+01088
+01089          16  CF-COMBINED-LIFE-AH-OPT.
+01090              20  CF-ISS-COUNT-DIFF          PIC S9(05)     COMP-3.
+01091              20  CF-SINGLE-MO-PREM-PCT      PIC S9(02).
+01092              20  CF-EARN-PREM-DECR-PCT      PIC S9(02).
+01093              20  CF-CANCELLATION-RATIO      PIC S9(02).
+01094
+01095          16  CF-LIFE-OPT.
+01096              20  CF-LF-LOSS-RATIO-PCT       PIC S9(03)     COMP-3.
+01097              20  CF-LF-LTM-LOSS-RATIO       PIC S9(03)     COMP-3.
+01098              20  CF-LF-PERIOD-PROFIT        PIC S9(03)     COMP-3.
+01099              20  CF-LF-LTM-PROFIT-PCT       PIC S9(02)V9   COMP-3.
+01100              20  CF-LF-LTM-INFORCE-DECR     PIC S9(02)V9   COMP-3.
+01101              20  CF-LF-LTM-TERM-CHG         PIC S9(02)V9   COMP-3.
+01102              20  CF-LF-TERM-AVG-WEIGHTED    PIC S9(02)V9   COMP-3.
+01103              20  CF-LF-LTM-AGE-PCT          PIC S9(02)V9   COMP-3.
+01104              20  CF-LF-AGE-AVG-WEIGHTED     PIC S9(02)V9   COMP-3.
+01105              20  CF-LF-AVG-AGE-MAX          PIC S9(02).
+01106
+01107          16  CF-AH-OPT.
+01108              20  CF-AH-LOSS-RATIO-PCT       PIC S9(03)     COMP-3.
+01109              20  CF-AH-LTM-LOSS-RATIO       PIC S9(03)     COMP-3.
+01110              20  CF-AH-PERIOD-PROFIT        PIC S9(03)     COMP-3.
+01111              20  CF-AH-LTM-PROFIT-PCT       PIC S9(02)V9   COMP-3.
+01112              20  CF-AH-LTM-INFORCE-DECR     PIC S9(02)V9   COMP-3.
+01113              20  CF-AH-LTM-TERM-CHG         PIC S9(02)V9   COMP-3.
+01114              20  CF-AH-TERM-AVG-WEIGHTED    PIC S9(02)V9   COMP-3.
+01115              20  CF-AH-LTM-AGE-PCT          PIC S9(02)V9   COMP-3.
+01116              20  CF-AH-AGE-AVG-WEIGHTED     PIC S9(02)V9   COMP-3.
+01117              20  CF-AH-AVG-AGE-MAX          PIC S9(02).
+01118
+01119          16  CF-ACCT-ZERO-MONTH-PRODUCTION PIC X.
+01120              88  CF-ACCT-CURRENT-MONTH-ACT      VALUE 'A'.
+01121              88  CF-ACCT-WITH-NO-PRODUCTION     VALUE 'B'.
+01122              88  CF-ACCT-WITH-ISSUE-ACTIVITY    VALUE 'C'.
+01123
+01124          16  CF-RETENTION-LIMIT             PIC S9(7)      COMP-3.
+01125
+01126          16  FILLER                         PIC X(673).
+01127
+01128
+01129 ****************************************************************
+01130 *             MORTGAGE SYSTEM PLAN RECORD                      *
+01131 ****************************************************************
+01132
+01133      12  CF-MORTGAGE-PLAN-MASTER  REDEFINES  CF-RECORD-BODY.
+01134          16  CF-PLAN-TYPE                   PIC X.
+01135              88  CF-LIFE-MORT-PLAN             VALUE 'L'.
+01136              88  CF-DISAB-MORT-PLAN            VALUE 'D'.
+01137              88  CF-AD-D-MORT-PLAN             VALUE 'A'.
+01138          16  CF-PLAN-ABBREV                 PIC XXX.
+01139          16  CF-PLAN-DESCRIPT               PIC X(10).
+01140          16  CF-PLAN-NOTES                  PIC X(20).
+01141          16  CF-PLAN-ESTABLISH-DATE         PIC XX.
+01142          16  CF-PLAN-UNDERWRITING.
+01143              20  CF-PLAN-TERM-DATA.
+01144                  24  CF-MINIMUM-TERM        PIC S999      COMP-3.
+01145                  24  CF-MAXIMUM-TERM        PIC S999      COMP-3.
+01146              20  CF-PLAN-AGE-DATA.
+01147                  24  CF-MINIMUM-AGE         PIC S999      COMP-3.
+01148                  24  CF-MAXIMUM-AGE         PIC S999      COMP-3.
+01149                  24  CF-MAXIMUM-ATTAIN-AGE  PIC S999      COMP-3.
+01150              20  CF-PLAN-BENEFIT-DATA.
+01151                  24  CF-MINIMUM-BENEFIT     PIC S9(7)V99  COMP-3.
+01152                  24  CF-MAXIMUM-BENEFIT     PIC S9(7)V99  COMP-3.
+01153                  24  CF-MAXIMUM-MONTHLY-BENEFIT
+01154                                             PIC S9(7)V99  COMP-3.
+01155          16  CF-PLAN-POLICY-FORMS.
+01156              20  CF-POLICY-FORM             PIC X(12).
+01157              20  CF-MASTER-APPLICATION      PIC X(12).
+01158              20  CF-MASTER-POLICY           PIC X(12).
+01159          16  CF-PLAN-RATING.
+01160              20  CF-RATE-CODE               PIC X(5).
+01161              20  CF-SEX-RATING              PIC X.
+01162                  88  CF-PLAN-NOT-SEX-RATED     VALUE '1'.
+01163                  88  CF-PLAN-SEX-RATED         VALUE '2'.
+01164              20  CF-SUB-STD-PCT             PIC S9V9999   COMP-3.
+01165              20  CF-SUB-STD-TYPE            PIC X.
+01166                  88  CF-PCT-OF-PREM            VALUE '1'.
+01167                  88  CF-PCT-OF-BENE            VALUE '2'.
+01168          16  CF-PLAN-PREM-TOLERANCES.
+01169              20  CF-PREM-TOLERANCE          PIC S999      COMP-3.
+01170              20  CF-PREM-TOLERANCE-PCT      PIC SV999     COMP-3.
+01171          16  CF-PLAN-PYMT-TOLERANCES.
+01172              20  CF-PYMT-TOLERANCE          PIC S999      COMP-3.
+01173              20  CF-PYMT-TOLERANCE-PCT      PIC SV999     COMP-3.
+01174          16  CF-PLAN-MISC-DATA.
+01175              20  FILLER                     PIC X.
+01176              20  CF-FREE-EXAM-DAYS          PIC S999      COMP-3.
+01177              20  CF-RETRO-RETENTION         PIC S9V9999   COMP-3.
+01178          16  CF-MORT-PLAN-USE-CTR           PIC S999      COMP-3.
+01179          16  CF-PLAN-IND-GRP                PIC X.
+01180              88  CF-MORT-INDIV-PLAN            VALUE 'I'
+01181                                                      '1'.
+01182              88  CF-MORT-GROUP-PLAN            VALUE 'G'
+01183                                                      '2'.
+01184          16  CF-MIB-SEARCH-SW               PIC X.
+01185              88  CF-MIB-SEARCH-ALL             VALUE '1'.
+01186              88  CF-MIB-SEARCH-NONE            VALUE '2'.
+01187              88  CF-MIB-SEARCH-EXCEEDED        VALUE '3'.
+01188              88  CF-MIB-SEARCH-VALID      VALUES ARE '1' '2' '3'.
+01189          16  CF-ALPHA-SEARCH-SW             PIC X.
+01190              88  CF-MIB-ALPHA-ALL              VALUE '1'.
+01191              88  CF-MIB-ALPHA-NONE             VALUE '2'.
+01192              88  CF-MIB-APLHA-EXCEEDED         VALUE '3'.
+01193              88  CF-CLIENT-ALPHA-ALL           VALUE 'A'.
+01194              88  CF-CLIENT-ALPHA-NONE          VALUE 'B'.
+01195              88  CF-CLIENT-APLHA-EXCEEDED      VALUE 'C'.
+01196              88  CF-BOTH-ALPHA-ALL             VALUE 'X'.
+01197              88  CF-BOTH-ALPHA-NONE            VALUE 'Y'.
+01198              88  CF-BOTH-APLHA-EXCEEDED        VALUE 'Z'.
+01199              88  CF-ALPHA-SEARCH-VALID    VALUES ARE '1' '2' '3'
+01200                                                      'A' 'B' 'C'
+01201                                                      'X' 'Y' 'Z'.
+01202          16  CF-EFF-DT-RULE-SW              PIC X.
+01203              88  CF-EFF-DT-ENTER               VALUE 'E'.
+01204              88  CF-EFF-DT-MONTH               VALUE 'M'.
+01205              88  CF-EFF-DT-QTR                 VALUE 'Q'.
+01206              88  CF-EFF-DT-SEMI                VALUE 'S'.
+01207              88  CF-EFF-DT-ANN                 VALUE 'A'.
+01208          16  FILLER                         PIC X(4).
+01209          16  CF-HEALTH-QUESTIONS            PIC X.
+01210              88  CF-VALID-QUESTIONS-CNT VALUES ARE '0' THRU '9'.
+01211          16  CF-GRACE-PERIOD                PIC S999      COMP-3.
+01212          16  CF-NUMBER-LAPSE-NOTICES        PIC S999      COMP-3.
+01213          16  CF-PLAN-SNGL-JNT               PIC X.
+01214              88  CF-COMBINED-PLAN              VALUE 'C'.
+01215              88  CF-JNT-PLAN                   VALUE 'J'.
+01216              88  CF-SNGL-PLAN                  VALUE 'S'.
+01217          16  CF-DAYS-TO-1ST-NOTICE          PIC  99.
+01218          16  CF-DAYS-TO-2ND-NOTICE          PIC  99.
+01219          16  CF-DAYS-TO-3RD-NOTICE          PIC  99.
+01220          16  CF-DAYS-TO-4TH-NOTICE          PIC  99.
+01221          16  CF-RERATE-CNTL                 PIC  X.
+01222              88  CF-RERATE-WITH-ISSUE-AGE       VALUE '1'.
+01223              88  CF-RERATE-WITH-CURRENT-AGE     VALUE '2'.
+01224              88  CF-DO-NOT-RERATE               VALUE '3' ' '.
+01225              88  CF-AUTO-RECALC                 VALUE '4'.
+01226          16  CF-BENEFIT-TYPE                PIC  X.
+01227              88  CF-BENEFIT-IS-LEVEL            VALUE '1'.
+01228              88  CF-BENEFIT-REDUCES             VALUE '2'.
+01229          16  CF-POLICY-FEE                  PIC S999V99
+01230                                                     COMP-3.
+01231          16  CF-1ST-NOTICE-FORM             PIC  X(04).
+01232          16  CF-2ND-NOTICE-FORM             PIC  X(04).
+01233          16  CF-3RD-NOTICE-FORM             PIC  X(04).
+01234          16  CF-4TH-NOTICE-FORM             PIC  X(04).
+01235          16  FILLER                         PIC  X(32).
+01236          16  CF-TERMINATION-FORM            PIC  X(04).
+01237          16  FILLER                         PIC  X(08).
+01238          16  CF-CLAIM-CAP                   PIC S9(7)V99
+01239                                                        COMP-3.
+01240          16  CF-REOCCURRING-DISABILITY-PRD  PIC S999   COMP-3.
+01241          16  CF-ISSUE-LETTER                PIC  X(4).
+01242          16  CF-YEARS-TO-NEXT-RERATE        PIC  99.
+01243          16  CF-DEPENDENT-COVERAGE          PIC  X.
+01244              88  CF-YES-DEP-COV                 VALUE 'Y'.
+01245              88  CF-NO-DEP-COV             VALUES ARE 'N' ' '.
+01246          16  CF-MP-REFUND-CALC              PIC X.
+01247              88  CF-MP-REFUND-NOT-USED          VALUE SPACE.
+01248              88  CF-MP-REFD-BY-R78              VALUE '1'.
+01249              88  CF-MP-REFD-BY-PRO-RATA         VALUE '2'.
+01250              88  CF-MP-REFD-AS-CALIF            VALUE '3'.
+01251              88  CF-MP-REFD-AS-TEXAS            VALUE '4'.
+01252              88  CF-MP-REFD-IS-NET-PAY          VALUE '5'.
+01253              88  CF-MP-REFD-ANTICIPATION        VALUE '6'.
+01254              88  CF-MP-REFD-MEAN                VALUE '8'.
+01255          16  CF-ALT-RATE-CODE               PIC  X(5).
+01256
+01257
+01258          16  FILLER                         PIC X(498).
+01259 ****************************************************************
+01260 *             MORTGAGE COMPANY MASTER RECORD                   *
+01261 ****************************************************************
+01262
+01263      12  CF-MORTG-COMPANY-MASTER-REC  REDEFINES  CF-RECORD-BODY.
+01264          16  CF-MORTG-ALT-MORT-CODE         PIC X(4).
+01265          16  CF-MORTG-ACCESS-CONTROL        PIC X.
+01266              88  CF-MORT-ST-PROD-CNTL                VALUE ' '.
+01267              88  CF-MORT-CARR-GRP-ST-PROD-CNTL       VALUE '1'.
+01268              88  CF-MORT-CARR-ST-PROD-CNTL           VALUE '2'.
+01269              88  CF-MORT-PROD-CNTL                   VALUE '3'.
+01270              88  CF-MORT-CARR-PROD-CNTL              VALUE '4'.
+01271
+01272          16  CF-MORTG-CONVERSION-DATE       PIC XX.
+01273          16  CF-MORTG-RATE-FILE-MAINT-DATE  PIC XX.
+01274          16  CF-MORTG-RATE-FILE-CREAT-DATE  PIC XX.
+01275          16  CF-MORTG-PROD-FILE-MAINT-DATE  PIC XX.
+01276          16  CF-MORTG-PROD-FILE-CREAT-DATE  PIC XX.
+01277
+01278          16  CF-MP-POLICY-LINKAGE-IND       PIC X(1).
+01279              88  CF-MP-PLCY-LINKAGE-USED     VALUE 'Y'.
+01280          16  CF-MP-RECON-USE-IND            PIC X(1).
+01281              88  CF-MP-USE-RECON             VALUE 'Y'.
+01282          16  CF-MORTG-CHECK-NO-COUNTER      PIC 9(6).
+01283              88  CF-MP-CHECK-CNT-RESET-VALUE VALUE 999999.
+01284          16  CF-MP-REPORT-LANGUAGE-IND      PIC X(1).
+01285              88  CF-MP-LANGUAGE-IS-ENG       VALUE 'E'.
+01286              88  CF-MP-LANGUAGE-IS-FR        VALUE 'F'.
+01287          16  FILLER                         PIC X(1).
+01288          16  CF-MORTG-CHECK-QUEUE-COUNTER   PIC 9(6).
+01289              88  CF-MP-CHKQ-CNT-RESET-VALUE  VALUE 999999.
+01290          16  CF-MORTG-MIB-VERSION           PIC X.
+01291              88  CF-MORTG-MIB-BATCH         VALUE '1'.
+01292              88  CF-MORTG-MIB-ONLINE        VALUE '2'.
+01293              88  CF-MORTG-MIB-BOTH          VALUE '3'.
+01294          16  CF-MORTG-ALT-MIB-SEARCH-CNTL.
+01295              20  CF-MORTG-MIB-LNAME-SEARCH  PIC X.
+01296                  88  CF-MIB-LAST-NAME-SEARCH     VALUE 'Y'.
+01297              20  CF-MORTG-MIB-FNAME-SEARCH  PIC X.
+01298                  88  CF-MIB-FIRST-NAME-SEARCH    VALUE 'Y'.
+01299              20  CF-MORTG-MIB-MNAME-SEARCH  PIC X.
+01300                  88  CF-MIB-MIDDLE-NAME-SEARCH   VALUE 'Y'.
+01301              20  CF-MORTG-MIB-BDATE-SEARCH  PIC X.
+01302                  88  CF-MIB-BIRTH-DATE-SEARCH    VALUE 'Y'.
+01303              20  CF-MORTG-MIB-BSTATE-SEARCH PIC X.
+01304                  88  CF-MIB-BIRTH-STATE-SEARCH   VALUE 'Y'.
+01305              20  CF-MORTG-MIB-RSTATE-SEARCH PIC X.
+01306                  88  CF-MIB-RESIDNT-STATE-SEARCH VALUE 'Y'.
+01307          16  CF-MORTG-MIB-COMPANY-SYMBOL    PIC XXX.
+01308          16  FILLER                         PIC X(7).
+01309          16  CF-MORTG-DESTINATION-SYMBOL.
+01310              20  CF-MORTG-MIB-COMM          PIC X(5).
+01311              20  CF-MORTG-MIB-TERM          PIC X(5).
+01312          16  CF-ASSIGN-POLICY-NO-SW         PIC X(01).
+01313              88  CF-ASSIGN-POLICY-NO             VALUE 'Y'.
+01314          16  FILLER                         PIC X(03).
+01315          16  CF-MP-CHECK-NO-CONTROL.
+01316              20  CF-MP-CHECK-NO-METHOD      PIC X(01).
+01317                  88  CF-MP-CHECK-NO-MANUAL     VALUE '1'.
+01318                  88  CF-MP-CHECK-NO-AUTO-SEQ   VALUE '2'
+01319                                                 ' ' LOW-VALUES.
+01320                  88  CF-MP-CHECK-NO-PRE-PRINTED
+01321                                                VALUE '3'.
+01322          16  CF-MORTG-LOAN-SHIFT-IND        PIC X(01).
+01323          16  CF-MORTG-SOLICITATION-NUM      PIC S9(17) COMP-3.
+01324          16  CF-MORTG-ALT-ALPHA-SEARCH-CNTL.
+01325              20  CF-MORTG-ALP-LNAME-SEARCH  PIC X.
+01326                  88  CF-ALPHA-LAST-NAME-SEARCH      VALUE 'Y'.
+01327              20  CF-MORTG-ALP-FNAME-SEARCH  PIC X.
+01328                  88  CF-ALPHA-FIRST-NAME-SEARCH     VALUE 'Y'.
+01329              20  CF-MORTG-ALP-MNAME-SEARCH  PIC X.
+01330                  88  CF-ALPHA-MIDDLE-NAME-SEARCH    VALUE 'Y'.
+01331              20  CF-MORTG-ALP-BDATE-SEARCH  PIC X.
+01332                  88  CF-ALPHA-BIRTH-DATE-SEARCH     VALUE 'Y'.
+01333              20  CF-MORTG-ALP-BSTATE-SEARCH PIC X.
+01334                  88  CF-ALPHA-BIRTH-STATE-SEARCH    VALUE 'Y'.
+01335              20  CF-MORTG-ALP-RSTATE-SEARCH PIC X.
+01336                  88  CF-ALPHA-RESIDNT-STATE-SEARCH  VALUE 'Y'.
+01337          16  CF-MORTG-BILLING-AREA.
+01338              20  CF-MORTG-BILL-CYCLE   OCCURS  5  TIMES
+01339                                             PIC X.
+01340          16  CF-MORTG-MONTH-END-DT          PIC XX.
+01341          16  CF-MORTG-CURRENT-ARCH-NUM      PIC S9(8)  COMP.
+01342          16  CF-MORTG-START-ARCH-NUM        PIC S9(8)  COMP.
+01343          16  CF-MORTG-MIB-DEST-SW           PIC X.
+01344              88 CF-MORTG-MIB-COMM-DEST              VALUE '1'.
+01345              88 CF-MORTG-MIB-TERM-DEST              VALUE '2'.
+01346          16  FILLER                         PIC X.
+01347          16  CF-MORTG-LABEL-CONTROL         PIC X.
+01348              88 CF-MORTG-CREATE-LABELS              VALUE 'Y'.
+01349              88 CF-MORTG-BYPASS-LABELS              VALUE 'N'.
+01350          16  CF-ACH-ORIGINATING-DFI-ID      PIC X(8).
+01351          16  FILLER                         PIC X(8).
+01352          16  CF-ACH-SENDING-DFI-NAME        PIC X(23).
+01353          16  CF-ACH-RECVING-DFI-ROUTING-NO  PIC X(8).
+01354          16  CF-ACH-RECVING-DFI-NAME        PIC X(23).
+01355          16  CF-ACH-COMPANY-ID.
+01356              20  CF-ACH-ID-CODE-DESIGNATOR  PIC X.
+01357                  88  CF-ACH-ICD-IRS-EIN             VALUE '1'.
+01358                  88  CF-ACH-ICD-DUNS                VALUE '3'.
+01359                  88  CF-ACH-ICD-USER-ASSIGNED-NO    VALUE '9'.
+01360              20  CF-ACH-COMPANY-ID-NO       PIC X(9).
+01361          16  CF-MORTG-BILL-GROUPING-CODE    PIC X.
+01362              88  CF-MORTG-CO-HAS-GROUPING           VALUE 'Y'.
+01363          16  CF-RATE-DEV-AUTHORIZATION      PIC X.
+01364              88  CF-RATE-DEV-AUTHORIZED             VALUE 'Y'.
+01365              88  CF-RATE-DEV-NOT-AUTHORIZED         VALUE 'N'.
+01366          16  CF-ACH-SENDING-DFI-ROUTING-NO  PIC X(9).
+01367          16  CF-CBA-FILE-CREATE-NUM         PIC 9(4).
+01368          16  FILLER                         PIC X(536).
+01369
+01370 ****************************************************************
+01371 *             MORTGAGE HEIGHT - WEIGHT CHARTS                  *
+01372 ****************************************************************
+01373
+01374      12  CF-FEMALE-HT-WT-REC  REDEFINES CF-RECORD-BODY.
+01375          16  CF-FEMALE-HT-WT-INFO OCCURS 30 TIMES.
+01376              20  CF-FEMALE-HEIGHT.
+01377                  24  CF-FEMALE-FT           PIC 99.
+01378                  24  CF-FEMALE-IN           PIC 99.
+01379              20  CF-FEMALE-MIN-WT           PIC 999.
+01380              20  CF-FEMALE-MAX-WT           PIC 999.
+01381          16  FILLER                         PIC X(428).
+01382
+01383      12  CF-MALE-HT-WT-REC    REDEFINES CF-RECORD-BODY.
+01384          16  CF-MALE-HT-WT-INFO   OCCURS 30 TIMES.
+01385              20  CF-MALE-HEIGHT.
+01386                  24  CF-MALE-FT             PIC 99.
+01387                  24  CF-MALE-IN             PIC 99.
+01388              20  CF-MALE-MIN-WT             PIC 999.
+01389              20  CF-MALE-MAX-WT             PIC 999.
+01390          16  FILLER                         PIC X(428).
+01391 ******************************************************************
+01392 *             AUTOMATIC ACTIVITY RECORD                          *
+01393 ******************************************************************
+01394      12  CF-AUTO-ACTIVITY-REC REDEFINES CF-RECORD-BODY.
+01395          16  CF-SYSTEM-DEFINED-ACTIVITY OCCURS 09 TIMES.
+01396              20  CF-SYS-ACTIVE-SW           PIC X(01).
+01397              20  CF-SYS-LETTER-ID           PIC X(04).
+01398              20  CF-SYS-RESEND-DAYS         PIC 9(03).
+01399              20  CF-SYS-FOLLOW-UP-DAYS      PIC 9(03).
+01400              20  CF-SYS-RESET-SW            PIC X(01).
+01401              20  CF-SYS-REPORT-DAYS         PIC 9(03).
+01402              20  CF-SYS-EACH-DAY-AFTER-SW   PIC X(01).
+01403
+01404          16  FILLER                         PIC X(50).
+01405
+01406          16  CF-USER-DEFINED-ACTIVITY  OCCURS 08 TIMES.
+01407              20  CF-USER-ACTIVE-SW          PIC X(01).
+01408              20  CF-USER-LETTER-ID          PIC X(04).
+01409              20  CF-USER-RESEND-DAYS        PIC 9(03).
+01410              20  CF-USER-FOLLOW-UP-DAYS     PIC 9(03).
+01411              20  CF-USER-RESET-SW           PIC X(01).
+01412              20  CF-USER-REPORT-DAYS        PIC 9(03).
+01413              20  CF-USER-EACH-DAY-AFTER-SW  PIC X(01).
+01414              20  CF-USER-ACTIVITY-DESC      PIC X(20).
+01415
+01416          16  FILLER                         PIC X(246).
+01000      EJECT
+01001 *                                COPY ELCMSTR.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            ELCMSTR.                            *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+00005 *                            VMOD=2.012                          *
+00006 *                                                                *
+00007 *   FILE DESCRIPTION = CLAIM MASTER FILE                         *
+00008 *                                                                *
+00009 *   FILE TYPE = VSAM,KSDS                                        *
+00010 *   RECORD SIZE = 350  RECFORM = FIXED                           *
+00011 *                                                                *
+00012 *   BASE CLUSTER = ELMSTR                         RKP=2,LEN=20   *
+00013 *       ALTERNATE PATH1 = ELMSTR2 (BY NAME)       RKP=22,LEN=29  *
+00014 *       ALTERNATE PATH2 = ELMSTR3 (BY SOC SEC NO) RKP=51,LEN=12  *
+00015 *       ALTERNATE PATH3 = ELMSTR5 (BY CERT NO)    RKP=63,LEN=12  *
+00016 *       ALTERNATE PATH4 = ELMSTR6 (BY CREDIT CARD NO)            *
+00017 *                                                 RKP=75,LEN=21  *
+00018 *                                                                *
+00019 *   **** NOTE ****                                               *
+00020 *             ANY CHANGES TO THIS COPYBOOK MUST ALSO BE          *
+00021 *             IMPLEMENTED IN COPYBOOK ELCRETR (RETRIEVE MASTER)  *
+00022 *                                                                *
+00023 *   LOG = YES                                                    *
+00024 *   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+120503******************************************************************
+120503*                   C H A N G E   L O G
+120503*
+120503* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+120503*-----------------------------------------------------------------
+120503*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+120503* EFFECTIVE    NUMBER
+120503*-----------------------------------------------------------------
+120503* 120503    2003080800002  SMVA  INITIAL SECURE PAY CHANGES
+080307* 080307    2007032100001  PEMA  ADD TOTAL INTEREST PAID FIELD
+031213* 031213    2012113000002  PEMA  ADD ACCIDENT INDICATOR
+051414* 051414  CR2013021100002  PEMA  RECURRENT CLAIM CHANGES
+052614* 052614    2014022100001  AJRA  ADD FAMILY LEAVE CLAIM TYPE
+081817* 081817    2016100700001  TANA  ADD NBR OF EXTENSIONS
+100518* 100518  CR2017061500001  TANA  ADD OTHER CLAIM TYPE
+022122* 022122  CR2021100800003  PEMA  Add B and H claim types
+00025 ******************************************************************
+00026  01  CLAIM-MASTER.
+00027      12  CL-RECORD-ID                PIC XX.
+00028          88  VALID-CL-ID         VALUE 'CL'.
+00029
+00030      12  CL-CONTROL-PRIMARY.
+00031          16  CL-COMPANY-CD           PIC X.
+00032          16  CL-CARRIER              PIC X.
+00033          16  CL-CLAIM-NO             PIC X(7).
+00034          16  CL-CERT-NO.
+00035              20  CL-CERT-PRIME       PIC X(10).
+00036              20  CL-CERT-SFX         PIC X.
+00037
+00038      12  CL-CONTROL-BY-NAME.
+00039          16  CL-COMPANY-CD-A1        PIC X.
+00040          16  CL-INSURED-LAST-NAME    PIC X(15).
+00041          16  CL-INSURED-NAME.
+00042              20  CL-INSURED-1ST-NAME PIC X(12).
+00043              20  CL-INSURED-MID-INIT PIC X.
+00044
+00045      12  CL-CONTROL-BY-SSN.
+00046          16  CL-COMPANY-CD-A2        PIC X.
+00047          16  CL-SOC-SEC-NO.
+00048              20  CL-SSN-STATE        PIC XX.
+00049              20  CL-SSN-ACCOUNT      PIC X(6).
+00050              20  CL-SSN-LN3          PIC X(3).
+00051
+00052      12  CL-CONTROL-BY-CERT-NO.
+00053          16  CL-COMPANY-CD-A4        PIC X.
+00054          16  CL-CERT-NO-A4.
+00055              20  CL-CERT-A4-PRIME    PIC X(10).
+00056              20  CL-CERT-A4-SFX      PIC X.
+00057
+00058      12  CL-CONTROL-BY-CCN.
+00059          16  CL-COMPANY-CD-A5        PIC X.
+00060          16  CL-CCN-A5.
+00061              20  CL-CCN.
+00062                  24  CL-CCN-PREFIX-A5 PIC X(4).
+00063                  24  CL-CCN-PRIME-A5 PIC X(12).
+00064              20  CL-CCN-FILLER-A5    PIC X(4).
+00065
+00066      12  CL-INSURED-PROFILE-DATA.
+00067          16  CL-INSURED-BIRTH-DT     PIC XX.
+00068          16  CL-INSURED-SEX-CD       PIC X.
+00069              88  INSURED-IS-MALE        VALUE 'M'.
+00070              88  INSURED-IS-FEMALE      VALUE 'F'.
+00071              88  INSURED-SEX-UNKNOWN    VALUE ' '.
+00072          16  CL-INSURED-OCC-CD       PIC X(6).
+00073          16  FILLER                  PIC X(5).
+00074
+00075      12  CL-PROCESSING-INFO.
+00076          16  CL-PROCESSOR-ID         PIC X(4).
+00077          16  CL-CLAIM-STATUS         PIC X.
+00078              88  CLAIM-IS-OPEN          VALUE 'O'.
+00079              88  CLAIM-IS-CLOSED        VALUE 'C'.
+00080          16  CL-CLAIM-TYPE           PIC X.
+00081 *            88  AH-CLAIM               VALUE 'A'.
+00082 *            88  LIFE-CLAIM             VALUE 'L'.
+00083 *            88  PROPERTY-CLAIM         VALUE 'P'.
+00084 *            88  IUI-CLAIM              VALUE 'I'.
+120503*            88  GAP-CLAIM              VALUE 'G'.
+052614*            88  FAMILY-LEAVE-CLAIM     VALUE 'F'.
+100518*            88  OTHER-CLAIM            VALUE 'O'.
+022122*            88  hospital-claim         value 'H'.
+022122*            88  bereavement-claim      value 'B'.
+00085          16  CL-CLAIM-PREM-TYPE      PIC X.
+00086              88  SINGLE-PREMIUM         VALUE '1'.
+00087              88  O-B-COVERAGE           VALUE '2'.
+00088              88  OPEN-END-COVERAGE      VALUE '3'.
+00089          16  CL-INCURRED-DT          PIC XX.
+00090          16  CL-REPORTED-DT          PIC XX.
+00091          16  CL-FILE-ESTABLISH-DT    PIC XX.
+00092          16  CL-EST-END-OF-DISAB-DT  PIC XX.
+00093          16  CL-LAST-PMT-DT          PIC XX.
+00094          16  CL-LAST-PMT-AMT         PIC S9(7)V99  COMP-3.
+00095          16  CL-PAID-THRU-DT         PIC XX.
+00096          16  CL-TOTAL-PAID-AMT       PIC S9(7)V99  COMP-3.
+00097          16  CL-NO-OF-PMTS-MADE      PIC S9(3)     COMP-3.
+00098          16  CL-NO-OF-DAYS-PAID      PIC S9(4)     COMP.
+00099          16  CL-PMT-CALC-METHOD      PIC X.
+00100              88  CL-360-DAY-YR          VALUE '1'.
+00101              88  CL-365-DAY-YR          VALUE '2'.
+00102              88  CL-FULL-MONTHS         VALUE '3'.
+00103          16  CL-CAUSE-CD             PIC X(6).
+00104
+00105          16  CL-PRIME-CERT-NO.
+00106              20  CL-PRIME-CERT-PRIME PIC X(10).
+00107              20  CL-PRIME-CERT-SFX   PIC X.
+00108
+00109          16  CL-SYSTEM-IDENTIFIER    PIC XX.
+00110              88  CL-CREDIT-CLAIM        VALUE 'CR'.
+00111              88  CL-CONVENIENCE-CLAIM   VALUE 'CV'.
+00112
+00113          16  CL-MICROFILM-NO         PIC X(10).
+051414         16  FILLER REDEFINES CL-MICROFILM-NO.
+051414             20  CL-BENEFIT-PERIOD   PIC 99.
+051414             20  FILLER              PIC X(8).
+00114          16  CL-PROG-FORM-TYPE       PIC X.
+00115          16  CL-LAST-ADD-ON-DT       PIC XX.
+00116
+00117          16  CL-LAST-REOPEN-DT       PIC XX.
+00118          16  CL-LAST-CLOSE-DT        PIC XX.
+00119          16  CL-LAST-CLOSE-REASON    PIC X(01).
+00120              88  FINAL-PAID             VALUE '1'.
+00121              88  CLAIM-DENIED           VALUE '2'.
+00122              88  AUTO-CLOSE             VALUE '3'.
+00123              88  MANUAL-CLOSE           VALUE '4'.
+00124              88  BENEFITS-CHANGED       VALUE 'C'.
+00125              88  SETUP-ERRORS           VALUE 'E'.
+00126          16  CL-ASSOC-CERT-SEQU      PIC S99.
+00127          16  CL-ASSOC-CERT-TOTAL     PIC S99.
+00128          16  CL-CLAIM-PAYMENT-STATUS PIC 9.
+00129              88  PAYMENT-IN-PREP        VALUE 1 THRU 9.
+080307         16  CL-TOTAL-INT-PAID       PIC S9(5)V99 COMP-3.
+080307         16  FILLER                  PIC X.
+00131
+00132      12  CL-CERTIFICATE-DATA.
+00133          16  CL-CERT-ORIGIN          PIC X.
+00134              88  CERT-WAS-ONLINE        VALUE '1'.
+00135              88  CERT-WAS-CREATED       VALUE '2'.
+00136              88  COVERAGE-WAS-ADDED     VALUE '3'.
+00137          16  CL-CERT-KEY-DATA.
+00138              20  CL-CERT-CARRIER     PIC X.
+00139              20  CL-CERT-GROUPING    PIC X(6).
+00140              20  CL-CERT-STATE       PIC XX.
+00141              20  CL-CERT-ACCOUNT.
+00142                  24  CL-CERT-ACCOUNT-PREFIX PIC X(4).
+00143                  24  CL-CERT-ACCOUNT-PRIME  PIC X(6).
+00144              20  CL-CERT-EFF-DT      PIC XX.
+00145
+00146      12  CL-STATUS-CONTROLS.
+00147          16  CL-PRIORITY-CD          PIC X.
+00148              88  CONFIDENTIAL-DATA      VALUE '8'.
+00149              88  HIGHEST-PRIORITY       VALUE '9'.
+00150          16  CL-SUPV-ATTN-CD         PIC X.
+00151              88  SUPV-NOT-REQUIRED      VALUE ' ' 'N'.
+00152              88  SUPV-IS-REQUIRED       VALUE 'Y'.
+00153          16  CL-PURGED-DT            PIC XX.
+00154          16  CL-RESTORED-DT          PIC XX.
+00155          16  CL-NEXT-AUTO-PAY-DT     PIC XX.
+00156          16  CL-NEXT-RESEND-DT       PIC XX.
+00157          16  CL-NEXT-FOLLOWUP-DT     PIC XX.
+031213         16  CL-CRITICAL-PERIOD      PIC 99.
+031213*        16  FILLER                  PIC XX.
+00159          16  CL-LAST-MAINT-DT        PIC XX.
+00160          16  CL-LAST-MAINT-USER      PIC X(4).
+00161          16  CL-LAST-MAINT-HHMMSS    PIC S9(6)     COMP-3.
+00162          16  CL-LAST-MAINT-TYPE      PIC X.
+00163              88  CLAIM-SET-UP           VALUE ' '.
+00164              88  PAYMENT-MADE           VALUE '1'.
+00165              88  LETTER-SENT            VALUE '2'.
+00166              88  MASTER-WAS-ALTERED     VALUE '3'.
+00167              88  MASTER-WAS-RESTORED    VALUE '4'.
+00168              88  INCURRED-DATE-CHANGED  VALUE '5'.
+00169              88  FILE-CONVERTED         VALUE '6'.
+00170              88  CHANGE-OF-BENEFITS     VALUE 'C'.
+00171              88  ERROR-CORRECTION       VALUE 'E'.
+00172          16  CL-RELATED-CLAIM-NO     PIC X(7).
+00173          16  CL-HISTORY-ARCHIVE-DT   PIC XX.
+00174          16  CL-BENEFICIARY          PIC X(10).
+00175          16  CL-FILE-ESTABLISHED-BY  PIC X(4).
+120808         16  CL-DENIAL-TYPE          PIC X.
+                   88  CL-TYPE-DENIAL          VALUE '1'.
+                   88  CL-TYPE-RESCISSION      VALUE '2'.
+                   88  CL-TYPE-REFORMATION     VALUE '3'.
+                   88  CL-TYPE-REF-TO-RES      VALUE '4'.
+                   88  CL-TYPE-RECONSIDERED    VALUE '5'.
+081817         16  CL-NO-OF-EXTENSIONS     PIC 99.
+081817         16  filler                  pic x(3).
+      *        16  CL-CRIT-PER-RECURRENT   PIC X.
+      *        16  CL-CRIT-PER-RTW-MOS     PIC 99.
+      *        16  CL-RTW-DT               PIC XX.
+00177
+00178      12  CL-TRAILER-CONTROLS.
+00179          16  CL-TRAILER-SEQ-CNT      PIC S9(4)     COMP.
+00180              88  CL-1ST-TRL-AVAIL       VALUE +4095.
+00181              88  CL-LAST-TRL-AVAIL      VALUE +100.
+00182              88  CL-RESV-EXP-HIST-TRLR  VALUE +0.
+00183          16  CL-LAST-INC-DT-CHANGE   PIC S9(4)     COMP.
+00184          16  FILLER                  PIC XX.
+00185          16  CL-AUTO-PAY-SEQ         PIC S9(4)     COMP.
+00186          16  CL-ADDRESS-TRAILER-CNT.
+00187              20  CL-INSURED-ADDR-CNT  PIC S9(1).
+00188                  88  NO-INSURED-AVAILABLE    VALUE ZERO.
+00189              20  CL-ACCOUNT-ADDR-CNT  PIC S9(1).
+00190                  88  ACCOUNT-IS-ONLINE       VALUE ZERO.
+00191              20  CL-BENIF-ADDR-CNT    PIC S9(1).
+00192                  88  BENEFICIARY-IS-ONLINE   VALUE ZERO.
+00193              20  CL-EMPLOYER-ADDR-CNT PIC S9(1).
+00194                  88  NO-EMPLOY-AVAILABLE     VALUE ZERO.
+00195              20  CL-DOCTOR-ADDR-CNT   PIC S9(1).
+00196                  88  NO-DOCTOR-AVAILABLE     VALUE ZERO.
+00197              20  CL-OTHER-1-ADDR-CNT  PIC S9(1).
+00198                  88  NO-OTHER-1-ADDRESSES    VALUE ZERO.
+00199              20  CL-OTHER-2-ADDR-CNT  PIC S9(1).
+00200                  88  NO-OTHER-2-ADDRESSES    VALUE ZERO.
+00201
+00202      12  CL-CV-REFERENCE-NO.
+00203          16  CL-CV-REFNO-PRIME       PIC X(18).
+00204          16  CL-CV-REFNO-SFX         PIC XX.
+00205
+00206      12  CL-FILE-LOCATION            PIC X(4).
+00207
+00208      12  CL-PROCESS-ERRORS.
+00209          16  CL-FATAL-ERROR-CNT      PIC S9(4)     COMP.
+00210              88  NO-FATAL-ERRORS        VALUE ZERO.
+00211          16  CL-FORCEABLE-ERROR-CNT  PIC S9(4)     COMP.
+00212              88  NO-FORCABLE-ERRORS     VALUE ZERO.
+00213
+00214      12  CL-PRODUCT-CD               PIC X.
+00215
+00216      12  CL-CURRENT-KEY-DATA.
+00217          16  CL-CURRENT-CARRIER      PIC X.
+00218          16  CL-CURRENT-GROUPING     PIC X(6).
+00219          16  CL-CURRENT-STATE        PIC XX.
+00220          16  CL-CURRENT-ACCOUNT      PIC X(10).
+00221
+00222      12  CL-ASSOCIATES               PIC X.
+00223          88  CL-ASSOC-NO-INTERFACE      VALUE 'A'.
+00224          88  CL-ASSOC-INTERFACE         VALUE 'I'.
+00225          88  CL-NON-ASSOC-NO-INTERFACE  VALUE 'N'.
+00226          88  CL-NON-ASSOC-INTERFACE     VALUE 'M'.
+00227
+00228      12  CL-ACTIVITY-CODE            PIC 99.
+00229      12  CL-ACTIVITY-MAINT-DT        PIC XX.
+00230      12  CL-ACTIVITY-MAINT-TYPE      PIC X(4).
+00231
+00232      12  CL-LAPSE-REPORT-CODE        PIC 9.
+00233      12  CL-LAG-REPORT-CODE          PIC 9.
+00234      12  CL-LOAN-TYPE                PIC XX.
+00235      12  CL-LEGAL-STATE              PIC XX.
+00236
+CIDMOD     12  CL-YESNOSW                  PIC X.
+031213     12  CL-ACCIDENT-CLAIM-SW        PIC X.
+031213         88  CL-ACCIDENT-NOT-SET           VALUE ' '.
+031213         88  CL-CLAIM-DUE-TO-ACCIDENT      VALUE 'Y'.
+031213         88  CL-CLAIM-NOT-DUE-TO-ACCIDENT  VALUE 'N'.
+051414     12  cl-insured-type             pic x.
+051414         88  cl-claim-on-primary         value 'P'.
+051414         88  cl-claim-on-co-borrower     value 'C'.
+031213     12  cl-benefit-expiration-dt    PIC XX.
+01002      EJECT
+01003 *                                COPY ELCTRLR.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            ELCTRLR.                            *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+00005 *                            VMOD=2.014                          *
+00006 *                                                                *
+00007 *   FILE DESCRIPTION = ACTIVITY TRAILER FILE                     *
+00008 *                                                                *
+00009 *   FILE TYPE = VSAM,KSDS                                        *
+00010 *   RECORD SIZE = 200    RECFORM = FIXED                         *
+00011 *                                                                *
+00012 *   BASE CLUSTER NAME = ELTRLR             RKP=2,LEN=22          *
+00013 *       ALTERNATE INDEX = NONE                                   *
+00014 *                                                                *
+00015 *   LOG = YES                                                    *
+00016 *   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+120503******************************************************************
+120503*                   C H A N G E   L O G
+120503*
+120503* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+120503*-----------------------------------------------------------------
+120503*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+120503* EFFECTIVE    NUMBER
+120503*-----------------------------------------------------------------
+120503* 120503    2003080800002  SMVA  INITIAL SECURE PAY CHANGES
+022106* 022106    2004040700004  PEMA  ADD LIFE CLAIM INTEREST
+050506* 050506    2006030600001  AJRA  ADD DENIAL PROOF DATE
+062806* 062806    2006030600001  AJRA  ADD PAYMENT PROOF DATE
+080106* 080106    2006052500001  AJRA  ADD N AND R NOTE TYPES
+041807* 041807    2006032200004  AJRA  ADD APPROVED BY TO PAYMENT
+082807* 082807    2007032100001  PEMA  ADD INT RATE TO PMT TRLR
+101807* 101807  IR2007100100007  PEMA  EXPAND SIZE OF CLM RESERVE FLDS
+070909* 070909    2009060400001  AJRA  ADD AUTO PAY END LETTER
+040110* 040110  CR2009070600002  AJRA  ADD RESEND LETTER ID TO LETTER
+071910* 071910  CR2009122800001  PEMA  ADD EOB SWITCHES
+102610* 102610    2009122800001  AJRA  ADD STOP DATE TO LETTER
+061511* 061511    2011042000002  AJRA  ADD VFY 2ND BENE TO ADDRESS TRAIL
+020413* 020413    2012071700001  AJRA  PRINT SURVEY AND PRINT CLM FORM I
+021213* 021213    2012092400007  AJRA  CAUSAL STATE SEQUENCE NO
+061013* 061013  CR2012113000002  PEMA  SPP CLAIM RELATED CHANGES
+102413* 102413  CR2013100800001  AJRA  ADD SPECIAL RELEASE IND
+022614* 022614    2013050100003  AJRA  ADD CERT CANCELLED NOTE TYPE - T
+040814* 040814    2014030500002  AJRA  ADD ICD CODES
+052614* 052614  CR2014022100001  AJRA  ADD FAMILY LEAVE CLAIM TYPE
+013017* 013017  CR2016053100001  PEMA  ACH PROCESSING
+062217* 062217  CR2017050300002  TANA  ADD AUTH RCVD
+100518* 100518  CR2017061500001  TANA  ADD OTHER CLAIM TYPE
+102418* 102418  CR2018083000001  TANA  ADD ADD NEW CALL TYPE
+022122* 022122  CR2021100800003  PEMA  Add B and H claim types
+00017 ******************************************************************
+00018  01  ACTIVITY-TRAILERS.
+00019      12  AT-RECORD-ID                    PIC XX.
+00020          88  VALID-AT-ID                       VALUE 'AT'.
+00021
+00022      12  AT-CONTROL-PRIMARY.
+00023          16  AT-COMPANY-CD               PIC X.
+00024          16  AT-CARRIER                  PIC X.
+00025          16  AT-CLAIM-NO                 PIC X(7).
+00026          16  AT-CERT-NO.
+00027              20  AT-CERT-PRIME           PIC X(10).
+00028              20  AT-CERT-SFX             PIC X.
+00029          16  AT-SEQUENCE-NO              PIC S9(4)     COMP.
+00030              88  AT-1ST-TRL-AVAIL             VALUE +4095.
+00031              88  AT-LAST-TRL-AVAIL            VALUE +100.
+00032              88  AT-RESV-EXP-HIST-TRL         VALUE +0.
+00033              88  AT-INSURED-ADDR-TRL          VALUE +1 THRU +9.
+00034              88  AT-BENEFICIARY-ADDR-TRL      VALUE +11 THRU +19.
+00035              88  AT-ACCOUNT-ADDR-TRL          VALUE +21 THRU +29.
+00036              88  AT-PHYSICIAN-ADDR-TRL        VALUE +31 THRU +39.
+00037              88  AT-EMPLOYERS-ADDR-TRL        VALUE +41 THRU +49.
+00038              88  AT-OTHER-1-ADDR-TRL          VALUE +51 THRU +59.
+00039              88  AT-OTHER-2-ADDR-TRL          VALUE +61 THRU +69.
+00040              88  AT-DIAGNOSIS-TRL             VALUE +90.
+022106             88  AT-BENEFICIARY-TRL           VALUE +91.
+022106             88  AT-SPECIAL-REVIEW-TRL        VALUE +92.
+061511             88  AT-VFY-2ND-BENE-NOTE-TRL     VALUE +93.
+021213             88  AT-VFY-CAUSAL-STATE          VALUE +94.
+                   88  AT-ERROR-MSGS-TRL            VALUE +95.
+00041
+00042      12  AT-TRAILER-TYPE                 PIC X.
+00043          88  RESERVE-EXPENSE-TR               VALUE '1'.
+00044          88  PAYMENT-TR                       VALUE '2'.
+00045          88  AUTO-PAY-TR                      VALUE '3'.
+00046          88  CORRESPONDENCE-TR                VALUE '4'.
+00047          88  ADDRESS-TR                       VALUE '5'.
+00048          88  GENERAL-INFO-TR                  VALUE '6'.
+00049          88  AUTO-PROMPT-TR                   VALUE '7'.
+00050          88  DENIAL-TR                        VALUE '8'.
+00051          88  INCURRED-CHG-TR                  VALUE '9'.
+00052          88  FORM-CONTROL-TR                  VALUE 'A'.
+00053
+00054      12  AT-RECORDED-DT                  PIC XX.
+00055      12  AT-RECORDED-BY                  PIC X(4).
+00056      12  AT-LAST-MAINT-HHMMSS            PIC S9(6)     COMP-3.
+00057
+00058      12  AT-TRAILER-BODY                 PIC X(165).
+00059
+00060      12  AT-RESERVE-EXPENSE-TR  REDEFINES  AT-TRAILER-BODY.
+00061          16  AT-RESERVE-CONTROLS.
+00062              20  AT-MANUAL-SW            PIC X.
+00063                  88  AT-MANUAL-RESERVES-USED VALUE '1'.
+00064              20  AT-FUTURE-SW            PIC X.
+00065                  88  AT-FUTURE-RESERVES-USED VALUE '1'.
+00066              20  AT-PTC-SW               PIC X.
+00067                  88  AT-PAY-TO-CURRENT-USED  VALUE '1'.
+00068              20  AT-IBNR-SW              PIC X.
+00069                  88  AT-IBNR-RESERVES-USED   VALUE '1'.
+00070              20  AT-PTC-LF-SW            PIC X.
+00071                  88  AT-LF-PTC-USED          VALUE '1'.
+00072              20  AT-CDT-ACCESS-METHOD    PIC X.
+00073                  88  AT-CDT-ROUND-NEAR       VALUE '1'.
+00074                  88  AT-CDT-ROUND-HIGH       VALUE '2'.
+00075                  88  AT-CDT-INTERPOLATED     VALUE '3'.
+00076              20  AT-PERCENT-OF-CDT       PIC S9(3)V99    COMP-3.
+00077          16  AT-LAST-COMPUTED-DT         PIC XX.
+101807         16  AT-FUTURE-RESERVE           PIC S9(7)V99    COMP-3.
+101807         16  AT-PAY-CURRENT-RESERVE      PIC S9(7)V99    COMP-3.
+101807         16  AT-IBNR-RESERVE             PIC S9(7)V99    COMP-3.
+101807         16  AT-INITIAL-MANUAL-RESERVE   PIC S9(7)V99    COMP-3.
+101807         16  AT-CURRENT-MANUAL-RESERVE   PIC S9(7)V99    COMP-3.
+101807         16  AT-ITD-ADDITIONAL-RESERVE   PIC S9(7)V99    COMP-3.
+00084          16  AT-EXPENSE-CONTROLS.
+00085              20  AT-EXPENSE-METHOD       PIC X.
+00086                  88  NO-EXPENSE-CALCULATED    VALUE '1'.
+00087                  88  FLAT-DOLLAR-PER-PMT      VALUE '2'.
+00088                  88  PERCENT-OF-PMT           VALUE '3'.
+00089                  88  DOLLAR-PER-OPEN-MONTH    VALUE '4'.
+00090              20  AT-EXPENSE-PERCENT      PIC S9(3)V99    COMP-3.
+00091              20  AT-EXPENSE-DOLLAR       PIC S9(3)V99    COMP-3.
+00092          16  AT-ITD-PAID-EXPENSES        PIC S9(5)V99    COMP-3.
+00093          16  AT-ITD-CHARGEABLE-EXPENSE   PIC S9(5)V99    COMP-3.
+00094
+00095          16  AT-ITD-LIFE-REFUNDS         PIC S9(5)V99    COMP-3.
+00096          16  AT-ITD-AH-REFUNDS           PIC S9(5)V99    COMP-3.
+00097
+101807*        16  FILLER                      PIC X(53).
+101807         16  FILLER                      PIC X(47).
+00099
+00100          16  AT-RESERVES-LAST-MAINT-DT   PIC XX.
+00101          16  AT-RESERVES-LAST-UPDATED-BY PIC X(4).
+00102
+00103          16  AT-OPEN-CLOSE-HISTORY OCCURS 6 TIMES.
+00104              20  AT-OPEN-CLOSE-DATE      PIC XX.
+00105              20  AT-OPEN-CLOSE-TYPE      PIC X.
+00106 *                    C = CLOSED
+00107 *                    O = OPEN
+00108              20  AT-OPEN-CLOSE-REASON    PIC X(5).
+00109 *                   REASONS = ALTER, AUTO, FINAL, NEW, FORCE
+00110
+00111      12  AT-PAYMENT-TR  REDEFINES  AT-TRAILER-BODY.
+00112          16  AT-PAYMENT-TYPE             PIC X.
+00113              88  PARTIAL-PAYMENT                VALUE '1'.
+00114              88  FINAL-PAYMENT                  VALUE '2'.
+00115              88  LUMP-SUM-PAYMENT               VALUE '3'.
+00116              88  ADDITIONAL-PAYMENT             VALUE '4'.
+00117              88  CHARGEABLE-EXPENSE             VALUE '5'.
+00118              88  NON-CHARGEABLE-EXPENSE         VALUE '6'.
+00119              88  VOIDED-PAYMENT                 VALUE '9'.
+00120              88  TRANSFER                       VALUE 'T'.
+022106             88  LIFE-INTEREST                  VALUE 'I'.
+00121
+00122          16  AT-CLAIM-TYPE               PIC X.
+00123              88  PAID-FOR-AH                    VALUE 'A'.
+00124              88  PAID-FOR-LIFE                  VALUE 'L'.
+00124              88  PAID-FOR-IUI                   VALUE 'I'.
+120503             88  PAID-FOR-GAP                   VALUE 'G'.
+052614             88  PAID-FOR-FAM                   VALUE 'F'.
+022122             88  PAID-FOR-BRV                   VALUE 'B'.
+022122             88  PAID-FOR-HOS                   VALUE 'H'.
+100518             88  PAID-FOR-OTH                   VALUE 'O'.
+00125          16  AT-CLAIM-PREM-TYPE          PIC X.
+00126              88  AT-SINGLE-PREMIUM              VALUE '1'.
+00127              88  AT-O-B-COVERAGE                VALUE '2'.
+00128              88  AT-OPEN-END-COVERAGE           VALUE '3'.
+00129          16  AT-AMOUNT-PAID              PIC S9(7)V99  COMP-3.
+00130          16  AT-CHECK-NO                 PIC X(7).
+00131          16  AT-PAID-FROM-DT             PIC XX.
+00132          16  AT-PAID-THRU-DT             PIC XX.
+00133          16  AT-DAYS-IN-PERIOD           PIC S9(4)     COMP.
+013017         16  AT-ACH-PAYMENT              PIC X.
+013017*        16  FILLER                      PIC X.
+00135          16  AT-PAYEES-NAME              PIC X(30).
+00136          16  AT-PAYMENT-ORIGIN           PIC X.
+00137              88  ONLINE-MANUAL-PMT              VALUE '1'.
+00138              88  ONLINE-AUTO-PMT                VALUE '2'.
+00139              88  OFFLINE-PMT                    VALUE '3'.
+00140          16  AT-CHECK-WRITTEN-DT         PIC XX.
+00141          16  AT-TO-BE-WRITTEN-DT         PIC XX.
+00142          16  AT-VOID-DATA.
+00143              20  AT-VOID-DT              PIC XX.
+041807*00144       20  AT-VOID-REASON          PIC X(30).
+041807             20  AT-VOID-REASON          PIC X(26).
+041807         16  AT-PMT-APPROVED-BY          PIC X(04).
+00145          16  AT-ADDL-RESERVE             PIC S9(5)V99  COMP-3.
+00146          16  AT-EXPENSE-PER-PMT          PIC S9(5)V99  COMP-3.
+082807         16  AT-INT-RATE REDEFINES AT-EXPENSE-PER-PMT
+082807                                         PIC S99V9(5)  COMP-3.
+00147          16  AT-CREDIT-INTERFACE.
+00148              20  AT-PMT-SELECT-DT        PIC XX.
+00149                  88  PAYMENT-NOT-SELECTED  VALUE LOW-VALUE.
+00150              20  AT-PMT-ACCEPT-DT        PIC XX.
+00151                  88  PAYMENT-NOT-ACCEPTED  VALUE LOW-VALUE.
+00152              20  AT-VOID-SELECT-DT       PIC XX.
+00153                  88  VOID-NOT-SELECTED     VALUE LOW-VALUE.
+00154              20  AT-VOID-ACCEPT-DT       PIC XX.
+00155                  88  VOID-NOT-ACCEPTED     VALUE LOW-VALUE.
+00156
+00157          16  AT-CHECK-QUE-CONTROL        PIC S9(8)     COMP.
+00158                  88  PAYMENT-NOT-QUEUED           VALUE ZERO.
+00159                  88  CONVERSION-PAYMENT           VALUE +99999999.
+00160          16  AT-CHECK-QUE-SEQUENCE       PIC S9(4)     COMP.
+00161
+00162          16  AT-FORCE-CONTROL            PIC X.
+00163              88  PAYMENT-WAS-FORCED           VALUE '1'.
+00164          16  AT-PREV-LAST-PMT-DT         PIC XX.
+00165          16  AT-PREV-PAID-THRU-DT        PIC XX.
+00166          16  AT-PREV-LAST-PMT-AMT        PIC S9(7)V99  COMP-3.
+00167          16  AT-ELIMINATION-DAYS         PIC S999      COMP-3.
+00168          16  AT-DAILY-RATE               PIC S9(3)V99  COMP-3.
+00169          16  AT-BENEFIT-TYPE             PIC X.
+00170
+00171          16  AT-EXPENSE-TYPE             PIC X.
+00172          16  AT-PAYMENT-APPROVAL-SW      PIC X.
+00173
+00174          16  AT-PAYEE-TYPE-CD.
+00175              20  AT-PAYEE-TYPE           PIC X.
+00176                  88  INSURED-PAID           VALUE 'I'.
+00177                  88  BENEFICIARY-PAID       VALUE 'B'.
+00178                  88  ACCOUNT-PAID           VALUE 'A'.
+00179                  88  OTHER-1-PAID           VALUE 'O'.
+00180                  88  OTHER-2-PAID           VALUE 'Q'.
+00181                  88  DOCTOR-PAID            VALUE 'P'.
+00182                  88  EMPLOYER-PAID          VALUE 'E'.
+00183              20  AT-PAYEE-SEQ            PIC X.
+00184
+00185          16  AT-CASH-PAYMENT             PIC X.
+00186          16  AT-GROUPED-PAYMENT          PIC X.
+00187          16  AT-PAYMENT-NOTE-SEQ-NO      PIC S9(4)       COMP.
+00188          16  AT-APPROVAL-LEVEL-REQD      PIC X.
+00189          16  AT-APPROVED-LEVEL           PIC X.
+00190          16  AT-VOID-TYPE                PIC X.
+00191              88  AT-PAYMENT-WAS-STOPPED     VALUE 'S'.
+00192              88  AT-PAYMENT-WAS-VOIDED      VALUE 'V'.
+00193          16  AT-AIG-UNEMP-IND            PIC X.
+00194              88  AT-AIG-UNEMPLOYMENT-PMT    VALUE 'U'.
+00195          16  AT-ASSOCIATES               PIC X.
+00196              88  AT-AIG-INTERFACE           VALUE 'I' 'N'.
+00197              88  AT-AIG-NON-INTERFACE       VALUE 'A' 'M'.
+00198
+00199          16  AT-FORM-CTL-SEQ-NO          PIC S9(4)       COMP.
+00200          16  AT-CV-PMT-CODE              PIC X.
+00201              88  FULL-DEATH-PAYMENT         VALUE '1'.
+00202              88  HALF-DEATH-PAYMENT         VALUE '2'.
+00203              88  FULL-ADD-PAYMENT           VALUE '3'.
+00204              88  HALF-ADD-PAYMENT           VALUE '4'.
+00205              88  FULL-RIDER-PAYMENT         VALUE '5'.
+00206              88  HALF-RIDER-PAYMENT         VALUE '6'.
+00207              88  NON-CHG-EXP-PAYMENT        VALUE '7'.
+00208              88  ADDL-PAYMENT               VALUE '8'.
+00209
+00210          16  AT-EOB-CODE1                PIC XXX.
+00211          16  AT-EOB-CODE2                PIC XXX.
+00212          16  AT-EOB-CODE3                PIC XXX.
+020413         16  FILLER REDEFINES AT-EOB-CODE3.
+020413             20  AT-PRINT-CLM-FORM       PIC X.
+020413             20  AT-PRINT-SURVEY         PIC X.
+102413             20  AT-SPECIAL-RELEASE      PIC X.
+00213          16  AT-EOB-CODE4                PIC XXX.
+               16  FILLER REDEFINES AT-EOB-CODE4.
+                   20  AT-INT-PMT-SELECT-DT    PIC XX.
+                   20  FILLER                  PIC X.
+00214          16  AT-EOB-CODE5                PIC XXX.
+062806         16  FILLER REDEFINES AT-EOB-CODE5.
+062806             20  AT-PMT-PROOF-DT         PIC XX.
+062806             20  FILLER                  PIC X.
+00215
+071910         16  AT-PRINT-EOB-WITH-CHECK     PIC X.
+071910             88  AT-PRINT-EOB            VALUE 'Y'.
+00217
+00218          16  AT-PAYMENT-LAST-MAINT-DT    PIC XX.
+00219          16  AT-PAYMENT-LAST-UPDATED-BY  PIC X(4).
+00220
+00221      12  AT-AUTO-PAY-TR  REDEFINES  AT-TRAILER-BODY.
+00222          16  AT-SCHEDULE-START-DT        PIC XX.
+00223          16  AT-SCHEDULE-END-DT          PIC XX.
+00224          16  AT-TERMINATED-DT            PIC XX.
+00225          16  AT-LAST-PMT-TYPE            PIC X.
+00226              88  LAST-PMT-IS-FINAL              VALUE 'F'.
+00227              88  LAST-PMT-IS-PARTIAL            VALUE 'P'.
+00228          16  AT-FIRST-PMT-DATA.
+00229              20  AT-FIRST-PMT-AMT        PIC S9(7)V99  COMP-3.
+00230              20  AT-DAYS-IN-1ST-PMT      PIC S9(4)     COMP.
+00231              20  AT-1ST-PAY-THRU-DT      PIC XX.
+00232          16  AT-REGULAR-PMT-DATA.
+00233              20  AT-REGULAR-PMT-AMT      PIC S9(7)V99  COMP-3.
+00234              20  AT-DAYS-IN-REG-PMT      PIC S9(4)     COMP.
+00235              20  AT-INTERVAL-MONTHS      PIC S9(4)     COMP.
+00236          16  AT-AUTO-PAYEE-CD.
+00237              20  AT-AUTO-PAYEE-TYPE      PIC X.
+00238                  88  INSURED-PAID-AUTO      VALUE 'I'.
+00239                  88  BENEFICIARY-PAID-AUTO  VALUE 'B'.
+00240                  88  ACCOUNT-PAID-AUTO      VALUE 'A'.
+00241                  88  OTHER-1-PAID-AUTO      VALUE 'O'.
+00242                  88  OTHER-2-PAID-AUTO      VALUE 'Q'.
+00243              20  AT-AUTO-PAYEE-SEQ       PIC X.
+00244          16  AT-AUTO-PAY-DAY             PIC 99.
+00245          16  AT-AUTO-CASH                PIC X.
+00246              88  AT-CASH                      VALUE 'Y'.
+00247              88  AT-NON-CASH                  VALUE 'N'.
+070909*        16  FILLER                      PIC X(129).
+070909         16  AT-AUTO-END-LETTER          PIC X(4).
+070909         16  FILLER                      PIC X(125).
+00249
+00250          16  AT-AUTO-PAY-LAST-MAINT-DT   PIC XX.
+00251          16  AT-AUTO-PAY-LAST-UPDATED-BY PIC X(4).
+00252
+00253      12  AT-CORRESPONDENCE-TR  REDEFINES  AT-TRAILER-BODY.
+00254          16  AT-LETTER-SENT-DT           PIC XX.
+00255          16  AT-RECEIPT-FOLLOW-UP        PIC XX.
+00256          16  AT-AUTO-RE-SEND-DT          PIC XX.
+00257          16  AT-LETTER-ANSWERED-DT       PIC XX.
+00258          16  AT-LETTER-ARCHIVE-NO        PIC S9(8)     COMP.
+00259          16  AT-LETTER-ORIGIN            PIC X.
+00260              88  ONLINE-CREATION              VALUE '1' '3'.
+00261              88  OFFLINE-CREATION             VALUE '2' '4'.
+                   88  NAPER-ONLINE-CREATION        VALUE '3'.
+                   88  NAPER-OFFLINE-CREATION       VALUE '4'.
+00262          16  AT-STD-LETTER-FORM          PIC X(4).
+00263          16  AT-REASON-TEXT              PIC X(70).
+00264          16  AT-ADDRESS-REC-SEQ-NO       PIC S9(4)     COMP.
+00265          16  AT-ADDRESEE-TYPE            PIC X.
+00266               88  INSURED-ADDRESEE            VALUE 'I'.
+00267               88  BENEFICIARY-ADDRESEE        VALUE 'B'.
+00268               88  ACCOUNT-ADDRESEE            VALUE 'A'.
+00269               88  PHYSICIAN-ADDRESEE          VALUE 'P'.
+00270               88  EMPLOYER-ADDRESEE           VALUE 'E'.
+00271               88  OTHER-ADDRESEE-1            VALUE 'O'.
+00272               88  OTHER-ADDRESEE-2            VALUE 'Q'.
+00273          16  AT-ADDRESSEE-NAME           PIC X(30).
+00274          16  AT-INITIAL-PRINT-DATE       PIC XX.
+00275          16  AT-RESEND-PRINT-DATE        PIC XX.
+00276          16  AT-CORR-SOL-UNSOL           PIC X.
+00277          16  AT-LETTER-PURGED-DT         PIC XX.
+CIDMOD*
+CIDMOD*FOLLOWING CID CHGS REENTERED AS DMD CHGS OVERLAID THEM.
+CIDMOD*
+CIDMOD         16  AT-CSO-REDEFINITION.
+040110             20  AT-RESEND-LETTER-FORM   PIC X(4).
+040110             20  AT-AUTO-CLOSE-IND       PIC X(1).
+040110             20  AT-LETTER-TO-BENE       PIC X(1).
+102610             20  AT-STOP-LETTER-DT       PIC X(2).
+062217             20  AT-AUTH-RCVD            PIC X(1).
+062217             20  FILLER                  PIC X(18).
+040110*             20  FILLER                  PIC X(27).
+CIDMOD             20  AT-CSO-LETTER-STATUS    PIC X.
+CIDMOD                 88  AT-CSO-LETTER-ONLINE    VALUE '1'.
+CIDMOD                 88  AT-CSO-LETTER-PURGED    VALUE '2'.
+CIDMOD                 88  AT-CSO-LETTER-RELOADED  VALUE '3'.
+CIDMOD             20  AT-CSO-LETTER-PURGE-DATE   PIC XX.
+CIDMOD             20  AT-CSO-LETTER-RELOAD-DATE  PIC XX.
+CIDMOD*
+CIDMOD*FOLLOWING DMD CHGS COMMENTED OUT AS THEY OVERLAY CID MODS NEEDED
+CIDMOD*
+CIDMOD*        16  FILLER                      PIC X(26).
+CIDMOD*
+CIDMOD*        16  AT-DMD-BSR-CODE             PIC X.
+CIDMOD*            88  AT-AUTOMATED-BSR              VALUE 'A'.
+CIDMOD*            88  AT-NON-AUTOMATED-BSR          VALUE 'B' ' '.
+CIDMOD*
+CIDMOD*        16  AT-DMD-LETTER-STATUS        PIC X.
+CIDMOD*            88  AT-DMD-LETTER-ONLINE          VALUE '1'.
+CIDMOD*            88  AT-DMD-LETTER-PURGED          VALUE '2'.
+CIDMOD*            88  AT-DMD-LETTER-RELOADED        VALUE '3'.
+CIDMOD*        16  AT-DMD-LETTER-PURGE-DT      PIC XX.
+CIDMOD*        16  AT-DMD-LETTER-RELOAD-DT     PIC XX.
+00290
+00291          16  AT-CORR-LAST-MAINT-DT       PIC XX.
+00292          16  AT-CORR-LAST-UPDATED-BY     PIC X(4).
+00293
+00294      12  AT-ADDRESS-TR  REDEFINES  AT-TRAILER-BODY.
+00295          16  AT-ADDRESS-TYPE             PIC X.
+00296              88  INSURED-ADDRESS               VALUE 'I'.
+00297              88  BENEFICIARY-ADDRESS           VALUE 'B'.
+00298              88  ACCOUNT-ADDRESS               VALUE 'A'.
+00299              88  PHYSICIAN-ADDRESS             VALUE 'P'.
+00300              88  EMPLOYER-ADDRESS              VALUE 'E'.
+00301              88  OTHER-ADDRESS-1               VALUE 'O'.
+00302              88  OTHER-ADDRESS-2               VALUE 'Q'.
+00303          16  AT-MAIL-TO-NAME             PIC X(30).
+00304          16  AT-ADDRESS-LINE-1           PIC X(30).
+00305          16  AT-ADDRESS-LINE-2           PIC X(30).
+00306          16  AT-CITY-STATE.
+                   20  AT-CITY                 PIC X(28).
+                   20  AT-STATE                PIC XX.
+00307          16  AT-ZIP.
+00308              20  AT-ZIP-CODE.
+00309                  24  AT-ZIP-1ST          PIC X.
+00310                      88  AT-CANADIAN-POST-CODE VALUE 'A' THRU 'Z'.
+00311                  24  FILLER              PIC X(4).
+00312              20  AT-ZIP-PLUS4            PIC X(4).
+00313          16  AT-CANADIAN-POSTAL-CODE  REDEFINES  AT-ZIP.
+00314              20  AT-CAN-POSTAL-1         PIC XXX.
+00315              20  AT-CAN-POSTAL-2         PIC XXX.
+00316              20  FILLER                  PIC XXX.
+00317          16  AT-PHONE-NO                 PIC 9(11)     COMP-3.
+061511*         16  FILLER                      PIC X(23).
+061511         16  AT-VFY-2ND-BENE-SSN         PIC X(9).
+061511         16  AT-VFY-2ND-BENE-VERIFIED    PIC X.
+061511         16  FILLER                      PIC X(13).
+00319          16  AT-ADDRESS-LAST-MAINT-DT    PIC XX.
+00320          16  AT-ADDRESS-LAST-UPDATED-BY  PIC X(4).
+00321
+00322      12  AT-GENERAL-INFO-TR  REDEFINES  AT-TRAILER-BODY.
+00323          16  AT-INFO-LINE-1              PIC X(60).
+061013         16  FILLER REDEFINES AT-INFO-LINE-1.
+061013             20  AT-NOTE-ERROR-NO OCCURS 15
+061013                                         PIC X(4).
+00324          16  AT-INFO-LINE-2              PIC X(60).
+040814         16  FILLER REDEFINES AT-INFO-LINE-2.
+040814             20  AT-ICD-CODE-1           PIC X(8).
+040814             20  AT-ICD-CODE-2           PIC X(8).
+040814             20  FILLER                  PIC X(44).
+00325          16  AT-INFO-TRAILER-TYPE        PIC X.
+061013             88  AT-ERRORS-NOTE          VALUE 'E'.
+00326              88  AT-PAYMENT-NOTE         VALUE 'P'.
+00327              88  AT-CALL-NOTE            VALUE 'C'.
+00328              88  AT-MAINT-NOTE           VALUE 'M'.
+00329              88  AT-CERT-CHANGE          VALUE 'X'.
+080106             88  AT-APPROVAL-NOTE        VALUE 'R'.
+080106             88  AT-NOTE-FILE-NOTE       VALUE 'N'.
+022614             88  AT-CERT-CANCELLED       VALUE 'T'.
+00330          16  AT-CALL-TYPE                PIC X.
+00331              88  AT-PHONE-CALL-IN        VALUE 'I'.
+102418             88  AT-PHONE-CALL-NEW       VALUE 'N'.
+00332              88  AT-PHONE-CALL-OUT       VALUE 'O'.
+00333          16  AT-NOTE-CONTINUATION        PIC X.
+00334              88  AT-CONTINUED-NOTE       VALUE 'X'.
+071910         16  AT-EOB-CODES-EXIST          PIC X.
+071910             88  AT-EOB-CODES-PRESENT    VALUE 'Y'.
+00335          16  FILLER                      PIC X(35).
+00336          16  AT-GEN-INFO-LAST-MAINT-DT   PIC XX.
+00337          16  AT-GEN-INFO-LAST-UPDATED-BY PIC X(4).
+00338
+00339      12  AT-AUTO-PROMPT-TR  REDEFINES  AT-TRAILER-BODY.
+00340          16  AT-PROMPT-LINE-1            PIC X(60).
+00341          16  AT-PROMPT-LINE-2            PIC X(60).
+00342          16  AT-PROMPT-START-DT          PIC XX.
+00343          16  AT-PROMPT-END-DT            PIC XX.
+00344          16  FILLER                      PIC X(35).
+00345          16  AT-PROMPT-LAST-MAINT-DT     PIC XX.
+00346          16  AT-PROMPT-LAST-UPDATED-BY   PIC X(4).
+00347
+00348      12  AT-DENIAL-INFO-TR  REDEFINES  AT-TRAILER-BODY.
+00349          16  AT-DENIAL-INFO-1            PIC X(60).
+00350          16  AT-DENIAL-INFO-2            PIC X(60).
+00351          16  AT-DENIAL-DT                PIC XX.
+00352          16  AT-RETRACTION-DT            PIC XX.
+00353          16  AT-DENIAL-REASON-CODE       PIC X(4).
+050506*         16  FILLER                      PIC X(31).
+050506         16  AT-DENIAL-PROOF-DT          PIC XX.
+050506         16  FILLER                      PIC X(29).
+00355          16  AT-DENIAL-LAST-MAINT-DT     PIC XX.
+00356          16  AT-DENIAL-LAST-UPDATED-BY   PIC X(4).
+00357
+00358      12  AT-INCURRED-CHG-TR  REDEFINES  AT-TRAILER-BODY.
+00359          16  AT-OLD-INCURRED-DT          PIC XX.
+00360          16  AT-OLD-REPORTED-DT          PIC XX.
+00361          16  AT-OLD-ESTABLISHED-DT       PIC XX.
+00362          16  AT-OLD-TOTAL-PAID           PIC S9(7)V99     COMP-3.
+00363          16  AT-OLD-DAYS-PAID            PIC S9(4)        COMP.
+00364          16  AT-OLD-NO-OF-PMTS           PIC S9(3)        COMP-3.
+00365          16  AT-OLD-PAID-THRU-DT         PIC XX.
+00366          16  AT-LAST-PMT-MADE-DT         PIC XX.
+00367          16  FILLER                      PIC X(26).
+00368          16  AT-OLD-DIAG-CODE            PIC X(6).
+00369          16  AT-TRAILER-CNT-AT-CHG       PIC S9(4)        COMP.
+00370          16  AT-OLD-ITD-PAID-EXPENSE     PIC S9(5)V99     COMP-3.
+00371          16  AT-OLD-CHARGABLE-EXPENSE    PIC S9(5)V99     COMP-3.
+00372          16  AT-OLD-INIT-MAN-RESV        PIC S9(7)V99     COMP-3.
+00373          16  AT-OLD-CURRENT-MAN-RESV     PIC S9(7)V99     COMP-3.
+00374          16  AT-OLD-ADDL-MAN-RESV        PIC S9(7)V99     COMP-3.
+00375          16  AT-OLD-DIAG-DESCRIP         PIC X(60).
+040814         16  AT-OLD-ICD-CODE-1           PIC X(8).
+040814         16  AT-OLD-ICD-CODE-2           PIC X(8).
+040814         16  FILLER                      PIC X(9).
+00377          16  AT-INCURRED-LAST-UPDATED-BY PIC X(4).
+00378
+00379      12  AT-FORM-CONTROL-TR  REDEFINES  AT-TRAILER-BODY.
+00380          16  AT-FORM-SEND-ON-DT          PIC XX.
+00381          16  AT-FORM-FOLLOW-UP-DT        PIC XX.
+00382          16  AT-FORM-RE-SEND-DT          PIC XX.
+00383          16  AT-FORM-ANSWERED-DT         PIC XX.
+00384          16  AT-FORM-PRINTED-DT          PIC XX.
+00385          16  AT-FORM-REPRINT-DT          PIC XX.
+00386          16  AT-FORM-TYPE                PIC X.
+00387              88  INITIAL-FORM                  VALUE '1'.
+00388              88  PROGRESS-FORM                 VALUE '2'.
+00389          16  AT-INSTRUCT-LN-1            PIC X(28).
+00390          16  AT-INSTRUCT-LN-2            PIC X(28).
+00391          16  AT-INSTRUCT-LN-3            PIC X(28).
+00392          16  AT-FORM-ADDR-SEQ-NO         PIC S9(4)      COMP.
+00393          16  AT-FORM-ADDRESS             PIC X.
+00394              88  FORM-TO-INSURED              VALUE 'I'.
+00395              88  FORM-TO-ACCOUNT              VALUE 'A'.
+00396              88  FORM-TO-OTHER-1              VALUE 'O'.
+00397              88  FORM-TO-OTHER-2              VALUE 'Q'.
+00398          16  AT-RELATED-1.
+00399              20 AT-REL-CARR-1            PIC X.
+00400              20 AT-REL-CLAIM-1           PIC X(7).
+00401              20 AT-REL-CERT-1            PIC X(11).
+00402          16  AT-RELATED-2.
+00403              20 AT-REL-CARR-2            PIC X.
+00404              20 AT-REL-CLAIM-2           PIC X(7).
+00405              20 AT-REL-CERT-2            PIC X(11).
+00406          16  AT-EMP-FORM-SEND-ON-DT      PIC XX.
+00407          16  AT-PHY-FORM-SEND-ON-DT      PIC XX.
+00408          16  AT-EMP-FORM-ANSWERED-DT     PIC XX.
+00409          16  AT-PHY-FORM-ANSWERED-DT     PIC XX.
+00410          16  AT-FORM-REM-PRINT-DT        PIC XX.
+102610         16  AT-STOP-FORM-DT             PIC X(2).
+00411
+102610         16  FILLER                      PIC X(09).
+00413          16  AT-FORM-LAST-MAINT-DT       PIC XX.
+00414          16  AT-FORM-LAST-UPDATED-BY     PIC X(4).
+00415 ******************************************************************
+01004      EJECT
+01005 *                                COPY ELCCERT.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            ELCCERT.                            *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+00005 *                            VMOD=2.013                          *
+00006 *                                                                *
+00007 *   FILE DESCRIPTION = CERTIFICATE MASTER                        *
+00008 *                                                                *
+00009 *   FILE TYPE = VSAM,KSDS                                        *
+00010 *   RECORD SIZE = 450  RECFORM = FIXED                           *
+00011 *                                                                *
+00012 *   BASE CLUSTER = ELCERT                         RKP=2,LEN=33   *
+00013 *       ALTERNATE PATH1 = ELCERT2 (BY NAME)       RKP=35,LEN=18  *
+00014 *       ALTERNATE PATH2 = ELCERT3 (BY SOC SEC NO) RKP=53,LEN=12  *
+00015 *       ALTERNATE PATH3 = ELCERT5 (BY CERT NO.)   RKP=65,LEN=12  *
+00016 *       ALTERNATE PATH4 = ELCERT6 (BY MEMBER NO.) RKP=77,LEN=13  *
+00017 *                                                                *
+00018 *   LOG = YES                                                    *
+00019 *   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+122002******************************************************************
+122002*                   C H A N G E   L O G
+122002*
+122002* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+122002*-----------------------------------------------------------------
+122002*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+122002* EFFECTIVE    NUMBER
+122002*-----------------------------------------------------------------
+122002* 122002                   PEMA  ADD MONTHLY PRODUCT PROCESSING
+040504* 040504  CR2003080800002  PEMA  ADD DEALER INCENTIVE PROCESSING
+061405* 061405  CR2005060300001  PEMA  ADD CLP STATE PROCESS FOR DCC
+110105* 110105    2005071200004  PEMA  INCREASE SIZE OF LOAN OFFICER
+072308* 072308  CR2007110500003  PEMA  ADD NH REFUND INTEREST PROCESSING
+102109* 102109  CR2008100900003  AJRA  ADD CLAIM CERT NOTE IND
+011410* 011410  CR2009050700003  PEMA  ADD SPP DEALER DIRECT
+032612* 032612  CR2011110200001  PEMA  AHL CHANGES
+090314* 090314  CR2014081300001  PEMA  LOAD CERTS INVOLVED IN THAO
+010716* 010716  CR2015082500001  PEMA CHG POLICY FEE TO CANCEL FEE
+062017* 062017  CR2015091000001  PEMA RENAME INTEREST FIELD
+122002******************************************************************
+00021
+00022  01  CERTIFICATE-MASTER.
+00023      12  CM-RECORD-ID                      PIC XX.
+00024          88  VALID-CM-ID                      VALUE 'CM'.
+00025
+00026      12  CM-CONTROL-PRIMARY.
+00027          16  CM-COMPANY-CD                 PIC X.
+00028          16  CM-CARRIER                    PIC X.
+00029          16  CM-GROUPING.
+00030              20  CM-GROUPING-PREFIX        PIC X(3).
+00031              20  CM-GROUPING-PRIME         PIC X(3).
+00032          16  CM-STATE                      PIC XX.
+00033          16  CM-ACCOUNT.
+00034              20  CM-ACCOUNT-PREFIX         PIC X(4).
+00035              20  CM-ACCOUNT-PRIME          PIC X(6).
+00036          16  CM-CERT-EFF-DT                PIC XX.
+00037          16  CM-CERT-NO.
+00038              20  CM-CERT-PRIME             PIC X(10).
+00039              20  CM-CERT-SFX               PIC X.
+00040
+00041      12  CM-CONTROL-BY-NAME.
+00042          16  CM-COMPANY-CD-A1              PIC X.
+00043          16  CM-INSURED-LAST-NAME          PIC X(15).
+00044          16  CM-INSURED-INITIALS.
+00045              20  CM-INSURED-INITIAL1       PIC X.
+00046              20  CM-INSURED-INITIAL2       PIC X.
+00047
+00048      12  CM-CONTROL-BY-SSN.
+00049          16  CM-COMPANY-CD-A2              PIC X.
+00050          16  CM-SOC-SEC-NO.
+00051              20  CM-SSN-STATE              PIC XX.
+00052              20  CM-SSN-ACCOUNT            PIC X(6).
+00053              20  CM-SSN-LN3.
+00054                  25  CM-INSURED-INITIALS-A2.
+00055                      30 CM-INSURED-INITIAL1-A2   PIC X.
+00056                      30 CM-INSURED-INITIAL2-A2   PIC X.
+00057                  25 CM-PART-LAST-NAME-A2         PIC X.
+00058
+00059      12  CM-CONTROL-BY-CERT-NO.
+00060          16  CM-COMPANY-CD-A4              PIC X.
+00061          16  CM-CERT-NO-A4                 PIC X(11).
+00062
+00063      12  CM-CONTROL-BY-MEMB.
+00064          16  CM-COMPANY-CD-A5              PIC X.
+00065          16  CM-MEMBER-NO.
+00066              20  CM-MEMB-STATE             PIC XX.
+00067              20  CM-MEMB-ACCOUNT           PIC X(6).
+00068              20  CM-MEMB-LN4.
+00069                  25  CM-INSURED-INITIALS-A5.
+00070                      30 CM-INSURED-INITIAL1-A5   PIC X.
+00071                      30 CM-INSURED-INITIAL2-A5   PIC X.
+00072                  25 CM-PART-LAST-NAME-A5         PIC XX.
+00073
+00074      12  CM-INSURED-PROFILE-DATA.
+00075          16  CM-INSURED-FIRST-NAME.
+00076              20  CM-INSURED-1ST-INIT       PIC X.
+00077              20  FILLER                    PIC X(9).
+00078          16  CM-INSURED-ISSUE-AGE          PIC 99.
+00079          16  CM-INSURED-SEX                PIC X.
+00080              88  CM-SEX-MALE                  VALUE 'M'.
+00081              88  CM-SEX-FEMAL                 VALUE 'F'.
+00082          16  CM-INSURED-JOINT-AGE          PIC 99.
+00083          16  CM-JOINT-INSURED-NAME.
+00084              20  CM-JT-LAST-NAME           PIC X(15).
+00085              20  CM-JT-FIRST-NAME.
+00086                  24  CM-JT-1ST-INIT        PIC X.
+00087                  24  FILLER                PIC X(9).
+00088              20  CM-JT-INITIAL             PIC X.
+00089
+00090      12  CM-LIFE-DATA.
+00091          16  CM-LF-BENEFIT-CD              PIC XX.
+00092          16  CM-LF-ORIG-TERM               PIC S999      COMP-3.
+00093          16  CM-LF-CRITICAL-PERIOD         PIC S999      COMP-3.
+00094          16  CM-LF-TERM-IN-DAYS            PIC S9(5)     COMP-3.
+00095          16  CM-LF-DEV-CODE                PIC XXX.
+00096          16  CM-LF-DEV-PCT                 PIC S9V9(6)   COMP-3.
+00097          16  CM-LF-BENEFIT-AMT             PIC S9(9)V99  COMP-3.
+00098          16  CM-LF-PREMIUM-AMT             PIC S9(7)V99  COMP-3.
+00099          16  CM-LF-ALT-BENEFIT-AMT         PIC S9(9)V99  COMP-3.
+00100          16  CM-LF-ALT-PREMIUM-AMT         PIC S9(7)V99  COMP-3.
+00101          16  CM-LF-NSP-PREMIUM-AMT         PIC S9(7)V99  COMP-3.
+00102          16  CM-LF-REMAINING-AMT           PIC S9(9)V99  COMP-3.
+00103          16  CM-LF-ITD-CANCEL-AMT          PIC S9(7)V99  COMP-3.
+00104          16  CM-LF-ITD-DEATH-AMT           PIC S9(9)V99  COMP-3.
+00105          16  CM-LF-PREMIUM-RATE            PIC S99V9(5)  COMP-3.
+00106          16  CM-LF-POLICY-FEE              PIC S9(3)V99  COMP-3.
+00107          16  CM-LF-ALT-PREMIUM-RATE        PIC S99V9(5)  COMP-3.
+090314         16  cm-temp-epiq                  pic xx.
+090314             88  EPIQ-CLASS                  value 'EQ'.
+090314*        16  FILLER                        PIC XX.
+00109
+00110      12  CM-AH-DATA.
+00111          16  CM-AH-BENEFIT-CD              PIC XX.
+00112          16  CM-AH-ORIG-TERM               PIC S999      COMP-3.
+00113          16  CM-AH-CRITICAL-PERIOD         PIC S999      COMP-3.
+00114          16  CM-AH-DEV-CODE                PIC XXX.
+00115          16  CM-AH-DEV-PCT                 PIC S9V9(6)   COMP-3.
+00116          16  CM-AH-BENEFIT-AMT             PIC S9(7)V99  COMP-3.
+00117          16  CM-AH-PREMIUM-AMT             PIC S9(7)V99  COMP-3.
+00118          16  CM-AH-NSP-PREMIUM-AMT         PIC S9(7)V99  COMP-3.
+00119          16  CM-AH-ITD-CANCEL-AMT          PIC S9(7)V99  COMP-3.
+00120          16  CM-AH-ITD-LUMP-PMT            PIC S9(7)V99  COMP-3.
+00121          16  CM-AH-ITD-AH-PMT              PIC S9(9)V99  COMP-3.
+00122          16  CM-AH-PAID-THRU-DT            PIC XX.
+00123              88  NO-AH-CLAIMS-PAID            VALUE LOW-VALUE.
+00124          16  CM-AH-PREMIUM-RATE            PIC S99V9(5)  COMP-3.
+010716         16  CM-CANCEL-FEE                 PIC S9(3)V99  COMP-3.
+00126          16  CM-AH-CEDED-BENEFIT           PIC S9(7)V99  COMP-3.
+00127          16  FILLER                        PIC X.
+00128
+00129      12  CM-LOAN-INFORMATION.
+00130          16  CM-LIVES                      PIC S9(7)     COMP-3.
+011410         16  CM-DDF-IU-RATE-UP REDEFINES CM-LIVES
+011410                                           PIC S9(5)V99  COMP-3.
+00131          16  CM-BILLED                     PIC S9(7)     COMP-3.
+00132          16  CM-LOAN-APR                   PIC S999V9(4) COMP-3.
+00133          16  CM-PAY-FREQUENCY              PIC S99.
+00134          16  CM-LOAN-TERM                  PIC S999      COMP-3.
+00135          16  CM-RATE-CLASS                 PIC XX.
+00136          16  CM-BENEFICIARY                PIC X(25).
+00137          16  CM-POLICY-FORM-NO             PIC X(12).
+00138          16  CM-PMT-EXTENSION-DAYS         PIC S999      COMP-3.
+00139          16  CM-LAST-ADD-ON-DT             PIC XX.
+00140          16  CM-DEDUCTIBLE-AMOUNTS.
+00141              20  CM-CLAIM-DEDUCT-WITHHELD  PIC S9(5)V99  COMP-3.
+00142              20  CM-CANCEL-DEDUCT-WITHHELD PIC S9(5)V99  COMP-3.
+00143          16  CM-RESIDENT-RATE REDEFINES CM-DEDUCTIBLE-AMOUNTS.
+00144              20  CM-RESIDENT-STATE         PIC XX.
+00145              20  CM-RATE-CODE              PIC X(4).
+00146              20  FILLER                    PIC XX.
+110105         16  FILLER REDEFINES CM-DEDUCTIBLE-AMOUNTS.
+110105             20  CM-LOAN-OFFICER           PIC X(5).
+110105             20  FILLER                    PIC XXX.
+00147          16  CM-CSR-CODE                   PIC XXX.
+00148          16  CM-UNDERWRITING-CODE          PIC X.
+00149              88  CM-POLICY-UNDERWRITTEN       VALUE 'Y'.
+081606         16  CM-POST-CARD-IND              PIC X.
+062017         16  CM-REF-INTERFACE-SW           PIC X.
+00151          16  CM-PREMIUM-TYPE               PIC X.
+00152              88  CM-SING-PRM                  VALUE '1'.
+00153              88  CM-O-B-COVERAGE              VALUE '2'.
+00154              88  CM-OPEN-END                  VALUE '3'.
+00155          16  CM-IND-GRP-TYPE               PIC X.
+00156              88  CM-INDIVIDUAL                VALUE 'I'.
+00157              88  CM-GROUP                     VALUE 'G'.
+00158          16  CM-SKIP-CODE                  PIC X.
+00159              88  NO-MONTHS-SKIPPED            VALUE SPACE.
+00160              88  SKIP-JULY                    VALUE '1'.
+00161              88  SKIP-AUGUST                  VALUE '2'.
+00162              88  SKIP-SEPTEMBER               VALUE '3'.
+00163              88  SKIP-JULY-AUG                VALUE '4'.
+00164              88  SKIP-AUG-SEPT                VALUE '5'.
+00165              88  SKIP-JULY-AUG-SEPT           VALUE '6'.
+00166              88  SKIP-JUNE-JULY-AUG           VALUE '7'.
+00167              88  SKIP-JUNE                    VALUE '8'.
+00168              88  SKIP-JUNE-JULY               VALUE '9'.
+00169              88  SKIP-AUG-SEPT-OCT            VALUE 'A'.
+00170              88  SKIP-BI-WEEKLY-3RD-PMT       VALUE 'X'.
+00171          16  CM-PAYMENT-MODE               PIC X.
+00172              88  PAY-MONTHLY                  VALUE SPACE.
+00173              88  PAY-WEEKLY                   VALUE '1'.
+00174              88  PAY-SEMI-MONTHLY             VALUE '2'.
+00175              88  PAY-BI-WEEKLY                VALUE '3'.
+00176              88  PAY-SEMI-ANUALLY             VALUE '4'.
+00177          16  CM-LOAN-NUMBER                PIC X(8).
+00178          16  CM-LOAN-BALANCE               PIC S9(7)V99  COMP-3.
+110105         16  CM-OLD-LOF                    PIC XXX.
+00179 *        16  CM-LOAN-OFFICER               PIC XXX.
+00180          16  CM-REIN-TABLE                 PIC XXX.
+00181          16  CM-SPECIAL-REIN-CODE          PIC X.
+00182          16  CM-LF-LOAN-EXPIRE-DT          PIC XX.
+00183          16  CM-AH-LOAN-EXPIRE-DT          PIC XX.
+00184          16  CM-LOAN-1ST-PMT-DT            PIC XX.
+00185
+00186      12  CM-STATUS-DATA.
+00187          16  CM-ENTRY-STATUS               PIC X.
+00188          16  CM-ENTRY-DT                   PIC XX.
+00189
+00190          16  CM-LF-STATUS-AT-CANCEL        PIC X.
+00191          16  CM-LF-CANCEL-DT               PIC XX.
+00192          16  CM-LF-CANCEL-EXIT-DT          PIC XX.
+00193
+00194          16  CM-LF-STATUS-AT-DEATH         PIC X.
+00195          16  CM-LF-DEATH-DT                PIC XX.
+00196          16  CM-LF-DEATH-EXIT-DT           PIC XX.
+00197
+00198          16  CM-LF-CURRENT-STATUS          PIC X.
+00199              88  CM-LF-POLICY-IS-ACTIVE       VALUE '1' '2' '3'
+00200                                                 'M' '4' '5' '9'.
+00201              88  CM-LF-NORMAL-ENTRY           VALUE '1'.
+00202              88  CM-LF-POLICY-PENDING         VALUE '2'.
+00203              88  CM-LF-POLICY-IS-RESTORE      VALUE '3'.
+00204              88  CM-LF-CONVERSION-ENTRY       VALUE '4'.
+00205              88  CM-LF-POLICY-IS-REISSUE      VALUE '5'.
+                   88  CM-LF-POLICY-IS-CASH         VALUE 'C'.
+122002             88  CM-LF-POLICY-IS-MONTHLY      VALUE 'M'.
+00206              88  CM-LF-LUMP-SUM-DISAB         VALUE '6'.
+00207              88  CM-LF-DEATH-CLAIM-APPLIED    VALUE '7'.
+00208              88  CM-LF-CANCEL-APPLIED         VALUE '8'.
+00209              88  CM-LF-IS-REIN-ONLY           VALUE '9'.
+00210              88  CM-LF-DECLINED               VALUE 'D'.
+00211              88  CM-LF-VOIDED                 VALUE 'V'.
+00212
+00213          16  CM-AH-STATUS-AT-CANCEL        PIC X.
+00214          16  CM-AH-CANCEL-DT               PIC XX.
+00215          16  CM-AH-CANCEL-EXIT-DT          PIC XX.
+00216
+00217          16  CM-AH-STATUS-AT-SETTLEMENT    PIC X.
+00218          16  CM-AH-SETTLEMENT-DT           PIC XX.
+00219          16  CM-AH-SETTLEMENT-EXIT-DT      PIC XX.
+00220
+00221          16  CM-AH-CURRENT-STATUS          PIC X.
+00222              88  CM-AH-POLICY-IS-ACTIVE       VALUE '1' '2' '3'
+00223                                                 'M' '4' '5' '9'.
+00224              88  CM-AH-NORMAL-ENTRY           VALUE '1'.
+00225              88  CM-AH-POLICY-PENDING         VALUE '2'.
+00226              88  CM-AH-POLICY-IS-RESTORE      VALUE '3'.
+00227              88  CM-AH-CONVERSION-ENTRY       VALUE '4'.
+00228              88  CM-AH-POLICY-IS-REISSUE      VALUE '5'.
+                   88  CM-AH-POLICY-IS-CASH         VALUE 'C'.
+122002             88  CM-AH-POLICY-IS-MONTHLY      VALUE 'M'.
+00229              88  CM-AH-LUMP-SUM-DISAB         VALUE '6'.
+00230              88  CM-AH-DEATH-CLAIM-APPLIED    VALUE '7'.
+00231              88  CM-AH-CANCEL-APPLIED         VALUE '8'.
+00232              88  CM-AH-IS-REIN-ONLY           VALUE '9'.
+00233              88  CM-AH-DECLINED               VALUE 'D'.
+00234              88  CM-AH-VOIDED                 VALUE 'V'.
+00235
+00236          16  CM-CLAIM-INTERFACE-SW         PIC X.
+00237              88  NO-CLAIM-ATTACHED            VALUE SPACE.
+00238              88  CERT-AND-CLAIM-ONLINE        VALUE '1'.
+00239              88  CERT-WAS-CREATED-FOR-CLAIM   VALUE '2'.
+00240          16  CM-CLAIM-ATTACHED-COUNT       PIC S9(4)     COMP.
+00241
+00242          16  CM-ENTRY-BATCH                PIC X(6).
+00243          16  CM-LF-EXIT-BATCH              PIC X(6).
+00244          16  CM-AH-EXIT-BATCH              PIC X(6).
+00245          16  CM-LAST-MONTH-END             PIC XX.
+00246
+00247      12  CM-NOTE-SW                        PIC X.
+00248          88  CERT-NOTES-ARE-NOT-PRESENT       VALUE ' '.
+00249          88  CERT-NOTES-PRESENT               VALUE '1'.
+00250          88  BILLING-NOTES-PRESENT            VALUE '2'.
+00251          88  CERT-BILLING-NOTES-PRESENT       VALUE '3'.
+102109         88  CLAIM-NOTES-PRESENT              VALUE '4'.
+102109         88  CLAIM-CERT-NOTES-PRESENT         VALUE '5'.
+102109         88  CLAIM-BILLING-NOTES-PRESENT      VALUE '6'.
+102109         88  CLAIM-CERT-BILL-NOTES-PRESENT    VALUE '7'.
+00252      12  CM-COMP-EXCP-SW                   PIC X.
+00253          88  COMPENSATION-SAME-AS-ACCT        VALUE ' '.
+00254          88  THIS-CERT-HAS-ERCOMM-ENTRY       VALUE '1'.
+00255      12  CM-INSURED-ADDRESS-SW             PIC X.
+00256          88  INSURED-ADDR-NOT-PRESENT         VALUE ' '.
+00257          88  INSURED-ADDR-PRESENT             VALUE '1'.
+00258
+011410*    12  CM-LF-CEDED-BENEFIT               PIC S9(7)V99   COMP-3.
+011410     12  CM-LF-CLP                         PIC S9(5)V99   COMP-3.
+011410     12  FILLER                            PIC X.
+00260
+011410*    12  CM-ISS-MICROFILM-NO               PIC S9(9)      COMP-3.
+011410     12  CM-AH-CLP                         PIC S9(5)V99   COMP-3.
+011410     12  FILLER                            PIC X.
+072308*    12  CM-CAN-MICROFILM-NO               PIC S9(9)      COMP-3.
+062017     12  CM-INT-ON-REFS                    PIC S9(7)V99   COMP-3.
+00263
+00264      12  CM-CREDIT-INTERFACE-SW-1          PIC X.
+00265          88  CERT-ADDED-BATCH                 VALUE ' '.
+00266          88  CERT-ADDED-ONLINE                VALUE '1'.
+00267          88  CERT-PEND-ISSUE-ERROR            VALUE '2'.
+00268          88  CERT-PURGED-OFFLINE              VALUE '3'.
+00269          88  CERT-PEND-ISSUE-RETURNED         VALUE '4'.
+00270      12  CM-CREDIT-INTERFACE-SW-2          PIC X.
+00271          88  CERT-AS-LOADED                   VALUE ' '.
+00272          88  CERT-CANCELLED-ONLINE            VALUE '1'.
+00273          88  CERT-CLAIM-ONLINE                VALUE '2'.
+00274          88  CERT-CLAIM-CANCEL-ONLINE         VALUE '3'.
+00275          88  CERT-PEND-CANCEL-ERROR           VALUE '4'.
+00276          88  CERT-PEND-CANCEL-VOID            VALUE '5'.
+00277          88  CERT-PEND-CAN-VOID-ERROR         VALUE '6'.
+00278          88  CERT-PEND-CANCEL-RETURNED        VALUE '7'.
+00279
+00280      12  CM-ACCOUNT-COMM-PCTS.
+00281          16  CM-LIFE-COMM-PCT              PIC SV9(5)    COMP-3.
+00282          16  CM-AH-COMM-PCT                PIC SV9(5)    COMP-3.
+00283
+00284      12  CM-USER-FIELD                     PIC X.
+040504     12  CM-ADDL-CLP                       PIC S9(5)V99  COMP-3.
+061405     12  CM-CLP-STATE                      PIC XX.
+032612     12  CM-LF-CLASS-CD REDEFINES CM-CLP-STATE PIC XX.
+061405     12  CM-USER-RESERVED                  PIC XXX.
+032612     12  FILLER REDEFINES CM-USER-RESERVED.
+032612         16  CM-AH-CLASS-CD                PIC XX.
+032612         16  F                             PIC X.
+00286 ******************************************************************
+01006      EJECT
+01007 *                                COPY ELCACTQ.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            ELCACTQ.                            *
+00004 *           PROGRAM REVIEWED FOR YEAR 2000 COMPLIANCE
+00005 *                            VMOD=2.004                          *
+00006 *                                                                *
+00007 *   FILE DESCRIPTION = ACTIVITY QUE FILE                         *
+00008 *                                                                *
+00009 *   FILE TYPE = VSAM,KSDS                                        *
+00010 *   RECORD SIZE = 60     RECFORM = FIXED                         *
+00011 *                                                                *
+00012 *   BASE CLUSTER NAME = ELACTQ             RKP=2,LEN=20          *
+00013 *       ALTERNATE INDEX = NONE                                   *
+00014 *                                                                *
+00015 *   LOG = YES                                                    *
+00016 *   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+CIDMOD*                                                                *
+CIDMOD*  NO  CID  MODS  IN  COPYBOOK  ELCACTQ                          *
+00017 ******************************************************************
+00018
+00019  01  ACTIVITY-QUE.
+00020      12  AQ-RECORD-ID                PIC XX.
+00021          88  VALID-AQ-ID                VALUE 'AQ'.
+00022
+00023      12  AQ-CONTROL-PRIMARY.
+00024          16  AQ-COMPANY-CD           PIC X.
+00025          16  AQ-CARRIER              PIC X.
+00026          16  AQ-CLAIM-NO             PIC X(7).
+00027          16  AQ-CERT-NO.
+00028              20  AQ-CERT-PRIME       PIC X(10).
+00029              20  AQ-CERT-SFX         PIC X.
+00030
+00031      12  AQ-PENDING-ACTIVITY-FLAGS.
+00032          88  NO-PENDING-ACTIVITY        VALUE SPACES.
+00033          16  AQ-PENDING-PAYMENT-FLAG PIC X.
+00034              88  PENDING-PAYMENTS       VALUE '1'.
+00035          16  AQ-PENDING-STATUS-FLAG  PIC X.
+00036              88  PENDING-FULL-PRINT     VALUE '1'.
+00037              88  PENDING-PART-PRINT     VALUE '2'.
+00038          16  AQ-PENDING-LETTER-FLAG  PIC X.
+00039              88  PENDING-LETTERS        VALUE '1'.
+00040          16  AQ-PENDING-CLAIM-RESTORE PIC X.
+00041              88  PENDING-RESTORE        VALUE 'C'.
+00042              88  PENDING-RESTORE-LETTER VALUE 'L'.
+00043
+00044      12  FILLER                      PIC X(20).
+00045
+00046      12  AQ-RESEND-DATE              PIC XX.
+00047      12  AQ-FOLLOWUP-DATE            PIC XX.
+00048      12  AQ-PAYMENT-COUNTER          PIC S9        COMP-3.
+00049      12  AQ-PMT-UNAPPROVED-COUNT     PIC S9        COMP-3.
+00050      12  AQ-AUTO-LETTER              PIC X(4).
+00051      12  FILLER                      PIC XX.
+00052      12  AQ-LAST-UPDATED-BY          PIC S9(4)     COMP.
+00053 *****************************************************************
+01008      EJECT
+01009 *                                COPY ERCACCT.
+00001 ******************************************************************
+00002 *                                                                *
+00002 *                                                                *
+00003 *                            ERCACCT                             *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+00005 *                            VMOD=2.031                          *
+00006 *                                                                *
+00007 *   CREDIT SYSTEM ACCOUNT MASTER FILE                            *
+00008 *                                                                *
+00009 *   THIS COPYBOOK IS USED FOR BOTH THE ONLINE AND BATCH          *
+00010 *   VSAM ACCOUNT MASTER FILES.                                   *
+00011 *                                                                *
+00012 *   FILE DESCRIPTION = ACCOUNT OR PRODUCER FILES                 *
+00013 *                                                                *
+00014 *   FILE TYPE = VSAM,KSDS                                        *
+00015 *   RECORD SIZE = 2000  RECFORM = FIX                            *
+00016 *                                                                *
+00017 *   BASE CLUSTER NAME = ERACCT                    RKP=2,LEN=26   *
+00018 *       ALTERNATE PATH1 = ERACCT2 (ALT GROUPING) RKP=28,LEN=26   *
+00019 *                                                                *
+00020 *   LOG = NO                                                     *
+00021 *   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+00022 *                                                                *
+00023 *                                                                *
+00024 ******************************************************************
+102004*                   C H A N G E   L O G
+102004*
+102004* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+102004*-----------------------------------------------------------------
+102004*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+102004* EFFECTIVE    NUMBER
+102004*-----------------------------------------------------------------
+102004* 102004    2003031400002  PEMA  ADD NEW STATUS CODE
+092705* 092705    2005050300006  PEMA  ADD SPP LEASES
+022808* 022808    2007083100002  PEMA  ADD FREEZE STATUS
+011410* 011410  CR2009050700003  PEMA  ADD SPP DEALER DIRECT
+030211* 030211  CR2010012100001  PEMA  ADD EMAILS FROM RDS
+031811* 031811  CR2011012700001  PEMA  ADD ACCT STATUS S - SUSPENDED
+101711* 101711  CR2011092000001  PEMA  ADD UNEARNED FACTOR STATE FOR DCC
+021916* 021916  CR2014010900001  TANA  ADD NEW STATUS CODE VALUES
+102004******************************************************************
+00025
+00026  01  ACCOUNT-MASTER.
+00027      12  AM-RECORD-ID                      PIC XX.
+00028          88  VALID-AM-ID                      VALUE 'AM'.
+00029
+00030      12  AM-CONTROL-PRIMARY.
+00031          16  AM-COMPANY-CD                 PIC X.
+00032          16  AM-MSTR-CNTRL.
+00033              20  AM-CONTROL-A.
+00034                  24  AM-CARRIER            PIC X.
+00035                  24  AM-GROUPING.
+00036                      28 AM-GROUPING-PREFIX PIC XXX.
+00037                      28 AM-GROUPING-PRIME  PIC XXX.
+00038                  24  AM-STATE              PIC XX.
+00039                  24  AM-ACCOUNT.
+00040                      28  AM-ACCOUNT-PREFIX PIC X(4).
+00041                      28  AM-ACCOUNT-PRIME  PIC X(6).
+00042              20  AM-CNTRL-1   REDEFINES   AM-CONTROL-A
+00043                                            PIC X(19).
+00044              20  AM-CNTRL-B.
+00045                  24  AM-EXPIRATION-DT      PIC XX.
+00046                  24  FILLER                PIC X(4).
+00047              20  AM-CNTRL-2 REDEFINES AM-CNTRL-B.
+00048                  24  AM-EXPIRE-DT          PIC 9(11)  COMP-3.
+00049
+00050      12  AM-CONTROL-BY-VAR-GRP.
+00051          16  AM-COMPANY-CD-A1              PIC X.
+00052          16  AM-VG-CARRIER                 PIC X.
+00053          16  AM-VG-GROUPING                PIC X(6).
+00054          16  AM-VG-STATE                   PIC XX.
+00055          16  AM-VG-ACCOUNT                 PIC X(10).
+00056          16  AM-VG-DATE.
+00057              20  AM-VG-EXPIRATION-DT       PIC XX.
+00058              20  FILLER                    PIC X(4).
+00059          16  AM-VG-EXP-DATE REDEFINES AM-VG-DATE
+00060                                            PIC 9(11)      COMP-3.
+030211     12  FILLER REDEFINES AM-CONTROL-BY-VAR-GRP.
+030211         16  FILLER                        PIC X(10).
+030211         16  AM-VG-KEY3.
+030211             20  AM-VG3-ACCOUNT            PIC X(10).
+030211             20  AM-VG3-EXP-DT             PIC XX.
+030211         16  FILLER                        PIC X(4).
+00061      12  AM-MAINT-INFORMATION.
+00062          16  AM-LAST-MAINT-DT              PIC XX.
+00063          16  AM-LAST-MAINT-HHMMSS          PIC S9(7)      COMP-3.
+00064          16  AM-LAST-MAINT-USER            PIC X(4).
+00065          16  FILLER                        PIC XX.
+00066
+00067      12  AM-EFFECTIVE-DT                   PIC XX.
+00068      12  AM-EFFECT-DT                      PIC 9(11)      COMP-3.
+00069
+00070      12  AM-PREV-DATES  COMP-3.
+00071          16  AM-PREV-EXP-DT                PIC 9(11).
+00072          16  AM-PREV-EFF-DT                PIC 9(11).
+00073
+00074      12  AM-REPORT-CODE-1                  PIC X(10).
+00075      12  AM-REPORT-CODE-2                  PIC X(10).
+00076
+00077      12  AM-CITY-CODE                      PIC X(4).
+00078      12  AM-COUNTY-PARISH                  PIC X(6).
+00079
+00080      12  AM-NAME                           PIC X(30).
+00081      12  AM-PERSON                         PIC X(30).
+00082      12  AM-ADDRS                          PIC X(30).
+00083      12  AM-CITY.
+               16  AM-ADDR-CITY                  PIC X(28).
+               16  AM-ADDR-STATE                 PIC XX.
+00084      12  AM-ZIP.
+00085          16  AM-ZIP-PRIME.
+00086              20  AM-ZIP-PRI-1ST            PIC X.
+00087                  88  AM-CANADIAN-POST-CODE    VALUE 'A' THRU 'Z'.
+00088              20  FILLER                    PIC X(4).
+00089          16  AM-ZIP-PLUS4                  PIC X(4).
+00090      12  AM-CANADIAN-POSTAL-CODE  REDEFINES  AM-ZIP.
+00091          16  AM-CAN-POSTAL-1               PIC XXX.
+00092          16  AM-CAN-POSTAL-2               PIC XXX.
+00093          16  FILLER                        PIC XXX.
+00094      12  AM-TEL-NO.
+00095          16  AM-AREA-CODE                  PIC 999.
+00096          16  AM-TEL-PRE                    PIC 999.
+00097          16  AM-TEL-NBR                    PIC 9(4).
+00098      12  AM-TEL-LOC                        PIC X.
+00099          88  AM-TEL-AT-HOME                   VALUE 'H'.
+00100          88  AM-TEL-AT-BUSINESS               VALUE 'B'.
+00101
+00102      12  AM-COMM-STRUCTURE.
+00103          16  AM-DEFN-1.
+00104              20  AM-AGT-COMMS       OCCURS 10 TIMES.
+00105                  24  AM-AGT.
+00106                      28  AM-AGT-PREFIX     PIC X(4).
+00107                      28  AM-AGT-PRIME      PIC X(6).
+00108                  24  AM-COM-TYP            PIC X.
+00109                  24  AM-L-COM              PIC SV9(5)     COMP-3.
+00110                  24  AM-J-COM              PIC SV9(5)     COMP-3.
+00111                  24  AM-A-COM              PIC SV9(5)     COMP-3.
+00112                  24  AM-RECALC-LV-INDIC    PIC X.
+00113                  24  AM-RETRO-LV-INDIC     PIC X.
+00114                  24  AM-GL-CODES           PIC X.
+00115                  24  AM-COMM-CHARGEBACK    PIC 9(02).
+00116                  24  FILLER                PIC X(01).
+00117          16  AM-DEFN-2   REDEFINES   AM-DEFN-1.
+00118              20  AM-COM-TBLS        OCCURS 10 TIMES.
+00119                  24  FILLER                PIC X(11).
+00120                  24  AM-L-COMA             PIC XXX.
+00121                  24  AM-J-COMA             PIC XXX.
+00122                  24  AM-A-COMA             PIC XXX.
+00123                  24  FILLER                PIC X(6).
+00124
+00125      12  AM-COMM-CHANGE-STATUS             PIC X.
+00126          88  AM-COMMISSIONS-CHANGED           VALUE '*'.
+00127
+00128      12  AM-CSR-CODE                       PIC X(4).
+00129
+00130      12  AM-BILLING-STATUS                 PIC X.
+00131          88  AM-ACCOUNT-BILLED                VALUE 'B'.
+00132          88  AM-ACCOUNT-NOT-BILLED            VALUE ' '.
+00133      12  AM-AUTO-REFUND-SW                 PIC X.
+00134          88  AUTO-REFUNDS-USED                VALUE 'Y'.
+00135          88  AUTO-REFUNDS-NOT-USED            VALUE 'N' ' '.
+00136      12  AM-GPCD                           PIC 99.
+00137      12  AM-IG                             PIC X.
+00138          88  AM-HAS-INDIVIDUAL                VALUE '1'.
+00139          88  AM-HAS-GROUP                     VALUE '2'.
+00140      12  AM-STATUS                         PIC X.
+00141          88  AM-ACCOUNT-ACTIVE                VALUE '0'.
+00142          88  AM-ACCOUNT-INACTIVE              VALUE '1'.
+00143          88  AM-ACCOUNT-TRANSFERRED           VALUE '2'.
+102004         88  AM-ACCOUNT-CANCELLED             VALUE '3'.
+022808         88  AM-ACCOUNT-FROZEN                VALUE '4'.
+031811         88  AM-ACCOUNT-SUSPENDED             VALUE '5'.
+021916         88  AM-ACCOUNT-DROPPED               VALUE '6'.
+021916         88  AM-ACCOUNT-LAPSED                VALUE '7'.
+021916         88  AM-ACCOUNT-RUN-OFF               VALUE '8'.
+021916         88  AM-ACCOUNT-PENDING               VALUE '9'.
+00144      12  AM-REMIT-TO                       PIC 99.
+00145      12  AM-ID-NO                          PIC X(11).
+00146
+00147      12  AM-CAL-TABLE                      PIC XX.
+00148      12  AM-LF-DEVIATION                   PIC XXX.
+00149      12  AM-AH-DEVIATION                   PIC XXX.
+00150      12  AM-LF-DEVIATION-PCT               PIC S9V9(6)    COMP-3.
+00151      12  AM-AH-DEVIATION-PCT               PIC S9V9(6)    COMP-3.
+00152      12  AM-LF-OB-RATE                     PIC S99V9(5)   COMP-3.
+00153      12  AM-AH-OB-RATE                     PIC S99V9(5)   COMP-3.
+00154      12  AM-LF-OB-RATE-JNT                 PIC S99V9(5)   COMP-3.
+00155      12  AM-AH-OB-RATE-JNT                 PIC S99V9(5)   COMP-3.
+00156
+00157      12  AM-USER-FIELDS.
+00158          16  AM-FLD-1                      PIC XX.
+00159          16  AM-FLD-2                      PIC XX.
+00160          16  AM-FLD-3                      PIC XX.
+00161          16  AM-FLD-4                      PIC XX.
+00162          16  AM-FLD-5                      PIC XX.
+00163
+00164      12  AM-1ST-PROD-DATE.
+00165          16  AM-1ST-PROD-YR                PIC XX.
+00166          16  AM-1ST-PROD-MO                PIC XX.
+00167          16  AM-1ST-PROD-DA                PIC XX.
+00168      12  AM-ANNIVERSARY-DATE               PIC 9(11)  COMP-3.
+00169      12  AM-CERTS-PURGED-DATE.
+00170          16  AM-PUR-YR                     PIC XX.
+00171          16  AM-PUR-MO                     PIC XX.
+00172          16  AM-PUR-DA                     PIC XX.
+00173      12  AM-HI-CERT-DATE                   PIC 9(11)  COMP-3.
+00174      12  AM-LO-CERT-DATE                   PIC 9(11)  COMP-3.
+00175      12  AM-ENTRY-DATE                     PIC 9(11)  COMP-3.
+00176      12  AM-INACTIVE-DATE.
+00177          16  AM-INA-MO                     PIC 99.
+00178          16  AM-INA-DA                     PIC 99.
+00179          16  AM-INA-YR                     PIC 99.
+00180      12  AM-AR-HI-CERT-DATE                PIC XX.
+00181
+00182      12  AM-LF-PSI-FACTOR                  PIC S9V9(6)    COMP-3.
+00183      12  AM-AH-PSI-FACTOR                  PIC S9V9(6)    COMP-3.
+00184
+00185      12  AM-OB-PAYMENT-MODE                PIC X.
+00186          88  AM-OB-PAID-MONTHLY               VALUE 'M' ' '.
+00187          88  AM-OB-PAID-QUARTERLY             VALUE 'Q'.
+00188          88  AM-OB-PAID-SEMI-ANNUALLY         VALUE 'S'.
+00189          88  AM-OB-PAID-ANNUALLY              VALUE 'A'.
+00190
+00191      12  AM-AH-ONLY-INDICATOR              PIC X.
+00192          88  AM-AH-ONLY-ALLOWED               VALUE 'Y' ' '.
+00193          88  AM-NO-AH-ONLY                    VALUE 'N'.
+00194
+00195      12  AM-EDIT-LOAN-OFC                  PIC X(01).
+00196
+00197      12  AM-OVER-SHORT.
+00198          16 AM-OVR-SHT-AMT                 PIC S999V99    COMP-3.
+00199          16 AM-OVR-SHT-PCT                 PIC S9V9(4)    COMP-3.
+00200
+011410     12  AM-DCC-PRODUCT-CODE               PIC XXX.
+041910     12  AM-DCC-CLP-STATE                  PIC XX.
+00202
+00203      12  AM-RECALC-COMM                    PIC X.
+00204      12  AM-RECALC-REIN                    PIC X.
+00205
+00206      12  AM-REI-TABLE                      PIC XXX.
+00207      12  AM-REI-ET-LF                      PIC X.
+00208      12  AM-REI-ET-AH                      PIC X.
+00209      12  AM-REI-PE-LF                      PIC X.
+00210      12  AM-REI-PE-AH                      PIC X.
+00211      12  AM-REI-PRT-ST                     PIC X.
+00212      12  AM-REI-FEE-LF                     PIC S9V9999    COMP-3.
+00213      12  AM-REI-FEE-AH                     PIC S9V9999    COMP-3.
+00214      12  AM-REI-LF-TAX                     PIC S9V9999    COMP-3.
+00215      12  AM-REI-GROUP-A                    PIC X(6).
+00216      12  AM-REI-MORT                       PIC X(4).
+00217      12  AM-REI-PRT-OW                     PIC X.
+00218      12  AM-REI-PR-PCT                     PIC S9V9999    COMP-3.
+00219      12  AM-REI-78-PCT                     PIC S9V9999    COMP-3.
+00220      12  AM-REI-AH-TAX                     PIC S9V9999    COMP-3.
+00221      12  AM-REI-GROUP-B                    PIC X(6).
+00222
+00223      12  AM-TRUST-TYPE                     PIC X(2).
+00224
+00225      12  AM-EMPLOYER-STMT-USED             PIC X.
+00226      12  AM-GROUPED-CHECKS-Y-N             PIC X.
+00227
+00228      12  AM-STD-AH-TYPE                    PIC XX.
+00229      12  AM-EARN-METHODS.
+00230          16  AM-EARN-METHOD-R              PIC X.
+00231              88 AM-REF-RL-R78                 VALUE 'R'.
+00232              88 AM-REF-RL-PR                  VALUE 'P'.
+00233              88 AM-REF-RL-MEAN                VALUE 'M'.
+00234              88 AM-REF-RL-ANTICIPATION        VALUE 'A'.
+00235          16  AM-EARN-METHOD-L              PIC X.
+00236              88 AM-REF-LL-R78                 VALUE 'R'.
+00237              88 AM-REF-LL-PR                  VALUE 'P'.
+00238              88 AM-REF-LL-MEAN                VALUE 'M'.
+00239              88 AM-REF-LL-ANTICIPATION        VALUE 'A'.
+00240          16  AM-EARN-METHOD-A              PIC X.
+00241              88 AM-REF-AH-R78                 VALUE 'R'.
+00242              88 AM-REF-AH-PR                  VALUE 'P'.
+00243              88 AM-REF-AH-MEAN                VALUE 'M'.
+00244              88 AM-REF-AH-ANTICIPATION        VALUE 'A'.
+00245              88 AM-REF-AH-CALIF-SPEC          VALUE 'C'.
+00246              88 AM-REF-AH-NET                 VALUE 'N'.
+00247
+00248      12  AM-TOL-PREM                       PIC S999V99    COMP-3.
+00249      12  AM-TOL-REF                        PIC S999V99    COMP-3.
+00250      12  AM-TOL-CLM                        PIC S999V99    COMP-3.
+00251
+00252      12  AM-RET-Y-N                        PIC X.
+00253      12  AM-RET-P-E                        PIC X.
+00254      12  AM-LF-RET                         PIC S9V9999    COMP-3.
+00255      12  AM-AH-RET                         PIC S9V9999    COMP-3.
+00256      12  AM-RET-GRP                        PIC X(6).
+00257      12  AM-RETRO-POOL  REDEFINES  AM-RET-GRP.
+00258          16  AM-POOL-PRIME                 PIC XXX.
+00259          16  AM-POOL-SUB                   PIC XXX.
+00260      12  AM-RETRO-EARNINGS.
+00261          16  AM-RET-EARN-R                 PIC X.
+00262          16  AM-RET-EARN-L                 PIC X.
+00263          16  AM-RET-EARN-A                 PIC X.
+00264      12  AM-RET-ST-TAX-USE                 PIC X.
+00265          88  CHARGE-ST-TAXES-ON-RETRO         VALUE 'Y' 'E' 'P'.
+00266          88  TAXES-NOT-IN-RETRO               VALUE 'N' ' '.
+00267      12  AM-RETRO-BEG-EARNINGS.
+00268          16  AM-RET-BEG-EARN-R             PIC X.
+00269          16  AM-RET-BEG-EARN-L             PIC X.
+00270          16  AM-RET-BEG-EARN-A             PIC X.
+00271      12  AM-RET-MIN-LOSS-L                 PIC SV999      COMP-3.
+00272      12  AM-RET-MIN-LOSS-A                 PIC SV999      COMP-3.
+00273
+00274      12  AM-USER-SELECT-OPTIONS.
+00275          16  AM-USER-SELECT-1              PIC X(10).
+00276          16  AM-USER-SELECT-2              PIC X(10).
+00277          16  AM-USER-SELECT-3              PIC X(10).
+00278          16  AM-USER-SELECT-4              PIC X(10).
+00279          16  AM-USER-SELECT-5              PIC X(10).
+00280
+00281      12  AM-LF-RPT021-EXP-PCT              PIC S9(3)V9(4) COMP-3.
+00282
+00283      12  AM-AH-RPT021-EXP-PCT              PIC S9(3)V9(4) COMP-3.
+00284
+00285      12  AM-RPT045A-SWITCH                 PIC X.
+00286          88  RPT045A-OFF                   VALUE 'N'.
+00287
+00288      12  AM-INSURANCE-LIMITS.
+00289          16  AM-MAX-MON-BEN                PIC S9(7)      COMP-3.
+00290          16  AM-MAX-TOT-BEN                PIC S9(7)      COMP-3.
+00291
+00292      12  AM-PROFILE-CHANGE-SWITCH          PIC X.
+00293          88  AM-PROFILE-DATA-CHANGED          VALUE '*'.
+00294
+00295      12  AM-DISMBR-COVERAGE-SW             PIC X.
+00296          88  AM-DISMBR-COVERAGE               VALUE 'Y'.
+00297          88  AM-NO-DISMBR-COVERAGE            VALUE 'N'.
+00298
+00299      12  AM-CANCEL-FEE                     PIC S9(3)V9(2) COMP-3.
+00300
+00301      12  AM-TOL-REF-PCT                    PIC S9V9(4)    COMP-3.
+090803     12  AM-CLP-TOL-PCT                    PIC S9V9(4)    COMP-3.
+092705     12  AM-SPP-LEASE-COMM                 PIC S9(5)V99   COMP-3.
+           12  AM-DCC-MAX-MARKETING-FEE          PIC S9(5)      COMP-3.
+           12  AM-DCC-UEF-STATE                  PIC XX.
+           12  FILLER                            PIC XXX.
+120406     12  AM-REPORT-CODE-3                  PIC X(10).
+090803*    12  FILLER                            PIC X(22).
+00303
+00304      12  AM-RESERVE-DATE.
+00305          16  AM-TARGET-LOSS-RATIO          PIC S9V9(4) COMP-3.
+00306          16  AM-LIFE-IBNR-PCT              PIC S9V9(4) COMP-3.
+00307          16  AM-CRDT-MODIFICATION-PCT      PIC S9V9(4) COMP-3.
+00308
+00309      12  AM-3RD-PARTY-NOTIF-LEVEL          PIC 99.
+00310      12  AM-NOTIFICATION-TYPES.
+00311          16  AM-NOTIF-OF-LETTERS           PIC X.
+00312          16  AM-NOTIF-OF-PAYMENTS          PIC X.
+00313          16  AM-NOTIF-OF-REPORTS           PIC X.
+00314          16  AM-NOTIF-OF-STATUS            PIC X.
+00315
+00316      12  AM-BENEFIT-TABLE-USAGE            PIC X.
+00317          88  AM-BENEFIT-TABLE-USED            VALUE 'Y'.
+00318          88  AM-USE-DEVIATIONS-ONLY           VALUE 'D'.
+00319          88  AM-EDIT-BENEFITS-ONLY            VALUE 'E'.
+00320          88  AM-EDITS-NOT-USED                VALUE ' '  'N'.
+00321
+00322      12  AM-BENEFIT-CONTROLS.
+00323          16  AM-ALLOWABLE-BENEFITS  OCCURS  20  TIMES.
+00324              20  AM-BENEFIT-CODE           PIC XX.
+00325              20  AM-BENEFIT-TYPE           PIC X.
+00326              20  AM-BENEFIT-REVISION       PIC XXX.
+00327              20  AM-BENEFIT-REM-TERM       PIC X.
+00328              20  AM-BENEFIT-RETRO-Y-N      PIC X.
+00329              20  FILLER                    PIC XX.
+00330          16  FILLER                        PIC X(80).
+00331
+00332      12  AM-TRANSFER-DATA.
+00333          16  AM-TRANSFERRED-FROM.
+00334              20  AM-TRNFROM-CARRIER        PIC X.
+00335              20  AM-TRNFROM-GROUPING.
+00336                  24  AM-TRNFROM-GRP-PREFIX PIC XXX.
+00337                  24  AM-TRNFROM-GRP-PRIME  PIC XXX.
+00338              20  AM-TRNFROM-STATE          PIC XX.
+00339              20  AM-TRNFROM-ACCOUNT.
+00340                  24  AM-TRNFROM-ACCT-PREFIX PIC X(4).
+00341                  24  AM-TRNFROM-ACCT-PRIME PIC X(6).
+00342              20  AM-TRNFROM-DTE            PIC XX.
+00343          16  AM-TRANSFERRED-TO.
+00344              20  AM-TRNTO-CARRIER          PIC X.
+00345              20  AM-TRNTO-GROUPING.
+00346                  24  AM-TRNTO-GRP-PREFIX   PIC XXX.
+00347                  24  AM-TRNTO-GRP-PRIME    PIC XXX.
+00348              20  AM-TRNTO-STATE            PIC XX.
+00349              20  AM-TRNTO-ACCOUNT.
+00350                  24  AM-TRNTO-ACCT-PREFIX  PIC X(4).
+00351                  24  AM-TRNTO-ACCT-PRIME   PIC X(6).
+00352              20  AM-TRNTO-DTE              PIC XX.
+00353          16  FILLER                        PIC X(10).
+00354
+00355      12  AM-SAVED-REMIT-TO                 PIC 99.
+00356
+00357      12  AM-COMM-STRUCTURE-SAVED.
+00358          16  AM-DEFN-1-SAVED.
+00359              20  AM-AGT-COMMS-SAVED    OCCURS 10 TIMES.
+00360                  24  AM-AGT-SV             PIC X(10).
+00361                  24  AM-COM-TYP-SV         PIC X.
+00362                  24  AM-L-COM-SV           PIC SV9(5)     COMP-3.
+00363                  24  AM-J-COM-SV           PIC SV9(5)     COMP-3.
+00364                  24  AM-A-COM-SV           PIC SV9(5)     COMP-3.
+00365                  24  AM-RECALC-LV-INDIC-SV PIC X.
+00366                  24  FILLER                PIC X.
+00367                  24  AM-GL-CODES-SV        PIC X.
+00368                  24  AM-COM-CHARGEBACK-SV  PIC 99.
+00369                  24  FILLER                PIC X.
+00370          16  AM-DEFN-2-SAVED   REDEFINES   AM-DEFN-1-SAVED.
+00371              20  AM-COM-TBLS-SAVED    OCCURS 10 TIMES.
+00372                  24  FILLER                PIC X(11).
+00373                  24  AM-L-COMA-SV          PIC XXX.
+00374                  24  AM-J-COMA-SV          PIC XXX.
+00375                  24  AM-A-COMA-SV          PIC XXX.
+00376                  24  FILLER                PIC X(6).
+00377
+00378      12  AM-FLC-NET-PREMIUM-ALLOWANCE.
+00379          16 AM-ACCOUNT-ALLOWANCE OCCURS  5 TIMES.
+00380             20  AM-ALLOW-BEGIN-RANGE       PIC S9(5)      COMP-3.
+00381             20  AM-ALLOW-END-RANGE         PIC S9(5)      COMP-3.
+00382             20  AM-ALLOWANCE-AMT           PIC S9(5)V99   COMP-3.
+00383
+122806     12  AM-ORIG-DEALER-NO                 PIC X(10).
+122806     12  FILLER                            PIC X(120).
+00385
+00386      12  AM-ACCOUNT-EXECUTIVE-DATA.
+00387          16  AM-CONTROL-NAME               PIC X(30).
+00388          16  AM-EXECUTIVE-ONE.
+00389              20  AM-EXEC1-NAME             PIC X(15).
+00390              20  AM-EXEC1-DIS-PERCENT      PIC S9(01)V9(04)
+00391                                                           COMP-3.
+00392              20  AM-EXEC1-LIFE-PERCENT     PIC S9(01)V9(04)
+00393                                                           COMP-3.
+00394          16  AM-EXECUTIVE-TWO.
+00395              20  AM-EXEC2-NAME             PIC X(15).
+00396              20  AM-EXEC2-DIS-PERCENT      PIC S9(01)V9(04)
+00397                                                           COMP-3.
+00398              20  AM-EXEC2-LIFE-PERCENT     PIC S9(01)V9(04)
+00399                                                           COMP-3.
+00400
+00401      12  AM-RETRO-ADDITIONAL-DATA.
+00402          16  AM-RETRO-QUALIFY-LIMIT        PIC S9(7)      COMP-3.
+00403          16  AM-RETRO-PREM-P-E             PIC X.
+00404          16  AM-RETRO-CLMS-P-I             PIC X.
+00405          16  AM-RETRO-RET-BRACKET-LF.
+00406              20  AM-RETRO-RET-METHOD-LF    PIC X.
+00407                  88  AM-RETRO-USE-PCT-LF      VALUE 'P' ' '.
+00408                  88  AM-RETRO-USE-SCALE-LF    VALUE 'S'.
+00409              20  AM-RETRO-RET-BASIS-LF     PIC X.
+00410                  88  AM-RETRO-EARN-BASIS-LF   VALUE 'E' ' '.
+00411                  88  AM-RETRO-PAID-BASIS-LF   VALUE 'P'.
+00412              20  AM-RETRO-BRACKETS-LF  OCCURS  3 TIMES.
+00413                  24  AM-RETRO-RET-PCT-LF   PIC S9V9999    COMP-3.
+00414                  24  AM-RETRO-RET-THRU-LF  PIC S9(7)      COMP-3.
+00415          16  AM-RETRO-RET-BRACKET-AH.
+00416              20  AM-RETRO-RET-METHOD-AH    PIC X.
+00417                  88  AM-RETRO-USE-PCT-AH      VALUE 'P' ' '.
+00418                  88  AM-RETRO-USE-SCALE-AH    VALUE 'S'.
+00419                  88  AM-RETRO-USE-LIFE-METHOD VALUE 'L'.
+00420              20  AM-RETRO-RET-BASIS-AH     PIC X.
+00421                  88  AM-RETRO-EARN-BASIS-AH   VALUE 'E' ' '.
+00422                  88  AM-RETRO-PAID-BASIS-AH   VALUE 'P'.
+00423              20  AM-RETRO-BRACKETS-AH  OCCURS  3 TIMES.
+00424                  24  AM-RETRO-RET-PCT-AH   PIC S9V9999    COMP-3.
+00425                  24  AM-RETRO-RET-THRU-AH  PIC S9(7)      COMP-3.
+00426
+00427      12  AM-COMMENTS.
+00428          16  AM-COMMENT-LINE           PIC X(50)   OCCURS 5 TIMES.
+00429
+00430      12  AM-CLIENT-OVERLAY-FLI   REDEFINES   AM-COMMENTS.
+00431          16  AM-FLI-RETRO-SHARE-CODE       PIC X.
+00432          16  AM-FLI-BILLING-CODE           PIC X.
+00433          16  AM-FLI-ALT-STATE-CODE         PIC XX.
+00434          16  AM-FLI-UNITED-IDENT           PIC X.
+00435          16  AM-FLI-INTEREST-LOST-DATA.
+00436              20  AM-FLI-BANK-NO            PIC X(5).
+00437              20  AM-FLI-BANK-BALANCE       PIC S9(9)V99   COMP-3.
+00438              20  AM-FLI-BANK-1ST-6-PREM    PIC S9(9)V99   COMP-3.
+00439              20  AM-FLI-BANK-CAP-AMT       PIC S9(9)V99   COMP-3.
+00440          16  AM-FLI-ALT-AGENT-CODES   OCCURS 10 TIMES.
+00441              20  AM-FLI-AGT                PIC X(9).
+00442              20  AM-FLI-AGT-COMM-ACC       PIC X.
+00443              20  AM-FLI-AGT-SHARE-PCT      PIC S9V99      COMP-3.
+00444          16  FILLER                        PIC X(102).
+00445
+00446      12  AM-CLIENT-OVERLAY-DMD   REDEFINES   AM-COMMENTS.
+00447          16  AM-ALLOWABLE-DMD-BENEFITS  OCCURS 30 TIMES.
+00448              20  AM-BENEFIT-DMD-CODE         PIC XX.
+00449              20  AM-BENEFIT-DMD-TYPE         PIC X.
+00450              20  AM-BENEFIT-DMD-REVISION     PIC XXX.
+00451              20  AM-BENEFIT-DMD-REM-TERM     PIC X.
+00452              20  AM-BENEFIT-DMD-RETRO-Y-N    PIC X.
+00453          16  FILLER                          PIC X(10).
+00454 ******************************************************************
+01010      EJECT
+01011 *                                COPY ELCBENE.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            ELCBENE.                            *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+00005 *                            VMOD=2.006                          *
+00006 *                                                                *
+00007 *   FILE DESCRIPTION = BENEFICIARY FILE                          *
+00008 *                                                                *
+00009 *   FILE TYPE = VSAM,KSDS                                        *
+00010 *   RECORD SIZE = 500   RECFORM = FIX                            *
+00011 *                                                                *
+00012 *   BASE CLUSTER NAME = ELBENE                   RKP=2,LEN=12    *
+00013 *     ALTERNATE PATH1 = ELBENE2 (ALT BY NAME)    RKP=14,LEN=42   *
+00014 *                                                                *
+00015 *   LOG = YES                                                    *
+00016 *   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+00017 *                                                                *
+CIDMOD*  NO  CID  MODS  TO  COPYBOOK  ELCBENE                          *
+00018 ******************************************************************
+013017*                   C H A N G E   L O G
+013017*
+013017* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+013017*-----------------------------------------------------------------
+013017*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+013017* EFFECTIVE    NUMBER
+013017*-----------------------------------------------------------------
+013017* 013017  CR2016053100001  PEMA  ACH PROCESSING
+082317* 082317  CR2017082100003  PEMA  Add sub type
+032019* 032019  CR2019011400002  PEMA  Add email address for ach report
+013017******************************************************************
+00019
+00020  01  BENEFICIARY-MASTER.
+00021      12  BE-RECORD-ID                PIC XX.
+00022          88  VALID-BE-ID                VALUE 'BE'.
+00023
+00024      12  BE-CONTROL-PRIMARY.
+00025          16  BE-COMPANY-CD           PIC X.
+00026          16  BE-RECORD-TYPE          PIC X.
+00027              88  BENEFICIARY-RECORD  VALUE 'B'.
+00028              88  ADJUSTOR-RECORD     VALUE 'A'.
+00029          16  BE-BENEFICIARY          PIC X(10).
+00030      12  BE-CONTROL-BY-NAME.
+00031          16  BE-COMPANY-CD-A1        PIC X.
+00032          16  BE-RECORD-TYPE-A1       PIC X.
+00033          16  BE-MAIL-TO-NAME-A1      PIC X(30).
+00034          16  BE-ALTERNATE-PRIME-A1   PIC X(10).
+00035
+00036      12  BE-LAST-MAINT-DT            PIC XX.
+00037      12  BE-LAST-MAINT-BY            PIC X(4).
+00038      12  BE-LAST-MAINT-HHMMSS        PIC S9(6)     COMP-3.
+00039
+00040      12  BE-ADDRESS-DATA.
+00041          16  BE-MAIL-TO-NAME         PIC X(30).
+00042          16  BE-ADDRESS-LINE-1       PIC X(30).
+00043          16  BE-ADDRESS-LINE-2       PIC X(30).
+00044          16  BE-ADDRESS-LINE-3       PIC X(30).
+00045          16  BE-CITY-STATE.
+051810             20  BE-CITY             PIC X(28).
+051810             20  BE-STATE            PIC XX.
+00046          16  BE-ZIP-CODE.
+00047              20  BE-ZIP-PRIME.
+00048                  24  BE-ZIP-1ST      PIC X.
+00049                      88  BE-CANADIAN-POST-CODE
+00050                                          VALUE 'A' THRU 'Z'.
+00051                  24  FILLER          PIC X(4).
+00052              20  BE-ZIP-PLUS4        PIC X(4).
+00053          16  BE-CANADIAN-POSTAL-CODE  REDEFINES  BE-ZIP-CODE.
+00054              20  BE-CAN-POSTAL-1     PIC XXX.
+00055              20  BE-CAN-POSTAL-2     PIC XXX.
+00056              20  FILLER              PIC XXX.
+00057          16  BE-PHONE-NO             PIC 9(11)     COMP-3.
+00058          16  BE-GROUP-CHECKS-Y-N     PIC X.
+00059
+00060 ******************************************************************
+00061 *    THE BE-CARRIER FIELD IS USED BY 'AIG' TO DETERMINE HOW TO   *
+00062 *    SET THE CARRIER CODE IN THE PENDING CLAIM FILE.             *
+00063 ******************************************************************
+00064      12  BE-CARRIER                  PIC X.
+00065
+00066      12  BE-ADDRESS-DATA2.
+00067          16  BE-MAIL-TO-NAME2        PIC X(30).
+00068          16  BE-ADDRESS-LINE-12      PIC X(30).
+00069          16  BE-ADDRESS-LINE-22      PIC X(30).
+00070          16  BE-ADDRESS-LINE-32      PIC X(30).
+00071          16  BE-CITY-STATE2.
+051810             20  BE-CITY2            PIC X(28).
+051810             20  BE-STATE2           PIC XX.
+00072          16  BE-ZIP-CODE2.
+00073              20  BE-ZIP-PRIME2.
+00074                  24  BE-ZIP-1ST2     PIC X.
+00075                      88  BE-CANADIAN-POST-CODE2
+00076                                          VALUE 'A' THRU 'Z'.
+00077                  24  FILLER          PIC X(4).
+00078              20  BE-ZIP-PLUS42       PIC X(4).
+00079          16  BE-CANADIAN-POSTAL-CODE2 REDEFINES  BE-ZIP-CODE2.
+00080              20  BE-CAN-POSTAL-12    PIC XXX.
+00081              20  BE-CAN-POSTAL-22    PIC XXX.
+00082              20  FILLER              PIC XXX.
+00083          16  BE-PHONE-NO2            PIC 9(11)     COMP-3.
+               16  BE-ACH-DATA.
+                   20  BE-ACH-YES-OR-NO    PIC X.
+                       88  BE-ON-ACH       VALUE 'Y'.
+                       88  BE-NOT-ON-ACH   VALUE 'N' ' '.
+                   20  BE-ACH-ABA-ROUTING-NUMBER
+                                           PIC X(15).
+                   20  BE-ACH-BANK-ACCOUNT-NUMBER
+                                           PIC X(20).
+                   20  BE-ACH-SUB-TYPE     PIC XX.
+032019             20  BE-ACH-EMAIL-YN     PIC X.
+032019                 88  BE-EMAIL-ACH-RPT  VALUE 'Y'.
+032019             20  be-ach-email-addr   PIC X(40).
+00084          16  BE-BILLING-STMT-DATA.
+032019*            20  BE-BSR-PHONE-NUM    PIC 9(11)     COMP-3.
+00091              20  BE-BSR-FAX-NUM      PIC 9(11)     COMP-3.
+00092              20  BE-OUTPUT-TYPE      PIC X.
+00093                  88  BE-FAX-OUTPUT         VALUE 'F'.
+00094                  88  BE-PRINT-OUTPUT       VALUE 'P' ' '.
+00095
+032019     12  filler                      PIC X(16).
+00097 ******************************************************************
+01012      EJECT
+01013 *                                COPY MPCPLCY.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                           MPCPLCY                              *
+00004 *                            VMOD=1.024                          *
+00005 *                                                                *
+00006 *   FILE DESCRIPTION = POLICY MASTER                             *
+00007 *                                                                *
+00008 *   FILE TYPE = VSAM,KSDS                                        *
+00009 *   RECORD SIZE = 1200 RECFORM = FIXED                           *
+00010 *                                                                *
+00011 *   BASE CLUSTER = MPPLCY                         RKP=2,LEN=42   *
+00012 *       ALTERNATE PATH2 = ** NOT USED **                         *
+00013 *       ALTERNATE PATH3 = MPPLCY3 (BY INSD SS NO) RKP=44,LEN=16  *
+00014 *       ALTERNATE PATH4 = MPPLCY4 (BY REF. NO.)   RKP=60,LEN=25  *
+00015 *       ALTERNATE PATH5 = MPPLCY5 (BY ACCOUNT )   RKP=85,LEN=27  *
+00016 *       ALTERNATE PATH6 = MPPLCY6 (BY TRANSIT )   RKP=112,LEN=15 *
+00017 *       ALTERNATE PATH7 = MPPLCY7 (BY LOAN NO.)   RKP=127,LEN=27 *
+00018 *                                                                *
+00019 *   LOG = YES                                                    *
+00020 *   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+00021 ******************************************************************
+00022 **WARNING*********************************************************
+00023 **ANY CHANGES TO THIS COPY BOOK MAY NEED CORRESPONDING CHANGES****
+00024 **TO THE FOLLOWING COPY BOOKS: MPCPOLUP                          *
+00025 **                             MPCPHSTD                          *
+00026 **                             MPCPHSTC                          *
+00027 **                             MPCPHSTT                          *
+00028 **                                                               *
+00029 ******************************************************************
+00030
+00031  01  POLICY-MASTER.
+00032      12  PM-RECORD-ID                      PIC XX.
+00033          88  VALID-PM-ID                      VALUE 'PM'.
+00034
+00035 ******************************************************************
+00036 *   BASE CLUSTER = MPPLCY         (BASE KEY)      RKP=2,LEN=42   *
+00037 ******************************************************************
+00038
+00039      12  PM-CONTROL-PRIMARY.
+00040          16  PM-PRODUCER-PRIMARY.
+00041              20  PM-PROD-PRIMARY.
+00042                  24  PM-COMPANY-CD         PIC X.
+00043                  24  PM-CGSP-KEY.
+00044                      28  PM-CARRIER        PIC X.
+00045                      28  PM-GROUPING.
+00046                          32  PM-GROUPING-PREFIX
+00047                                            PIC X(3).
+00048                          32  PM-GROUPING-PRIME
+00049                                            PIC X(3).
+00050                      28  PM-STATE          PIC X(2).
+00051                      28  PM-PRODUCER.
+00052                          32  PM-PRODUCER-PREFIX
+00053                                            PIC X(4).
+00054                          32  PM-PRODUCER-PRIME
+00055                                            PIC X(6).
+00056              20  PM-POLICY-EFF-DT              PIC XX.
+00057          16  PM-REFERENCE-NUMBER.
+00058              20  PM-REFNO-PRIME            PIC X(18).
+00059              20  PM-REFNO-SFX              PIC XX.
+00060
+00061 ******************************************************************
+00062 *       ALTERNATE PATH3 = MPPLCY3 (BY INSD SS NO) RKP=44,LEN=16  *
+00063 ******************************************************************
+00064
+00065      12  PM-CONTROL-BY-SSN.
+00066          16  PM-COMPANY-CD-A3              PIC X.
+00067          16  PM-SOC-SEC-NO.
+00068              20  PM-SSN-STATE              PIC XX.
+00069              20  PM-SSN-PRODUCER           PIC X(6).
+00070              20  PM-SSN-LN3.
+00071                  25  PM-INSURED-INITIALS-A3.
+00072                      30 PM-INSURED-INITIAL1-A3 PIC X.
+00073                      30 PM-INSURED-INITIAL2-A3 PIC X.
+00074                  25 PM-PART-LAST-NAME-A3         PIC X.
+00075          16  PM-DATE-A3                     PIC XX.
+00076          16  PM-TIME-A3                     PIC S9(04)   COMP.
+00077
+00078 ******************************************************************
+00079 *       ALTERNATE PATH4 = MPPLCY4 (BY REFRENCE)   RKP=60,LEN=25  *
+00080 ******************************************************************
+00081
+00082      12  PM-CONTROL-BY-POLICY-NO.
+00083          16  PM-COMPANY-CD-A4              PIC X.
+00084          16  PM-POLICY-NO-A4.
+00085              20  PM-POLICY-PRIME-A4        PIC X(18).
+00086              20  PM-POLICY-SFX-A4          PIC XX.
+00087          16  PM-DATE-A4                    PIC XX.
+00088          16  PM-TIME-A4                    PIC S9(04)   COMP.
+00089
+00090 ******************************************************************
+00091 *       ALTERNATE PATH5 = MPPLCY5 (BY ACCOUNT NO) RKP=85,LEN=27  *
+00092 ******************************************************************
+00093
+00094      12  PM-CONTROL-BY-ACCOUNT.
+00095          16  PM-COMPANY-CD-A5              PIC X.
+00096          16  PM-BANK-ACCOUNT-NUMBER        PIC X(20).
+00097          16  PM-DATE-A5                    PIC XX.
+00098          16  PM-TIME-A5                    PIC S9(07)   COMP.
+00099
+00100 ******************************************************************
+00101 *       ALTERNATE PATH6 = MPPLCY6 (BY TRANSIT NO) RKP=112,LEN=15 *
+00102 ******************************************************************
+00103
+00104      12  PM-CONTROL-BY-TRANSIT.
+00105          16  PM-COMPANY-CD-A6              PIC X.
+00106          16  PM-BANK-TRANSIT-NUMBER.
+00107              20  PM-FEDERAL-NUMBER         PIC X(4).
+00108              20  PM-BANK-NUMBER            PIC X(4).
+00109          16  PM-DATE-A6                    PIC XX.
+00110          16  PM-TIME-A6                    PIC S9(07)   COMP.
+00111
+00112 ******************************************************************
+00113 *       ALTERNATE PATH7 = MPPLCY7 (BY LOAN NO)    RKP=127,LEN=27 *
+00114 ******************************************************************
+00115
+00116      12  PM-CONTROL-BY-LOAN-NO.
+00117          16  PM-COMPANY-CD-A7              PIC X.
+00118          16  PM-LOAN-NUMBER                PIC X(20).
+00119          16  PM-DATE-A7                    PIC XX.
+00120          16  PM-TIME-A7                    PIC S9(07)   COMP.
+00121
+00122 ******************************************************************
+00123 *                 FILE SYNCHRONIZATION DATA                      *
+00124 ******************************************************************
+00125
+00126      12  FILLER                            PIC X(05).
+00127      12  PM-FILE-SYNCH-DATA.
+00128          16  PM-LAST-CHANGE-DT             PIC XX.
+00129          16  PM-LAST-CHANGE-TIME           PIC S9(7)    COMP.
+00130          16  PM-LAST-CHANGE-PROCESSOR      PIC X(4).
+00131      12  FILLER                            PIC X(05).
+00132
+00133 ******************************************************************
+00134 *                    INSUREDS PROFILE DATA                       *
+00135 ******************************************************************
+00136
+00137      12  PM-INSURED-PROFILE-DATA.
+00138          16  PM-INSURED-NAME.
+00139              20  PM-INSURED-LAST-NAME     PIC X(15).
+00140              20  PM-INSURED-FIRST-NAME.
+00141                  24  PM-INSURED-1ST-INIT PIC X.
+00142                  24  FILLER               PIC X(9).
+00143              20  PM-INSURED-MIDDLE-INIT PIC X.
+00144          16  PM-INSURED-ADDRESS.
+00145              20  PM-ADDRESS-LINE-1         PIC X(30).
+00146              20  PM-ADDRESS-LINE-2         PIC X(30).
+00147              20  PM-CITY                   PIC X(25).
+00148              20  PM-RESIDENT-STATE         PIC XX.
+00149              20  PM-ZIP-CD.
+00150                  24  PM-ZIP-FIRST-FIVE     PIC X(5).
+00151                  24  PM-ZIP-PLUS-FOUR      PIC X(4).
+00152          16  PM-INSURED-PERSONAL.
+00153              20  PM-INSURED-OCC-CLASS      PIC X.
+00154                  88  PM-PREFERRED            VALUE '1'.
+00155                  88  PM-STANDARD             VALUE '2'.
+00156                  88  PM-HAZARDOUS            VALUE '3'.
+00157                  88  PM-VERY-HAZARDOUS       VALUE '4'.
+00158                  88  PM-EXTREME-HAZARDOUS VALUE '5'.
+00159                  88  PM-NOT-OCC              VALUE '6'.
+00160                  88  PM-OCC-UNKNOWN          VALUE '9'.
+00161              20  PM-INSURED-OCC-CD         PIC X(3).
+00162              20  PM-INSURED-OCC-CD-NUM REDEFINES
+00163                  PM-INSURED-OCC-CD         PIC 9(3).
+00164              20  PM-INSURED-SEX            PIC X.
+00165                  88  PM-INSURED-SEX-MALE      VALUE 'M'.
+00166                  88  PM-INSURED-SEX-FEMALE VALUE 'F'.
+00167              20  PM-INSURED-BIRTH-DT       PIC XX.
+00168              20  PM-INSURED-ISSUE-AGE      PIC S9(3)     COMP-3.
+00169              20  PM-INSURED-HEIGHT-FT      PIC S9(3)     COMP-3.
+00170              20  PM-INSURED-HEIGHT-IN      PIC S9(3)     COMP-3.
+00171              20  PM-INSURED-WEIGHT         PIC S9(3)     COMP-3.
+00172              20  PM-INSURED-BIRTH-STATE PIC XX.
+00173              20  PM-INSURED-PHONE-NO       PIC X(13).
+00174              20  PM-INSURED-RATED-AGE      PIC S9(3)     COMP-3.
+00175          16  PM-INS-LANGUAGE-IND           PIC X(01).
+00176              88  PM-ENGLISH                           VALUE 'E'.
+00177              88  PM-FRENCH                            VALUE 'F'.
+00178              88  PM-SPANISH                           VALUE 'S'.
+00179          16  PM-INSURED-TOT-BENEFIT        PIC S9(7)V99  COMP-3.
+00180
+00181          16  PM-INSURED-AGE-IND            PIC X(01).
+00182              88  PM-INSURED-AGE-75-REACHED            VALUE 'Y'.
+00183      12  FILLER                            PIC X(13).
+00184
+00185 ******************************************************************
+00186 *                JOINT INSUREDS PROFILE DATA                     *
+00187 ******************************************************************
+00188
+00189      12  PM-JOINT-PROFILE-DATA.
+00190          16  PM-JOINT-NAME.
+00191              20  PM-JOINT-LAST-NAME        PIC X(15).
+00192              20  PM-JOINT-FIRST-NAME.
+00193                  24  PM-JOINT-1ST-INIT     PIC X.
+00194                  24  FILLER                PIC X(9).
+00195              20  PM-JOINT-MIDDLE-INIT      PIC X.
+00196          16  PM-JOINT-SOC-SEC-NO.
+00197              20  PM-JT-SSN-STATE           PIC XX.
+00198              20  PM-JT-SSN-PRODUCER        PIC X(6).
+00199              20  PM-JT-SSN-LN3.
+00200                  25  PM-JT-INSURED-INITIALS-A3.
+00201                      30 PM-JT-INSURED-INITIAL1-A3 PIC X.
+00202                      30 PM-JT-INSURED-INITIAL2-A3 PIC X.
+00203                  25 PM-JT-PART-LAST-NAME-A3        PIC X.
+00204          16  PM-JOINT-PERSONAL.
+00205              20  PM-JOINT-OCC-CLASS        PIC X.
+00206                  88 PM-JNT-PREFERRED          VALUE '1'.
+00207                  88 PM-JNT-STANDARD           VALUE '2'.
+00208                  88 PM-JNT-HAZARDOUS          VALUE '3'.
+00209                  88 PM-JNT-VERY-HAZARDOUS     VALUE '4'.
+00210                  88 PM-JNT-EXTREME-HAZARDOUS VALUE '5'.
+00211                  88 PM-JNT-NOT-OCC            VALUE '6'.
+00212                  88 PM-JNT-OCC-UNKNOWN        VALUE '9'.
+00213              20  PM-JOINT-OCC-CD           PIC X(3).
+00214              20  PM-JOINT-SEX              PIC X.
+00215                  88  PM-JOINT-SEX-MALE        VALUE 'M'.
+00216                  88  PM-JOINT-SEX-FEMALE      VALUE 'F'.
+00217              20  PM-JOINT-BIRTH-DT         PIC XX.
+00218              20  PM-JOINT-ISSUE-AGE        PIC S9(3)     COMP-3.
+00219              20  PM-JOINT-HEIGHT-FT        PIC S9(3)     COMP-3.
+00220              20  PM-JOINT-HEIGHT-IN        PIC S9(3)     COMP-3.
+00221              20  PM-JOINT-WEIGHT           PIC S9(3)     COMP-3.
+00222              20  PM-JOINT-BIRTH-STATE      PIC XX.
+00223              20  PM-JOINT-RATED-AGE        PIC S9(3)     COMP-3.
+00224          16  PM-JOINT-TOT-BENEFIT          PIC S9(7)V99  COMP-3.
+00225          16  PM-JOINT-AGE-IND              PIC X(01).
+00226              88  PM-JOINT-AGE-75-REACHED              VALUE 'Y'.
+00227
+00228      12  FILLER                            PIC X(12).
+00229
+00230 ******************************************************************
+00231 *                  INSURANCE COVERAGE DATA                       *
+00232 ******************************************************************
+00233
+00234      12  PM-INS-COVERAGE-DATA.
+00235          16  PM-FREE-PERIOD                PIC S9(03)    COMP-3.
+00236          16  PM-LOAN-TERM                  PIC S9(3)     COMP-3.
+00237          16  PM-LOAN-APR                   PIC S9V9999   COMP-3.
+00238          16  PM-LOAN-DT                    PIC XX.
+00239          16  PM-LOAN-PYMT                  PIC S9(5)V99  COMP-3.
+00240          16  PM-LOAN-BALC                  PIC S9(7)V99  COMP-3.
+00241          16  PM-INS-BENEFIT-MONTHS         PIC S9(3)     COMP-3.
+00242          16  PM-INS-MONTH-BENEFIT          PIC S9(7)V99  COMP-3.
+00243          16  PM-INS-TOTAL-BENEFIT          PIC S9(7)V99  COMP-3.
+00244          16  PM-INS-PLAN-TYPE              PIC X.
+00245              88  PM-AH-MORT-PLAN              VALUE 'A'.
+00246              88  PM-AD-D-MORT-PLAN            VALUE 'E'.
+00247              88  PM-DISMEM-MORT-PLAN          VALUE 'D'.
+00248              88  PM-LIFE-MORT-PLAN            VALUE 'L'.
+00249          16  PM-INS-PLAN-CD                PIC XX.
+00250          16  PM-INS-PLAN-REVISION          PIC X(3).
+00251          16  PM-INS-POLICY-FORM            PIC X(12).
+00252          16  PM-INS-MSTR-POLICY.
+00253              20  PM-FREE-TYPE              PIC X(04).
+00254              20  FILLER                    PIC X(08).
+00255          16  PM-INS-MSTR-APP.
+00256              20  FILLER                    PIC X(11).
+00257              20  PM-INS-B-C-TYPE           PIC X(01).
+00258          16  PM-INS-RATE-CD                PIC X(5).
+00259          16  PM-INS-SEX-RATING             PIC X.
+00260              88  PM-NOT-SEX-RATED              VALUE '1'.
+00261              88  PM-SEX-RATED                  VALUE '2'.
+00262          16  PM-INS-SUBSTANDARD-PCT        PIC S9V9999   COMP-3.
+00263          16  PM-INS-SUBSTANDARD-TYPE       PIC X.
+00264          16  PM-INS-TERMINATION-DT         PIC XX.
+00265          16  PM-INS-MONTH-PREMIUM      PIC S9(5)V999999  COMP-3.
+00266          16  PM-INS-CALC-MO-PREM       PIC S9(5)V999999  COMP-3.
+00267          16  PM-REINSURANCE-TABLE          PIC X(3).
+00268          16  PM-MORTALITY-CD               PIC X(4).
+00269          16  PM-INS-TYPE                   PIC X.
+00270              88  PM-INDIVIDUAL                VALUES ARE '1' 'I'.
+00271              88  PM-GROUP                     VALUES ARE '2' 'G'.
+00272          16  PM-LOAN-OFFICER               PIC X(5).
+00273          16  PM-POLICY-FEE                 PIC S9(3)V99 COMP-3.
+00274          16  PM-DEPENDENT-COUNT            PIC S99      COMP-3.
+00275          16  PM-CWA-AMOUNT                 PIC S9(5)V99  COMP-3.
+00276          16  PM-LAST-AUTO-RERATE-DT        PIC XX.
+00277          16  PM-PREM-FINANCED-SW           PIC X.
+00278              88  PM-PREM-FINANCED              VALUE 'Y'.
+00279              88  PM-PREM-NOT-FINANCED          VALUE 'N'.
+00280
+00281          16  PM-INS-TERM-LETTER-IND        PIC X.
+00282              88  PM-TERM-INITIALIZED           VALUE 'Y'.
+00283          16  PM-INS-UNDERWRITER-MAX-BEN PIC S9(7)V99     COMP-3.
+00284      12  FILLER                            PIC X(11).
+00285
+00286 ******************************************************************
+00287 *                    POLICY BILLING DATA                         *
+00288 ******************************************************************
+00289
+00290      12  PM-BILLING-DATA.
+00291          16  PM-BILLING-MODE               PIC X(1).
+00292              88  PM-ANNUAL                    VALUE '1'.
+00293              88  PM-SEMI-ANNUAL               VALUE '2'.
+00294              88  PM-QUARTERLY                 VALUE '3'.
+00295              88  PM-MONTHLY                   VALUE '4'.
+00296              88  PM-BI-MONTHLY                VALUE '5'.
+00297              88  PM-SINGLE-PREM               VALUE '6'.
+00298          16  PM-BILLING-SCHEDULE           PIC X(1).
+00299          16  PM-BILLING-SW                 PIC X(1).
+00300              88  PM-FIRST-BILLING             VALUE 'Y'.
+00301              88  PM-PAID-IN-ADVANCE           VALUE 'A'.
+00302              88  PM-POLICY-FEE-REFUNDED       VALUE 'F'.
+00303          16  PM-BILLING-TYPE               PIC X(1).
+00304              88  PM-LIST-BILL                 VALUE '1'.
+00305              88  PM-TAPE-BILL                 VALUE '2'.
+00306              88  PM-TAPE-LIST-BILL            VALUE '3'.
+00307              88  PM-GROUP-BILL          VALUE ARE '1' '2' '3'.
+00308              88  PM-DIRECT-BILL               VALUE '4'.
+00309              88  PM-PAC-BILL            VALUE ARE '5' 'C' 'S'.
+00310              88  PM-CHARGE-CARD-BILL          VALUE '6'.
+00311              88  PM-INDIV-BILL
+00312                                   VALUE ARE '4' '5' '6' 'C' 'S'.
+00313              88  PM-GRP-PLCY-BILL             VALUE '7'.
+00314              88  PM-GRP-PLCY-PAC              VALUE '8'.
+00315              88  PM-GRP-PLCY-CR-CRD           VALUE '9'.
+00316              88  PM-GRP-PLCY            VALUE ARE '7' '8' '9'.
+00317              88  PM-GRP-PROD                  VALUE 'A'.
+00318              88  PM-EFT-CHECKING              VALUE 'C'.
+00319              88  PM-EFT-SAVINGS               VALUE 'S'.
+00320          16  PM-PAYMENT-AMT                PIC S9(5)V99  COMP-3.
+00321          16  PM-OVER-SHORT-AMT             PIC S9(5)V99  COMP-3.
+00322          16  PM-LAST-BILL-DT               PIC XX.
+00323          16  PM-LAST-BILL-AMT              PIC S9(5)V99  COMP-3.
+00324          16  PM-BILL-TO-DT                 PIC XX.
+00325          16  PM-LAST-PYMT-DT               PIC XX.
+00326          16  PM-PAID-TO-DT                 PIC XX.
+00327          16  PM-PYMT-INVOICE-NUMBER        PIC X(6).
+00328          16  PM-MONTHS-PAID                PIC S9(3)     COMP-3.
+00329          16  PM-TOTAL-PREM-RECVD           PIC S9(7)V99  COMP-3.
+00330          16  PM-BILLING-GROUPING-CODE      PIC X(6).
+00331          16  PM-CHARGE-CARD-EXP-DT         PIC X(2).
+00332          16  PM-CHARGE-CARD-TYPE           PIC X(2).
+00333              88  PM-VISA                      VALUE 'VI'.
+00334              88  PM-MSTR-CARD                 VALUE 'MC'.
+00335              88  PM-DINERS-CLUB               VALUE 'DN'.
+00336              88  PM-DISCOVER                  VALUE 'DS'.
+00337              88  PM-CARTE-BLANCHE             VALUE 'CB'.
+00338              88  PM-AMERICAN-EXPRESS          VALUE 'AE'.
+00339          16  PM-BILL-INVOICE-NUMBER        PIC X(6).
+00340          16  PM-BILL-DAY                   PIC S99       COMP-3.
+00341          16  PM-RES-PREM-TAX           PIC S9(3)V999999  COMP-3.
+00342      12  FILLER                            PIC X(15).
+00343
+00344 ******************************************************************
+00345 *                     CLAIM PAYMENT DATA                         *
+00346 ******************************************************************
+00347
+00348      12  PM-CLAIM-PAYMENT-DATA.
+00349          16  PM-CLAIM-BENEFICIARY-NAME     PIC X(25).
+00350          16  PM-CLAIM-INTERFACE-SW         PIC X.
+00351              88  PM-NO-CLAIM-ATTACHED         VALUE SPACE.
+00352              88  PM-POLICY-AND-CLAIM-ONLINE VALUE '1'.
+00353              88  PM-POLICY-CREATED-FOR-CLAIM VALUE '2'.
+00354              88  PM-CLAIM-CLOSED              VALUE '3'.
+00355              88  PM-ACTIVE-CLAIM              VALUE '1' '2'.
+00356              88  PM-CLAIM-ATTACHED            VALUE '1' '2' '3'.
+00357          16  PM-CLAIM-INCURRED-DT          PIC XX.
+00358          16  PM-CLAIM-PAID-TO-DT           PIC XX.
+00359          16  PM-CLAIM-PAYMENT-CNT          PIC S9(3)     COMP-3.
+00360          16  PM-CLAIM-LAST-PAYMENT-AMT     PIC S9(7)V99  COMP-3.
+00361          16  PM-CLAIM-EXPENSES-ITD         PIC S9(7)V99  COMP-3.
+00362          16  PM-CLAIM-PAYMENTS-ITD         PIC S9(7)V99  COMP-3.
+00363          16  PM-CLAIM-ACCUMULATOR          PIC S9(7)V99  COMP-3.
+00364          16  PM-CLAIM-ATTACH-CNT           PIC S9(3)     COMP-3.
+00365          16  PM-CLAIM-LIFE-ITD             PIC S9(7)V99  COMP-3.
+00366          16  PM-CLAIM-AH-ITD               PIC S9(7)V99  COMP-3.
+00367          16  PM-CLAIM-RIDER-ITD            PIC S9(7)V99  COMP-3.
+00368
+00369      12  FILLER                            PIC X(03).
+00370
+00371 ******************************************************************
+00372 *                POLICY STATUS AND DISPOSITION                   *
+00373 ******************************************************************
+00374
+00375      12  PM-STATUS-DISPOSITION-DATA.
+00376          16  PM-ISSUE-EOM-DT               PIC XX.
+00377          16  PM-REPLACEMENT-SWITCH         PIC X.
+00378          16  PM-APPL-SIGN-DT               PIC XX.
+00379          16  PM-UNDERWRITER                PIC X(3).
+00380          16  PM-ENTRY-PROCESSOR            PIC X(4).
+00381          16  PM-ENTRY-STATUS               PIC X.
+00382              88  PM-NORMAL                    VALUE '1'.
+00383              88  PM-TAKE-OVER                 VALUE '2'.
+00384              88  PM-CONVERSION                VALUE '4'.
+00385              88  PM-RE-ISSUE                  VALUE '5'.
+00386              88  PM-REINSURANCE-ONLY          VALUE '9'.
+00387          16  PM-ENTRY-DT                   PIC XX.
+00388          16  PM-ENTRY-TIME                 PIC S9(7) COMP-3.
+00389          16  PM-EXIT-DT                    PIC XX.
+00390          16  PM-CURRENT-STATUS             PIC X.
+00391              88  PM-LAPSE                     VALUE '0'.
+00392              88  PM-ACTIVE                    VALUE '1'.
+00393              88  PM-PENDING-ISSUE             VALUE '2'.
+00394              88  PM-DECLINED                  VALUE '3'.
+00395              88  PM-PENDING-CANCEL            VALUE '4'.
+00396              88  PM-PENDING-ISSUE-ERROR       VALUE '5'.
+00397              88  PM-CLAIM-APPLIED             VALUE '6'.
+00398              88  PM-CANCEL                    VALUE '7'.
+00399              88  PM-PENDING-UNWTR-REVW        VALUE '8'.
+00400              88  PM-PENDING-CANCEL-ERROR      VALUE '9'.
+00401              88  PM-CANCEL-TRANSFER           VALUE 'C'.
+00402              88  PM-CLAIM-SETTLEMENT          VALUE 'F'.
+00403              88  PM-TERMINATE                 VALUE 'T'.
+00404 ** NOTE TYPE 1 IS ANYTHING THAT IS OR HAS BEEN ACTIVE.  TYPE 2 IS
+00405 ** EVERYTHING ELSE.  IF YOU ADD A STATUS ADD THE VALUE TO ONE OF
+00406 ** THESE GROUPS.
+00407              88  PM-TYPE-STAT-1
+00408                      VALUES ARE '0' '1' '4' '6' '7' '9'
+00409                                 'C' 'F' 'T'.
+00410              88  PM-TYPE-STAT-2
+00411                      VALUES ARE '2' '3' '5' '8'.
+00412              88  PM-BILLABLE-STATUS VALUES ARE '0' '1' '6'.
+00413              88  PM-PENDING-STATUS
+00414                                 VALUES ARE '2' '4' '5' '8' '9'.
+00415              88  PM-PENDING-ISSUE-STATUS
+00416                                 VALUES ARE '2' '5' '8'.
+00417              88  PM-CANCEL-STATUS
+00418                                 VALUES ARE '4' '7' '9' 'C'.
+00419          16  PM-CANCEL-CAUSE-CD            PIC X(3).
+00420          16  PM-CANCEL-DT                  PIC XX.
+00421          16  PM-REFUND-AMT                 PIC S9(5)V99  COMP-3.
+00422          16  PM-CALC-REFUND-AMT            PIC S9(5)V99  COMP-3.
+00423          16  PM-DECLINE-CD                 PIC X(3).
+00424          16  PM-DECLINE-DT                 PIC XX.
+00425          16  PM-LAST-LAPSE-DT              PIC XX.
+00426          16  PM-LAST-REINSTATE-DT          PIC XX.
+00427          16  PM-SECURITY-ACCESS-CODE       PIC X.
+00428          16  PM-PREV-CONTROL-PRIMARY.
+00429              20  PM-PREV-COMPANY-CD             PIC X.
+00430              20  PM-PREV-CARRIER                PIC X.
+00431              20  PM-PREV-GROUPING.
+00432                  24  PM-PREV-GROUPING-PREFIX PIC X(3).
+00433                  24  PM-PREV-GROUPING-PRIME     PIC X(3).
+00434              20  PM-PREV-STATE                  PIC XX.
+00435              20  PM-PREV-PRODUCER.
+00436                  24  PM-PREV-PRODUCER-PREFIX PIC X(4).
+00437                  24  PM-PREV-PRODUCER-PRIME     PIC X(6).
+00438              20  PM-PREV-POLICY-EFF-DT          PIC XX.
+00439              20  PM-PREV-REFERENCE-NUMBER.
+00440                  24  PM-PREV-REFNO-PRIME        PIC X(18).
+00441                  24  PM-PREV-REFNO-SFX          PIC XX.
+00442          16  PM-ACTION-DT                  PIC XX.
+00443          16  PM-ACTION-CODE                PIC X(3).
+00444          16  PM-ACTION-DT-2                PIC XX.
+00445          16  PM-ACTION-CODE-2              PIC X(3).
+00446          16  PM-ACTION-DT-3                PIC XX.
+00447          16  PM-ACTION-CODE-3              PIC X(3).
+00448          16  PM-ACTION-DT-4                PIC XX.
+00449          16  PM-ACTION-CODE-4              PIC X(3).
+00450          16  PM-ACTION-DT-5                PIC XX.
+00451          16  PM-ACTION-CODE-5              PIC X(3).
+00452
+00453          16  PM-KEY-CHANGE                 PIC X.
+00454                  88  PM-NO-KEY-CHG      VALUES ARE ' ' 'N'.
+00455                  88  PM-KEY-CHG              VALUE 'Y'.
+00456          16  PM-KEY-CHANGE-DT              PIC XX.
+00457
+00458          16  PM-RTI-INDICATOR              PIC X.
+00459          16  PM-REASON-CODE                PIC X(3).
+00460          16  PM-IN-OUT-PROCESSING-IND      PIC X(1).
+00461              88  PM-IN-OUT-PROCESSING      VALUE 'Y'.
+00462              88  PM-NOT-IN-OUT-PROCESSING  VALUE SPACES.
+00463
+00464      12  FILLER                            PIC X(12).
+00465
+00466 ******************************************************************
+00467 *                 AGENT AND COMMISSION DATA                      *
+00468 ******************************************************************
+00469
+00470      12  PM-COMMISSION-DATA.
+00471          16  PM-REMIT-TO                   PIC S9(3) COMP-3.
+00472          16  PM-COMM-CHANGE-SW             PIC X.
+00473                  88  PM-COMMISSION-CHANGE     VALUE 'Y'.
+00474          16  PM-AGENT-INFORMATION OCCURS     5 TIMES.
+00475              20  PM-AGENT-NUMBER           PIC X(10).
+00476              20  PM-AGENT-TYPE             PIC X.
+00477                  88  PM-PRODUCER-LEVEL-AGENT
+00478                                               VALUES ARE 'C' 'D'.
+00479                  88  PM-AGENT-GROSS           VALUE 'C'.
+00480                  88  PM-AGENT-REINS           VALUE 'R'.
+00481                  88  PM-AGENT-GROSS-REINS     VALUE 'D'.
+00482                  88  PM-OVERWRITE-GROSS       VALUE 'O'.
+00483                  88  PM-OVERWRITE-GROSS-REINS VALUE 'P'.
+00484                  88  PM-OVERWRITE-REINS       VALUE 'T'.
+00485                  88  PM-REINS-ONLY            VALUE 'W'.
+00486              20  PM-COMMISSION-BILL-PAID PIC X(1).
+00487                  88  PM-GENERATE-BILL         VALUE 'B'.
+00488                  88  PM-GENERATE-PAID         VALUE 'P'.
+00489              20  PM-AGENT-COMP-1ST-YEAR PIC S99V999.
+00490              20  PM-COMP-1ST-YEAR-TYPE     PIC X(1).
+00491                  88  PM-COMP-1ST-YEAR-PERCENT VALUE '1'.
+00492                  88  PM-COMP-1ST-YEAR-DOLLARS VALUE '2'.
+00493                  88  PM-COMP-1ST-YEAR-NOT-USED VALUE '3'.
+00494              20  PM-RENEWAL-DATA.
+00495                  24  PM-AGENT-RENEWAL-DATA OCCURS 6 TIMES.
+00496                      28  PM-RENEW-MONTHS     PIC S999    COMP-3.
+00497                      28  PM-RENEW-COMMISSION
+00498                                              PIC S99V999 COMP-3.
+00499                      28  PM-RENEW-TYPE       PIC X(1).
+00500                          88  PM-COMP-RENEW-PERCENT      VALUE '1'.
+00501                          88  PM-COMP-RENEW-DOLLARS      VALUE '2'.
+00502                          88  PM-COMP-RENEW-NOT-USED     VALUE '3'.
+00503              20  PM-COMP-RECALC-FLAG       PIC X(1).
+00504                  88  PM-BYPASS-RECALC         VALUE 'N'.
+00505      12  FILLER                            PIC X(20).
+00506 ******************************************************************
+00507 *             CUSTOMER DATA                                      *
+00508 ******************************************************************
+00509      12  PM-CUSTOMER-ID                    PIC X(20).
+00510 ******************************************************************
+00511      12  FILLER                            PIC X(43).
+00512 ******************************************************************
+01014      EJECT
+01015 *                                COPY MPCPLAN.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            MPCPLAN                             *
+00004 *                            VMOD=1.012                          *
+00005 *                                                                *
+00006 *   MORTGAGE SYSTEM PRODUCER PLAN MASTER FILE.                   *
+00007 *                                                                *
+00008 *   THIS COPYBOOK IS USED FOR THE ONLINE                         *
+00009 *   PLAN CODE MASTER FILE.                                       *
+00010 *                                                                *
+00011 *   FILE DESCRIPTION = PRODUCER PLAN MASTER                      *
+00012 *                                                                *
+00013 *   FILE TYPE = VSAM,KSDS                                        *
+00014 *   RECORD SIZE = 450  RECFORM = FIX                             *
+00015 *                                                                *
+00016 *   BASE CLUSTER NAME = MPPLAN                    RKP=2,LEN=25   *
+00017 *       ALTERNATE PATH1 = MPPLAN2 (ALT GROUPING) RKP=47,LEN=25   *
+00018 *                                                                *
+00019 *   LOG = NO                                                     *
+00020 *   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+00021 *                                                                *
+00022 *                                                                *
+00023 ******************************************************************
+00024
+00025  01  PRODUCER-PLANS.
+00026      12  PP-RECORD-ID                      PIC  X(02).
+00027          88  VALID-PP-ID                      VALUE 'PP'.
+00028
+00029 ******************************************************************
+00030 *   BASE CLUSTER NAME = MPPLAN                    RKP=2,LEN=25   *
+00031 ******************************************************************
+00032
+00033      12  PP-CONTROL-PRIMARY.
+00034          16  PP-PROD-PRIMARY.
+00035              20  PP-COMPANY-CD             PIC  X(01).
+00036              20  PP-CONTROL-A.
+00037                  24  PP-CARRIER            PIC  X(01).
+00038                  24  PP-GROUPING.
+00039                      28  PP-GROUPING-PREFIX
+00040                                            PIC  X(03).
+00041                      28  PP-GROUPING-PRIME PIC  X(03).
+00042                  24  PP-STATE              PIC  X(02).
+00043                  24  PP-PRODUCER.
+00044                      28  PP-PRODUCER-PREFIX
+00045                                            PIC  X(04).
+00046                      28  PP-PRODUCER-PRIME PIC  X(06).
+00047          16  PP-PRODUCER-PLAN.
+00048              20  PP-PLAN-CODE              PIC  X(02).
+00049              20  PP-PLAN-REVISION          PIC  9(03).
+00050      12  FILLER                            PIC  X(20).
+00051
+00052 ******************************************************************
+00053 *      ALTERNATE PATH1 = MPPLAN2 (ALT GROUPING) RKP=47,LEN=25    *
+00054 ******************************************************************
+00055
+00056      12  PP-CONTROL-BY-VAR-GRP.
+00057          16  PP-COMPANY-CD-A1              PIC  X(01).
+00058          16  PP-VG-CARRIER                 PIC  X(01).
+00059          16  PP-VG-GROUPING                PIC  X(06).
+00060          16  PP-VG-STATE                   PIC  X(02).
+00061          16  PP-VG-PRODUCER                PIC  X(10).
+00062          16  PP-VG-PLAN-CODE               PIC  X(02).
+00063          16  PP-VG-PLAN-REVISION           PIC  X(03).
+00064      12  FILLER                            PIC  X(20).
+00065
+00066 ******************************************************************
+00067 *                PRODUCER SECURITY DATA                          *
+00068 ******************************************************************
+00069
+00070      12  PP-SECURITY-ACCESS-CODE           PIC  X(01).
+00071      12  PP-POLICY-CNT                     PIC S9(07)    COMP-3.
+00072
+00073 ******************************************************************
+00074 *                FILE SYNCHRONIZATION DATA                       *
+00075 ******************************************************************
+00076
+00077      12  PP-MAINT-INFORMATION.
+00078          16  PP-LAST-MAINT-DATE            PIC  X(02).
+00079          16  PP-LAST-MAINT-HHMMSS          PIC S9(07)    COMP-3.
+00080          16  PP-LAST-MAINT-USER            PIC  X(04).
+00081      12  FILLER                            PIC  X(10).
+00082
+00083 ******************************************************************
+00084 *                   CRITICAL FILE DATES                          *
+00085 ******************************************************************
+00086
+00087      12  PP-PLAN-DATES.
+00088          16  PP-PLAN-EFFECT-DATE           PIC  X(02).
+00089          16  PP-PLAN-EXPIRE-DATE           PIC  X(02).
+00090
+00091      12  FILLER                            PIC  X(10).
+00092
+00093 ******************************************************************
+00094 *                GENERAL INFORMATION                             *
+00095 ******************************************************************
+00096
+00097      12  PP-GENERAL-INFORMATION.
+00098          16  PP-ALPHA-SEARCH-SW            PIC  X(01).
+00099              88  PP-MIB-ALPHA-ALL              VALUE '1'.
+00100              88  PP-MIB-ALPHA-NONE             VALUE '2'.
+00101              88  PP-MIB-ALPHA-EXCEEDED         VALUE '3'.
+00102              88  PP-CLIENT-ALPHA-ALL           VALUE 'A'.
+00103              88  PP-CLIENT-ALPHA-NONE          VALUE 'B'.
+00104              88  PP-CLIENT-ALPHA-EXCEEDED      VALUE 'C'.
+00105              88  PP-BOTH-ALPHA-ALL             VALUE 'X'.
+00106              88  PP-BOTH-ALPHA-NONE            VALUE 'Y'.
+00107              88  PP-BOTH-ALPHA-EXCEEDED        VALUE 'Z'.
+00108              88  PP-ALPHA-SEARCH-VALID    VALUES ARE '1' '2' '3'
+00109                                                      'A' 'B' 'C'
+00110                                                      'X' 'Y' 'Z'.
+00111          16  PP-BENEFIT-TYPE               PIC  X(01).
+00112              88  PP-BENEFIT-IS-LEVEL            VALUE '1'.
+00113              88  PP-BENEFIT-REDUCES             VALUE '2'.
+00114          16  PP-DAYS-TO-1ST-NOTICE         PIC  9(02).
+00115          16  PP-DAYS-TO-2ND-NOTICE         PIC  9(02).
+00116          16  PP-DAYS-TO-3RD-NOTICE         PIC  9(02).
+00117          16  PP-DAYS-TO-4TH-NOTICE         PIC  9(02).
+00118          16  PP-EFF-DT-RULE-SW             PIC  X(01).
+00119              88  PP-EFF-DT-ENTER               VALUE 'E'.
+00120              88  PP-EFF-DT-MONTH               VALUE 'M'.
+00121              88  PP-EFF-DT-QTR                 VALUE 'Q'.
+00122              88  PP-EFF-DT-SEMI                VALUE 'S'.
+00123              88  PP-EFF-DT-ANN                 VALUE 'A'.
+00124          16  PP-FREE-EXAM-DAYS             PIC S9(03)   COMP-3.
+00125          16  PP-GRACE-PERIOD               PIC S9(03)   COMP-3.
+00126          16  PP-HEALTH-QUESTIONS           PIC  9(01).
+00127          16  PP-NUMBER-LAPSE-NOTICES       PIC S9(03)   COMP-3.
+00128          16  PP-MIB-SEARCH-SW              PIC  X(01).
+00129              88  PP-MIB-SEARCH-ALL             VALUE '1'.
+00130              88  PP-MIB-SEARCH-NONE            VALUE '2'.
+00131              88  PP-MIB-SEARCH-EXCEEDED        VALUE '3'.
+00132              88  PP-MIB-SEARCH-VALID      VALUES ARE '1' '2' '3'.
+00133          16  PP-PLAN-ABBREV                PIC  X(03).
+00134          16  PP-PLAN-AGES.
+00135              20  PP-MINIMUM-AGE            PIC S9(03)   COMP-3.
+00136              20  PP-MAXIMUM-AGE            PIC S9(03)   COMP-3.
+00137              20  PP-MAXIMUM-ATTAIN-AGE     PIC S9(03)   COMP-3.
+00138          16  PP-PLAN-BENEFITS.
+00139              20  PP-CLAIM-CAP              PIC S9(07)V99 COMP-3.
+00140              20  PP-MINIMUM-BENEFIT        PIC S9(07)V99 COMP-3.
+00141              20  PP-MAXIMUM-BENEFIT        PIC S9(07)V99 COMP-3.
+00142              20  PP-MAXIMUM-MONTHLY-BENEFIT
+00143                                            PIC S9(07)V99 COMP-3.
+00144          16  PP-PLAN-DESCRIPTION           PIC  X(10).
+00145          16  PP-POLICY-FEE                 PIC S9(03)V9(02)
+00146                                                         COMP-3.
+00147          16  PP-PLAN-IND-GRP               PIC  X(01).
+00148          16  PP-PLAN-SNGL-JNT              PIC  X(01).
+00149              88  PP-COMBINED-PLAN             VALUE 'C'.
+00150              88  PP-JNT-PLAN                  VALUE 'J'.
+00151              88  PP-SNGL-PLAN                 VALUE 'S'.
+00152          16  PP-PLAN-TERMS.
+00153              20  PP-MINIMUM-TERM           PIC S9(03)   COMP-3.
+00154              20  PP-MAXIMUM-TERM           PIC S9(03)   COMP-3.
+00155          16  PP-PLAN-TYPE                  PIC  X(01).
+00156              88  PP-AH-MORT-PLAN              VALUE 'A'.
+00157              88  PP-AD-D-MORT-PLAN            VALUE 'E'.
+00158              88  PP-DISMEM-MORT-PLAN          VALUE 'D'.
+00159              88  PP-LIFE-MORT-PLAN            VALUE 'L'.
+00160          16  PP-PREMIUM-TOLERANCES.
+00161              20  PP-PREM-TOLERANCE         PIC S9(03)   COMP-3.
+00162              20  PP-PREM-TOLERANCE-PCT     PIC SV9(03)  COMP-3.
+00163          16  PP-RATE-CODE                  PIC  X(05).
+00164          16  PP-REOCCURRING-DISABILITY-PRD PIC S9(03)   COMP-3.
+00165          16  PP-REPLACEMENT-LAW-SW         PIC  X(01).
+00166              88  PP-NO-REPLACE                VALUE '1'.
+00167              88  PP-REPLACE-APPLIES           VALUE '2'.
+00168              88  PP-VALID-REPLACEMENT-LAW     VALUE '1' '2'.
+00169          16  PP-RETRO-RETENTION            PIC S9V9(04) COMP-3.
+00170          16  PP-RERATE-CNTL                PIC  X(01).
+00171              88  PP-RERATE-WITH-ISSUE-AGE       VALUE '1'.
+00172              88  PP-RERATE-WITH-CURRENT-AGE     VALUE '2'.
+00173              88  PP-DO-NOT-RERATE               VALUE '3' ' '.
+00174              88  PP-AUTO-RECALC                 VALUE '4'.
+00175          16  PP-SEX-RATING                 PIC  X(01).
+00176              88  PP-NOT-SEX-RATED             VALUE '1'.
+00177              88  PP-SEX-RATED                 VALUE '2'.
+00178          16  PP-SUBSTANDARD-DATA.
+00179              20  PP-SUBSTANDARD-PERCENT    PIC S9(01)V9(04).
+00180              20  PP-SUBSTANDARD-TYPE       PIC  X(01).
+00181                  88  PP-PCT-OF-BENEFIT        VALUE '1'.
+00182                  88  PP-PCT-OF-PREMIUM        VALUE '2'.
+00183                  88  PP-NOT-APPLICABLE        VALUE '3'.
+00184          16  PP-YEARS-TO-NEXT-RERATE       PIC  9(02).
+00185          16  PP-DEPENDANT-COVERAGE         PIC  X(01).
+00186              88  PP-DEP-COVERED               VALUE 'Y'.
+00187              88  PP-DEP-NOT-COVERED           VALUE 'N' ' '.
+00188          16  PP-REFUND-CALC                PIC  X(01).
+00189              88  PP-RFND-MP-REFUND     VALUES ARE ' ' LOW-VALUES.
+00190              88  PP-RFND-BY-R78               VALUE '1'.
+00191              88  PP-RFND-BY-PRO-RATA          VALUE '2'.
+00192              88  PP-RFND-AS-CALIF             VALUE '3'.
+00193              88  PP-RFND-AS-TEXAS             VALUE '4'.
+00194              88  PP-RFND-IS-NET-PAY           VALUE '5'.
+00195              88  PP-RFND-ANTICIPATION         VALUE '6'.
+00196              88  PP-RFND-MEAN                 VALUE '8'.
+00197              88  PP-VALID-REFUND       VALUES ARE ' ' '1' '2' '3'
+00198                                                   '4' '5' '6' '8'
+00199                                                   LOW-VALUES.
+00200          16  PP-ALT-RATE-CODE              PIC  X(05).
+00201
+00202      12  FILLER                            PIC  X(39).
+00203
+00204 ******************************************************************
+00205 *                     PLAN FORMS AND LETTERS                     *
+00206 ******************************************************************
+00207
+00208      12  PP-PLAN-MASTER-FORMS.
+00209          16  PP-POLICY-FORM                PIC  X(12).
+00210          16  PP-MASTER-APPLICATION         PIC  X(12).
+00211          16  PP-MASTER-POLICY              PIC  X(12).
+00212      12  PP-DELINQUENCY-NOTICE-FORMS.
+00213          16  PP-1ST-NOTICE-FORM            PIC  X(04).
+00214          16  PP-2ND-NOTICE-FORM            PIC  X(04).
+00215          16  PP-3RD-NOTICE-FORM            PIC  X(04).
+00216          16  PP-4TH-NOTICE-FORM            PIC  X(04).
+00217      12  FILLER                            PIC  X(32).
+00218      12  PP-TERMINATION-FORM               PIC  X(04).
+00219      12  FILLER                            PIC  X(08).
+00220      12  PP-ISSUE-LETTER                   PIC  X(04).
+00221
+00222      12  FILLER                            PIC  X(80).
+00223 ******************************************************************
+01016      EJECT
+01017 *                                COPY MPCPROD.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            MPCPROD                             *
+00004 *                            VMOD=1.010                          *
+00005 *                                                                *
+00006 *   MORTGAGE SYSTEM PRODUCER MASTER FILE                         *
+00007 *                                                                *
+00008 *   THIS COPYBOOK IS USED FOR THE ONLINE                         *
+00009 *   VSAM PRODUCER MASTER FILE.                                   *
+00010 *                                                                *
+00011 *   FILE DESCRIPTION = PRODUCER MASTER FILE                      *
+00012 *                                                                *
+00013 *   FILE TYPE = VSAM,KSDS                                        *
+00014 *   RECORD SIZE = 2000 RECFORM = FIXED                           *
+00015 *                                                                *
+00016 *   BASE CLUSTER NAME = MPPROD                    RKP=02,LEN=22  *
+00017 *       ALTERNATE PATH1 = MPPROD2 (ALT GROUPING)  RKP=48,LEN=22  *
+00018 *       ALTERNATE PATH2 = MPPROD3 (PRODUCER NAME) RKP=90,LEN=56  *
+00019 *                                                                *
+00020 *   LOG = NO                                                     *
+00021 *   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+00022 *                                                                *
+00023 *                                                                *
+00024 ******************************************************************
+00025
+00026  01  PRODUCER-MASTER.
+00027      12  PD-RECORD-ID                 PIC  X(02).
+00028          88  PD-VALID-ID                   VALUE 'PD'.
+00029
+00030 ******************************************************************
+00031 *   BASE CLUSTER NAME = MPPROD                    RKP=2,LEN=22   *
+00032 ******************************************************************
+00033
+00034      12  PD-CONTROL-PRIMARY-BATCH.
+00035          16  FILLER                   PIC  X(20).
+00036          16  PD-EXPIRE-DT.
+00037              20  PD-EXPIRE-DT-YY      PIC  9(02).
+00038              20  PD-EXPIRE-DT-MM      PIC  9(02).
+00039              20  PD-EXPIRE-DT-DD      PIC  9(02).
+00040      12  FILLER REDEFINES PD-CONTROL-PRIMARY-BATCH.
+00041          16  PD-CONTROL-PRIMARY.
+00042              20  PD-COMPANY-CD        PIC  X(01).
+00043              20  PD-MSTR-CNTRL.
+00044                  24  PD-CONTROL-A.
+00045                      28  PD-CARRIER   PIC  X(01).
+00046                      28  PD-GROUPING.
+00047                          32 PD-GROUPING-PREFIX
+00048                                       PIC  X(03).
+00049                          32 PD-GROUPING-PRIME
+00050                                       PIC  X(03).
+00051                      28  PD-STATE     PIC  X(02).
+00052                      28  PD-PRODUCER.
+00053                          32  PD-PRODUCER-PREFIX
+00054                                       PIC  X(04).
+00055                          32  PD-PRODUCER-PRIME
+00056                                       PIC  X(06).
+00057                  24  PD-CNTRL-B.
+00058                      28  PD-EXPIRE-DATE
+00059                                       PIC  X(02).
+00060          16  FILLER REDEFINES PD-CONTROL-PRIMARY.
+00061              20  FILLER               PIC  X(01).
+00062              20  PD-CGSPE-KEY         PIC  X(21).
+00063          16  FILLER                   PIC  X(04).
+00064      12  FILLER                       PIC  X(20).
+00065
+00066 ******************************************************************
+00067 *      ALTERNATE PATH1 = MPPROD2 (ALT GROUPING) RKP=48,LEN=22    *
+00068 ******************************************************************
+00069
+00070      12  PD-CONTROL-BY-VAR-GRP.
+00071          16  PD-VG-CCGSP-KEYLET.
+00072              20  PD-COMPANY-CD-A1     PIC  X(01).
+00073              20  PD-VG-CARRIER        PIC  X(01).
+00074              20  PD-VG-GROUPING       PIC  X(06).
+00075              20  PD-VG-STATE          PIC  X(02).
+00076              20  PD-VG-PRODUCER       PIC  X(10).
+00077          16  PD-VG-DATE.
+00078              24  PD-VG-EXPIRE-DATE    PIC  X(02).
+00079      12  FILLER                       PIC  X(20).
+00080
+00081
+00082 ******************************************************************
+00083 *      ALTERNATE PATH2 = MPPROD3 (NAME)         RKP=90,LEN=56    *
+00084 ******************************************************************
+00085
+00086      12  PD-CONTROL-BY-NAME.
+00087          16  PD-COMPANY-CD-A2         PIC  X(01).
+00088          16  PD-NAME-A2               PIC  X(30).
+00089          16  PD-CGSPE-KEY-A2.
+00090              20  PD-CARRIER-A2        PIC  X(01).
+00091              20  PD-GROUPING-A2       PIC  X(06).
+00092              20  PD-STATE-A2          PIC  X(02).
+00093              20  PD-PRODUCER-A2       PIC  X(10).
+00094              20  PD-EXPIRE-DATE-A2    PIC  X(02).
+00095          16  PD-CURRENT-DATE-BIN-A2   PIC  X(02).
+00096          16  PD-CURRENT-TIME-BIN-A2   PIC S9(04) COMP.
+00097      12  FILLER                       PIC  X(20).
+00098
+00099 ******************************************************************
+00100 *                FILE SYNCHRONIZATION DATA                       *
+00101 ******************************************************************
+00102
+00103      12  PD-MAINT-INFORMATION.
+00104          16  PD-LAST-MAINT-DATE       PIC  X(02).
+00105          16  PD-LAST-MAINT-HHMMSS     PIC S9(07) COMP-3.
+00106          16  PD-LAST-MAINT-USER       PIC  X(04).
+00107
+00108 ******************************************************************
+00109 *                PRODUCER SECURITY DATA                          *
+00110 ******************************************************************
+00111
+00112      12  PD-SECURITY-ACCESS-CODE      PIC  X(01).
+00113
+00114 ******************************************************************
+00115 *                DATES                                           *
+00116 ******************************************************************
+00117
+00118      12  PD-ANNIVERSARY-DATE          PIC  X(02).
+00119
+00120      12  PD-AR-HI-DATE.
+00121          16  PD-AR-HI-POLICY-DATE     PIC  X(02).
+00122          16  FILLER                   PIC  X(04).
+00123      12  PD-AR-HI-POLICY-DT REDEFINES PD-AR-HI-DATE.
+00124          16  PD-AR-HI-POLICY-DT-YY    PIC  9(02).
+00125          16  PD-AR-HI-POLICY-DT-MM    PIC  9(02).
+00126          16  PD-AR-HI-POLICY-DT-DD    PIC  9(02).
+00127
+00128      12  PD-ENTRY-DATE                PIC  X(02).
+00129
+00130      12  PD-EFFECT-DTE.
+00131          16  PD-EFFECT-DATE           PIC  X(02).
+00132          16  FILLER                   PIC  X(04).
+00133      12  PD-EFFECT-DT REDEFINES PD-EFFECT-DTE.
+00134          16  PD-EFFECT-DT-YY          PIC  9(02).
+00135          16  PD-EFFECT-DT-MM          PIC  9(02).
+00136          16  PD-EFFECT-DT-DD          PIC  9(02).
+00137
+00138      12  PD-HI-DATE.
+00139          16  PD-HI-POLICY-DATE        PIC  X(02).
+00140          16  FILLER                   PIC  X(04).
+00141      12  PD-HI-POLICY-DT REDEFINES PD-HI-DATE.
+00142          16  PD-HI-POLICY-DT-YY       PIC  9(02).
+00143          16  PD-HI-POLICY-DT-MM       PIC  9(02).
+00144          16  PD-HI-POLICY-DT-DD       PIC  9(02).
+00145
+00146      12  PD-INACTIVE-DATE             PIC  X(02).
+00147
+00148      12  PD-LO-DATE.
+00149          16  PD-LO-POLICY-DATE        PIC  X(02).
+00150          16  FILLER                   PIC  X(04).
+00151      12  PD-LO-POLICY-DT REDEFINES PD-LO-DATE.
+00152          16  PD-LO-POLICY-DT-YY       PIC  9(02).
+00153          16  PD-LO-POLICY-DT-MM       PIC  9(02).
+00154          16  PD-LO-POLICY-DT-DD       PIC  9(02).
+00155
+00156      12  PD-POLICIES-PURGED-DATE      PIC  X(02).
+00157
+00158      12  PD-PREV-DATES.
+00159          16  PD-PREV-EFF-DATE         PIC  X(02).
+00160          16  FILLER                   PIC  X(04).
+00161          16  PD-PREV-EXP-DATE         PIC  X(02).
+00162          16  FILLER                   PIC  X(04).
+00163      12  PD-PREV-DTS REDEFINES PD-PREV-DATES.
+00164          16  PD-PREV-EFF-DT.
+00165              20  PD-PREV-EFF-DT-YY    PIC  9(02).
+00166              20  PD-PREV-EFF-DT-MM    PIC  9(02).
+00167              20  PD-PREV-EFF-DT-DD    PIC  9(02).
+00168          16  PD-PREV-EXP-DT.
+00169              20  PD-PREV-EXP-DT-YY    PIC  9(02).
+00170              20  PD-PREV-EXP-DT-MM    PIC  9(02).
+00171              20  PD-PREV-EXP-DT-DD    PIC  9(02).
+00172
+00173      12  PD-1ST-PROD-DATE             PIC  X(02).
+00174
+00175      12  FILLER                       PIC  X(20).
+00176
+00177 ******************************************************************
+00178 *                MORTGAGE BILLING DATA                           *
+00179 ******************************************************************
+00180
+00181      12  PD-CONTACT                   PIC  X(30).
+00182      12  PD-BILLING-MONTHS.
+00183          16  PD-BILLING-MONTH-ANNUAL  PIC  9(02).
+00184          16  PD-BILLING-MONTH-SEMIANN PIC  9(02).
+00185      12  PD-BILLING-ADVANCE-ARREARS   PIC  X(01).
+00186          88  PD-BILL-ADVANCE              VALUE '1'.
+00187          88  PD-BILL-ARREARS              VALUE '2'.
+00188      12  PD-BILLING-MODE              PIC  X(01).
+00189          88  PD-ANNUAL-BILL               VALUE '1'.
+00190          88  PD-SEMI-ANNUAL-BILL          VALUE '2'.
+00191          88  PD-QUARTERLY-BILL            VALUE '3'.
+00192          88  PD-MONTHLY-BILL              VALUE '4'.
+00193          88  PD-BI-MONTHLY-BILL           VALUE '5'.
+00194          88  PD-SINGLE-PREM-BILL          VALUE '6'.
+00195      12  PD-BILLING-GROUPING-CODE     PIC  X(06).
+00196      12  PD-BILLING-SCHEDULE          PIC  X(01).
+00197          88  PD-BILL-1ST-WEEK             VALUE '1'.
+00198          88  PD-BILL-2ND-WEEK             VALUE '2'.
+00199          88  PD-BILL-3RD-WEEK             VALUE '3'.
+00200          88  PD-BILL-4TH-WEEK             VALUE '4'.
+00201          88  PD-BILL-5TH-WEEK             VALUE '5'.
+00202          88  PD-HOLD-BILL                 VALUE '6'.
+00203          88  PD-NO-BILL                   VALUE '7'.
+00204      12  PD-BILLING-SEQUENCE          PIC  X(01).
+00205          88  PD-BILL-NAME-SEQU            VALUE '1'.
+00206          88  PD-BILL-LOAN-SEQU            VALUE '2'.
+00207          88  PD-BILL-PLCY-SEQU            VALUE '3'.
+00208      12  PD-BILLING-TYPE              PIC  X(01).
+00209          88  PD-LIST-BILL                 VALUE '1'.
+00210          88  PD-TAPE-BILL                 VALUE '2'.
+00211          88  PD-TAPE-LIST-BILL            VALUE '3'.
+00212          88  PD-GROUP-BILL            VALUES ARE '1' '2' '3'.
+00213          88  PD-DIRECT-BILL               VALUE '4'.
+00214          88  PD-PAC                   VALUES ARE '5' 'C' 'S'.
+00215          88  PD-CREDIT-CARD               VALUE '6'.
+00216          88  PD-INDIV-BILL
+00217                               VALUES ARE '4' '5' '6' 'C' 'S'.
+00218          88  PD-GROUP-BY-POLICY           VALUE '7'.
+00219          88  PD-GROUP-BY-POLICY-PAC       VALUE '8'.
+00220          88  PD-GROUP-BY-POLICY-CRDC      VALUE '9'.
+00221          88  PD-GROUP-BY-BILL             VALUE '7' '8' '9'.
+00222          88  PD-GROUP-BY-PROD             VALUE 'A'.
+00223          88  PD-EFT-CHECKING              VALUE 'C'.
+00224          88  PD-EFT-SAVINGS               VALUE 'S'.
+00225      12  PD-DATE-PAID                 PIC  X(02).
+00226      12  PD-LAST-BILLING-DATE         PIC  X(02).
+00227      12  PD-LAST-BILL-TO-DATE         PIC  X(02).
+00228      12  PD-MAX-MONTHS-BILL           PIC S9(03)  COMP-3.
+00229      12  PD-PAID-TO-DATE              PIC  X(02).
+00230      12  PD-PREV-BILLING-DATE         PIC  X(02).
+00231      12  PD-PREV-BILL-TO-DATE         PIC  X(02).
+00232
+00233      12  FILLER                       PIC  X(20).
+00234
+00235 ******************************************************************
+00236 *                PERSONAL DATA                                   *
+00237 ******************************************************************
+00238
+00239      12  PD-ADDRS                     PIC  X(30).
+00240      12  PD-CITY                      PIC  X(30).
+00241      12  PD-CITY-CODE                 PIC  X(04).
+00242      12  PD-COUNTY-CODE               PIC  X(03).
+00243      12  PD-NAME                      PIC  X(30).
+00244      12  PD-PARRISH-CODE              PIC  X(03).
+00245      12  PD-PERSON                    PIC  X(30).
+00246      12  PD-TEL-NO.
+00247          16  PD-AREA-CODE             PIC  9(03).
+00248          16  PD-TEL-PRE               PIC  9(03).
+00249          16  PD-TEL-NBR               PIC  9(04).
+00250      12  PD-ZIP.
+00251          16  PD-ZIP-PRIME             PIC  X(05).
+00252          16  PD-ZIP-PLUS4             PIC  X(04).
+00253      12  PD-LANGUAGE-IND              PIC  X(01).
+00254          88  PD-ENGLISH                          VALUE 'E'.
+00255          88  PD-FRENCH                           VALUE 'F'.
+00256          88  PD-SPANISH                          VALUE 'S'.
+00257
+00258      12  FILLER                       PIC  X(19).
+00259
+00260 ******************************************************************
+00261 *                REINSURANCE DATA                                *
+00262 ******************************************************************
+00263
+00264      12  PD-REINS-TBL-CODE            PIC  X(03).
+00265      12  PD-REIN-RECALC               PIC  X(01).
+00266
+00267      12  PD-REI-AH-FEE                PIC S9(01)V9(04) COMP-3.
+00268      12  PD-REI-AH-PE                 PIC  X(01).
+00269      12  PD-REI-AH-TAX                PIC S9(01)V9(04) COMP-3.
+00270
+00271      12  PD-REI-GROUP-A               PIC  X(06).
+00272      12  PD-REI-GROUP-B               PIC  X(06).
+00273
+00274      12  PD-REI-LF-FEE                PIC S9(01)V9(04) COMP-3.
+00275      12  PD-REI-LF-PE                 PIC  X(01).
+00276      12  PD-REI-LF-TAX                PIC S9(01)V9(04) COMP-3.
+00277
+00278      12  PD-REI-MORT                  PIC  X(04).
+00279      12  PD-REI-PRT-OW                PIC  X(01).
+00280      12  PD-REI-PRT-ST                PIC  X(01).
+00281
+00282      12  PD-REI-ADD-FEE               PIC S9(01)V9(04) COMP-3.
+00283      12  PD-REI-ADD-PE                PIC  X(01).
+00284      12  PD-REI-ADD-TAX               PIC S9(01)V9(04) COMP-3.
+00285
+00286      12  PD-REI-DIS-FEE               PIC S9(01)V9(04) COMP-3.
+00287      12  PD-REI-DIS-PE                PIC  X(01).
+00288      12  PD-REI-DIS-TAX               PIC S9(01)V9(04) COMP-3.
+00289
+00290      12  FILLER                       PIC  X(10).
+00291 ******************************************************************
+00292 *                RETRO DATA                                      *
+00293 ******************************************************************
+00294
+00295      12  PD-RET-AH                    PIC S9(01)V9(04) COMP-3.
+00296      12  PD-RET-GRP                   PIC  X(06).
+00297      12  PD-RET-LF                    PIC S9(01)V9(04) COMP-3.
+00298      12  PD-RET-MIN-LOSS-A            PIC SV9(03)      COMP-3.
+00299      12  PD-RET-MIN-LOSS-L            PIC SV9(03)      COMP-3.
+00300      12  PD-RET-P-E                   PIC  X(01).
+00301      12  PD-RET-ST-TAX-USE            PIC  X(01).
+00302          88  PD-CHARGE-ST-TAXES-ON-RETRO      VALUE 'Y' 'E' 'P'.
+00303          88  PD-TAXES-NOT-IN-RETRO            VALUE 'N' ' '.
+00304      12  PD-RET-Y-N                   PIC  X(01).
+00305      12  PD-RET-ADD                   PIC S9(01)V9(04) COMP-3.
+00306      12  PD-RET-MIN-LOSS-ADD          PIC SV9(03)      COMP-3.
+00307      12  PD-RET-DIS                   PIC S9(01)V9(04) COMP-3.
+00308      12  PD-RET-MIN-LOSS-DIS          PIC SV9(03)      COMP-3.
+00309
+00310      12  FILLER                       PIC  X(10).
+00311
+00312 ******************************************************************
+00313 *                     MANAGEMENT OPTIONS                         *
+00314 ******************************************************************
+00315
+00316      12  PD-DEFAULT-UNWTR-CODE        PIC  X(03).
+00317      12  PD-LAPSE-NOTICE-CNTL         PIC  X(01).
+00318      12  PD-CORRESPONDENCE-CNTL       PIC  X(01).
+00319      12  PD-RETAIN-BILLING-DATA-MTHS  PIC S9(03)  COMP-3.
+00320      12  PD-RETAIN-CLAIM-DATA-MTHS    PIC S9(03)  COMP-3.
+00321      12  PD-RETAIN-COMMISSION-MTHS    PIC S9(03)  COMP-3.
+00322      12  PD-RETAIN-DELINQUENCY-MTHS   PIC S9(03)  COMP-3.
+00323      12  PD-RETAIN-INSD-PROFILE-MTHS  PIC S9(03)  COMP-3.
+00324      12  PD-RETAIN-INS-COVERAGE-MTHS  PIC S9(03)  COMP-3.
+00325      12  PD-RETAIN-STATUS-DISP-MTHS   PIC S9(03)  COMP-3.
+00326      12  PD-NUM-BILLING-CYCLES-RETAINED
+00327                                       PIC S9(03)  COMP-3.
+00328      12  PD-RETAIN-UNDERWRITER-HST-MTHS
+00329                                       PIC S9(03)  COMP-3.
+00330
+00331      12  FILLER                       PIC X(098).
+00332
+00333
+00334 ******************************************************************
+00335 *                MISCELLANEOUS DATA                              *
+00336 ******************************************************************
+00337
+00338      12  PD-AH-RPT021-EXP-PCT         PIC S9(03)V9(04) COMP-3.
+00339      12  PD-AUTO-REFUND-SW            PIC  X(01).
+00340          88  PD-AUTO-REFUNDS-USED             VALUE 'Y'.
+00341          88  PD-AUTO-REFUNDS-NOT-USED         VALUE 'N' ' '.
+00342      12  PD-BUSINESS-TYPE             PIC  9(02).
+00343      12  PD-CAL-TABLE                 PIC  X(02).
+00344      12  PD-COMMENTS.
+00345          16  PD-COMMENT-LINE          PIC  X(50)
+00346                                            OCCURS 5 TIMES.
+00347      12  PD-EMPLOYER-STMT-USED        PIC  X(01).
+00348      12  PD-GROUPED-CHECKS-Y-N        PIC  X(01).
+00349      12  PD-IG                        PIC  X(01).
+00350          88  PD-HAS-INDIVIDUAL                VALUE 'I'
+00351                                                     '1'.
+00352          88  PD-HAS-GROUP                     VALUE 'G'
+00353                                                     '2'.
+00354      12  PD-LF-RPT021-EXP-PCT         PIC S9(03)V9(04) COMP-3.
+00355      12  PD-REPORT-CODE-1             PIC  X(10).
+00356      12  PD-REPORT-CODE-2             PIC  X(10).
+00357      12  PD-RPT045A-SWITCH            PIC  X(01).
+00358          88  PD-RPT045A-OFF                VALUE 'N'.
+00359      12  PD-SPECIAL-BILLING-FREQ      PIC  X(01).
+00360          88  PD-HAS-SPECIAL-BILL-FREQ         VALUE 'Y'.
+00361          88  PD-NO-SPECIAL-BILL-FREQ          VALUE 'N' ' '.
+00362      12  PD-STATUS                    PIC  X(01).
+00363          88  PD-STATUS-ACTIVE                 VALUE '0'.
+00364          88  PD-STATUS-INACTIVE               VALUE '1'.
+00365      12  PD-STD-AH-TYPE               PIC  X(02).
+00366      12  PD-TAX-NUMBER                PIC  X(11).
+00367      12  PD-TOL-CLM                   PIC S9(03)V9(02) COMP-3.
+00368      12  PD-USER-FIELDS.
+00369          16  PD-USER-FLD-1            PIC  X(02).
+00370          16  PD-USER-FLD-2            PIC  X(02).
+00371          16  PD-USER-FLD-3            PIC  X(02).
+00372          16  PD-USER-FLD-4            PIC  X(02).
+00373          16  PD-USER-FLD-5            PIC  X(02).
+00374      12  PD-USER-SELECT-OPTIONS.
+00375          16  PD-USER-SELECT-1         PIC  X(10).
+00376          16  PD-USER-SELECT-2         PIC  X(10).
+00377          16  PD-USER-SELECT-3         PIC  X(10).
+00378          16  PD-USER-SELECT-4         PIC  X(10).
+00379          16  PD-USER-SELECT-5         PIC  X(10).
+00380      12  PD-DIS-RPT021-EXP-PCT        PIC S9(03)V9(04) COMP-3.
+00381      12  PD-ADD-RPT021-EXP-PCT        PIC S9(03)V9(04) COMP-3.
+00382      12  FILLER                       PIC  X(20).
+00383
+00384 ******************************************************************
+00385 *                CLIENT USE AREAS                                *
+00386 ******************************************************************
+00387
+00388      12  PD-CLIENT-USE-AREA-1         PIC  X(30).
+00389      12  PD-CLIENT-USE-AREA-2         PIC  X(30).
+00390      12  PD-CLIENT-USE-AREA-3         PIC  X(11).
+00391      12  PD-CLIENT-USE-AREA-4         PIC  X(30).
+00392      12  PD-CLIENT-USE-AREA-5         PIC  X(30).
+00393      12  PD-CLIENT-USE-AREA-6         PIC  X(11).
+00394      12  PD-CLIENT-USE-AREA-7         PIC  X(30).
+00395      12  PD-CLIENT-USE-AREA-8         PIC  X(30).
+00396      12  PD-CLIENT-USE-AREA-9         PIC  X(11).
+00397
+00398 ******************************************************************
+00399 *                TRANSFER DATA                                   *
+00400 ******************************************************************
+00401      12  PD-TRANSFERRED-FROM.
+00402          16  PD-TRNFROM-CARRIER       PIC  X(01).
+00403          16  PD-TRNFROM-GROUPING.
+00404              20  PD-TRNFROM-GRP-PREFIX
+00405                                       PIC  X(03).
+00406              20  PD-TRNFROM-GRP-PRIME PIC  X(03).
+00407          16  PD-TRNFROM-STATE         PIC  X(02).
+00408          16  PD-TRNFROM-PRODUCER.
+00409              20  PD-TRNFROM-PROD-PREFIX
+00410                                       PIC  X(04).
+00411              20  PD-TRNFROM-PROD-PRIME
+00412                                       PIC  X(06).
+00413          16  PD-TRNFROM-DATE          PIC  X(02).
+00414      12  PD-TRANSFERRED-TO.
+00415          16  PD-TRNTO-CARRIER         PIC  X(01).
+00416          16  PD-TRNTO-GROUPING.
+00417              20  PD-TRNTO-GRP-PREFIX  PIC  X(03).
+00418              20  PD-TRNTO-GRP-PRIME   PIC  X(03).
+00419          16  PD-TRNTO-STATE           PIC  X(02).
+00420          16  PD-TRNTO-PRODUCER.
+00421              20  PD-TRNTO-PROD-PREFIX PIC  X(04).
+00422              20  PD-TRNTO-PROD-PRIME  PIC  X(06).
+00423          16  PD-TRNTO-DATE            PIC  X(02).
+00424      12  FILLER                       PIC  X(20).
+00425
+00426 ******************************************************************
+00427 *                MORTGAGE PLANS SOLD                             *
+00428 ******************************************************************
+00429
+00430      12  PD-PLANS-SOLD.
+00431          16  PD-PRODUCER-PLANS  OCCURS 40 TIMES
+00432                                 INDEXED BY PD-PLAN-NDX
+00433                                            PD-PLAN-NDX2.
+00434              20  PD-INDIVIDUAL-PLAN.
+00435                  24  PD-PLAN-CODE     PIC  X(02).
+00436                  24  PD-PLAN-REVISION PIC  X(03).
+00437              20  PD-IBNR-PERCENT      PIC S9(01)V9(04) COMP-3.
+00438      12  FILLER                       PIC  X(54).
+00439
+00440 ******************************************************************
+00441 *                 AGENT AND COMMISSION DATA                      *
+00442 ******************************************************************
+00443
+00444      12  PD-COMMISSION-INFORMATION.
+00445          16  PD-REMIT-TO              PIC S9(03)   COMP-3.
+00446          16  PD-RECALCULATION-SW      PIC  X(01).
+00447              88  PD-RECALC-DETAIL             VALUE 'Y'.
+00448              88  PD-RECALC-NO-DETAIL          VALUE 'I'.
+00449              88  PD-IGNORE-RECALC             VALUE 'N'.
+00450              88  PD-VALID-RECALCULATION-SW    VALUE 'Y' 'I' 'N'.
+00451          16  PD-AGENT-DATA.
+00452              20  PD-AGENT-ENTRY       OCCURS 5 TIMES
+00453                                     INDEXED BY PD-AGENT-NDX
+00454                                                PD-AGENT-NDX2.
+00455                  24  PD-AGENT-NUMBER  PIC  X(10).
+00456                  24  PD-AGENT-TYPE    PIC  X(01).
+00457                      88  PD-AGENT-TYPE-A      VALUE 'C' 'D'.
+00458                      88  PD-AGENT-TYPE-G      VALUE 'O' 'R'
+00459                                                     'P' 'T'
+00460                                                     'W'.
+00461                      88  PD-AGENT-GROSS       VALUE 'C'.
+00462                      88  PD-AGENT-REINS       VALUE 'R'.
+00463                      88  PD-AGENT-GROSS-REINS VALUE 'D'.
+00464                      88  PD-OVERWRITE-GROSS   VALUE 'O'.
+00465                      88  PD-OVERWRITE-GROSS-REINS
+00466                                           VALUE 'P'.
+00467                      88  PD-OVERWRITE-REINS   VALUE 'T'.
+00468                      88  PD-REINS-ONLY        VALUE 'W'.
+00469                      88  PD-VALID-AGENT-TYPE  VALUE 'C' 'R'
+00470                                                 'D' 'O' 'P'
+00471                                                 'T' 'W'.
+00472                  24  PD-COMMISSION-BILLED-PAID
+00473                                       PIC  X(01).
+00474                      88  PD-AGENT-BILLED      VALUE 'B'.
+00475                      88  PD-AGENT-PAID        VALUE 'P'.
+00476                  24  PD-COMP-RECALC-FLAG
+00477                                       PIC  X(01).
+00478                      88  PD-BYPASS-RECALC     VALUE 'N'.
+00479                      88  PD-VALID-RECALC-FLAG VALUE ' ' 'N'.
+00480      12  FILLER                       PIC  X(55).
+00481
+00482 ******************************************************************
+00483 *                BANK DATA                                       *
+00484 ******************************************************************
+00485
+00486      12  PD-BANK-ACCOUNT-NUMBER       PIC  X(20).
+00487      12  PD-BANK-TRANSIT-NUMBER.
+00488          16  PD-FEDERAL-NUMBER        PIC  X(04).
+00489          16  PD-BANK-NUMBER           PIC  X(04).
+00490      12  PD-CHARGE-CARD-EXP-DT        PIC  X(02).
+00491      12  PD-CHARGE-CARD-TYPE          PIC  X(02).
+00492          88  PD-AMERICAN-EXPRESS                 VALUE 'AE'.
+00493          88  PD-CARTE-BLANCHE                    VALUE 'CB'.
+00494          88  PD-DINERS-CLUB                      VALUE 'DN'.
+00495          88  PD-DISCOVER                         VALUE 'DS'.
+00496          88  PD-MASTER-CARD                      VALUE 'MC'.
+00497          88  PD-VISA                             VALUE 'VI'.
+00498      12  PD-SIGNATURE-NAME            PIC  X(25).
+00499      12  PD-AUTHORIZATION-SW          PIC  X(01).
+00500 ******************************************************************
+00501 *                GENERIC FILLER                                  *
+00502 ******************************************************************
+00503
+00504      12  PD-DATE-TEST                 PIC S9(08) COMP.
+00505      12  FILLER                       PIC  X(62).
+00506
+00507 ******************************************************************
+01018      EJECT
+       PROCEDURE DIVISION USING DFHEIBLK DFHCOMMAREA CONTROL-FILE
+                                CLAIM-MASTER ACTIVITY-TRAILERS
+                                CERTIFICATE-MASTER ACTIVITY-QUE
+                                ACCOUNT-MASTER BENEFICIARY-MASTER
+                                POLICY-MASTER PRODUCER-PLANS
+                                PRODUCER-MASTER.
+       0000-DFHEXIT SECTION.
+           MOVE '9#                    $   ' TO DFHEIV0.
+           MOVE 'EL008' TO DFHEIV1.
+           CALL 'kxdfhei1' USING DFHEIV0 DFH-START DFHEIV DFHEIV1.
+01020      MOVE EIBDATE               TO DC-JULIAN-YYDDD.
+01021      MOVE '5'                   TO DC-OPTION-CODE.
+01022      PERFORM 8100-DATE-RTN  THRU  8100-EXIT.
+01023      MOVE DC-GREG-DATE-1-EDIT   TO  SAVE-DATE.
+01024      MOVE DC-BIN-DATE-1         TO  SAVE-BIN-DATE.
+01025
+01026  0001-PROCESSING-EXITS.
+01027 *    MOVE DFHCOMMAREA  TO  PROGRAM-INTERFACE-BLOCK.
+01028
+01029      
+      * EXEC CICS  HANDLE CONDITION
+01030 *           ERROR    (8300-ABEND)
+01031 *           PGMIDERR (8900-PGMIDERR)
+01032 *           ENDDATA  (9999-FINALIZE)
+01033 *    END-EXEC.
+      *    MOVE '"$.L&                 ! " #00007094' TO DFHEIV0
+           MOVE X'22242E4C2620202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2220233030303037303934' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01034
+01035      MOVE SPACES                 TO DL34-PROCESS-TYPE.
+01036
+01037  0002-PROCESSING-MAINLINE.
+01038      
+      * EXEC CICS  RETRIEVE
+01039 *               INTO    (PROGRAM-INTERFACE-BLOCK)
+01040 *               LENGTH  (PI-COMM-LENGTH)
+01041 *    END-EXEC.
+      *    MOVE '0*I L                 &   #00007103' TO DFHEIV0
+           MOVE X'302A49204C20202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037313033' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 PROGRAM-INTERFACE-BLOCK, 
+                 PI-COMM-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01042
+01043 * DLO034 OPEN WHEN DMD OR CID
+01044      MOVE PI-COMPANY-ID          TO WS-SAVED-PI-COMPANY-ID.
+pemuni     IF PI-COMPANY-ID = 'DMD' OR 'XXX'
+01046          IF DL34-PROCESS-TYPE IS EQUAL TO SPACES
+01047              MOVE 'O'                TO DL34-PROCESS-TYPE
+01048              MOVE PI-COMPANY-ID      TO DL34-COMPANY-ID
+01049              MOVE THIS-PGM           TO DL34-PRINT-PROGRAM-ID
+01050              MOVE PI-PROCESSOR-ID    TO DL34-USERID
+01051              MOVE SPACES             TO DL34-PRINT-LINE
+01052              MOVE PI-ALT-DMD-PRT-ID  TO DL34-OVERRIDE-PRINTER-ID
+01053
+01054              
+      * EXEC CICS LINK
+01055 *                PROGRAM    ('DLO034')
+01056 *                COMMAREA   (DLO034-COMMUNICATION-AREA)
+01057 *                LENGTH     (DLO034-REC-LENGTH)
+01058 *            END-EXEC
+           MOVE 'DLO034' TO DFHEIV1
+      *    MOVE '."C                   (   #00007119' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037313139' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DLO034-COMMUNICATION-AREA, 
+                 DLO034-REC-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+01059
+01060              IF DL34-RETURN-CODE NOT = 'OK'
+01061                  MOVE  '**DLO034 OPEN ERROR - ABORT**'
+01062                                  TO WS-PASSED-DATA
+01063                  GO TO 9999-FINALIZE.
+01064
+01065      PERFORM 4000-INITIALIZE  THRU 4000-EXIT.
+01066
+01067      IF PI-CALLING-PROGRAM  = 'EL180'
+01068          MOVE 'EL180 ONL'        TO  HEAD-REPORT-NO
+01069          MOVE LOW-VALUES         TO  WS-AQ-CONTROL-PRIMARY
+01070          MOVE PI-COMPANY-CD      TO  WS-AQ-COMPANY-CD
+01071          PERFORM  0020-PROCESS-ACTQ  THRU 0020-EXIT
+01072           UNTIL  END-OF-ACTQ-FILE
+01073      ELSE
+01074          PERFORM  0021-PROCESS-PI    THRU 0021-EXIT.
+01075
+01076      GO TO 0002-PROCESSING-MAINLINE.
+01077
+01078  0002-EXIT.
+01079      EJECT
+01080
+01081  0020-PROCESS-ACTQ.
+01082      PERFORM  1450-BROWSE-ACTQ   THRU 1450-EXIT.
+01083
+01084  0020-READNEXT-ACTQ.
+01085      PERFORM 1400-READNEXT-ACTQ     THRU 1400-EXIT.
+01086
+01087      IF END-OF-ACTQ-FILE
+01088          MOVE TPG      TO WS-PASSED-CNTL-CHAR
+01089          MOVE  SPACES  TO WS-PASSED-DATA
+01090          PERFORM 1455-ENDBR-ACTQ  THRU 1455-EXIT
+01091          GO TO 0020-EXIT.
+01092
+01093      IF ACTQ-READ-ERROR
+01094          MOVE    '*** ERROR ON READ ACTQ ***' TO WS-PASSED-DATA
+01095          GO TO 9999-FINALIZE.
+01096
+01097      IF PENDING-FULL-PRINT OR
+01098         PENDING-PART-PRINT
+01099          NEXT SENTENCE
+01100      ELSE
+01101          GO TO 0020-READNEXT-ACTQ.
+01102
+01103      IF WS-AQ-CONTROL-PRIMARY = WS-LAST-AQ-KEY
+01104         GO TO 0020-READNEXT-ACTQ.
+01105
+01106      MOVE WS-AQ-CONTROL-PRIMARY TO WS-LAST-AQ-KEY.
+01107
+01108      
+      * EXEC CICS ENDBR
+01109 *         DATASET   ('ELACTQ')
+01110 *    END-EXEC.
+           MOVE 'ELACTQ' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&2                    $   #00007173' TO DFHEIV0
+           MOVE X'263220202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202420' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037313733' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01111
+01112      
+      * EXEC CICS READ
+01113 *         DATASET   ('ELACTQ')
+01114 *         RIDFLD    (WS-AQ-CONTROL-PRIMARY)
+01115 *         SET       (ADDRESS OF ACTIVITY-QUE)
+01116 *    END-EXEC.
+           MOVE 'ELACTQ' TO DFHEIV1
+      *    MOVE '&"S        E          (   #00007177' TO DFHEIV0
+           MOVE X'262253202020202020202045' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037313737' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-AQ-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF ACTIVITY-QUE TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01117
+01118      MOVE WS-PI-NAME              TO WS-UNALIGNED-FIELD.
+01119      MOVE SPACES                  TO WS-ALIGNED-FIELD.
+01120      MOVE +30                     TO WS-NAME-LENGTH.
+01121      PERFORM ELCALGNP             THRU ELCALGNP-EXIT.
+01122      MOVE WS-ALIGNED-FIELD        TO HEAD-COMPANY.
+01123
+01124 **   BUILD MSTR KEY
+01125      MOVE  AQ-CONTROL-PRIMARY  TO WS-CL-CONTROL-PRIMARY.
+01126
+01127 ***  BUILD TRLR KEY
+01128      MOVE AQ-CONTROL-PRIMARY TO  WS-AT-CONTROL-PRIMARY.
+01129      MOVE ZEROS              TO  WS-AT-SEQ-NO.
+01130
+01131      IF PENDING-FULL-PRINT
+01132          MOVE 'X' TO WS-FULL-PRINT-SW.
+01133
+01134      PERFORM  0022-PROCESS-3-FILES  THRU 0022-EXIT.
+01135
+01136      MOVE AQ-CONTROL-PRIMARY  TO WS-AQ-CONTROL-PRIMARY.
+01137      PERFORM 1480-READ-UPDATE-ACTQ   THRU 1480-EXIT.
+01138      MOVE SPACES              TO AQ-PENDING-STATUS-FLAG.
+01139
+01140      IF AQ-PENDING-LETTER-FLAG   = SPACE  AND
+01141         AQ-PENDING-PAYMENT-FLAG  = SPACE
+01142          PERFORM 1800-DELETE-ACTQ  THRU 1800-EXIT
+01143      ELSE
+01144          PERFORM 1850-REWRITE-ACTQ  THRU 1850-EXIT.
+01145
+01146      MOVE 'X'                    TO  WS-PROG-END.
+CIDMOD     IF PI-COMPANY-ID = 'DMD' OR 'XXX'
+CIDMOD        CONTINUE
+CIDMDO     ELSE
+CIDMOD        PERFORM ELPRTCVP THRU ELPRTCVP-EXIT.
+01148      
+      * EXEC CICS SYNCPOINT
+01149 *        END-EXEC.
+      *    MOVE '6"                    !   #00007216' TO DFHEIV0
+           MOVE X'362220202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037323136' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01150
+01151  0020-EXIT.
+01152       EXIT.
+01153      EJECT
+01154  0021-PROCESS-PI.
+01155 **     READ CNTL RECORD TO OBTAIN COMPANY NAME
+01156      MOVE PI-COMPANY-ID        TO WS-CF-COMPANY-ID.
+01157      MOVE SPACES               TO WS-CF-PROCESSOR.
+01158      MOVE ZEROS                TO WS-CF-SEQUENCE-NO.
+01159      MOVE '1'                  TO WS-CF-RECORD-TYPE.
+01160
+01161      MOVE SPACES               TO WS-CNTL-ERROR-SW.
+01162      PERFORM 1300-READ-CNTL       THRU 1300-EXIT.
+01163
+01164      IF NO-COMPANY-RECORD
+01165          MOVE    '*** ERROR NO COMP REC  ***' TO WS-PASSED-DATA
+01166          GO TO 9999-FINALIZE.
+01167
+01168      MOVE CF-CL-MAIL-TO-NAME      TO WS-UNALIGNED-FIELD.
+01169      MOVE SPACES                  TO WS-ALIGNED-FIELD.
+01170      MOVE +30                     TO WS-NAME-LENGTH.
+01171      PERFORM ELCALGNP              THRU ELCALGNP-EXIT.
+01172      MOVE WS-ALIGNED-FIELD         TO HEAD-COMPANY.
+01173
+01174      MOVE SPACES TO   END-OC-TABLE-SW
+01175                       END-AD-TABLE-SW
+01176                       END-AP-TABLE-SW.
+01177
+01178      IF PI-CALLING-PROGRAM IS EQUAL TO 'EL1602'
+01179          MOVE 'EL1602 ONL'       TO  HEAD-REPORT-NO
+01180      ELSE
+01181          MOVE 'EL150 ONL'        TO  HEAD-REPORT-NO.
+01182
+01183 *       BUILD TRAILER KEY AND MSTR KEY
+01184      MOVE PI-COMPANY-CD      TO  WS-AT-COMPANY-CD
+01185                                  WS-CL-COMPANY-CD.
+01186      MOVE PI-CARRIER         TO  WS-AT-CARRIER
+01187                                  WS-CL-CARRIER.
+01188      MOVE PI-CLAIM-NO        TO  WS-AT-CLAIM-NO
+01189                                  WS-CL-CLAIM-NO.
+01190      MOVE PI-CERT-NO         TO  WS-AT-CERT-NO
+01191                                  WS-CL-CERT-NO.
+01192      MOVE ZEROS              TO  WS-AT-SEQ-NO.
+01193
+01194      IF PI-ENTRY-CD-1 NOT  = '1'
+01195          MOVE 'X'  TO WS-FULL-PRINT-SW.
+01196
+01197      PERFORM 0022-PROCESS-3-FILES   THRU 0022-EXIT.
+01198
+01199  0021-EXIT.
+01200       EXIT.
+01201      EJECT
+01202  0022-PROCESS-3-FILES.
+01203      PERFORM  1550-READ-MSTR  THRU 1550-EXIT.
+01204
+01205      IF MSTR-READ-ERROR
+01206          MOVE    '*** ERROR ON READ MSTR ***' TO WS-PASSED-DATA
+01207          MOVE ' '                TO AQ-PENDING-PAYMENT-FLAG
+01208                                     AQ-PENDING-LETTER-FLAG
+01209                                     AQ-PENDING-STATUS-FLAG
+01210                                     WS-MSTR-READ-ERROR-SW
+01211          GO TO 0022-EXIT.
+01212
+01213      MOVE SPACES                 TO P-CAUSE-DIAG.
+01214      MOVE WS-CL-CONTROL-PRIMARY  TO WS-AT-CONTROL-PRIMARY.
+01215      MOVE +90   TO WS-AT-SEQ-NO.
+01216
+01217      
+      * EXEC CICS  HANDLE CONDITION
+01218 *           NOTFND  (0022-BYPASS)
+01219 *    END-EXEC.
+      *    MOVE '"$I                   ! # #00007285' TO DFHEIV0
+           MOVE X'222449202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2320233030303037323835' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01220
+01221      
+      * EXEC CICS READ
+01222 *         DATASET ('ELTRLR')
+01223 *         SET     (ADDRESS OF ACTIVITY-TRAILERS)
+01224 *         RIDFLD  (WS-AT-CONTROL-PRIMARY)
+01225 *    END-EXEC.
+           MOVE 'ELTRLR' TO DFHEIV1
+      *    MOVE '&"S        E          (   #00007289' TO DFHEIV0
+           MOVE X'262253202020202020202045' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037323839' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-AT-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF ACTIVITY-TRAILERS TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01226
+01227      MOVE AT-INFO-LINE-1         TO P-CAUSE-DIAG.
+01228
+01229  0022-BYPASS.
+01230
+01231      MOVE 0 TO WS-PAGE-CNT.
+01232
+01233      SET AP-INDEX   TO 1.
+01234      SET AD-INDEX   TO 1.
+01235      SET OC-INDEX   TO 1.
+01236
+01237      MOVE +0    TO WS-AT-SEQ-NO.
+01238      PERFORM 2110-MOVE-CLAIM-INFO  THRU 2110-EXIT.
+01239
+01240 ***  BUILDIN CERT KEY
+01241
+01242      IF CL-SYSTEM-IDENTIFIER IS EQUAL TO 'CV'
+01243          MOVE CL-COMPANY-CD      TO  WS-PM-COMPANY-CD
+01244          MOVE CL-CERT-KEY-DATA   TO  WS-PM-POLICY-DATA
+01245          MOVE CL-CV-REFERENCE-NO TO  WS-PM-REFERENCE-NO
+01246      ELSE
+01247          MOVE CL-COMPANY-CD      TO  WS-CM-COMPANY-CD
+01248          MOVE CL-CERT-KEY-DATA   TO  WS-CM-CERT-DATA
+01249          MOVE CL-CERT-NO         TO  WS-CM-CERT-NO.
+01250
+01251 ***  READ CERT/POLICY MASTER
+01252
+01253      IF CL-SYSTEM-IDENTIFIER IS EQUAL TO 'CV'
+01254          PERFORM 1605-READ-EMPLCY THRU 1605-EXIT
+01255      ELSE
+01256          PERFORM 1600-READ-CERT   THRU 1600-EXIT.
+01257
+01258      IF CL-SYSTEM-IDENTIFIER IS EQUAL TO 'CV'
+01259          IF PLCY-READ-ERROR
+01260              PERFORM 2120-NO-CERT-INFO THRU 2120-EXIT
+01261          ELSE
+01262              PERFORM 2140-MOVE-PLCY-INFO THRU 2140-EXIT
+01263      ELSE
+01264          IF CERT-READ-ERROR
+01265              PERFORM 2120-NO-CERT-INFO  THRU 2120-EXIT
+01266          ELSE
+01267              PERFORM 2130-MOVE-CERT-INFO THRU 2130-EXIT.
+01268
+01269      PERFORM  1700-BROWSE-TRLR   THRU 1700-EXIT.
+01270
+01271      IF TRLR-BROWSE-ERROR
+01272         GO TO 0022-BYPASS-TRLRS.
+01273
+01274 *      TRAILER 0 IS THE FIRST REC AFTER START
+01275      PERFORM  1750-READNEXT-TRLR   THRU 1750-EXIT.
+01276
+01277      PERFORM 2150-MOVE-TR0-INFO    THRU 2150-EXIT.
+01278
+01279 ***  NOW ALL 3 FILES HAVE BEEN READ
+01280
+01281  0022-BYPASS-TRLRS.
+01282
+01283      PERFORM 2300-PRINT-TO-LINE-26  THRU 2300-EXIT.
+01284
+01285      MOVE AT-CONTROL-PRIMARY TO WS-AT-CONTROL-SAVED.
+01286      MOVE SPACE              TO WS-TRAILER-KEY-CHG-SW.
+01287
+01288      IF NOT TRLR-BROWSE-ERROR
+01289         PERFORM 2500-PROCESS-N-PRINT-TRAILERS THRU 2500-EXIT
+01290            UNTIL TRAILER-KEY-CHANGED
+01291         ELSE
+01292         MOVE '* TRLRS HAVE BEEN PURGED    *' TO WS-PASSED-DATA
+01293         PERFORM ELPRTCVP THRU ELPRTCVP-EXIT
+01294         GO TO 0022-END.
+01295
+01296 ******     BUILD ERACCT/EMPROD KEY
+01297
+01298      IF CL-SYSTEM-IDENTIFIER IS EQUAL TO 'CV'
+01299          IF NOT PLCY-READ-ERROR
+01300              IF FULL-PRINT-REQUIRED
+01301                  MOVE PM-CONTROL-PRIMARY TO  WS-PD-CONTROL-PRIMARY
+01302                  PERFORM 1150-READ-AND-BUILD-PROD THRU 1199-EXIT
+01303              ELSE
+01304                  NEXT SENTENCE
+01305          ELSE
+01306              NEXT SENTENCE
+01307      ELSE
+01308          IF NOT CERT-READ-ERROR
+01309              IF FULL-PRINT-REQUIRED
+01310                  MOVE CM-CONTROL-PRIMARY TO WS-AM-CONTROL-PRIMARY
+01311                  PERFORM 1100-READ-AND-BUILD-ACCT THRU 1149-EXIT.
+01312
+01313 *******     BUILD ELBENE KEY
+01314      IF FULL-PRINT-REQUIRED
+01315         MOVE CL-COMPANY-CD  TO WS-BE-COMPANY-CD
+01316         MOVE 'B'            TO WS-BE-RECORD-TYPE
+01317         MOVE CL-BENEFICIARY TO WS-BE-BENEFICIARY
+01318         PERFORM 1200-READ-AND-BUILD-BENE THRU 1299-EXIT.
+01319
+01320      IF FULL-PRINT-REQUIRED
+01321          PERFORM 2700-PRINT-OPEN-CLOSE-HISTORY THRU 2700-EXIT.
+01322
+01323  0022-END.
+01324      IF NOT TRLR-BROWSE-ERROR
+01325         PERFORM  1701-ENDBR-TRLR      THRU 1701-EXIT.
+01326
+01327  0022-EXIT.
+01328       EXIT.
+01329
+01330      EJECT
+01331  1100-READ-AND-BUILD-ACCT.
+01332      
+      * EXEC CICS  HANDLE CONDITION
+01333 *           NOTFND  (1140-ENDBR)
+01334 *           ENDFILE (1140-ENDBR)
+01335 *    END-EXEC.
+      *    MOVE '"$I''                  ! $ #00007400' TO DFHEIV0
+           MOVE X'222449272020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2420233030303037343030' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01336
+01337      
+      * EXEC CICS  STARTBR
+01338 *           DATASET  ('ERACCT')
+01339 *           RIDFLD   (WS-AM-CONTROL-PRIMARY)
+01340 *           GTEQ
+01341 *    END-EXEC.
+           MOVE 'ERACCT' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&,         G          &   #00007405' TO DFHEIV0
+           MOVE X'262C20202020202020202047' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037343035' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 WS-AM-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01342
+01343      MOVE 'X'         TO WS-ACCT-BROWSE-SW.
+01344
+01345  1110-READ-NEXT.
+01346      
+      * EXEC CICS  READNEXT
+01347 *           SET      (ADDRESS OF ACCOUNT-MASTER)
+01348 *           DATASET  ('ERACCT')
+01349 *           RIDFLD   (WS-AM-CONTROL-PRIMARY)
+01350 *    END-EXEC.
+           MOVE 'ERACCT' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&.S                   )   #00007414' TO DFHEIV0
+           MOVE X'262E53202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202920' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037343134' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-AM-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF ACCOUNT-MASTER TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01351
+01352  1120-CHECK-IF-EQUAL.
+01353      IF CM-COMPANY-CD = AM-COMPANY-CD AND
+01354         CM-CARRIER    = AM-CARRIER    AND
+01355         CM-GROUPING   = AM-GROUPING   AND
+01356         CM-STATE      = AM-STATE      AND
+01357         CM-ACCOUNT    = AM-ACCOUNT
+01358            NEXT SENTENCE
+01359      ELSE
+01360         GO TO 1149-EXIT.
+01361
+01362      IF CM-CERT-EFF-DT NOT LESS THAN AM-EXPIRATION-DT
+01363         GO TO 1110-READ-NEXT.
+01364
+01365      IF CM-CERT-EFF-DT NOT LESS THAN AM-EFFECTIVE-DT
+01366         NEXT SENTENCE
+01367      ELSE
+01368         GO TO 1110-READ-NEXT.
+01369
+01370  1130-BUILD-ERACCT-ADDR.
+01371      MOVE 'X' TO END-AD-TABLE-SW.
+01372      MOVE '8'                    TO AD-TBL-TYPE   (AD-INDEX).
+01373      MOVE AM-NAME                TO AD-TBL-NAME   (AD-INDEX).
+01374      MOVE AM-ADDRS               TO AD-TBL-ADDR-1 (AD-INDEX).
+01375      MOVE SPACES                 TO AD-TBL-ADDR-2 (AD-INDEX).
+051810     MOVE SPACES                 TO AD-TBL-CITY   (AD-INDEX).
+051810     STRING AM-ADDR-CITY ' ' AM-ADDR-STATE
+051810        DELIMITED BY '  ' INTO AD-TBL-CITY (AD-INDEX)
+051810     END-STRING
+01377
+01378      MOVE SPACES                 TO WS-ZIP-WORK.
+01379      IF AM-CANADIAN-POST-CODE
+01380          MOVE AM-CAN-POSTAL-1    TO WS-CAN-POSTAL-1
+01381          MOVE AM-CAN-POSTAL-2    TO WS-CAN-POSTAL-2
+01382      ELSE
+01383          MOVE AM-ZIP-PRIME       TO WS-ZIP-PRIME
+01384          IF AM-ZIP-PLUS4 NOT = SPACES  AND  ZEROS
+01385              MOVE '-'            TO WS-ZIP-DASH
+01386              MOVE AM-ZIP-PLUS4   TO WS-ZIP-PLUS4.
+01387      MOVE WS-ZIP-WORK            TO AD-TBL-ZIP    (AD-INDEX).
+01388
+01389      MOVE AM-TEL-NO              TO WS-WORK-PHONE.
+01390      INSPECT WS-WORK-PHONE CONVERTING SPACES TO '0'.
+01391      MOVE WS-NUMERIC-PHONE       TO AD-TBL-PHONE (AD-INDEX).
+01392      SET AD-INDEX UP BY 1.
+01393
+01394  1140-ENDBR.
+01395      IF ACCT-BROWSE-OKAY
+01396         
+      * EXEC CICS  ENDBR
+01397 *            DATASET  ('ERACCT')
+01398 *       END-EXEC.
+           MOVE 'ERACCT' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&2                    $   #00007467' TO DFHEIV0
+           MOVE X'263220202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202420' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037343637' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01399
+01400  1149-EXIT.
+01401       EXIT.
+01402
+01403      EJECT
+01404  1150-READ-AND-BUILD-PROD.
+01405      
+      * EXEC CICS  HANDLE CONDITION
+01406 *        NOTFND    (1190-ENDBR)
+01407 *        ENDFILE   (1190-ENDBR)
+01408 *    END-EXEC.
+      *    MOVE '"$I''                  ! % #00007476' TO DFHEIV0
+           MOVE X'222449272020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2520233030303037343736' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01409
+01410      
+      * EXEC CICS  STARTBR
+01411 *        DATASET  ('MPPROD')
+01412 *        RIDFLD   (WS-PD-CONTROL-PRIMARY)
+01413 *        GTEQ
+01414 *    END-EXEC.
+           MOVE 'MPPROD' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&,         G          &   #00007481' TO DFHEIV0
+           MOVE X'262C20202020202020202047' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037343831' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 WS-PD-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01415
+01416      MOVE 'X'                    TO  WS-PRODUCER-BROWSE-SW.
+01417
+01418  1160-READ-NEXT.
+01419      
+      * EXEC CICS  READNEXT
+01420 *        SET       (ADDRESS OF PRODUCER-MASTER)
+01421 *        DATASET   ('MPPROD')
+01422 *        RIDFLD    (WS-PD-CONTROL-PRIMARY)
+01423 *    END-EXEC.
+           MOVE 'MPPROD' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&.S                   )   #00007490' TO DFHEIV0
+           MOVE X'262E53202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202920' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037343930' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-PD-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF PRODUCER-MASTER TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01424
+01425  1170-CHECK-IF-EQUAL.
+01426
+01427      IF PM-COMPANY-CD = PD-COMPANY-CD AND
+01428         PM-CARRIER    = PD-CARRIER    AND
+01429         PM-GROUPING   = PD-GROUPING   AND
+01430         PM-STATE      = PD-STATE      AND
+01431         PM-PRODUCER   = PD-PRODUCER
+01432          NEXT SENTENCE
+01433      ELSE
+01434          GO TO 1199-EXIT.
+01435
+01436      IF PM-POLICY-EFF-DT NOT LESS THAN PD-EXPIRE-DATE
+01437          GO TO 1160-READ-NEXT.
+01438
+01439      IF PM-POLICY-EFF-DT NOT LESS THAN PD-EFFECT-DATE
+01440          NEXT SENTENCE
+01441      ELSE
+01442          GO TO 1160-READ-NEXT.
+01443
+01444  1180-BUILD-EMPROD-ADDR.
+01445
+01446      MOVE 'X'                    TO  END-AD-TABLE-SW.
+01447      MOVE '8'                    TO  AD-TBL-TYPE   (AD-INDEX).
+01448      MOVE PD-NAME                TO  AD-TBL-NAME   (AD-INDEX).
+01449      MOVE PD-ADDRS               TO  AD-TBL-ADDR-1 (AD-INDEX).
+01450      MOVE SPACES                 TO  AD-TBL-ADDR-2 (AD-INDEX).
+01451      MOVE PD-CITY                TO  AD-TBL-CITY   (AD-INDEX).
+01452
+01453      MOVE SPACES                 TO  WS-ZIP-WORK.
+01454      MOVE PD-ZIP-PRIME           TO  WS-ZIP-PRIME
+01455      IF PD-ZIP-PLUS4 NOT = SPACES  AND  ZEROS
+01456          MOVE '-'                TO  WS-ZIP-DASH
+01457          MOVE PD-ZIP-PLUS4       TO  WS-ZIP-PLUS4.
+01458      MOVE WS-ZIP-WORK            TO  AD-TBL-ZIP    (AD-INDEX).
+01459
+01460      MOVE PD-TEL-NO              TO  WS-WORK-PHONE.
+01461      INSPECT WS-WORK-PHONE CONVERTING SPACES TO '0'.
+01462      MOVE WS-NUMERIC-PHONE       TO  AD-TBL-PHONE (AD-INDEX).
+01463      SET AD-INDEX UP BY 1.
+01464
+01465  1190-ENDBR.
+01466      IF PRODUCER-BROWSE-OKAY
+01467         
+      * EXEC CICS  ENDBR
+01468 *            DATASET  ('MPPROD')
+01469 *       END-EXEC.
+           MOVE 'MPPROD' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&2                    $   #00007538' TO DFHEIV0
+           MOVE X'263220202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202420' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037353338' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01470
+01471  1199-EXIT.
+01472       EXIT.
+01473      EJECT
+01474
+01475  1200-READ-AND-BUILD-BENE.
+01476      
+      * EXEC CICS  HANDLE CONDITION
+01477 *           NOTFND  (1299-EXIT)
+01478 *           ENDFILE (1299-EXIT)
+01479 *    END-EXEC.
+      *    MOVE '"$I''                  ! & #00007547' TO DFHEIV0
+           MOVE X'222449272020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2620233030303037353437' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01480
+01481  1210-READ.
+01482      
+      * EXEC CICS  READ
+01483 *           SET      (ADDRESS OF BENEFICIARY-MASTER)
+01484 *           DATASET  ('ELBENE')
+01485 *           RIDFLD   (WS-BE-CONTROL-PRIMARY)
+01486 *           EQUAL
+01487 *    END-EXEC.
+           MOVE 'ELBENE' TO DFHEIV1
+      *    MOVE '&"S        E          (   #00007553' TO DFHEIV0
+           MOVE X'262253202020202020202045' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037353533' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-BE-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF BENEFICIARY-MASTER TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01488
+01489  1220-BUILD-CLBENE-ADDR.
+01490      MOVE 'X' TO END-AD-TABLE-SW.
+01491      MOVE '9'                    TO AD-TBL-TYPE   (AD-INDEX).
+01492      MOVE BE-MAIL-TO-NAME        TO AD-TBL-NAME   (AD-INDEX).
+01493      MOVE BE-ADDRESS-LINE-1      TO AD-TBL-ADDR-1 (AD-INDEX).
+01494      MOVE BE-ADDRESS-LINE-2      TO AD-TBL-ADDR-2 (AD-INDEX).
+051810     MOVE SPACES                 TO AD-TBL-CITY   (AD-INDEX).
+051810     STRING BE-CITY ' ' BE-STATE
+051810        DELIMITED BY '  ' INTO AD-TBL-CITY (AD-INDEX)
+051810     END-STRING
+01496
+01497      MOVE SPACES                 TO WS-ZIP-WORK.
+01498      IF BE-CANADIAN-POST-CODE
+01499          MOVE BE-CAN-POSTAL-1    TO WS-CAN-POSTAL-1
+01500          MOVE BE-CAN-POSTAL-2    TO WS-CAN-POSTAL-2
+01501      ELSE
+01502          MOVE BE-ZIP-PRIME       TO WS-ZIP-PRIME
+01503          IF BE-ZIP-PLUS4 NOT = SPACES  AND  ZEROS
+01504              MOVE '-'            TO WS-ZIP-DASH
+01505              MOVE BE-ZIP-PLUS4   TO WS-ZIP-PLUS4.
+01506      MOVE WS-ZIP-WORK            TO AD-TBL-ZIP    (AD-INDEX).
+01507
+01508      IF BE-PHONE-NO NOT NUMERIC
+01509         MOVE ZEROS TO BE-PHONE-NO.
+01510      MOVE BE-PHONE-NO            TO AD-TBL-PHONE  (AD-INDEX).
+01511
+01512  1299-EXIT.
+01513       EXIT.
+01514      EJECT
+01515  1300-READ-CNTL.
+01516 ******************************************************************
+01517 ***          I/O REQUESTS AGAINST THE CONTROL FILE             ***
+01518 ******************************************************************
+01519
+01520      
+      * EXEC CICS  HANDLE CONDITION
+01521 *           NOTFND  (1301-NOTFND)
+01522 *    END-EXEC.
+      *    MOVE '"$I                   ! '' #00007594' TO DFHEIV0
+           MOVE X'222449202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2720233030303037353934' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01523
+01524      
+      * EXEC CICS  READ
+01525 *           SET      (ADDRESS OF CONTROL-FILE)
+01526 *           DATASET  ('ELCNTL')
+01527 *           RIDFLD   (WS-CF-CONTROL-PRIMARY)
+01528 *    END-EXEC.
+           MOVE 'ELCNTL' TO DFHEIV1
+      *    MOVE '&"S        E          (   #00007598' TO DFHEIV0
+           MOVE X'262253202020202020202045' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037353938' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-CF-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF CONTROL-FILE TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01529
+01530      GO TO 1300-EXIT.
+01531
+01532  1301-NOTFND.
+01533      MOVE  'X'  TO WS-CNTL-ERROR-SW.
+01534
+01535  1300-EXIT.
+01536       EXIT.
+01537
+01538      EJECT
+01539  1400-READNEXT-ACTQ.
+01540 ******************************************************************
+01541 ***       I/O REQUESTS AGAINST THE ACTIVITY QUE FILE           ***
+01542 ******************************************************************
+01543
+01544      
+      * EXEC CICS  HANDLE CONDITION
+01545 *           NOTFND  (1401-NOTFND)
+01546 *           ENDFILE (1402-EOF)
+01547 *    END-EXEC.
+      *    MOVE '"$I''                  ! ( #00007618' TO DFHEIV0
+           MOVE X'222449272020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2820233030303037363138' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01548
+01549      
+      * EXEC CICS  READNEXT
+01550 *           SET      (ADDRESS OF ACTIVITY-QUE)
+01551 *           DATASET  ('ELACTQ')
+01552 *           RIDFLD   (WS-AQ-CONTROL-PRIMARY)
+01553 *    END-EXEC.
+           MOVE 'ELACTQ' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&.S                   )   #00007623' TO DFHEIV0
+           MOVE X'262E53202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202920' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037363233' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-AQ-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF ACTIVITY-QUE TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01554
+01555      IF AQ-COMPANY-CD NOT = PI-COMPANY-CD
+01556         GO TO 1402-EOF.
+01557
+01558      GO TO 1400-EXIT.
+01559
+01560  1401-NOTFND.
+01561      MOVE  'X'  TO WS-ACTQ-READ-ERROR-SW.
+01562      GO TO 1400-EXIT.
+01563
+01564  1402-EOF.
+01565      MOVE  'E'  TO WS-ELACTQ-EOF-SW.
+01566      GO TO 1400-EXIT.
+01567
+01568  1400-EXIT.
+01569       EXIT.
+01570
+01571  1450-BROWSE-ACTQ.
+01572      
+      * EXEC CICS  HANDLE CONDITION
+01573 *           NOTFND  (1451-NOTFND)
+01574 *    END-EXEC.
+      *    MOVE '"$I                   ! ) #00007646' TO DFHEIV0
+           MOVE X'222449202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2920233030303037363436' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01575
+01576      
+      * EXEC CICS  STARTBR
+01577 *           DATASET  ('ELACTQ')
+01578 *           RIDFLD   (WS-AQ-CONTROL-PRIMARY)
+01579 *           GTEQ
+01580 *    END-EXEC.
+           MOVE 'ELACTQ' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&,         G          &   #00007650' TO DFHEIV0
+           MOVE X'262C20202020202020202047' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037363530' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 WS-AQ-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01581
+01582      GO TO 1450-EXIT.
+01583
+01584  1451-NOTFND.
+01585      MOVE    '*** ERROR ON START ACTQ ***' TO WS-PASSED-DATA
+01586      GO TO 9999-FINALIZE.
+01587
+01588  1450-EXIT.
+01589       EXIT.
+01590
+01591  1455-ENDBR-ACTQ.
+01592      
+      * EXEC CICS  ENDBR
+01593 *           DATASET  ('ELACTQ')
+01594 *    END-EXEC.
+           MOVE 'ELACTQ' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&2                    $   #00007666' TO DFHEIV0
+           MOVE X'263220202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202420' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037363636' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01595
+01596  1455-EXIT.
+01597       EXIT.
+01598
+01599  1480-READ-UPDATE-ACTQ.
+01600      
+      * EXEC CICS  HANDLE CONDITION
+01601 *           NOTFND  (1481-NOTFND)
+01602 *    END-EXEC.
+      *    MOVE '"$I                   ! * #00007674' TO DFHEIV0
+           MOVE X'222449202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2A20233030303037363734' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01603
+01604      
+      * EXEC CICS  READ
+01605 *           SET      (ADDRESS OF ACTIVITY-QUE)
+01606 *           DATASET  ('ELACTQ')
+01607 *           RIDFLD   (WS-AQ-CONTROL-PRIMARY)
+01608 *           UPDATE
+01609 *    END-EXEC.
+           MOVE 'ELACTQ' TO DFHEIV1
+      *    MOVE '&"S        EU         (   #00007678' TO DFHEIV0
+           MOVE X'262253202020202020202045' TO DFHEIV0(1:12)
+           MOVE X'552020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037363738' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-AQ-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF ACTIVITY-QUE TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01610
+01611      GO TO 1480-EXIT.
+01612
+01613  1481-NOTFND.
+01614      MOVE  'X'  TO WS-ACTQ-READ-ERROR-SW.
+01615
+01616  1480-EXIT.
+01617       EXIT.
+01618
+01619      EJECT
+01620  1550-READ-MSTR.
+01621 ******************************************************************
+01622 ***       I/O REQUESTS AGAINST THE CLAIM MASTER FILE           ***
+01623 ******************************************************************
+01624
+01625      
+      * EXEC CICS  HANDLE CONDITION
+01626 *           NOTFND  (1551-NOTFND)
+01627 *           ENDFILE (1552-EOF)
+01628 *    END-EXEC.
+      *    MOVE '"$I''                  ! + #00007699' TO DFHEIV0
+           MOVE X'222449272020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2B20233030303037363939' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01629
+01630      
+      * EXEC CICS  READ
+01631 *           SET      (ADDRESS OF CLAIM-MASTER)
+01632 *           DATASET  ('ELMSTR')
+01633 *           RIDFLD   (WS-CL-CONTROL-PRIMARY)
+01634 *    END-EXEC.
+           MOVE 'ELMSTR' TO DFHEIV1
+      *    MOVE '&"S        E          (   #00007704' TO DFHEIV0
+           MOVE X'262253202020202020202045' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037373034' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-CL-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF CLAIM-MASTER TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01635
+01636      GO TO 1550-EXIT.
+01637
+01638  1552-EOF.
+01639      MOVE  'E'  TO WS-ELMSTR-EOF-SW.
+01640      GO TO 1550-EXIT.
+01641
+01642  1551-NOTFND.
+01643      MOVE  'X'  TO WS-MSTR-READ-ERROR-SW.
+01644
+01645  1550-EXIT.
+01646       EXIT.
+01647
+01648      EJECT
+01649  1600-READ-CERT.
+01650 ******************************************************************
+01651 ***   I/O REQUESTS AGAINST THE CERTIFICATE MASTER FILE         ***
+01652 ******************************************************************
+01653
+01654      
+      * EXEC CICS  HANDLE CONDITION
+01655 *           NOTFND  (1601-NOTFND)
+01656 *    END-EXEC.
+      *    MOVE '"$I                   ! , #00007728' TO DFHEIV0
+           MOVE X'222449202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2C20233030303037373238' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01657
+01658      
+      * EXEC CICS  READ
+01659 *           SET      (ADDRESS OF CERTIFICATE-MASTER)
+01660 *           DATASET  ('ELCERT')
+01661 *           RIDFLD   (WS-CM-CONTROL-PRIMARY)
+01662 *    END-EXEC.
+           MOVE 'ELCERT' TO DFHEIV1
+      *    MOVE '&"S        E          (   #00007732' TO DFHEIV0
+           MOVE X'262253202020202020202045' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037373332' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-CM-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF CERTIFICATE-MASTER TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01663
+01664      GO TO 1600-EXIT.
+01665
+01666  1601-NOTFND.
+01667      MOVE  'X'  TO WS-CERT-READ-ERROR-SW.
+01668
+01669  1600-EXIT.
+01670       EXIT.
+01671
+01672  1605-READ-EMPLCY.
+01673 ******************************************************************
+01674 ***   I/O REQUESTS AGAINST THE CONVENIENCE POLICY MASTER FILE  ***
+01675 ******************************************************************
+01676
+01677      
+      * EXEC CICS  HANDLE CONDITION
+01678 *           NOTFND  (1605-NOTFND)
+01679 *    END-EXEC.
+      *    MOVE '"$I                   ! - #00007751' TO DFHEIV0
+           MOVE X'222449202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2D20233030303037373531' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01680
+01681      
+      * EXEC CICS  READ
+01682 *           SET      (ADDRESS OF POLICY-MASTER)
+01683 *           DATASET  ('MPPLCY')
+01684 *           RIDFLD   (WS-PM-CONTROL-PRIMARY)
+01685 *    END-EXEC.
+           MOVE 'MPPLCY' TO DFHEIV1
+      *    MOVE '&"S        E          (   #00007755' TO DFHEIV0
+           MOVE X'262253202020202020202045' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037373535' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-PM-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF POLICY-MASTER TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01686
+01687      GO TO 1605-EXIT.
+01688
+01689  1605-NOTFND.
+01690      MOVE  'X'                   TO  WS-PLCY-READ-ERROR-SW.
+01691
+01692  1605-EXIT.
+01693       EXIT.
+01694
+01695  1610-READ-EMPLAN.
+01696 ******************************************************************
+01697 ***   I/O REQUESTS AGAINST THE CONVENIENCE PRODUCER PLAN       ***
+01698 ***   MASTER FILE                                              ***
+01699 ******************************************************************
+01700
+01701      
+      * EXEC CICS  HANDLE CONDITION
+01702 *           NOTFND  (1610-NOTFND)
+01703 *    END-EXEC.
+      *    MOVE '"$I                   ! . #00007775' TO DFHEIV0
+           MOVE X'222449202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2E20233030303037373735' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01704
+01705      
+      * EXEC CICS  READ
+01706 *           SET      (ADDRESS OF PRODUCER-PLANS)
+01707 *           DATASET  ('MPPLAN')
+01708 *           RIDFLD   (WS-PP-CONTROL-PRIMARY)
+01709 *    END-EXEC.
+           MOVE 'MPPLAN' TO DFHEIV1
+      *    MOVE '&"S        E          (   #00007779' TO DFHEIV0
+           MOVE X'262253202020202020202045' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037373739' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-PP-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF PRODUCER-PLANS TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01710
+01711      GO TO 1610-EXIT.
+01712
+01713  1610-NOTFND.
+01714      MOVE  'X'                   TO  WS-PLAN-READ-ERROR-SW.
+01715
+01716  1610-EXIT.
+01717       EXIT.
+01718
+01719      EJECT
+01720  1700-BROWSE-TRLR.
+01721 ******************************************************************
+01722 ***       I/O REQUESTS AGAINST THE ACTIVITY TRAILER FILE       ***
+01723 ******************************************************************
+01724
+01725      
+      * EXEC CICS  HANDLE CONDITION
+01726 *           NOTFND  (1701-NOTFND)
+01727 *    END-EXEC.
+      *    MOVE '"$I                   ! / #00007799' TO DFHEIV0
+           MOVE X'222449202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'2F20233030303037373939' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01728
+01729      
+      * EXEC CICS  STARTBR
+01730 *           DATASET  ('ELTRLR')
+01731 *           RIDFLD   (WS-AT-CONTROL-PRIMARY)
+01732 *           EQUAL
+01733 *    END-EXEC.
+           MOVE 'ELTRLR' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&,         E          &   #00007803' TO DFHEIV0
+           MOVE X'262C20202020202020202045' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037383033' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 WS-AT-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01734
+01735      MOVE SPACE TO WS-TRLR-BROWSE-ERROR-SW.
+01736
+01737      GO TO 1700-EXIT.
+01738  1701-NOTFND.
+01739      MOVE  'X'  TO WS-TRLR-BROWSE-ERROR-SW.
+01740
+01741  1700-EXIT.
+01742       EXIT.
+01743
+01744  1701-ENDBR-TRLR.
+01745      
+      * EXEC CICS  ENDBR
+01746 *           DATASET  ('ELTRLR')
+01747 *    END-EXEC.
+           MOVE 'ELTRLR' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&2                    $   #00007819' TO DFHEIV0
+           MOVE X'263220202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202420' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037383139' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01748
+01749  1701-EXIT.
+01750       EXIT.
+01751
+01752  1750-READNEXT-TRLR.
+01753      
+      * EXEC CICS  HANDLE CONDITION
+01754 *           ENDFILE (1752-ENDFILE)
+01755 *    END-EXEC.
+      *    MOVE '"$''                   ! 0 #00007827' TO DFHEIV0
+           MOVE X'222427202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'3020233030303037383237' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01756
+01757      
+      * EXEC CICS  READNEXT
+01758 *           DATASET  ('ELTRLR')
+01759 *           RIDFLD   (WS-AT-CONTROL-PRIMARY)
+01760 *           SET      (ADDRESS OF ACTIVITY-TRAILERS)
+01761 *    END-EXEC.
+           MOVE 'ELTRLR' TO DFHEIV1
+           MOVE 0
+             TO DFHEIV11
+      *    MOVE '&.S                   )   #00007831' TO DFHEIV0
+           MOVE X'262E53202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202920' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037383331' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-AT-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF ACTIVITY-TRAILERS TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01762
+01763      GO TO 1750-EXIT.
+01764
+01765  1752-ENDFILE.
+01766      MOVE  'E'  TO WS-ELTRLR-EOF-SW.
+01767
+01768  1750-EXIT.
+01769       EXIT.
+01770
+01771      EJECT
+01772  1800-DELETE-ACTQ.
+01773 ******************************************************************
+01774 ***     MORE I/O REQUESTS AGAINST THE ACTIVITY QUE FILE        ***
+01775 ******************************************************************
+01776
+01777      
+      * EXEC CICS  HANDLE CONDITION
+01778 *           ERROR   (1801-ERROR)
+01779 *    END-EXEC.
+      *    MOVE '"$.                   ! 1 #00007851' TO DFHEIV0
+           MOVE X'22242E202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'3120233030303037383531' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01780
+01781      
+      * EXEC CICS  DELETE
+01782 *           DATASET  ('ELACTQ')
+01783 *    END-EXEC.
+           MOVE 'ELACTQ' TO DFHEIV1
+      *    MOVE '&(                    &   #00007855' TO DFHEIV0
+           MOVE X'262820202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037383535' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01784
+01785      GO TO 1800-EXIT.
+01786
+01787  1801-ERROR.
+01788      MOVE    '*** ERROR UPDATING ACTQ ***' TO WS-PASSED-DATA.
+01789      GO TO 9999-FINALIZE.
+01790
+01791  1800-EXIT. EXIT.
+01792 *********
+01793  1850-REWRITE-ACTQ.
+01794      
+      * EXEC CICS  HANDLE CONDITION
+01795 *           ERROR   (1851-ERROR)
+01796 *    END-EXEC.
+      *    MOVE '"$.                   ! 2 #00007868' TO DFHEIV0
+           MOVE X'22242E202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'3220233030303037383638' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01797
+01798      
+      * EXEC CICS  REWRITE
+01799 *           DATASET  ('ELACTQ')
+01800 *           FROM     (ACTIVITY-QUE)
+01801 *    END-EXEC.
+           MOVE LENGTH OF
+            ACTIVITY-QUE
+             TO DFHEIV11
+           MOVE 'ELACTQ' TO DFHEIV1
+      *    MOVE '&& L                  %   #00007872' TO DFHEIV0
+           MOVE X'2626204C2020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202520' TO DFHEIV0(13:12)
+           MOVE X'2020233030303037383732' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 ACTIVITY-QUE, 
+                 DFHEIV11, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+01802
+01803      GO TO 1850-EXIT.
+01804
+01805  1851-ERROR.
+01806          MOVE    '*** ERROR UPDATING ACTQ ***' TO WS-PASSED-DATA
+01807          GO TO 9999-FINALIZE.
+01808
+01809  1850-EXIT.
+01810       EXIT.
+01811
+01812      EJECT
+uktdel*ALIGN-RTN.                      COPY ELCALGNP.
+uktins ALIGN-RTN.
+uktins*    COPY ELCALGNP.
+00001 ******************************************************************
+00002 *                                                                *
+00003 *                            ELCALGNP.                           *
+00004 *                            VMOD=2.002                          *
+00005 *                                                                *
+CIDMOD*   NO  CID  MODS  IN  COPYBOOK ELCALGNP                         *
+00006 ******************************************************************
+00007
+00008 ******************************************************************
+00009 ***                 -ELCALGNP-
+00010 ***     COPY MEMBER FOR FIELD ALIGNMENT ROUTINE                  *
+00011 ***     THIS ROUTINE WILL ACCEPT AN ALPHABETIC FIELD AND AFTER   *
+00012 ***      ALIGNING THE CONTENTS IN THE CENTER, RETURNS THE ALIGNED*
+00013 ***      FIELD IN A SEPARATE AREA.
+00014 ***     THIS ROUTINE TO BE USED ONLY WITH ACCOMPANIMENT          *
+00015 ***      OF THE WORKING-STORAGE COPY MEMBER ( ELCALGND )         *
+00016 ***     THE HOST PROGRAM MUST INITIALIZE THE FOLLOWING 2 FIELDS  *
+00017 ***      FROM THE ABOVE COPY MEMBER FOR THIS PROCEDURE TO BE     *
+00018 ***      SUCCESSFUL.                                             *
+00019 ***       WS-UNALIGNED-FIELD   PIC X(30)
+00020 ***                         THE ALPHANUMERIC FIELD TO BE ALIGNED
+00021 ***       WS-NAME-LENGTH       PIC S9(4)
+00022 ***                         THE NUMERIC LENGTH OF THE ABOVE FIELD
+00023 ***                         DEFAULT VALUE IS 30
+00024 ******************************************************************
+00025  ELCALGNP.
+00026      MOVE SPACES   TO WS-ALIGNED-FIELD.
+00027
+00028      IF WS-UNALIGNED-FIELD = SPACES
+00029          GO TO ELCALGNP-EXIT.
+00030
+00031      MOVE  ZEROS     TO WS-HALF-BLANKS
+00032                         WS-ACTUAL-NAME-LENGTH
+00033                         WS-SPACE-COUNTER.
+00034
+00035      MOVE LOW-VALUES TO WS-LENGTH-FOUND-SW.
+00036      SET NAME-IND    TO WS-NAME-LENGTH.
+00037
+00038      PERFORM S1-FIND-SPACE-LENGTH  THRU S1-EXIT
+00039                                     UNTIL  LENGTH-FOUND.
+00040
+00041      IF WS-SPACE-COUNTER LESS 2
+00042          MOVE WS-UNALIGNED-FIELD  TO WS-ALIGNED-FIELD
+00043          GO TO ELCALGNP-EXIT.
+00044
+00045      SUBTRACT WS-SPACE-COUNTER FROM WS-NAME-LENGTH
+00046                                     GIVING WS-ACTUAL-NAME-LENGTH.
+00047
+00048      DIVIDE  WS-SPACE-COUNTER BY 2  GIVING WS-HALF-BLANKS.
+00049      SET  NAME-IND-A TO 1.
+00050      PERFORM  S2-MOVE-LEADING-SPACE  THRU S2-EXIT
+00051                                     WS-HALF-BLANKS  TIMES.
+00052      SET  NAME-IND   TO 1.
+00053      PERFORM S3-MOVE-ALPHA           THRU S3-EXIT
+00054                                     WS-ACTUAL-NAME-LENGTH  TIMES.
+00055  ELCALGNP-EXIT.
+00056      EXIT.
+00057
+00058  S1-FIND-SPACE-LENGTH.
+00059      IF  WS-UNALIGNED-BYTE (NAME-IND) = SPACES
+00060          ADD 1  TO WS-SPACE-COUNTER
+00061      ELSE
+00062          MOVE HIGH-VALUES TO WS-LENGTH-FOUND-SW
+00063          GO TO S1-EXIT.
+00064
+00065      SET NAME-IND  DOWN BY 1.
+00066      IF NAME-IND NOT  GREATER THAN ZERO
+00067          MOVE  HIGH-VALUES TO WS-LENGTH-FOUND-SW.
+00068
+00069  S1-EXIT.
+00070      EXIT.
+00071
+00072  S2-MOVE-LEADING-SPACE.
+00073      MOVE SPACE   TO WS-UNALIGNED-BYTE-A (NAME-IND-A)
+00074      SET NAME-IND-A  UP  BY 1.
+00075
+00076  S2-EXIT.
+00077      EXIT.
+00078
+00079  S3-MOVE-ALPHA.
+00080      MOVE  WS-UNALIGNED-BYTE (NAME-IND) TO
+00081                          WS-UNALIGNED-BYTE-A (NAME-IND-A).
+00082      SET NAME-IND   UP BY 1.
+00083      SET NAME-IND-A UP BY 1.
+00084
+00085  S3-EXIT.
+00086      EXIT.
+00087
+01814      EJECT
+01815  2110-MOVE-CLAIM-INFO.
+01816      MOVE CL-CLAIM-NO          TO P-CLAIM-NO.
+01817      MOVE CL-CARRIER           TO P-CARR.
+01818      MOVE CL-CERT-NO           TO P-CERT-NO.
+01819      MOVE CL-CCN               TO HEAD-CREDIT-CARD.
+01820      MOVE CL-INSURED-SEX-CD    TO P-INSURED-SEX.
+01821      MOVE SPACES               TO P-STATUS     P-TYPE.
+01822
+121802     EVALUATE TRUE
+121802        WHEN CL-CLAIM-TYPE = PI-AH-OVERRIDE-L1
+01824            MOVE PI-AH-OVERRIDE-L2
+                                       TO P-TYPE
+121802        WHEN CL-CLAIM-TYPE = 'I'
+121802           MOVE ' IU '            TO P-TYPE
+121802        WHEN CL-CLAIM-TYPE = 'G'
+121802           MOVE 'GAP '            TO P-TYPE
+052614
+052614        WHEN CL-CLAIM-TYPE = 'F'
+052614           MOVE 'FAM '            TO P-TYPE
+100518
+100518        WHEN CL-CLAIM-TYPE = 'O'
+100518           MOVE 'OTH '            TO P-TYPE
+080322        WHEN CL-CLAIM-TYPE = 'B'
+080322           MOVE ' BRV  '          TO P-TYPE
+080322
+080322        WHEN CL-CLAIM-TYPE = 'H'
+080322           MOVE ' HOSP '          TO P-TYPE
+121802        WHEN CL-CLAIM-TYPE = PI-LIFE-OVERRIDE-L1
+01827            MOVE PI-LIFE-OVERRIDE-L2
+                                       TO P-TYPE
+121802     END-EVALUATE
+01828
+01829      IF CLAIM-IS-CLOSED
+01830          MOVE 'CLOSED'  TO P-STATUS.
+01831
+01832      IF CLAIM-IS-OPEN
+01833          MOVE 'OPEN'    TO P-STATUS.
+01834
+01835      PERFORM 2111-ARRANGE-NAME  THRU 2111-EXIT.
+01836
+01837      MOVE CL-PROCESSOR-ID TO P-PROCESSOR.
+01838      MOVE CL-LAST-PMT-AMT TO P-LAST-PMT-AMT.
+01839
+01840      IF CL-PAID-THRU-DT  = LOW-VALUES OR SPACES
+01841          MOVE SPACE TO P-PAID-THRU-DT
+01842          IF PI-USES-PAID-TO
+01843             MOVE 'PAID  TO   - ' TO L-12-PD-THRU
+01844          ELSE
+01845             MOVE 'PAID THRU  - ' TO L-12-PD-THRU
+01846      ELSE
+01847          IF NOT PI-USES-PAID-TO
+01848             MOVE CL-PAID-THRU-DT TO DC-BIN-DATE-1
+01849             MOVE ' '             TO DC-OPTION-CODE
+01850             PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+01851             MOVE DC-GREG-DATE-1-EDIT  TO P-PAID-THRU-DT
+01852          ELSE
+01853             MOVE 'PAID  TO   - ' TO L-12-PD-THRU
+01854             MOVE CL-PAID-THRU-DT TO DC-BIN-DATE-1
+01855             MOVE +1  TO DC-ELAPSED-DAYS
+01856             MOVE +0  TO DC-ELAPSED-MONTHS
+01857             MOVE '6' TO DC-OPTION-CODE
+01858             PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+01859             MOVE DC-GREG-DATE-1-EDIT  TO P-PAID-THRU-DT.
+01860
+01861      IF CL-LAST-PMT-DT = LOW-VALUES OR SPACES
+01862          MOVE SPACE TO P-LAST-PMT-DT
+01863      ELSE
+01864          MOVE CL-LAST-PMT-DT  TO DC-BIN-DATE-1
+01865          MOVE ' '             TO DC-OPTION-CODE
+01866          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+01867          MOVE DC-GREG-DATE-1-EDIT  TO P-LAST-PMT-DT.
+01868
+01869      IF CL-INCURRED-DT = LOW-VALUES OR SPACES
+01870          MOVE SPACE TO P-INCURRED-DT
+01871      ELSE
+01872          MOVE CL-INCURRED-DT  TO DC-BIN-DATE-1
+01873          MOVE ' '             TO DC-OPTION-CODE
+01874          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+01875          MOVE DC-GREG-DATE-1-EDIT  TO P-INCURRED-DT.
+01876
+01877      IF CL-REPORTED-DT = LOW-VALUES OR SPACES
+01878          MOVE SPACE TO P-REPORTED-DT
+01879      ELSE
+01880          MOVE CL-REPORTED-DT TO DC-BIN-DATE-1
+01881          MOVE ' '            TO DC-OPTION-CODE
+01882          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+01883          MOVE DC-GREG-DATE-1-EDIT  TO P-REPORTED-DT
+01884
+01885      IF CL-FILE-ESTABLISH-DT = LOW-VALUES OR SPACES
+01886          MOVE SPACE TO P-ESTAB-DT
+01887      ELSE
+01888          MOVE CL-FILE-ESTABLISH-DT TO DC-BIN-DATE-1
+01889          MOVE ' '                  TO DC-OPTION-CODE
+01890          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+01891          MOVE DC-GREG-DATE-1-EDIT    TO P-ESTAB-DT.
+01892
+01893      IF CL-NEXT-AUTO-PAY-DT = LOW-VALUES OR SPACES
+01894          MOVE SPACES   TO P-NEXT-AUTO-DT
+01895      ELSE
+01896          IF PI-USES-PAID-TO
+01897              MOVE CL-NEXT-AUTO-PAY-DT    TO  DC-BIN-DATE-1
+01898              MOVE '6'                    TO  DC-OPTION-CODE
+01899              MOVE +1                     TO  DC-ELAPSED-DAYS
+01900              MOVE +0                     TO  DC-ELAPSED-MONTHS
+01901              PERFORM 8100-DATE-RTN      THRU 8100-EXIT
+01902              IF NO-CONVERSION-ERROR
+01903                  MOVE DC-GREG-DATE-1-EDIT TO P-NEXT-AUTO-DT
+01904              ELSE
+01905                  MOVE SPACES             TO  P-NEXT-AUTO-DT
+01906          ELSE
+01907              MOVE CL-NEXT-AUTO-PAY-DT    TO  DC-BIN-DATE-1
+01908              MOVE ' '                    TO  DC-OPTION-CODE
+01909              MOVE +0                     TO  DC-ELAPSED-DAYS
+01910                                             DC-ELAPSED-MONTHS
+01911              PERFORM 8100-DATE-RTN       THRU 8100-EXIT
+01912              IF NO-CONVERSION-ERROR
+01913                  MOVE DC-GREG-DATE-1-EDIT TO P-NEXT-AUTO-DT
+01914              ELSE
+01915                  MOVE SPACES             TO  P-NEXT-AUTO-DT.
+01916
+01917      MOVE CL-NO-OF-PMTS-MADE     TO P-PMTS-MADE.
+01918
+01919      MOVE SPACES  TO P-PREM-TYPE.
+01920      IF SINGLE-PREMIUM
+01921          MOVE 'SINGLE'           TO P-PREM-TYPE.
+01922
+01923      IF O-B-COVERAGE
+01924          MOVE 'OB COVG'          TO P-PREM-TYPE.
+01925
+01926      IF OPEN-END-COVERAGE
+01927          MOVE 'OPN END'          TO P-PREM-TYPE.
+01928
+01929      MOVE CL-TOTAL-PAID-AMT      TO P-TOT-PAID.
+01930
+01931      MOVE SPACES              TO P-PURGED-STMT
+01932                                  P-PURGED-DATE.
+01933
+01934      IF CL-PURGED-DT NOT EQUAL LOW-VALUES
+01935         MOVE CL-PURGED-DT         TO DC-BIN-DATE-1
+01936         MOVE ' '                  TO DC-OPTION-CODE
+01937         MOVE +0                   TO DC-ELAPSED-DAYS
+01938                                      DC-ELAPSED-MONTHS
+01939         PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+01940         MOVE 'PURGED DATE  - '    TO P-PURGED-STMT
+01941         MOVE DC-GREG-DATE-1-EDIT  TO P-PURGED-DATE.
+01942
+01943  2110-EXIT.
+01944       EXIT.
+01945
+01946      EJECT
+01947  2111-ARRANGE-NAME.
+01948      MOVE SPACES                TO P-NAME-GRP.
+01949      MOVE CL-INSURED-LAST-NAME  TO WS-LAST-NAME.
+01950      MOVE CL-INSURED-1ST-NAME   TO WS-FIRST-NAME.
+01951
+01952      SET L-IND  TO 1.
+01953      SET F-IND  TO 1.
+01954      SET P-IND  TO 1.
+01955
+01956      MOVE SPACES  TO WS-LN-SW
+01957                      WS-FN-SW
+01958                      PREVIOUS-BYTE.
+01959
+01960      IF WS-LAST-NAME = SPACE
+01961          NEXT SENTENCE
+01962      ELSE
+01963          PERFORM 2111A-LOAD-LAST-NAME  THRU 2111A-EXIT
+01964           UNTIL  LAST-NAME-LOADED
+01965           OR     L-IND  GREATER THAN 15.
+01966
+01967      MOVE ',' TO P-NAME (P-IND).
+01968      SET P-IND  UP  BY 2.
+01969      IF WS-FIRST-NAME = SPACE
+01970          NEXT SENTENCE
+01971      ELSE
+01972          PERFORM 2111B-LOAD-FIRST-NAME  THRU 2111B-EXIT
+01973           UNTIL  FIRST-NAME-LOADED
+01974           OR     F-IND  GREATER THAN 12.
+01975
+01976      IF CL-INSURED-MID-INIT NOT = SPACES
+01977          MOVE ','  TO P-NAME (P-IND)
+01978          SET P-IND  UP BY 1
+01979          MOVE CL-INSURED-MID-INIT  TO P-NAME (P-IND)
+01980      ELSE
+01981          NEXT SENTENCE.
+01982
+01983  2111-EXIT.
+01984       EXIT.
+01985
+01986  2111A-LOAD-LAST-NAME.
+01987      IF  WS-L-BYTE (L-IND) = SPACE
+01988          IF PREVIOUS-BYTE = SPACE
+01989              MOVE 'X' TO WS-LN-SW
+01990              SET P-IND  DOWN  BY 1
+01991              GO TO 2111A-EXIT
+01992          ELSE
+01993              MOVE SPACE TO PREVIOUS-BYTE
+01994      ELSE
+01995          MOVE WS-L-BYTE (L-IND)  TO P-NAME (P-IND)
+01996                                     PREVIOUS-BYTE.
+01997
+01998      SET L-IND  UP BY 1.
+01999      SET P-IND  UP BY 1.
+02000
+02001  2111A-EXIT.
+02002        EXIT.
+02003
+02004  2111B-LOAD-FIRST-NAME.
+02005      IF  WS-F-BYTE (F-IND) = SPACE
+02006          IF PREVIOUS-BYTE = SPACE
+02007              MOVE 'X' TO WS-FN-SW
+02008              SET P-IND  DOWN BY 1
+02009              GO TO 2111B-EXIT
+02010          ELSE
+02011              MOVE SPACE TO PREVIOUS-BYTE
+02012      ELSE
+02013          MOVE WS-F-BYTE (F-IND)  TO P-NAME (P-IND)
+02014                                     PREVIOUS-BYTE.
+02015
+02016      SET F-IND  UP BY 1.
+02017      SET P-IND  UP BY 1.
+02018
+02019  2111B-EXIT.
+02020        EXIT.
+02021
+02022      EJECT
+02023  2120-NO-CERT-INFO.
+02024      MOVE SPACES     TO P-COVERAGE
+02025                         P-EXPIRE
+02026                         WS-CANC-DT
+02027                         P-CERT-ISSUE-DT
+02028                         P-CERT-ENTRY-MM  P-CERT-SL
+02029                         P-CERT-ENTRY-YY.
+02030      MOVE ZERO       TO P-TERM
+02031                         P-REM.
+02032      MOVE SPACES     TO P-CERT-STAT
+02033                         P-ACCT
+02034                         P-STATE
+02035                         P-GROUP
+02036                         P-REIN-CODE
+02037                         P-CERT-CANC-DT
+02038                         P-MEMBER-NO
+02039                         P-CERT-BATCH.
+02040      MOVE ZERO       TO P-ORIG-BENEF-AMT.
+02041
+02042  2120-EXIT.
+02043       EXIT.
+02044
+02045      EJECT
+02046  2130-MOVE-CERT-INFO.
+02047      MOVE ZEROS                    TO WS-BEN-CODE.
+02048      MOVE CM-INSURED-ISSUE-AGE     TO P-INSURED-AGE.
+02049      MOVE CM-USER-FIELD            TO P-USER-CODE.
+02050
+02051      IF CM-LF-ALT-BENEFIT-AMT NOT NUMERIC
+02052          MOVE ZEROS                TO CM-LF-ALT-BENEFIT-AMT.
+02053
+052614     IF CL-CLAIM-TYPE = PI-AH-OVERRIDE-L1 OR 'I' OR 'G' OR 'F'
+02055          MOVE  CM-AH-BENEFIT-CD      TO  WS-BEN-CODE
+02056          MOVE  '5'                   TO  WS-CF-RECORD-TYPE
+02057          MOVE  CM-AH-ORIG-TERM       TO  P-TERM
+02058                                          CP-ORIGINAL-TERM
+02059          MOVE CM-AH-LOAN-EXPIRE-DT   TO  DC-BIN-DATE-1
+02060          MOVE  CM-AH-BENEFIT-AMT     TO  P-ORIG-BENEF-AMT
+02061          MOVE  CM-AH-CURRENT-STATUS  TO  WS-STATUS
+02062          MOVE WS-BIN-CURRENT-DT      TO  CP-VALUATION-DT
+02063      ELSE
+02064          MOVE  CM-LF-BENEFIT-CD      TO  WS-BEN-CODE
+02065          MOVE  '4'                   TO  WS-CF-RECORD-TYPE
+02066          MOVE  CM-LF-ORIG-TERM       TO  P-TERM
+02067                                          CP-ORIGINAL-TERM
+02068          MOVE CM-LF-LOAN-EXPIRE-DT   TO  DC-BIN-DATE-1
+02069          COMPUTE P-ORIG-BENEF-AMT =
+02070                 CM-LF-BENEFIT-AMT + CM-LF-ALT-BENEFIT-AMT
+02071          MOVE  CM-LF-CURRENT-STATUS  TO  WS-STATUS
+02072          MOVE CL-INCURRED-DT         TO  CP-VALUATION-DT
+           END-IF
+02073
+02074      MOVE ' '                       TO DC-OPTION-CODE.
+02075      PERFORM 8100-DATE-RTN  THRU 8100-EXIT.
+02076      MOVE DC-GREG-DATE-1-EDIT       TO P-EXPIRE.
+02077
+02078      MOVE CM-CERT-EFF-DT           TO CP-CERT-EFF-DT
+02079
+02080      MOVE 'CERT ENTRY    - '        TO L22-ENTRY-LIT.
+02081      IF CM-ENTRY-DT = LOW-VALUES OR SPACES
+02082          MOVE SPACES TO    P-CERT-ENTRY-YY   P-CERT-SL
+02083                            P-CERT-ENTRY-MM
+02084      ELSE
+02085          MOVE CM-ENTRY-DT           TO DC-BIN-DATE-1
+02086          MOVE ' '                   TO DC-OPTION-CODE
+02087          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02088          MOVE DC-GREG-DATE-1-MDY    TO WS-MM-DD-YY
+02089          MOVE WS-MM                 TO P-CERT-ENTRY-MM
+02090          MOVE WS-YY                 TO P-CERT-ENTRY-YY
+02091          MOVE '/' TO P-CERT-SL.
+02092
+02093      MOVE 'CERT ISSUE   - '         TO L15-ISSUE-LIT.
+02094      MOVE CM-CERT-EFF-DT            TO DC-BIN-DATE-1.
+02095      MOVE ' '                       TO DC-OPTION-CODE.
+02096      PERFORM 8100-DATE-RTN  THRU 8100-EXIT.
+02097      MOVE DC-GREG-DATE-1-EDIT       TO P-CERT-ISSUE-DT.
+02098
+02099      MOVE CM-LOAN-1ST-PMT-DT        TO CP-FIRST-PAY-DATE.
+02100
+02101 **     READ CNTL RECORD TO OBTAIN FREE LOOK DAYS
+02102
+02103      MOVE PI-COMPANY-ID             TO WS-CF-COMPANY-ID.
+02104      MOVE PI-STATE                  TO WS-CF-PROCESSOR.
+02105      MOVE ZEROS                     TO WS-CF-SEQUENCE-NO.
+02106      MOVE '3'                       TO WS-CF-RECORD-TYPE.
+02107      MOVE SPACES                    TO WS-CNTL-ERROR-SW.
+02108
+02109      PERFORM 1300-READ-CNTL  THRU 1300-EXIT.
+02110
+02111      IF NO-COMPANY-RECORD
+02112         MOVE    '*** ERROR NO STATE REC ***' TO WS-PASSED-DATA
+02113         GO TO 9999-FINALIZE
+02114      ELSE
+02115         MOVE CF-ST-FREE-LOOK-PERIOD TO CP-FREE-LOOK.
+02116
+02117      MOVE PI-REM-TRM-CALC-OPTION    TO CP-REM-TRM-CALC-OPTION.
+02118      MOVE PI-COMPANY-ID             TO CP-COMPANY-ID.
+02119      MOVE '4'                       TO CP-REM-TERM-METHOD.
+02120      PERFORM 9800-LINK-REM-TERM THRU 9800-EXIT.
+02121
+02122      IF CP-REMAINING-TERM-3 NOT GREATER THAN ZEROS
+02123         MOVE ZEROS      TO  P-REM
+02124        ELSE
+02125         MOVE CP-REMAINING-TERM-3 TO  P-REM.
+02126
+02127      MOVE SPACES           TO P-CERT-STAT.
+02128
+02129      IF WS-STATUS = '1' OR '4'
+02130         IF CP-REMAINING-TERM-3  NOT GREATER THAN ZEROS
+02131            MOVE 'EXPIRED'  TO P-CERT-STAT
+02132           ELSE
+02133            MOVE 'ACTIVE'   TO P-CERT-STAT.
+02134
+02135      IF WS-STATUS = '2'
+02136          MOVE 'PEND'     TO P-CERT-STAT.
+02137
+02138      IF WS-STATUS = '3'
+02139          MOVE 'RESTORE ' TO P-CERT-STAT.
+02140
+02141      IF WS-STATUS = '5'
+02142          MOVE 'REISSUE ' TO P-CERT-STAT.
+02143
+02144      IF WS-STATUS = '6'
+02145          MOVE 'LMP DIS'  TO P-CERT-STAT.
+02146
+02147      IF WS-STATUS = '7'
+02148          MOVE 'DEATH'    TO P-CERT-STAT.
+02149
+02150      IF WS-STATUS = '8'
+02151          MOVE 'CANCEL'   TO P-CERT-STAT.
+02152
+02153      IF WS-STATUS = '9'
+02154          MOVE 'RE-ONLY ' TO P-CERT-STAT.
+02155
+02156      IF WS-STATUS = 'D'
+02157          MOVE 'DECLINE'  TO P-CERT-STAT.
+02158
+02159      IF WS-STATUS = 'V'
+02160          MOVE 'VOID'     TO P-CERT-STAT.
+02161
+02162      MOVE SPACES                 TO WS-CANC-DT.
+02163
+052614     IF CL-CLAIM-TYPE = PI-AH-OVERRIDE-L1 OR 'I' OR 'G' OR 'F'
+02165         GO TO 2130-AH-CHECK
+121802     END-IF
+02166
+02167      IF CM-LF-CURRENT-STATUS = '8'
+02168         IF CM-LF-CANCEL-DT NOT = LOW-VALUES
+02169             MOVE CM-LF-CANCEL-DT TO WS-CANC-DT.
+02170
+02171      IF CM-LF-CURRENT-STATUS = '7'
+02172         IF CM-LF-DEATH-DT NOT = LOW-VALUES
+02173             MOVE CM-LF-DEATH-DT     TO WS-CANC-DT.
+02174
+02175      GO TO 2130-CONV-DATE.
+02176
+02177  2130-AH-CHECK.
+02178      IF CM-AH-CURRENT-STATUS = '8'
+02179         IF CM-AH-CANCEL-DT NOT = LOW-VALUES
+02180             MOVE CM-AH-CANCEL-DT TO WS-CANC-DT.
+02181
+02182      IF CM-AH-CURRENT-STATUS = '6' OR '7'
+02183         IF CM-AH-SETTLEMENT-DT NOT = LOW-VALUES
+02184             MOVE CM-AH-SETTLEMENT-DT TO WS-CANC-DT.
+02185
+02186  2130-CONV-DATE.
+02187      MOVE 'CERT CANCEL-'       TO L21-CANC-LIT.
+02188      IF WS-CANC-DT = LOW-VALUES OR SPACES  OR ZEROS
+02189          MOVE SPACES TO P-CERT-CANC-DT
+02190      ELSE
+02191          MOVE WS-CANC-DT TO DC-BIN-DATE-1
+02192          MOVE ' '        TO DC-OPTION-CODE
+02193          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02194          MOVE DC-GREG-DATE-1-EDIT   TO P-CERT-CANC-DT.
+02195
+02196      MOVE 'ACCOUNT       - '        TO L19-ACCT-LIT.
+02197      MOVE CM-ACCOUNT     TO P-ACCT.
+02198      MOVE CM-STATE       TO P-STATE.
+02199      MOVE CM-GROUPING    TO P-GROUP.
+02200      MOVE CM-REIN-TABLE  TO P-REIN-CODE.
+02201      MOVE CM-ENTRY-BATCH TO P-CERT-BATCH.
+02202      MOVE CM-MEMBER-NO   TO P-MEMBER-NO.
+02203
+02204  2130-GET-BENEFIT-DESC.
+02205      IF WS-BEN-CODE = ZERO
+02206          MOVE '** NONE **' TO P-COVERAGE
+02207          GO TO 2130-EXIT.
+02208
+02209      MOVE WS-ACCESS            TO WS-CF-PROCESSOR.
+02210      MOVE PI-COMPANY-ID        TO WS-CF-COMPANY-ID.
+02211      MOVE +0                   TO WS-CF-SEQUENCE-NO.
+02212      MOVE SPACES               TO WS-CNTL-ERROR-SW.
+02213
+02214      
+      * EXEC CICS HANDLE CONDITION
+02215 *         ENDFILE (2130-EXIT)
+02216 *         NOTFND  (2130-EXIT)
+02217 *    END-EXEC.
+      *    MOVE '"$''I                  ! 3 #00008398' TO DFHEIV0
+           MOVE X'222427492020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+           MOVE X'3320233030303038333938' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+02218
+02219      
+      * EXEC CICS READ
+02220 *         DATASET ('ELCNTL')
+02221 *         SET     (ADDRESS OF CONTROL-FILE)
+02222 *         RIDFLD  (WS-CF-CONTROL-PRIMARY)
+02223 *         GTEQ
+02224 *    END-EXEC.
+           MOVE 'ELCNTL' TO DFHEIV1
+      *    MOVE '&"S        G          (   #00008403' TO DFHEIV0
+           MOVE X'262253202020202020202047' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303038343033' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DFHEIV20, 
+                 DFHEIV99, 
+                 WS-CF-CONTROL-PRIMARY, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           SET ADDRESS OF CONTROL-FILE TO
+               DFHEIV20
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+02225
+02226      IF WS-CF-COMPANY-ID  NOT = CF-COMPANY-ID  OR
+02227         WS-CF-RECORD-TYPE NOT = CF-RECORD-TYPE
+02228              GO TO 2130-EXIT.
+02229
+02230      PERFORM 2135-DUMMY THRU 2135-EXIT
+02231          VARYING SUB1 FROM 1 BY 1 UNTIL
+02232          ((SUB1 GREATER 8) OR
+02233               (CF-BENEFIT-CODE (SUB1) = WS-BEN-CODE)).
+02234
+02235      IF SUB1 NOT = 9
+02236          MOVE CF-BENEFIT-DESCRIP (SUB1) TO P-COVERAGE
+02237      ELSE
+02238          MOVE 'CD MISSING'   TO P-COVERAGE.
+02239
+02240  2130-EXIT.
+02241       EXIT.
+02242
+02243  2135-DUMMY.
+02244  2135-EXIT.
+02245       EXIT.
+02246       EJECT
+02247  2140-MOVE-PLCY-INFO.
+02248
+02249      MOVE PM-COMPANY-CD              TO  WS-PP-COMPANY-CD.
+02250      MOVE PM-CARRIER                 TO  WS-PP-CARRIER.
+02251      MOVE PM-GROUPING                TO  WS-PP-GROUPING.
+02252      MOVE PM-STATE                   TO  WS-PP-STATE.
+02253      MOVE PM-PRODUCER                TO  WS-PP-PRODUCER.
+02254      MOVE PM-INS-PLAN-CD             TO  WS-PP-PLAN-CODE.
+02255      MOVE PM-INS-PLAN-REVISION       TO  WS-PP-REV-NO.
+02256
+02257      PERFORM 1610-READ-EMPLAN THRU 1610-EXIT.
+02258
+02259      IF PLAN-READ-ERROR
+02260          MOVE '** NONE **'           TO  P-COVERAGE
+02261          GO TO 2140-CONT-MOVE.
+02262
+02263      MOVE PP-PLAN-ABBREV             TO  P-COVERAGE.
+02264      MOVE PP-REFUND-CALC             TO  CP-EARNING-METHOD
+02265                                          CP-RATING-METHOD.
+02266
+02267      IF PP-BENEFIT-IS-LEVEL
+02268          MOVE 'L'                    TO  CP-BENEFIT-TYPE
+02269      ELSE
+02270          MOVE 'R'                    TO  CP-BENEFIT-TYPE.
+02271
+02272  2140-CONT-MOVE.
+02273
+02274      MOVE PM-INS-PLAN-CD             TO  WS-BEN-CODE.
+02275      MOVE PM-INSURED-ISSUE-AGE       TO  WS-AGE.
+02276      MOVE WS-AGE-3-4                 TO  P-INSURED-AGE.
+02277      MOVE PM-CURRENT-STATUS          TO  WS-STATUS.
+02278      MOVE PM-LOAN-TERM               TO  P-TERM
+02279                                          CP-ORIGINAL-TERM.
+02280
+052614     IF CL-CLAIM-TYPE = PI-AH-OVERRIDE-L1 OR 'I' OR 'G' OR 'F'
+02282          MOVE PM-INS-MONTH-BENEFIT   TO  P-ORIG-BENEF-AMT
+02283          MOVE WS-BIN-CURRENT-DT      TO  CP-VALUATION-DT
+02284      ELSE
+02285          MOVE PM-INS-TOTAL-BENEFIT   TO  P-ORIG-BENEF-AMT
+02286          MOVE CL-INCURRED-DT         TO  CP-VALUATION-DT
+           END-IF
+02287
+02288      MOVE PM-INS-TERMINATION-DT      TO  DC-BIN-DATE-1.
+02289      MOVE ' '                        TO  DC-OPTION-CODE.
+02290      PERFORM 8100-DATE-RTN  THRU 8100-EXIT.
+02291      MOVE DC-GREG-DATE-1-EDIT        TO  P-EXPIRE.
+02292
+02293      MOVE PM-POLICY-EFF-DT           TO  CP-CERT-EFF-DT.
+02294
+02295      MOVE 'PLCY ENTRY    - '         TO  L22-ENTRY-LIT.
+02296      IF PM-ENTRY-DT = LOW-VALUES OR SPACES
+02297          MOVE SPACES                 TO  P-CERT-ENTRY-YY
+02298                                          P-CERT-SL
+02299                                          P-CERT-ENTRY-MM
+02300      ELSE
+02301          MOVE PM-ENTRY-DT            TO  DC-BIN-DATE-1
+02302          MOVE ' '                    TO  DC-OPTION-CODE
+02303          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02304          MOVE DC-GREG-DATE-1-MDY     TO  WS-MM-DD-YY
+02305          MOVE WS-MM                  TO  P-CERT-ENTRY-MM
+02306          MOVE WS-YY                  TO  P-CERT-ENTRY-YY
+02307          MOVE '/'                    TO  P-CERT-SL.
+02308
+02309      MOVE 'PLCY ISSUE   - '          TO  L15-ISSUE-LIT.
+02310      MOVE PM-POLICY-EFF-DT           TO  DC-BIN-DATE-1.
+02311      MOVE ' '                        TO  DC-OPTION-CODE.
+02312      PERFORM 8100-DATE-RTN  THRU 8100-EXIT.
+02313      MOVE DC-GREG-DATE-1-EDIT        TO  P-CERT-ISSUE-DT.
+02314
+02315      IF PM-AH-MORT-PLAN
+02316          MOVE '3'                    TO  CP-REM-TERM-METHOD
+02317          MOVE PM-LOAN-DT             TO  CP-FIRST-PAY-DATE
+02318      ELSE
+02319          MOVE '2'                    TO  CP-REM-TERM-METHOD
+02320          MOVE PM-POLICY-EFF-DT       TO  CP-FIRST-PAY-DATE.
+02321
+02322 **     READ CNTL RECORD TO OBTAIN FREE LOOK DAYS
+02323
+02324      MOVE PI-COMPANY-ID              TO WS-CF-COMPANY-ID.
+02325      MOVE PI-STATE                   TO WS-CF-PROCESSOR.
+02326      MOVE ZEROS                      TO WS-CF-SEQUENCE-NO.
+02327      MOVE '3'                        TO WS-CF-RECORD-TYPE.
+02328      MOVE SPACES                     TO WS-CNTL-ERROR-SW.
+02329
+02330      PERFORM 1300-READ-CNTL  THRU 1300-EXIT.
+02331
+02332      IF NO-COMPANY-RECORD
+02333         MOVE    '*** ERROR NO STATE REC ***' TO WS-PASSED-DATA
+02334         GO TO 9999-FINALIZE
+02335      ELSE
+02336         MOVE CF-ST-FREE-LOOK-PERIOD  TO CP-FREE-LOOK.
+02337
+02338      MOVE '1'                        TO  CP-REM-TRM-CALC-OPTION.
+02339      MOVE PI-COMPANY-ID              TO  CP-COMPANY-ID.
+02340      MOVE PM-COMPANY-CD              TO  CP-COMPANY-CD.
+02341
+02342      PERFORM 9800-LINK-REM-TERM THRU 9800-EXIT.
+02343
+02344      IF PM-AH-MORT-PLAN
+02345          MOVE CP-REMAINING-TERM-1        TO  P-REM
+02346      ELSE
+02347          IF (PI-COMPANY-ID IS EQUAL TO 'CIG' OR 'CUK')
+02348              COMPUTE CP-REMAINING-TERM-3 = CP-REMAINING-TERM-3 + 1
+02349              MOVE CP-REMAINING-TERM-3    TO  P-REM
+02350          ELSE
+02351              MOVE CP-REMAINING-TERM-3    TO  P-REM.
+02352
+02353      MOVE SPACES                     TO  P-CERT-STAT.
+02354      MOVE 'PLCY STATUS   - '         TO  L16-STATUS-LIT.
+02355
+02356      IF WS-STATUS IS EQUAL TO '0'
+02357          MOVE 'LAPSED'               TO  P-CERT-STAT.
+02358      IF WS-STATUS IS EQUAL TO '1'
+02359          MOVE 'ACTIVE'               TO  P-CERT-STAT.
+02360      IF WS-STATUS IS EQUAL TO '2'
+02361          MOVE 'PEND'                 TO  P-CERT-STAT.
+02362      IF WS-STATUS IS EQUAL TO '3'
+02363          MOVE 'DECLIN'               TO  P-CERT-STAT.
+02364      IF (WS-STATUS IS EQUAL TO '4' OR '9')
+02365          MOVE 'PNDCNC'               TO  P-CERT-STAT.
+02366      IF WS-STATUS IS EQUAL TO '5'
+02367          MOVE 'PNDISS'               TO  P-CERT-STAT.
+02368      IF WS-STATUS IS EQUAL TO '6'
+02369          MOVE 'CLAIM'                TO  P-CERT-STAT.
+02370      IF WS-STATUS IS EQUAL TO '7'
+02371          MOVE 'CANCEL'               TO  P-CERT-STAT.
+02372      IF WS-STATUS IS EQUAL TO '8'
+02373          MOVE 'PNDUNW'               TO  P-CERT-STAT.
+02374      IF WS-STATUS IS EQUAL TO 'C'
+02375          MOVE 'TRNSFR'               TO  P-CERT-STAT.
+02376      IF WS-STATUS IS EQUAL TO 'F'
+02377          MOVE 'SETTLE'               TO  P-CERT-STAT.
+02378      IF WS-STATUS IS EQUAL TO 'T'
+02379          MOVE 'TRMNAT'               TO  P-CERT-STAT.
+02380
+02381      MOVE SPACES                     TO  WS-CANC-DT.
+02382      MOVE 'PLCY CANCEL-'             TO  L21-CANC-LIT.
+02383
+02384      IF PM-CURRENT-STATUS IS EQUAL TO '7'
+02385          IF PM-CANCEL-DT IS NOT EQUAL TO LOW-VALUES
+02386              MOVE PM-CANCEL-DT       TO  WS-CANC-DT.
+02387
+02388      IF (WS-CANC-DT EQUAL LOW-VALUES OR SPACES OR ZEROS)
+02389          MOVE SPACES                 TO  P-CERT-CANC-DT
+02390      ELSE
+02391          MOVE WS-CANC-DT             TO  DC-BIN-DATE-1
+02392          MOVE ' '                    TO  DC-OPTION-CODE
+02393          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02394          MOVE DC-GREG-DATE-1-EDIT    TO  P-CERT-CANC-DT.
+02395
+02396      MOVE 'PRODUCER      - '         TO  L19-ACCT-LIT.
+02397      MOVE PM-PRODUCER                TO  P-ACCT.
+02398      MOVE PM-STATE                   TO  P-STATE.
+02399      MOVE PM-GROUPING                TO  P-GROUP.
+02400
+02401  2140-EXIT.
+02402       EXIT.
+02403
+02404      EJECT
+02405  2150-MOVE-TR0-INFO.
+02406      IF NOT RESERVE-EXPENSE-TR
+02407          MOVE  '* TRAILER 0 NOT FIRST, ABORT*' TO WS-PASSED-DATA
+02408          GO TO 9999-FINALIZE
+02409      ELSE
+02410          MOVE AT-ITD-PAID-EXPENSES      TO  P-TOT-EXPENSE
+02411          MOVE AT-INITIAL-MANUAL-RESERVE TO  P-ORIG-MANUAL
+02412          MOVE AT-ITD-CHARGEABLE-EXPENSE TO  P-CHG-EXPENSE
+02413          MOVE AT-CURRENT-MANUAL-RESERVE TO  P-REM-MANUAL
+02414          MOVE AT-ITD-ADDITIONAL-RESERVE TO  P-ADD-RESERVE.
+02415
+02416      IF FULL-PRINT-REQUIRED
+02417          PERFORM  2510-MOVE-OC-HISTORY  THRU 2510-EXIT.
+02418
+02419  2150-EXIT.
+02420       EXIT.
+02421
+02422      EJECT
+02423  2300-PRINT-TO-LINE-26.
+02424      MOVE  ZEROS  TO WS-PAGE-CNT.
+02425      PERFORM 4013-HEADING-RTN  THRU 4013-EXIT.
+02426
+02427      MOVE TSP             TO WS-PASSED-CNTL-CHAR.
+02428      MOVE  HEAD-LINE-7    TO WS-PASSED-DATA.
+02429      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02430
+02431      MOVE DSP             TO WS-PASSED-CNTL-CHAR.
+02432      MOVE       LINE-9    TO WS-PASSED-DATA.
+02433      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02434
+02435      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02436      MOVE  HEAD-LINE-10   TO WS-PASSED-DATA.
+02437      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02438
+02439      MOVE DSP             TO WS-PASSED-CNTL-CHAR.
+02440      MOVE       LINE-12   TO WS-PASSED-DATA.
+02441      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02442
+02443      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02444      MOVE       LINE-13   TO WS-PASSED-DATA.
+02445      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02446
+02447      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02448      MOVE       LINE-14   TO WS-PASSED-DATA.
+02449      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02450
+02451      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02452      MOVE       LINE-15   TO WS-PASSED-DATA.
+02453      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02454
+02455      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02456      MOVE       LINE-16   TO WS-PASSED-DATA.
+02457      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02458
+02459      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02460      MOVE       LINE-17   TO WS-PASSED-DATA.
+02461      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02462
+02463      MOVE DSP             TO WS-PASSED-CNTL-CHAR.
+02464      MOVE       LINE-19   TO WS-PASSED-DATA.
+02465      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02466
+02467      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02468      MOVE       LINE-20   TO WS-PASSED-DATA.
+02469      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02470
+02471      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02472      MOVE       LINE-21   TO WS-PASSED-DATA.
+02473      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02474
+02475      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02476      MOVE       LINE-22   TO WS-PASSED-DATA.
+02477      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02478
+02479      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02480      MOVE       LINE-23   TO WS-PASSED-DATA.
+02481      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02482
+02483      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02484      MOVE       LINE-23A  TO WS-PASSED-DATA.
+02485      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02486
+02487      MOVE DSP             TO WS-PASSED-CNTL-CHAR.
+02488      MOVE       LINE-25   TO WS-PASSED-DATA.
+02489      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02490
+02491      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+02492      MOVE       LINE-26   TO WS-PASSED-DATA.
+02493      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02494
+02495  2300-EXIT.
+02496       EXIT.
+02497      EJECT
+02498  2500-PROCESS-N-PRINT-TRAILERS.
+02499 **   ADD  1  TO WS-AT-SEQ-NO.
+02500      PERFORM  1750-READNEXT-TRLR  THRU 1750-EXIT.
+02501
+02502      IF END-OF-TRLR-FILE
+02503          MOVE  'X'  TO  WS-TRAILER-KEY-CHG-SW
+02504          GO TO 2500-EXIT.
+02505
+02506      MOVE AT-CONTROL-PRIMARY   TO  WS-NEW-AT-CONTROL-PRIMARY.
+02507      IF WS-NEW-AT-CONTROL-WO-SEQ  NOT =
+02508                                   WS-AT-CONTROL-SAVED-WO-SEQ
+02509          MOVE 'X'  TO WS-TRAILER-KEY-CHG-SW
+02510          GO TO 2500-EXIT.
+02511
+02512 *TR2
+02513      IF PAYMENT-TR
+02514          PERFORM 2520-PROCESS-TR2   THRU 2520-EXIT
+02515          GO TO 2500-EXIT.
+02516 *TR3
+02517      IF AUTO-PAY-TR          AND
+02518         FULL-PRINT-REQUIRED  AND
+02519         AP-INDEX  LESS THAN 11
+02520          PERFORM 2530-PROCESS-TR3  THRU 2530-EXIT
+02521          GO TO 2500-EXIT.
+02522 *TR4
+02523      IF CORRESPONDENCE-TR
+02524          PERFORM 2540-PROCESS-TR4    THRU 2540-EXIT
+02525          GO TO 2500-EXIT.
+02526 *TR5
+02527      IF ADDRESS-TR            AND
+02528         FULL-PRINT-REQUIRED   AND
+02529         AD-INDEX  LESS THAN 60
+02530          PERFORM 2550-PROCESS-TR5    THRU 2550-EXIT
+02531          GO TO 2500-EXIT.
+02532 *TR6
+02533      IF GENERAL-INFO-TR
+02534          PERFORM 2560-PROCESS-TR6     THRU 2560-EXIT
+02535          GO TO 2500-EXIT.
+02536 *TR7
+02537      IF AUTO-PROMPT-TR
+02538          PERFORM 2570-PROCESS-TR7     THRU 2570-EXIT
+02539          GO TO 2500-EXIT.
+02540 *TR8
+02541      IF DENIAL-TR
+02542          PERFORM 2580-PROCESS-TR8    THRU 2580-EXIT
+02543          GO TO 2500-EXIT.
+02544 *TR9
+02545      IF INCURRED-CHG-TR
+02546          PERFORM 2590-PROCESS-TR9    THRU 2590-EXIT
+02547          GO TO 2500-EXIT.
+02548 *TRA
+02549      IF FORM-CONTROL-TR
+02550          PERFORM 2600-PROCESS-TRA    THRU 2600-EXIT
+02551          GO TO 2500-EXIT.
+02552
+02553  2500-EXIT.
+02554       EXIT.
+02555
+02556  2510-MOVE-OC-HISTORY.
+02557      MOVE  1  TO OC-SUB.
+02558      SET  OC-INDEX TO 1.
+02559      PERFORM  2511-LOAD-OC-TABLE  THRU 2511-EXIT  6 TIMES.
+02560
+02561  2510-EXIT.
+02562       EXIT.
+02563
+02564  2511-LOAD-OC-TABLE.
+02565      IF AT-OPEN-CLOSE-DATE (OC-SUB) = SPACES OR LOW-VALUES
+02566           ADD 1 TO OC-SUB
+02567           GO TO 2511-EXIT.
+02568
+02569      MOVE  'X'  TO END-OC-TABLE-SW.
+02570
+02571      MOVE AT-OPEN-CLOSE-DATE (OC-SUB)   TO
+02572                         OC-TBL-OPCL-DT (OC-INDEX).
+02573      MOVE AT-OPEN-CLOSE-TYPE (OC-SUB)   TO
+02574                         OC-TBL-OPCL-TYPE (OC-INDEX).
+02575      MOVE AT-OPEN-CLOSE-REASON (OC-SUB) TO
+02576                         OC-TBL-OPCL-REASON (OC-INDEX).
+02577
+02578      SET OC-INDEX  UP BY 1.
+02579      ADD 1  TO OC-SUB.
+02580
+02581  2511-EXIT.
+02582       EXIT.
+02583
+02584      EJECT
+02585  2520-PROCESS-TR2.
+02586 ******************************************************************
+02587 ***          BUILD PAYMENT INFORMATION                         ***
+02588 ******************************************************************
+02589
+02590      IF  WS-LINE-CNT  GREATER THAN  50
+02591          PERFORM  4013-HEADING-RTN  THRU 4013-EXIT
+02592          PERFORM  1014-HEADING-CONT THRU 1014-EXIT.
+02593
+091113     IF AT-PAYMENT-TYPE = 'T'
+091113         MOVE 'TRANSFR PMT' TO P-PAY-ACT-TYPE
+091113     ELSE
+091113       IF AT-PAYMENT-TYPE = 'I'
+091113          MOVE 'INTERST PMT' TO P-PAY-ACT-TYPE
+091113       ELSE
+091113          MOVE AT-PAYMENT-TYPE TO WS-SUB
+091113          IF WS-SUB < 1 OR > 6
+091113              MOVE 2 TO WS-SUB
+091113          END-IF
+091113          MOVE PAY-DESC (WS-SUB) TO P-PAY-ACT-TYPE
+091113       END-IF
+091113     END-IF.
+091113
+02594      MOVE AT-PAYEES-NAME   TO P-PAY-PAYEE.
+02595      MOVE AT-PAYEE-TYPE-CD TO P-PAY-PAYEE-CD.
+02596
+02597      IF AT-RECORDED-DT  = LOW-VALUES OR SPACES
+02598          MOVE SPACE TO P-PAY-PMT-DT
+02599      ELSE
+02600          MOVE  AT-RECORDED-DT      TO DC-BIN-DATE-1
+02601          MOVE  ' '   TO DC-OPTION-CODE
+02602          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02603          MOVE DC-GREG-DATE-1-EDIT  TO P-PAY-PMT-DT.
+02604
+02605      MOVE AT-RECORDED-BY  TO P-PAY-BY.
+02606
+02607      IF AT-CHECK-WRITTEN-DT  = LOW-VALUES OR SPACES
+02608          MOVE ZEROS TO P-PAY-WRIT-DT
+02609      ELSE
+02610          MOVE AT-CHECK-WRITTEN-DT TO  DC-BIN-DATE-1
+02611          MOVE  ' '                TO DC-OPTION-CODE
+02612          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02613          MOVE DC-GREG-DATE-1-EDIT TO  P-PAY-WRIT-DT.
+02614
+02615      MOVE AT-CHECK-NO         TO  P-PAY-CHECK.
+02616      MOVE AT-AMOUNT-PAID      TO  P-PAY-PMT-AMT.
+02617      MOVE AT-ADDL-RESERVE     TO  P-PAY-RESERVE.
+02618      MOVE AT-EXPENSE-PER-PMT  TO  P-PAY-EXPEN.
+02619
+02620      IF AT-PMT-ACCEPT-DT  = LOW-VALUES OR SPACES
+02621          MOVE SPACES             TO P-PAY-CREDIT-DT
+02622      ELSE
+02623          MOVE AT-PMT-ACCEPT-DT   TO DC-BIN-DATE-1
+02624          MOVE  ' '               TO DC-OPTION-CODE
+02625          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02626          MOVE DC-GREG-DATE-1-EDIT TO  P-PAY-CREDIT-DT.
+02627
+02628      IF AT-VOID-DT = LOW-VALUES OR SPACES
+02629          MOVE SPACES              TO  P-PAY-VOID-DT
+02630                                       P-PAY-REASON
+02631      ELSE
+02632          MOVE AT-VOID-DT          TO  DC-BIN-DATE-1
+02633          MOVE  ' '                TO DC-OPTION-CODE
+02634          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02635          MOVE DC-GREG-DATE-1-EDIT TO  P-PAY-VOID-DT
+02636          MOVE AT-VOID-REASON      TO  P-PAY-REASON.
+02637
+02638      IF AT-PAYMENT-TYPE EQUAL '5' OR '6'
+02639         MOVE AT-EXPENSE-TYPE    TO P-EXP-TYPE
+02640         GO TO 2521-CONTINUE.
+02641
+02642      MOVE AT-PAID-FROM-DT     TO DC-BIN-DATE-1
+02643      MOVE  ' '                TO DC-OPTION-CODE
+02644      PERFORM 8100-DATE-RTN    THRU 8100-EXIT
+02645      MOVE DC-GREG-DATE-1-EDIT TO  P-PAY-FROM-DT
+02646
+02647      IF NOT PI-USES-PAID-TO
+02648         MOVE AT-PAID-THRU-DT     TO DC-BIN-DATE-1
+02649         MOVE  ' '                TO DC-OPTION-CODE
+02650         PERFORM 8100-DATE-RTN    THRU 8100-EXIT
+02651         MOVE DC-GREG-DATE-1-EDIT TO  P-PAY-THRU-DT
+02652      ELSE
+02653         MOVE '  TO  - '          TO L-5B-PD-THRU
+02654         MOVE AT-PAID-THRU-DT     TO DC-BIN-DATE-1
+02655         MOVE +1                  TO DC-ELAPSED-DAYS
+02656         MOVE +0                  TO DC-ELAPSED-MONTHS
+02657         MOVE  '6'                TO DC-OPTION-CODE
+02658         PERFORM 8100-DATE-RTN    THRU 8100-EXIT
+02659         MOVE DC-GREG-DATE-1-EDIT TO  P-PAY-THRU-DT.
+02660
+02661      MOVE AT-DAYS-IN-PERIOD   TO  P-PAY-DAYS
+02662      MOVE AT-DAILY-RATE       TO  P-PAY-RATE.
+02663
+02664  2521-CONTINUE.
+02665
+02666      IF ONLINE-MANUAL-PMT
+02667           MOVE 'ONLINE'   TO P-PAY-ORIGIN.
+02668      IF ONLINE-AUTO-PMT
+02669           MOVE 'ONLINE'   TO P-PAY-ORIGIN.
+02670      IF OFFLINE-PMT
+02671           MOVE 'OFFLINE'  TO P-PAY-ORIGIN.
+02672
+02673      IF AT-CV-PMT-CODE IS NOT EQUAL TO ' '
+02674          GO TO 2522-CONTINUE.
+02675
+02676      IF PARTIAL-PAYMENT
+02677           MOVE 'PARTIAL PAYMENT'         TO P-PAY-TYPE.
+02678      IF FINAL-PAYMENT
+02679           MOVE 'FINAL PAYMENT'           TO P-PAY-TYPE.
+02680      IF LUMP-SUM-PAYMENT
+02681           MOVE 'LUMP SUM PAYMENT'        TO P-PAY-TYPE.
+02682      IF ADDITIONAL-PAYMENT
+02683           MOVE 'ADDITIONAL PAYMENT'      TO P-PAY-TYPE.
+02684      IF CHARGEABLE-EXPENSE
+02685           MOVE 'CHARGEABLE EXPENSE'      TO P-PAY-TYPE.
+02686      IF NON-CHARGEABLE-EXPENSE
+02687           MOVE 'NON CHARGEABLE EXPENSE'  TO P-PAY-TYPE.
+02688
+02689      MOVE DSP           TO WS-PASSED-CNTL-CHAR.
+02690      MOVE  P-PAY-LINE-1 TO WS-PASSED-DATA.
+02691      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02692
+02693      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+02694      MOVE  P-PAY-LINE-2 TO WS-PASSED-DATA.
+02695      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02696
+02697      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+02698      MOVE  P-PAY-LINE-3 TO WS-PASSED-DATA.
+02699      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02700
+02701      MOVE SSP                    TO WS-PASSED-CNTL-CHAR.
+02702      MOVE  P-PAY-LINE-4          TO WS-PASSED-DATA.
+02703      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02704
+02705      IF AT-PAYMENT-TYPE = '5' OR '6'
+02706          MOVE SSP                TO WS-PASSED-CNTL-CHAR
+02707          MOVE P-PAY-LINE-5C      TO WS-PASSED-DATA
+02708          PERFORM ELPRTCVP THRU ELPRTCVP-EXIT
+02709      ELSE
+02710          IF P-PAY-VOID-DT = SPACES
+02711              MOVE SSP            TO WS-PASSED-CNTL-CHAR
+02712              MOVE  P-PAY-LINE-5B TO WS-PASSED-DATA
+02713              PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT
+02714          ELSE
+02715              MOVE SSP            TO WS-PASSED-CNTL-CHAR
+02716              MOVE  P-PAY-LINE-5A TO WS-PASSED-DATA
+02717              PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT
+02718              MOVE SSP            TO WS-PASSED-CNTL-CHAR
+02719              MOVE  P-PAY-LINE-5B TO WS-PASSED-DATA
+02720              PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02721
+02722      GO TO 2520-EXIT.
+02723
+02724  2522-CONTINUE.
+02725
+02726      IF AT-CV-PMT-CODE IS EQUAL TO '1'
+02727          MOVE 'FULL DEATH PAYMENT'       TO  P-PAY-TYPE.
+02728      IF AT-CV-PMT-CODE IS EQUAL TO '2'
+02729          MOVE 'HALF DEATH PAYMENT'       TO  P-PAY-TYPE.
+02730      IF AT-CV-PMT-CODE IS EQUAL TO '3'
+02731          MOVE 'FULL AD&D PAYMENT'        TO  P-PAY-TYPE.
+02732      IF AT-CV-PMT-CODE IS EQUAL TO '4'
+02733          MOVE 'HALF AD&D PAYMENT'        TO  P-PAY-TYPE.
+02734      IF AT-CV-PMT-CODE IS EQUAL TO '5'
+02735          MOVE 'FULL RIDER PAYMENT'       TO  P-PAY-TYPE.
+02736      IF AT-CV-PMT-CODE IS EQUAL TO '6'
+02737          MOVE 'HALF RIDER PAYMENT'       TO  P-PAY-TYPE.
+02738      IF AT-CV-PMT-CODE IS EQUAL TO '7'
+02739          MOVE 'NON CHARGEABLE EXPENSE'   TO  P-PAY-TYPE.
+02740      IF AT-CV-PMT-CODE IS EQUAL TO '8'
+02741          MOVE 'ADDITIONAL PAYMENT'       TO  P-PAY-TYPE.
+02742
+02743      MOVE DSP                        TO  WS-PASSED-CNTL-CHAR.
+02744      MOVE P-PAY-LINE-1               TO  WS-PASSED-DATA.
+02745      PERFORM ELPRTCVP THRU ELPRTCVP-EXIT.
+02746
+02747      MOVE SSP                        TO  WS-PASSED-CNTL-CHAR.
+02748      MOVE P-PAY-LINE-2               TO  WS-PASSED-DATA.
+02749      PERFORM ELPRTCVP THRU ELPRTCVP-EXIT.
+02750
+02751      MOVE SSP                        TO  WS-PASSED-CNTL-CHAR.
+02752      MOVE P-PAY-LINE-3               TO  WS-PASSED-DATA.
+02753      PERFORM ELPRTCVP THRU ELPRTCVP-EXIT.
+02754
+02755      MOVE SSP                        TO  WS-PASSED-CNTL-CHAR.
+02756      MOVE P-PAY-LINE-4               TO  WS-PASSED-DATA.
+02757      PERFORM ELPRTCVP THRU ELPRTCVP-EXIT.
+02758
+02759      IF AT-CV-PMT-CODE IS EQUAL TO '8'
+02760          MOVE SSP                    TO  WS-PASSED-CNTL-CHAR
+02761          MOVE P-PAY-LINE-5C          TO  WS-PASSED-DATA
+02762          PERFORM ELPRTCVP THRU ELPRTCVP-EXIT
+02763      ELSE
+02764          IF P-PAY-VOID-DT IS EQUAL TO SPACES
+02765              MOVE SSP                TO  WS-PASSED-CNTL-CHAR
+02766              MOVE P-PAY-LINE-5B      TO  WS-PASSED-DATA
+02767              PERFORM ELPRTCVP THRU ELPRTCVP-EXIT
+02768          ELSE
+02769              MOVE SSP                TO  WS-PASSED-CNTL-CHAR
+02770              MOVE P-PAY-LINE-5A      TO  WS-PASSED-DATA
+02771              PERFORM ELPRTCVP THRU ELPRTCVP-EXIT
+02772              MOVE P-PAY-LINE-5B      TO  WS-PASSED-DATA
+02773              PERFORM ELPRTCVP THRU ELPRTCVP-EXIT.
+02774
+02775  2520-EXIT.
+02776       EXIT.
+02777
+02778      EJECT
+02779  2530-PROCESS-TR3.
+02780 ******************************************************************
+02781 ***          BUILD AUTO PAYMENT SCHEDULE INFORMATION           ***
+02782 ******************************************************************
+02783
+02784      MOVE  'X'                    TO END-AP-TABLE-SW.
+02785      MOVE AT-RECORDED-DT          TO AP-TBL-EST-DT (AP-INDEX).
+02786      MOVE AT-RECORDED-BY          TO AP-TBL-EST-BY (AP-INDEX).
+02787      MOVE AT-TERMINATED-DT        TO AP-TBL-TERM-DT (AP-INDEX).
+02788      MOVE AT-SCHEDULE-START-DT TO
+02789                        AP-TBL-SCHED-START-DT (AP-INDEX).
+02790      MOVE AT-SCHEDULE-END-DT      TO
+02791                        AP-TBL-SCHED-END-DT (AP-INDEX).
+02792      MOVE AT-LAST-PMT-TYPE        TO AP-TBL-LAST-TYPE (AP-INDEX).
+02793      MOVE AT-FIRST-PMT-AMT        TO AP-TBL-FIRST-AMT (AP-INDEX).
+02794      MOVE AT-DAYS-IN-1ST-PMT      TO AP-TBL-FIRST-DAYS (AP-INDEX).
+02795      MOVE AT-1ST-PAY-THRU-DT      TO AP-TBL-FIRST-DT (AP-INDEX).
+02796      MOVE AT-REGULAR-PMT-AMT      TO AP-TBL-REG-AMT (AP-INDEX).
+02797      MOVE AT-INTERVAL-MONTHS      TO AP-TBL-INT-MO (AP-INDEX).
+02798      SET  AP-INDEX  UP BY 1.
+02799
+02800  2530-EXIT.
+02801       EXIT.
+02802
+02803      EJECT
+02804  2540-PROCESS-TR4.
+02805 ******************************************************************
+02806 ***          BUILD CORRESPONDENCE INFORMATION                  ***
+02807 ******************************************************************
+02808
+02809      IF  WS-LINE-CNT  GREATER THAN  50
+02810          PERFORM  4013-HEADING-RTN  THRU 4013-EXIT
+02811          PERFORM  1014-HEADING-CONT THRU 1014-EXIT.
+02812
+02813      MOVE AT-RECORDED-DT      TO DC-BIN-DATE-1
+02814      MOVE  ' '                TO DC-OPTION-CODE
+02815      PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02816      MOVE DC-GREG-DATE-1-EDIT TO  P-LET-LET-DT.
+02817      MOVE AT-RECORDED-BY      TO  P-LET-BY.
+02818
+02819      MOVE AT-ADDRESEE-TYPE           TO P-LET-ADSEE-CD
+02820      MOVE AT-STD-LETTER-FORM         TO P-LET-FORM.
+02821      MOVE AT-LETTER-ARCHIVE-NO       TO P-LET-ARCH.
+02822      MOVE AT-REASON-TEXT             TO P-LET-RE.
+02823
+02824      IF AT-LETTER-SENT-DT = LOW-VALUES OR SPACES
+091113         MOVE 'MAIL RCVD ' TO P-LET-ACT-TYPE
+02825          MOVE ZEROS TO P-LET-SENT-DT
+02826      ELSE
+091113         MOVE 'LETTER    ' TO P-LET-ACT-TYPE
+02827          MOVE AT-LETTER-SENT-DT      TO DC-BIN-DATE-1
+02828          MOVE  ' '                   TO DC-OPTION-CODE
+02829          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02830          MOVE DC-GREG-DATE-1-EDIT TO  P-LET-SENT-DT.
+02831
+02832      IF AT-AUTO-RE-SEND-DT = LOW-VALUES OR SPACES
+02833          MOVE ZEROS TO P-LET-SEND-DT
+02834      ELSE
+02835          MOVE AT-AUTO-RE-SEND-DT     TO DC-BIN-DATE-1
+02836          MOVE  ' '                   TO DC-OPTION-CODE
+02837          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02838          MOVE DC-GREG-DATE-1-EDIT TO  P-LET-SEND-DT.
+02839
+02840      IF AT-RECEIPT-FOLLOW-UP = LOW-VALUES OR SPACES
+02841          MOVE SPACE TO P-LET-FOL-DT
+02842      ELSE
+02843          MOVE AT-RECEIPT-FOLLOW-UP     TO DC-BIN-DATE-1
+02844          MOVE  ' '                     TO DC-OPTION-CODE
+02845          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02846          MOVE DC-GREG-DATE-1-EDIT TO  P-LET-FOL-DT.
+02847
+02848      IF AT-LETTER-ANSWERED-DT  = LOW-VALUES OR SPACES
+02849          MOVE SPACE TO P-LET-ANS-DT
+02850      ELSE
+02851          MOVE AT-LETTER-ANSWERED-DT    TO DC-BIN-DATE-1
+02852          MOVE  ' '                     TO DC-OPTION-CODE
+02853          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02854          MOVE DC-GREG-DATE-1-EDIT TO  P-LET-ANS-DT.
+02855
+02856      MOVE SPACES  TO P-LET-ORIGIN
+02857                      P-LET-ADSEE.
+02858
+02859      IF  ONLINE-CREATION
+02860           MOVE 'ONLINE '       TO P-LET-ORIGIN.
+02861      IF  OFFLINE-CREATION
+02862           MOVE 'OFFLINE'       TO P-LET-ORIGIN.
+02863      IF  INSURED-ADDRESEE
+02864           MOVE 'INSURED'       TO P-LET-ADSEE.
+02865      IF  BENEFICIARY-ADDRESEE
+02866           MOVE 'BENEFICIARY'   TO P-LET-ADSEE.
+02867      IF  ACCOUNT-ADDRESEE
+02868           MOVE 'ACCOUNT'       TO P-LET-ADSEE.
+02869      IF  PHYSICIAN-ADDRESEE
+02870           MOVE 'PHYSICIAN'     TO P-LET-ADSEE.
+02871      IF  EMPLOYER-ADDRESEE
+02872           MOVE 'EMPLOYER'      TO P-LET-ADSEE.
+02873      IF  OTHER-ADDRESEE-1
+02874           MOVE 'OTHER 1'       TO P-LET-ADSEE.
+02875      IF  OTHER-ADDRESEE-2
+02876           MOVE 'OTHER 2'       TO P-LET-ADSEE.
+02877
+02878      MOVE DSP           TO WS-PASSED-CNTL-CHAR.
+02879      MOVE  P-LET-LINE-1 TO WS-PASSED-DATA.
+02880      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02881
+02882      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+02883      MOVE  P-LET-LINE-2 TO WS-PASSED-DATA.
+02884      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02885
+02886      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+02887      MOVE  P-LET-LINE-3 TO WS-PASSED-DATA.
+02888      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02889
+02890      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+02891      MOVE  P-LET-LINE-4 TO WS-PASSED-DATA.
+02892      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02893
+02894      IF P-LET-RE = SPACES
+02895          NEXT SENTENCE
+02896      ELSE
+02897          MOVE SSP           TO WS-PASSED-CNTL-CHAR
+02898          MOVE  P-LET-LINE-5 TO WS-PASSED-DATA
+02899          PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02900
+02901  2540-EXIT.
+02902       EXIT.
+02903
+02904      EJECT
+02905  2550-PROCESS-TR5.
+02906 ******************************************************************
+02907 ***          BUILD ADDRESS INFORMATION                         ***
+02908 ******************************************************************
+02909
+02910      MOVE  'X'                  TO END-AD-TABLE-SW.
+02911      MOVE  AT-ADDRESS-TYPE      TO AD-TBL-TYPE    (AD-INDEX).
+02912      MOVE  AT-MAIL-TO-NAME      TO AD-TBL-NAME    (AD-INDEX).
+02913      MOVE  AT-ADDRESS-LINE-1    TO AD-TBL-ADDR-1  (AD-INDEX).
+02914      MOVE  AT-ADDRESS-LINE-2    TO AD-TBL-ADDR-2  (AD-INDEX).
+051810     MOVE  SPACES               TO AD-TBL-CITY    (AD-INDEX).
+051810     STRING AT-CITY ' ' AT-STATE
+051810        DELIMITED BY '  ' INTO AD-TBL-CITY (AD-INDEX)
+051810     END-STRING
+02916
+02917      MOVE SPACES                 TO WS-ZIP-WORK.
+02918      IF AT-CANADIAN-POST-CODE
+02919          MOVE AT-CAN-POSTAL-1    TO WS-CAN-POSTAL-1
+02920          MOVE AT-CAN-POSTAL-2    TO WS-CAN-POSTAL-2
+02921      ELSE
+02922          MOVE AT-ZIP-CODE        TO WS-ZIP-PRIME
+02923          IF AT-ZIP-PLUS4 NOT = SPACES  AND  ZEROS
+02924              MOVE '-'            TO WS-ZIP-DASH
+02925              MOVE AT-ZIP-PLUS4   TO WS-ZIP-PLUS4.
+02926      MOVE WS-ZIP-WORK            TO AD-TBL-ZIP    (AD-INDEX).
+02927
+02928      MOVE  AT-PHONE-NO          TO AD-TBL-PHONE   (AD-INDEX).
+02929      SET AD-INDEX  UP BY 1.
+02930
+02931  2550-EXIT.
+02932       EXIT.
+02933
+02934      EJECT
+02935  2560-PROCESS-TR6.
+02936 ******************************************************************
+02937 ***          BUILD CLAIM NOTES INFORMATION                     ***
+02938 ******************************************************************
+02939
+02940      IF  WS-LINE-CNT  GREATER THAN  50
+02941          PERFORM  4013-HEADING-RTN  THRU 4013-EXIT
+02942          PERFORM  1014-HEADING-CONT THRU 1014-EXIT.
+02943
+091113     IF AT-MAINT-NOTE
+091113         MOVE 'MAINT NOTES'     TO P-NOT-ACT-TYPE
+091113     ELSE
+091113       IF AT-CALL-NOTE
+091113          IF AT-PHONE-CALL-IN
+091113             MOVE 'CALL  IN   '  TO P-NOT-ACT-TYPE
+091113          ELSE
+091113             MOVE 'CALL  OUT  '  TO P-NOT-ACT-TYPE
+091113          END-IF
+091113       ELSE
+091113         IF AT-CERT-CHANGE
+091113             MOVE 'CERT CHANGE'  TO P-NOT-ACT-TYPE
+091113         ELSE
+091113           IF AT-APPROVAL-NOTE
+091113              MOVE 'APPROVL REV' TO P-NOT-ACT-TYPE
+091113           ELSE
+091113             IF AT-NOTE-FILE-NOTE
+091113                MOVE 'NOTE & FILE' TO P-NOT-ACT-TYPE
+091113             ELSE
+091113                MOVE 'NOTE       ' TO P-NOT-ACT-TYPE
+091113             END-IF
+091113           END-IF
+091113         END-IF
+091113       END-IF
+091113     END-IF.
+091113
+091113     IF AT-SEQUENCE-NO = +90
+091113         MOVE 'DIAGNOSIS  '     TO P-NOT-ACT-TYPE
+091113     END-IF.
+091113
+091113     IF AT-SEQUENCE-NO = +91
+091113         MOVE 'LOAN INFO  '     TO P-NOT-ACT-TYPE
+091113     END-IF.
+091113
+091113     IF AT-SEQUENCE-NO = +92
+091113         MOVE 'SPEC REVIEW'     TO P-NOT-ACT-TYPE
+091113     END-IF.
+091113
+091113     IF AT-SEQUENCE-NO = +93
+091113         MOVE 'VERIFY SSN '     TO P-NOT-ACT-TYPE
+091113     END-IF.
+091113
+091113     IF AT-SEQUENCE-NO = +94
+091113         MOVE 'CAUSL STATE'     TO P-NOT-ACT-TYPE
+091113     END-IF.
+091113
+02944      MOVE  AT-INFO-LINE-1       TO P-NOT-TEXT-1.
+02945      MOVE  AT-INFO-LINE-2       TO P-NOT-TEXT-2.
+02946      MOVE  AT-RECORDED-BY       TO P-NOT-BY.
+02947
+02948      IF AT-RECORDED-DT = LOW-VALUES OR SPACES
+02949          MOVE SPACES TO P-NOT-NOTE-DT
+02950      ELSE
+02951          MOVE  AT-RECORDED-DT    TO DC-BIN-DATE-1
+02952          MOVE  ' '               TO DC-OPTION-CODE
+02953          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02954          MOVE DC-GREG-DATE-1-EDIT TO  P-NOT-NOTE-DT.
+02955
+101713     IF (AT-SEQUENCE-NO = +95)
+020816        AND (PI-COMPANY-ID = 'DCC' OR 'VPP')
+101713         PERFORM VARYING A1 FROM +1 BY +1 UNTIL
+101713              AT-NOTE-ERROR-NO (A1) = SPACES
+101713              MOVE AT-NOTE-ERROR-NO (A1)
+101713                                 TO EMI-ERROR
+101713              MOVE '2'           TO EMI-SWITCH1
+101713              IF AT-NOTE-ERROR-NO (A1) = '1653'
+101713                 EVALUATE TRUE
+101713                    WHEN CL-CLAIM-TYPE = 'L'
+101713                       MOVE '  LF  '
+101713                              TO EMI-CLAIM-TYPE
+101713                    WHEN CL-CLAIM-TYPE = 'I'
+101713                       MOVE '  IU  '
+101713                              TO EMI-CLAIM-TYPE
+052614                    WHEN CL-CLAIM-TYPE = 'F'
+052614                       MOVE '  FL  '
+052614                              TO EMI-CLAIM-TYPE
+080322                    WHEN CL-CLAIM-TYPE = 'B'
+080322                       MOVE ' BR  '          TO EMI-CLAIM-TYPE
+080322
+080322                    WHEN CL-CLAIM-TYPE = 'H'
+080322                       MOVE ' HS '          TO EMI-CLAIM-TYPE
+100518                    WHEN CL-CLAIM-TYPE = 'O'
+100518                       MOVE '  OT  '
+100518                              TO EMI-CLAIM-TYPE
+101713                    WHEN OTHER
+101713                       MOVE '  AH  '
+101713                              TO EMI-CLAIM-TYPE
+101713                 END-EVALUATE
+101713              END-IF
+101713              PERFORM 9900-ERROR-FORMAT
+101713                                 THRU 9900-EXIT
+101713              MOVE EMI-LINE1 (8:64)
+101713                             TO P-NOT-TEXT-1
+101713              MOVE SPACES    TO P-NOT-TEXT-2
+101713
+101713             MOVE DSP           TO WS-PASSED-CNTL-CHAR
+101713             MOVE  P-NOT-LINE-1 TO WS-PASSED-DATA
+101713             PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT
+101713
+101713             MOVE SSP           TO WS-PASSED-CNTL-CHAR
+101713             MOVE  P-NOT-LINE-2 TO WS-PASSED-DATA
+101713             PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT
+101713
+101713             MOVE SSP           TO WS-PASSED-CNTL-CHAR
+101713             MOVE  P-NOT-LINE-3 TO WS-PASSED-DATA
+101713             PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT
+101713
+101713         END-PERFORM
+101713         GO TO 2560-EXIT
+101713     END-IF.
+101713
+02956      MOVE DSP           TO WS-PASSED-CNTL-CHAR.
+02957      MOVE  P-NOT-LINE-1 TO WS-PASSED-DATA.
+02958      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02959
+02960      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+02961      MOVE  P-NOT-LINE-2 TO WS-PASSED-DATA.
+02962      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02963
+02964      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+02965      MOVE  P-NOT-LINE-3 TO WS-PASSED-DATA.
+02966      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+02967
+02968  2560-EXIT.
+02969       EXIT.
+02970
+02971      EJECT
+02972  2570-PROCESS-TR7.
+02973 ******************************************************************
+02974 ***          BUILD AUTO PROMPT INFORMATION                     ***
+02975 ******************************************************************
+02976
+02977      IF  WS-LINE-CNT  GREATER THAN  50
+02978          PERFORM  4013-HEADING-RTN  THRU 4013-EXIT
+02979          PERFORM  1014-HEADING-CONT THRU 1014-EXIT.
+02980
+02981      MOVE  AT-PROMPT-LINE-1     TO P-PRO-TEXT-1.
+02982      MOVE  AT-PROMPT-LINE-2     TO P-PRO-TEXT-2.
+02983      MOVE  AT-RECORDED-BY       TO P-PRO-BY.
+02984
+02985      IF AT-RECORDED-DT = LOW-VALUES OR SPACES
+02986          MOVE SPACES TO P-PRO-NOTE-DT
+02987      ELSE
+02988          MOVE  AT-RECORDED-DT    TO DC-BIN-DATE-1
+02989          MOVE  ' '               TO DC-OPTION-CODE
+02990          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02991          MOVE DC-GREG-DATE-1-EDIT TO  P-PRO-NOTE-DT.
+02992
+02993      IF AT-PROMPT-START-DT = LOW-VALUES OR SPACES
+02994          MOVE SPACE               TO P-PRO-START-DT
+02995      ELSE
+02996          MOVE AT-PROMPT-START-DT  TO DC-BIN-DATE-1
+02997          MOVE  ' '                TO DC-OPTION-CODE
+02998          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+02999          MOVE DC-GREG-DATE-1-EDIT TO  P-PRO-START-DT.
+03000
+03001      IF AT-PROMPT-END-DT = LOW-VALUES OR SPACES
+03002          MOVE SPACE               TO P-PRO-END-DT
+03003      ELSE
+03004          MOVE AT-PROMPT-END-DT    TO DC-BIN-DATE-1
+03005          MOVE  ' '                TO DC-OPTION-CODE
+03006          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03007          MOVE DC-GREG-DATE-1-EDIT TO  P-PRO-END-DT.
+03008
+03009      MOVE DSP           TO WS-PASSED-CNTL-CHAR.
+03010      MOVE  P-PRO-LINE-1 TO WS-PASSED-DATA.
+03011      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03012
+03013      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03014      MOVE  P-PRO-LINE-2 TO WS-PASSED-DATA.
+03015      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03016
+03017      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03018      MOVE  P-PRO-LINE-3 TO WS-PASSED-DATA.
+03019      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03020
+03021  2570-EXIT.
+03022       EXIT.
+03023
+03024      EJECT
+03025  2580-PROCESS-TR8.
+03026 ******************************************************************
+03027 ***          BUILD DENIAL INFORMATION                          ***
+03028 ******************************************************************
+03029
+03030      IF  WS-LINE-CNT  GREATER THAN  50
+03031          PERFORM  4013-HEADING-RTN  THRU 4013-EXIT
+03032          PERFORM  1014-HEADING-CONT THRU 1014-EXIT.
+03033
+03034      IF AT-DENIAL-DT = LOW-VALUES OR SPACES
+03035          MOVE SPACE               TO P-DEN-DEN-DT
+03036      ELSE
+03037          MOVE AT-DENIAL-DT        TO DC-BIN-DATE-1
+03038          MOVE  ' '                TO DC-OPTION-CODE
+03039          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03040          MOVE DC-GREG-DATE-1-EDIT TO P-DEN-DEN-DT.
+03041
+03042      MOVE AT-RECORDED-BY          TO P-DEN-BY.
+03043
+03044      IF AT-RETRACTION-DT = LOW-VALUES OR SPACES
+03045          MOVE SPACE                  TO P-DEN-RECON-DT
+03046      ELSE
+03047          MOVE AT-RETRACTION-DT       TO DC-BIN-DATE-1
+03048          MOVE  ' '                    TO DC-OPTION-CODE
+03049          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03050          MOVE DC-GREG-DATE-1-EDIT TO  P-DEN-RECON-DT.
+03051
+03052      MOVE AT-DENIAL-REASON-CODE      TO P-DEN-CODE.
+03053      MOVE AT-DENIAL-INFO-1           TO P-DEN-TEXT-1.
+03054      MOVE AT-DENIAL-INFO-2           TO P-DEN-TEXT-2.
+03055
+03056      MOVE DSP           TO WS-PASSED-CNTL-CHAR.
+03057      MOVE  P-DEN-LINE-1 TO WS-PASSED-DATA.
+03058      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03059
+03060      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03061      MOVE  P-DEN-LINE-2 TO WS-PASSED-DATA.
+03062      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03063
+03064      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03065      MOVE  P-DEN-LINE-3 TO WS-PASSED-DATA.
+03066      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03067
+03068  2580-EXIT.
+03069       EXIT.
+03070
+03071      EJECT
+03072  2590-PROCESS-TR9.
+03073 ******************************************************************
+03074 ***          BUILD RESERVE/EXPENSE/HISTORY INFORMATION         ***
+03075 ******************************************************************
+03076
+03077      IF  WS-LINE-CNT  GREATER THAN  50
+03078          PERFORM  4013-HEADING-RTN  THRU 4013-EXIT
+03079          PERFORM  1014-HEADING-CONT THRU 1014-EXIT.
+03080
+03081      MOVE  AT-OLD-INIT-MAN-RESV      TO P-CHG-INIT-RES.
+03082      MOVE  AT-OLD-TOTAL-PAID         TO P-CHG-TOT-PD.
+03083      MOVE  AT-OLD-CURRENT-MAN-RESV   TO P-CHG-CUR-RES.
+03084      MOVE  AT-OLD-ITD-PAID-EXPENSE   TO P-CHG-TOT-EXP.
+03085      MOVE  AT-OLD-DAYS-PAID          TO P-CHG-DAYS-PD.
+03086      MOVE  AT-OLD-ADDL-MAN-RESV      TO P-CHG-ADD-RES.
+03087      MOVE  AT-OLD-CHARGABLE-EXPENSE  TO P-CHG-CHG-EXP.
+03088      MOVE  AT-OLD-NO-OF-PMTS         TO P-CHG-PMTS.
+03089      MOVE  AT-TRAILER-CNT-AT-CHG     TO P-CHG-TOT-TRLRS.
+03090      MOVE  AT-RECORDED-BY            TO P-CHG-BY.
+03091
+03092      MOVE  AT-RECORDED-DT            TO DC-BIN-DATE-1
+03093      MOVE  ' '                       TO DC-OPTION-CODE
+03094      PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03095      MOVE DC-GREG-DATE-1-EDIT        TO P-CHG-REC-DT.
+03096
+03097      IF AT-OLD-INCURRED-DT = LOW-VALUES OR SPACES
+03098          MOVE ZEROS                  TO P-CHG-INC-DT
+03099      ELSE
+03100          MOVE  AT-OLD-INCURRED-DT    TO DC-BIN-DATE-1
+03101          MOVE  ' '                   TO DC-OPTION-CODE
+03102          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03103          MOVE DC-GREG-DATE-1-EDIT    TO P-CHG-INC-DT.
+03104
+03105      IF AT-OLD-PAID-THRU-DT = LOW-VALUES OR SPACES
+03106         MOVE ZEROS                  TO P-CHG-PAID-TO-DT
+03107      ELSE
+03108         IF NOT PI-USES-PAID-TO
+03109            MOVE  AT-OLD-PAID-THRU-DT   TO DC-BIN-DATE-1
+03110            MOVE  ' '                   TO DC-OPTION-CODE
+03111            PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03112            MOVE DC-GREG-DATE-1-EDIT    TO P-CHG-PAID-TO-DT
+03113         ELSE
+03114            MOVE 'PD TO - ' TO L-1-PD-THRU
+03115            MOVE  AT-OLD-PAID-THRU-DT   TO DC-BIN-DATE-1
+03116            MOVE +1                     TO DC-ELAPSED-DAYS
+03117            MOVE +0                     TO DC-ELAPSED-MONTHS
+03118            MOVE  '6'                   TO DC-OPTION-CODE
+03119            PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03120            MOVE DC-GREG-DATE-1-EDIT    TO P-CHG-PAID-TO-DT.
+03121
+03122      IF AT-OLD-REPORTED-DT = LOW-VALUES OR SPACES
+03123          MOVE ZEROS TO P-CHG-REP-DT
+03124      ELSE
+03125          MOVE AT-OLD-REPORTED-DT     TO DC-BIN-DATE-1
+03126          MOVE  ' '                   TO DC-OPTION-CODE
+03127          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03128          MOVE DC-GREG-DATE-1-EDIT    TO P-CHG-REP-DT.
+03129
+03130      IF AT-OLD-ESTABLISHED-DT = LOW-VALUES OR SPACES
+03131          MOVE ZEROS                  TO P-CHG-CREAT-DT
+03132      ELSE
+03133          MOVE  AT-OLD-ESTABLISHED-DT TO DC-BIN-DATE-1
+03134          MOVE  ' '                   TO DC-OPTION-CODE
+03135          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03136          MOVE DC-GREG-DATE-1-EDIT    TO P-CHG-CREAT-DT.
+03137
+03138      IF AT-LAST-PMT-MADE-DT = LOW-VALUES OR SPACES
+03139          MOVE ZEROS TO P-CHG-LAST-PMT-DT
+03140      ELSE
+03141          MOVE  AT-LAST-PMT-MADE-DT   TO DC-BIN-DATE-1
+03142          MOVE  ' '                   TO DC-OPTION-CODE
+03143          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03144          MOVE DC-GREG-DATE-1-EDIT    TO P-CHG-LAST-PMT-DT.
+03145
+03146      MOVE DSP           TO WS-PASSED-CNTL-CHAR.
+03147      MOVE  P-CHG-LINE-1 TO WS-PASSED-DATA.
+03148      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03149
+03150      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03151      MOVE  P-CHG-LINE-2 TO WS-PASSED-DATA.
+03152      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03153
+03154      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03155      MOVE  P-CHG-LINE-3 TO WS-PASSED-DATA.
+03156      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03157
+03158      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03159      MOVE  P-CHG-LINE-4 TO WS-PASSED-DATA.
+03160      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03161
+03162  2590-EXIT.
+03163       EXIT.
+03164
+03165      EJECT
+03166  2600-PROCESS-TRA.
+03167 ******************************************************************
+03168 ***       BUILD CONTINUING CLAIM FORM INFORMATION              ***
+03169 ******************************************************************
+03170
+03171      IF WS-LINE-CNT GREATER THAN 50
+03172          PERFORM  4013-HEADING-RTN  THRU 4013-EXIT
+03173          PERFORM  1014-HEADING-CONT THRU 1014-EXIT.
+03174
+03175      MOVE AT-RECORDED-DT           TO DC-BIN-DATE-1
+03176      MOVE  ' '                     TO DC-OPTION-CODE
+03177      PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03178      MOVE DC-GREG-DATE-1-EDIT      TO P-FORM-LET-DT.
+03179      MOVE AT-RECORDED-BY           TO P-FORM-BY.
+03180      MOVE AT-FORM-ADDRESS          TO P-FORM-ADSEE-CD.
+03181
+03182      IF INITIAL-FORM
+03183         MOVE 'INIT'                TO P-FORM-FORM
+03184        ELSE
+03185         MOVE 'PROG'                TO P-FORM-FORM.
+03186
+03187      IF AT-FORM-SEND-ON-DT = LOW-VALUES OR SPACES
+03188          MOVE SPACES                  TO P-FORM-SENT-DT
+03189      ELSE
+03190          MOVE AT-FORM-SEND-ON-DT      TO DC-BIN-DATE-1
+03191          MOVE  ' '                    TO DC-OPTION-CODE
+03192          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03193          MOVE DC-GREG-DATE-1-EDIT     TO  P-FORM-SENT-DT.
+03194
+03195
+03196      IF AT-FORM-RE-SEND-DT = LOW-VALUES OR SPACES
+03197          MOVE SPACES                  TO P-FORM-SEND-DT
+03198      ELSE
+03199          MOVE AT-FORM-RE-SEND-DT      TO DC-BIN-DATE-1
+03200          MOVE  ' '                    TO DC-OPTION-CODE
+03201          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03202          MOVE DC-GREG-DATE-1-EDIT     TO  P-FORM-SEND-DT.
+03203
+03204
+03205      IF AT-FORM-FOLLOW-UP-DT = LOW-VALUES OR SPACES
+03206          MOVE SPACE                   TO P-FORM-FOL-DT
+03207      ELSE
+03208          MOVE AT-FORM-FOLLOW-UP-DT    TO DC-BIN-DATE-1
+03209          MOVE  ' '                    TO DC-OPTION-CODE
+03210          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03211          MOVE DC-GREG-DATE-1-EDIT     TO  P-FORM-FOL-DT.
+03212
+03213      IF AT-FORM-ANSWERED-DT = LOW-VALUES OR SPACES
+03214          MOVE SPACE                   TO P-CLM-FORM-ANS-DT
+03215      ELSE
+03216          MOVE AT-FORM-ANSWERED-DT     TO DC-BIN-DATE-1
+03217          MOVE  ' '                    TO DC-OPTION-CODE
+03218          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03219          MOVE DC-GREG-DATE-1-EDIT     TO P-CLM-FORM-ANS-DT.
+03220
+03221      MOVE SPACES                      TO P-FORM-LINE-4
+03222
+03223      IF AT-EMP-FORM-ANSWERED-DT = LOW-VALUES OR SPACES
+03224          MOVE SPACES                  TO P-EMP-FORM-ANS-DT
+03225          MOVE SPACES                  TO P-EMP-FORM-COMM
+03226      ELSE
+03227          MOVE '   EMP.  ANSWERED - '  TO P-EMP-FORM-COMM
+03228          MOVE AT-EMP-FORM-ANSWERED-DT TO DC-BIN-DATE-1
+03229          MOVE  ' '                    TO DC-OPTION-CODE
+03230          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03231          MOVE DC-GREG-DATE-1-EDIT     TO P-EMP-FORM-ANS-DT.
+03232
+03233      IF AT-PHY-FORM-ANSWERED-DT = LOW-VALUES OR SPACES
+03234          MOVE SPACES                  TO P-PHY-FORM-ANS-DT
+03235          MOVE SPACES                  TO P-PHY-FORM-COMM
+03236      ELSE
+03237          MOVE 'PHY.  ANSWERED - '     TO P-PHY-FORM-COMM
+03238          MOVE AT-PHY-FORM-ANSWERED-DT TO DC-BIN-DATE-1
+03239          MOVE  ' '                    TO DC-OPTION-CODE
+03240          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03241          MOVE DC-GREG-DATE-1-EDIT     TO P-PHY-FORM-ANS-DT.
+03242
+03243      MOVE SPACES                      TO P-FORM-ADSEE.
+03244
+03245      IF  FORM-TO-INSURED
+03246           MOVE 'INSURED'              TO P-FORM-ADSEE.
+03247      IF  FORM-TO-ACCOUNT
+03248           MOVE 'ACCOUNT'              TO P-FORM-ADSEE.
+03249      IF  FORM-TO-OTHER-1
+03250           MOVE 'OTHER 1'              TO P-FORM-ADSEE.
+03251      IF  FORM-TO-OTHER-2
+03252           MOVE 'OTHER 2'              TO P-FORM-ADSEE.
+03253
+03254      IF PROGRESS-FORM
+03255         MOVE AT-INSTRUCT-LN-1    TO P-FORM-INSTRUCT
+03256         MOVE AT-INSTRUCT-LN-2    TO P-FORM-INSTRUCT-1.
+03257
+03258      MOVE DSP                    TO WS-PASSED-CNTL-CHAR.
+03259      MOVE  P-FORM-LINE-1         TO WS-PASSED-DATA.
+03260      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03261
+03262      MOVE SSP                    TO WS-PASSED-CNTL-CHAR.
+03263      MOVE  P-FORM-LINE-2         TO WS-PASSED-DATA.
+03264      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03265
+03266      MOVE SSP                    TO WS-PASSED-CNTL-CHAR.
+03267      MOVE  P-FORM-LINE-3         TO WS-PASSED-DATA.
+03268      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03269
+03270      IF P-FORM-LINE-4 NOT EQUAL SPACES
+03271         MOVE SSP                    TO WS-PASSED-CNTL-CHAR
+03272         MOVE  P-FORM-LINE-4         TO WS-PASSED-DATA
+03273         PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03274
+03275      IF INITIAL-FORM OR AT-INSTRUCT-LN-1 = SPACES
+03276         GO TO 2600-CHECK-RELATED-CLAIMS.
+03277
+03278      MOVE SSP                    TO WS-PASSED-CNTL-CHAR.
+03279      MOVE  P-FORM-LINE-5         TO WS-PASSED-DATA.
+03280      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03281
+03282      IF AT-INSTRUCT-LN-2 NOT = SPACES
+03283         MOVE SSP                 TO WS-PASSED-CNTL-CHAR
+03284         MOVE  P-FORM-LINE-6      TO WS-PASSED-DATA
+03285         PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03286
+03287      IF AT-INSTRUCT-LN-3 NOT = SPACES
+03288         MOVE AT-INSTRUCT-LN-3    TO P-FORM-INSTRUCT-1
+03289         MOVE SSP                 TO WS-PASSED-CNTL-CHAR
+03290         MOVE  P-FORM-LINE-6      TO WS-PASSED-DATA
+03291         PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03292
+03293  2600-CHECK-RELATED-CLAIMS.
+03294
+03295      IF AT-RELATED-1 NOT = SPACES
+03296         MOVE AT-REL-CLAIM-1      TO P-FORM-CLAIM
+03297         MOVE AT-REL-CARR-1       TO P-FORM-CARRIER
+03298         MOVE AT-REL-CERT-1       TO P-FORM-CERT
+03299         MOVE SSP                 TO WS-PASSED-CNTL-CHAR
+03300         MOVE P-FORM-LINE-7       TO WS-PASSED-DATA
+03301         PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03302
+03303      IF AT-RELATED-2 NOT = SPACES
+03304         MOVE AT-REL-CLAIM-2      TO P-FORM-CLAIM
+03305         MOVE AT-REL-CARR-2       TO P-FORM-CARRIER
+03306         MOVE AT-REL-CERT-2       TO P-FORM-CERT
+03307         MOVE SSP                 TO WS-PASSED-CNTL-CHAR
+03308         MOVE P-FORM-LINE-7       TO WS-PASSED-DATA
+03309         PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03310
+03311  2600-EXIT.
+03312       EXIT.
+03313
+03314      EJECT
+03315  2700-PRINT-OPEN-CLOSE-HISTORY.
+03316      IF OC-TABLE-LOADED  OR
+03317         AD-TABLE-LOADED  OR
+03318         AP-TABLE-LOADED
+03319          NEXT SENTENCE
+03320      ELSE
+03321          GO TO 2700-EXIT.
+03322
+03323      PERFORM 4013-HEADING-RTN   THRU 4013-EXIT.
+03324      PERFORM 1014-HEADING-CONT  THRU 1014-EXIT.
+03325
+03326      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03327      MOVE  P-2-LINE-6   TO WS-PASSED-DATA.
+03328      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03329
+03330      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03331      MOVE  P-2-LINE-8   TO WS-PASSED-DATA.
+03332      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03333
+03334      SET  AP-INDEX  TO 1.
+03335      SET  AD-INDEX  TO 1.
+03336      SET  OC-INDEX  TO 1.
+03337
+03338      IF OC-TABLE-LOADED
+03339          PERFORM  2710-PROCESS-OC  THRU 2710-EXIT
+03340           UNTIL  END-OC-TABLE
+03341           OR OC-INDEX GREATER THAN 6
+03342          MOVE SPACES  TO WS-PASSED-DATA
+03343          MOVE SSP     TO WS-PASSED-CNTL-CHAR
+03344          PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03345
+03346      MOVE SPACES TO END-OC-TABLE-SW.
+03347
+03348      IF AP-TABLE-LOADED
+03349          PERFORM  2720-PROCESS-AP  THRU 2720-EXIT
+03350           UNTIL  END-AP-TABLE
+03351           OR AP-INDEX GREATER THAN 10
+03352          MOVE SPACES  TO WS-PASSED-DATA
+03353          MOVE SSP     TO WS-PASSED-CNTL-CHAR
+03354          PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03355
+03356      MOVE SPACES TO END-AP-TABLE-SW.
+03357
+03358      IF AD-TABLE-LOADED
+03359          PERFORM  2730-PROCESS-AD  THRU 2730-EXIT
+03360           UNTIL  END-AD-TABLE
+03361           OR AD-INDEX GREATER THAN  60
+03362          MOVE SPACES  TO WS-PASSED-DATA
+03363          MOVE SSP     TO WS-PASSED-CNTL-CHAR
+03364          PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03365
+03366      MOVE SPACES TO END-AD-TABLE-SW.
+03367
+03368  2700-EXIT.
+03369       EXIT.
+03370
+03371  2710-PROCESS-OC.
+03372      IF OC-TBL-OPCL-DT (OC-INDEX)  = SPACES OR LOW-VALUES
+03373          MOVE   'E'  TO END-OC-TABLE-SW
+03374          GO TO 2710-EXIT.
+03375
+03376      MOVE SPACES    TO P-2-HIS-OPCL.
+03377
+03378      IF  OC-TBL-OPCL-TYPE (OC-INDEX) = 'O'
+03379          MOVE 'OPEN '   TO P-2-HIS-OPCL.
+03380      IF  OC-TBL-OPCL-TYPE (OC-INDEX) = 'C'
+03381          MOVE 'CLOSE'   TO P-2-HIS-OPCL.
+03382
+03383      MOVE OC-TBL-OPCL-REASON (OC-INDEX)   TO P-2-HIS-CAUSE.
+03384
+03385      MOVE OC-TBL-OPCL-DT (OC-INDEX) TO DC-BIN-DATE-1.
+03386      MOVE  ' '                      TO DC-OPTION-CODE.
+03387      PERFORM 8100-DATE-RTN  THRU 8100-EXIT.
+03388      MOVE DC-GREG-DATE-1-EDIT TO  P-2-HIS-DATE.
+03389
+03390      MOVE SSP              TO WS-PASSED-CNTL-CHAR.
+03391      MOVE P-2-HIS-DETAIL   TO WS-PASSED-DATA.
+03392      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03393
+03394      MOVE SPACES  TO  OC-TBL-OPCL-TYPE   (OC-INDEX)
+03395                       OC-TBL-OPCL-DT     (OC-INDEX)
+03396                       OC-TBL-OPCL-REASON (OC-INDEX).
+03397
+03398      SET  OC-INDEX   UP BY 1.
+03399
+03400  2710-EXIT.
+03401       EXIT.
+03402
+03403      EJECT
+03404  2720-PROCESS-AP.
+03405      IF AP-TBL-SCHED-START-DT (AP-INDEX) = SPACES
+03406          MOVE   'E'  TO END-AP-TABLE-SW
+03407          GO TO 2720-EXIT.
+03408
+03409      IF  WS-LINE-CNT  GREATER THAN  50
+03410          PERFORM  4013-HEADING-RTN  THRU 4013-EXIT.
+03411
+03412      MOVE AP-TBL-EST-BY     (AP-INDEX)    TO P-2-EST-BY.
+03413      MOVE AP-TBL-FIRST-DAYS (AP-INDEX)    TO P-2-DAYS-1ST.
+03414      MOVE AP-TBL-FIRST-AMT  (AP-INDEX)    TO P-2-1ST-PMT.
+03415      MOVE AP-TBL-REG-AMT    (AP-INDEX)    TO P-2-REG-PMT.
+03416      MOVE AP-TBL-FIRST-DAYS (AP-INDEX)    TO P-2-DAYS-1ST.
+03417
+03418      MOVE AP-TBL-EST-DT (AP-INDEX)        TO DC-BIN-DATE-1.
+03419      MOVE  ' '                            TO DC-OPTION-CODE.
+03420      PERFORM 8100-DATE-RTN  THRU 8100-EXIT.
+03421      MOVE DC-GREG-DATE-1-EDIT             TO P-2-EST-DT.
+03422
+03423      IF AP-TBL-SCHED-START-DT (AP-INDEX)  = LOW-VALUES OR
+03424                                             SPACES
+03425          MOVE ZEROS TO P-2-EFF-DT
+03426      ELSE
+03427          MOVE AP-TBL-SCHED-START-DT (AP-INDEX) TO  DC-BIN-DATE-1
+03428          MOVE  ' '                           TO  DC-OPTION-CODE
+03429          MOVE +0                             TO  DC-ELAPSED-DAYS
+03430                                                  DC-ELAPSED-MONTHS
+03431          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03432          IF NO-CONVERSION-ERROR
+03433              MOVE DC-GREG-DATE-1-EDIT        TO  P-2-EFF-DT
+03434          ELSE
+03435              MOVE SPACES                     TO  P-2-EFF-DT.
+03436
+03437      IF AP-TBL-SCHED-END-DT (AP-INDEX) = LOW-VALUES OR SPACES
+03438          MOVE ZEROS                          TO  P-2-END-DT
+03439          IF PI-USES-PAID-TO
+03440              MOVE 'LAST PAY TO DATE    - '   TO  P-2-LST-PMT-DT
+03441          ELSE
+03442              MOVE 'LAST PAY THRU DATE  - '   TO  P-2-LST-PMT-DT
+03443      ELSE
+03444          IF PI-USES-PAID-TO
+03445              MOVE 'LAST PAY TO DATE    - '   TO  P-2-LST-PMT-DT
+03446              MOVE AP-TBL-SCHED-END-DT (AP-INDEX) TO DC-BIN-DATE-1
+03447              MOVE '6'                        TO  DC-OPTION-CODE
+03448              MOVE +1                         TO  DC-ELAPSED-DAYS
+03449              MOVE +0                         TO  DC-ELAPSED-MONTHS
+03450              PERFORM 8100-DATE-RTN THRU 8100-EXIT
+03451              IF NO-CONVERSION-ERROR
+03452                  MOVE DC-GREG-DATE-1-EDIT    TO  P-2-LST-PMT-ON
+03453              ELSE
+03454                  MOVE SPACES                 TO  P-2-LST-PMT-ON
+03455          ELSE
+03456              MOVE 'LAST PAY THRU DATE  - '   TO  P-2-LST-PMT-DT
+03457              MOVE AP-TBL-SCHED-END-DT (AP-INDEX) TO DC-BIN-DATE-1
+03458              MOVE  ' '                       TO  DC-OPTION-CODE
+03459              MOVE +0                         TO  DC-ELAPSED-DAYS
+03460                                                  DC-ELAPSED-MONTHS
+03461              PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03462              IF NO-CONVERSION-ERROR
+03463                  MOVE DC-GREG-DATE-1-EDIT    TO  P-2-LST-PMT-ON
+03464              ELSE
+03465                  MOVE SPACES                 TO  P-2-LST-PMT-ON.
+03466
+03467      IF AP-TBL-FIRST-DT (AP-INDEX) = LOW-VALUES OR SPACES
+03468          MOVE SPACES                         TO  P-2-1ST-PMT-ON
+03469          IF PI-USES-PAID-TO
+03470              MOVE 'FIRST PAY TO DATE   - '   TO  P-2-1ST-PMT-DT
+03471          ELSE
+03472              MOVE 'FIRST PAY THRU DATE - '   TO  P-2-1ST-PMT-DT
+03473      ELSE
+03474          IF PI-USES-PAID-TO
+03475              MOVE 'FIRST PAY TO DATE   - '   TO  P-2-1ST-PMT-DT
+03476              MOVE AP-TBL-FIRST-DT (AP-INDEX) TO  DC-BIN-DATE-1
+03477              MOVE '6'                        TO  DC-OPTION-CODE
+03478              MOVE +1                         TO  DC-ELAPSED-DAYS
+03479              MOVE +0                         TO  DC-ELAPSED-MONTHS
+03480              PERFORM 8100-DATE-RTN THRU 8100-EXIT
+03481              IF NO-CONVERSION-ERROR
+03482                  MOVE DC-GREG-DATE-1-EDIT    TO  P-2-1ST-PMT-ON
+03483              ELSE
+03484                  MOVE SPACES                 TO  P-2-1ST-PMT-ON
+03485          ELSE
+03486              MOVE 'FIRST PAY THRU DATE - '   TO  P-2-1ST-PMT-DT
+03487              MOVE AP-TBL-FIRST-DT (AP-INDEX) TO  DC-BIN-DATE-1
+03488              MOVE  ' '                       TO  DC-OPTION-CODE
+03489              MOVE +0                         TO  DC-ELAPSED-DAYS
+03490                                                  DC-ELAPSED-MONTHS
+03491              PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03492              IF NO-CONVERSION-ERROR
+03493                  MOVE DC-GREG-DATE-1-EDIT    TO  P-2-1ST-PMT-ON
+03494              ELSE
+03495                  MOVE SPACES                 TO  P-2-1ST-PMT-ON.
+03496
+03497      IF AP-TBL-TERM-DT (AP-INDEX) = LOW-VALUES OR SPACES
+03498          MOVE SPACES                    TO P-2-END-DT
+03499      ELSE
+03500          MOVE AP-TBL-TERM-DT (AP-INDEX) TO DC-BIN-DATE-1
+03501          MOVE +0                        TO DC-ELAPSED-DAYS
+03502                                            DC-ELAPSED-MONTHS
+03503          MOVE  ' '                      TO DC-OPTION-CODE
+03504          PERFORM 8100-DATE-RTN  THRU 8100-EXIT
+03505          MOVE DC-GREG-DATE-1-EDIT       TO P-2-END-DT.
+03506
+03507      MOVE AP-TBL-INT-MO  (AP-INDEX)    TO P-2-MOS-BET.
+03508
+03509      MOVE  SPACES   TO  P-2-PAYEE.
+03510
+03511      IF  INSURED-PAID-AUTO
+03512          MOVE  'INSURED PAID AUTO'  TO  P-2-PAYEE.
+03513      IF  BENEFICIARY-PAID-AUTO
+03514          MOVE  'BENEF-Y PAID AUTO'  TO  P-2-PAYEE.
+03515      IF  ACCOUNT-PAID-AUTO
+03516          MOVE  'ACCOUNT PAID AUTO'  TO  P-2-PAYEE.
+03517      IF  OTHER-1-PAID-AUTO
+03518          MOVE  'OTHER-1 PAID AUTO'  TO  P-2-PAYEE.
+03519      IF  OTHER-2-PAID-AUTO
+03520          MOVE  'OTHER-2 PAID AUTO'  TO  P-2-PAYEE.
+03521
+03522      IF  AP-TBL-LAST-TYPE (AP-INDEX)  = '1'
+03523          MOVE  'YES'   TO P-2-LAST-FINAL
+03524      ELSE
+03525          MOVE  'NO '   TO P-2-LAST-FINAL
+03526
+03527      MOVE DSP             TO WS-PASSED-CNTL-CHAR.
+03528      MOVE P-2-AUT-LINE-1  TO WS-PASSED-DATA.
+03529      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03530
+03531      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03532      MOVE P-2-AUT-LINE-2  TO WS-PASSED-DATA.
+03533      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03534
+03535      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03536      MOVE P-2-AUT-LINE-3  TO WS-PASSED-DATA.
+03537      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03538
+03539      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03540      MOVE P-2-AUT-LINE-4  TO WS-PASSED-DATA.
+03541      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03542
+03543      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03544      MOVE P-2-AUT-LINE-5  TO WS-PASSED-DATA.
+03545      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03546
+03547      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03548      MOVE P-2-AUT-LINE-6  TO WS-PASSED-DATA.
+03549      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03550
+03551      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03552      MOVE P-2-AUT-LINE-7  TO WS-PASSED-DATA.
+03553      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03554
+03555      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03556      MOVE P-2-AUT-LINE-8  TO WS-PASSED-DATA.
+03557      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03558
+03559      MOVE SPACES TO AP-TBL-EST-DT         (AP-INDEX)
+03560                     AP-TBL-EST-BY         (AP-INDEX)
+03561                     AP-TBL-SCHED-START-DT (AP-INDEX)
+03562                     AP-TBL-SCHED-END-DT   (AP-INDEX)
+03563                     AP-TBL-TERM-DT        (AP-INDEX)
+03564                     AP-TBL-LAST-TYPE      (AP-INDEX)
+03565                     AP-TBL-FIRST-DT       (AP-INDEX)
+03566                     AP-TBL-INT-MO         (AP-INDEX).
+03567
+03568       MOVE ZEROS  TO AP-TBL-FIRST-AMT     (AP-INDEX)
+03569                      AP-TBL-FIRST-DAYS    (AP-INDEX)
+03570                      AP-TBL-REG-AMT       (AP-INDEX)
+03571                      AP-TBL-REG-MO        (AP-INDEX).
+03572
+03573      SET  AP-INDEX   UP BY 1.
+03574
+03575  2720-EXIT.
+03576       EXIT.
+03577
+03578      EJECT
+03579  2730-PROCESS-AD.
+03580      IF AD-TBL-TYPE (AD-INDEX) = SPACES
+03581          MOVE   'E'  TO END-AD-TABLE-SW
+03582          GO TO 2730-EXIT.
+03583
+03584      IF  WS-LINE-CNT  GREATER THAN  50
+03585          PERFORM  4013-HEADING-RTN  THRU 4013-EXIT.
+03586
+03587      MOVE AD-TBL-TYPE   (AD-INDEX)     TO P-2-ADD-CODE.
+03588      MOVE AD-TBL-NAME   (AD-INDEX)     TO P-2-ADD-NAME.
+03589      MOVE AD-TBL-ADDR-1 (AD-INDEX)     TO P-2-ADD-ADDR-1.
+03590      MOVE AD-TBL-ADDR-2 (AD-INDEX)     TO P-2-ADD-ADDR-2.
+03591      MOVE AD-TBL-CITY   (AD-INDEX)     TO P-2-ADD-CITY.
+03592      MOVE AD-TBL-ZIP    (AD-INDEX)     TO P-2-ADD-ZIP.
+03593      MOVE AD-TBL-PHONE  (AD-INDEX)     TO WS-PHONE-BRKDN.
+03594      MOVE WS-PH-1                      TO WS-PH-ED-1.
+03595      MOVE WS-PH-2                      TO WS-PH-ED-2.
+03596      MOVE WS-PH-3                      TO WS-PH-ED-3.
+03597      MOVE WS-PHONE-EDIT                TO P-2-ADD-PHONE.
+03598
+03599      IF AD-TBL-TYPE  (AD-INDEX)   = 'I'
+03600          MOVE 'INSURED'        TO P-2-ADD-TYPE.
+03601      IF AD-TBL-TYPE  (AD-INDEX)   = 'B'
+03602          MOVE 'BENEFICIARY'    TO P-2-ADD-TYPE.
+03603      IF AD-TBL-TYPE  (AD-INDEX)   = 'A'
+03604          MOVE 'ACCOUNT'        TO P-2-ADD-TYPE.
+03605      IF AD-TBL-TYPE  (AD-INDEX)   = 'P'
+03606          MOVE 'PHYSICIAN'      TO P-2-ADD-TYPE.
+03607      IF AD-TBL-TYPE  (AD-INDEX)   = 'E'
+03608          MOVE 'EMPLOYER'       TO P-2-ADD-TYPE.
+03609      IF AD-TBL-TYPE  (AD-INDEX)   = 'O'
+03610          MOVE 'OTHER 1'        TO P-2-ADD-TYPE.
+03611      IF AD-TBL-TYPE  (AD-INDEX)   = 'Q'
+03612          MOVE 'OTHER 2'        TO P-2-ADD-TYPE.
+03613      IF AD-TBL-TYPE  (AD-INDEX)   = '8'
+03614          IF CL-SYSTEM-IDENTIFIER IS EQUAL TO 'CV'
+03615              MOVE 'FROM PROD MSTR'   TO P-2-ADD-TYPE
+03616          ELSE
+03617              MOVE 'FROM ACCT MSTR'   TO P-2-ADD-TYPE.
+03618      IF AD-TBL-TYPE  (AD-INDEX)   = '9'
+03619          MOVE 'FROM BENE MSTR'    TO P-2-ADD-TYPE.
+03620
+03621      MOVE DSP             TO WS-PASSED-CNTL-CHAR.
+03622      MOVE P-2-ADD-LINE-1  TO WS-PASSED-DATA.
+03623      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03624
+03625      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03626      MOVE P-2-ADD-LINE-2  TO WS-PASSED-DATA.
+03627      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03628
+03629      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03630      MOVE P-2-ADD-LINE-3  TO WS-PASSED-DATA.
+03631      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03632
+03633      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03634      MOVE P-2-ADD-LINE-4  TO WS-PASSED-DATA.
+03635      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03636
+03637      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03638      MOVE P-2-ADD-LINE-5  TO WS-PASSED-DATA.
+03639      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03640
+03641      MOVE SSP             TO WS-PASSED-CNTL-CHAR.
+03642      MOVE P-2-ADD-LINE-6  TO WS-PASSED-DATA.
+03643      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03644
+03645      MOVE  SPACES  TO AD-TBL-TYPE   (AD-INDEX)
+03646                       AD-TBL-NAME   (AD-INDEX)
+03647                       AD-TBL-ADDR-1 (AD-INDEX)
+03648                       AD-TBL-ADDR-2 (AD-INDEX)
+03649                       AD-TBL-CITY   (AD-INDEX).
+03650       MOVE ZEROS TO   AD-TBL-ZIP    (AD-INDEX)
+03651                       AD-TBL-PHONE  (AD-INDEX).
+03652
+03653      SET  AD-INDEX   UP BY 1.
+03654
+03655  2730-EXIT.
+03656       EXIT.
+03657
+03658      EJECT
+03659  4000-INITIALIZE.
+03660      MOVE SPACES TO   END-OC-TABLE-SW
+03661                       END-AD-TABLE-SW
+03662                       END-AP-TABLE-SW.
+03663
+03664      MOVE SAVE-DATE         TO HEAD-RUN-DATE.
+03665
+03666      MOVE 0  TO WS-PAGE-CNT.
+03667
+03668      MOVE +80  TO WS-LINE-LEN.
+03669
+03670      SET  AP-INDEX   TO 1.
+03671      SET  AD-INDEX   TO 1.
+03672      SET  OC-INDEX   TO 1.
+03673
+03674      PERFORM 4001-CLEAR-OC-TABLE  6   TIMES.
+03675      PERFORM 4002-CLEAR-AP-TABLE  10  TIMES.
+03676      PERFORM 4003-CLEAR-AD-TABLE  60  TIMES.
+03677
+03678      MOVE SAVE-DATE     TO DC-GREG-DATE-1-EDIT
+03679                            HEAD-RUN-DATE.
+03680
+03681      MOVE '2' TO DC-OPTION-CODE.
+03682      PERFORM 8100-DATE-RTN  THRU 8100-EXIT.
+03683      MOVE DC-GREG-DATE-1-ALPHA  TO WS-UNALIGNED-FIELD.
+03684      MOVE DC-BIN-DATE-1         TO WS-BIN-CURRENT-DT
+03685      MOVE +18 TO WS-NAME-LENGTH.
+03686      PERFORM ELCALGNP              THRU ELCALGNP-EXIT.
+03687      MOVE WS-ALIGNED-FIELD      TO HEAD-RUN-DATE-FULL.
+03688
+03689  4000-EXIT.
+03690       EXIT.
+03691
+03692  4001-CLEAR-OC-TABLE.
+03693      MOVE SPACES  TO  OC-TBL-OPCL-DT     (OC-INDEX)
+03694                       OC-TBL-OPCL-TYPE   (OC-INDEX)
+03695                       OC-TBL-OPCL-REASON (OC-INDEX).
+03696      SET  OC-INDEX   UP BY 1.
+03697
+03698  4001-EXIT.
+03699       EXIT.
+03700
+03701  4002-CLEAR-AP-TABLE.
+03702      MOVE SPACES TO AP-TBL-EST-DT         (AP-INDEX)
+03703                     AP-TBL-EST-BY         (AP-INDEX)
+03704                     AP-TBL-SCHED-START-DT (AP-INDEX)
+03705                     AP-TBL-SCHED-END-DT   (AP-INDEX)
+03706                     AP-TBL-TERM-DT        (AP-INDEX)
+03707                     AP-TBL-LAST-TYPE      (AP-INDEX)
+03708                     AP-TBL-FIRST-DT       (AP-INDEX)
+03709                     AP-TBL-INT-MO         (AP-INDEX).
+03710
+03711       MOVE ZEROS  TO AP-TBL-FIRST-AMT     (AP-INDEX)
+03712                      AP-TBL-FIRST-DAYS    (AP-INDEX)
+03713                      AP-TBL-REG-AMT       (AP-INDEX)
+03714                      AP-TBL-REG-MO        (AP-INDEX).
+03715
+03716      SET  AP-INDEX   UP BY 1.
+03717
+03718  4002-EXIT.
+03719       EXIT.
+03720
+03721  4003-CLEAR-AD-TABLE.
+03722      MOVE  SPACES  TO AD-TBL-TYPE   (AD-INDEX)
+03723                       AD-TBL-NAME   (AD-INDEX)
+03724                       AD-TBL-ADDR-1 (AD-INDEX)
+03725                       AD-TBL-ADDR-2 (AD-INDEX)
+03726                       AD-TBL-CITY   (AD-INDEX).
+03727       MOVE ZEROS TO   AD-TBL-ZIP    (AD-INDEX)
+03728                       AD-TBL-PHONE  (AD-INDEX).
+03729
+03730      SET  AD-INDEX   UP BY 1.
+03731
+03732  4003-EXIT.
+03733       EXIT.
+03734
+03735  4013-HEADING-RTN.
+03736      ADD  1  TO  WS-PAGE-CNT.
+03737      MOVE WS-PAGE-CNT   TO HEAD-PAGE-NO.
+03738      MOVE TPG           TO WS-PASSED-CNTL-CHAR.
+03739      MOVE  HEAD-LINE-2  TO WS-PASSED-DATA.
+03740      PERFORM ELPRTCVP   THRU ELPRTCVP-EXIT.
+03741
+03742      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03743      MOVE  HEAD-LINE-3  TO WS-PASSED-DATA.
+03744      PERFORM ELPRTCVP   THRU ELPRTCVP-EXIT.
+03745
+03746      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03747      MOVE  HEAD-LINE-4  TO WS-PASSED-DATA.
+03748      PERFORM ELPRTCVP   THRU ELPRTCVP-EXIT.
+03749
+03750  4013-EXIT.
+03751       EXIT.
+03752
+03753  1014-HEADING-CONT.
+03754      MOVE DSP           TO WS-PASSED-CNTL-CHAR.
+03755      MOVE  LINE-25      TO WS-PASSED-DATA.
+03756      PERFORM ELPRTCVP   THRU ELPRTCVP-EXIT.
+03757
+03758      MOVE SSP           TO WS-PASSED-CNTL-CHAR.
+03759      MOVE  LINE-26      TO WS-PASSED-DATA.
+03760      PERFORM ELPRTCVP   THRU ELPRTCVP-EXIT.
+03761
+03762  1014-EXIT.
+03763       EXIT.
+03764
+03765       EJECT
+uktdel*PRINT-RTN.  COPY ELPRTCVP.
+uktins PRINT-RTN.
+uktins*    COPY ELPRTCVP.
+00001 ******************************************************************
+00002 ***                                                              *
+00003 ***                          ELPRTCVP.                           *
+00004 ***                          VMOD=2.003                          *
+00005 ***                                                              *
+00006 ***     COPY MEMBER FOR TERMINAL ONLINE PRINT ROUTINE.           *
+00007 ***     THIS ROUTINE WILL ACCOMODATE PRINTING TO A 3270          *
+00008 ***     TERMINAL PRINTER. A BUFFER OF UP TO 1920 CHARACTERS      *
+00009 ***     IS ACCUMULATED AND PRINTED COLLECTIVELY.                 *
+00010 ***                                                              *
+00011 ***     THIS ROUTINE TO BE USED ONLY WITH ACCOMPANIMENT          *
+00012 ***      OF THE WORKING-STORAGE COPY MEMBER ( ELPRTCVD )         *
+00013 ***     THE HOST PROGRAM MUST INITIALIZE THE FOLLOWING 3 FIELDS  *
+00014 ***      FROM THE ABOVE COPY MEMBER FOR THIS PROCEDURE TO BE     *
+00015 ***      SUCCESSFUL.                                             *
+00016 ***      05  WS-LINE-LEN    PIC  S9(4)  COMP  VALUE +80.         *
+00017 ***                         LENGTH OF THE LINE TO BE PRINTED     *
+00018 ***                         DEFAULT IS 80, YOU CAN USE ANY NUMBER*
+00019 ***                         UP TO 132.  THIS FIELD IS ONLY ACCEP-*
+00020 ***                         TED THE FIRST TIME THRU THE ROUTINE. *
+00021 ***      05  WS-PROG-END    PIC  X  VALUE SPACES.                *
+00022 ***                         PROGRAM END SWITCH. INITIALIZED      *
+00023 ***                         TO SPACE-     MOVE IN ANY NONBLANK   *
+00024 ***                         TO IT WHEN PROGRAM IS FINISHED.      *
+00025 ***      05  WS-PRINT-AREA.                                      *
+00026 ***          10  WS-PASSED-CNTL-CHAR     PIC X.                  *
+00027 ***          10  WS-PASSED-DATA          PIC X(132).             *
+00028 ***                         USE THE DATA TO BE PRINTED IN THE    *
+00029 ***                         WS-PASSED-DATA.                      *
+00030 ***                         USE THE STANDARD CARRIAGE CONTROL    *
+00031 ***                         CHARACTER IN THE WS-PASSED-CNTL-CHAR *
+00032 ***                           SINGLE-SPACE            VALUE ' '  *
+00033 ***                           DOUBLE-SPACE            VALUE '0'  *
+00034 ***                           TRIPLE-SPACE            VALUE '-'  *
+00035 ***                           TOP-PAGE                VALUE '1'  *
+00036 ***      NOTE: A LINE COUNT IS PROVIDED IN FIELDNAME -WS-LINE-CNT*
+00037 ***            THE USE OF THIS FIELD IS OPTIONAL.                *
+00038 ***            THIS ROUTINE WILL ONLY ADD 1, 2, OR 3             *
+00039 ***            TO THIS COUNT DEPENDING ON THE WS-PASSED-CNTL-CHAR*
+00040 ***            AND RESET THE COUNT TO ZERO WHEN TOP-PAGE         *
+00041 ***            CONDITION.                                        *
+00042 ***                                                              *
+00043 ******************************************************************
+00044
+00045  ELPRTCVP.
+00046
+pemuni*    IF PI-COMPANY-ID IS EQUAL TO 'DMD' OR 'CID'
+pemuni     IF PI-COMPANY-ID IS EQUAL TO 'DMD' OR 'XXX'
+00048          MOVE 'P'                TO DL34-PROCESS-TYPE
+00049          MOVE THIS-PGM           TO DL34-PRINT-PROGRAM-ID
+00050          MOVE PI-PROCESSOR-ID    TO DL34-USERID
+00051          MOVE PI-COMPANY-ID      TO DL34-COMPANY-ID
+00052          MOVE WS-PRINT-AREA      TO DL34-PRINT-LINE
+00053          MOVE PI-ALT-DMD-PRT-ID  TO DL34-OVERRIDE-PRINTER-ID
+00054
+00055          
+      * EXEC CICS LINK
+00056 *            PROGRAM    ('DLO034')
+00057 *            COMMAREA   (DLO034-COMMUNICATION-AREA)
+00058 *            LENGTH     (DLO034-REC-LENGTH)
+00059 *        END-EXEC
+           MOVE 'DLO034' TO DFHEIV1
+      *    MOVE '."C                   (   #00010127' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303130313237' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DLO034-COMMUNICATION-AREA, 
+                 DLO034-REC-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+00060
+00061             IF DL34-RETURN-CODE = 'OK'
+00062                 GO TO ELPRTCVP-EXIT
+00063             ELSE
+00064 *               MOVE '8339'     TO EMI-ERROR ?????ERROR MESSAGE???
+00065                 GO TO ELPRTCVP-EXIT.
+00066
+00067      IF NOT FIRST-TIME
+00068          GO TO ELPRTCVP-020.
+00069
+00070      IF WS-LINE-LEN NOT GREATER ZERO
+00071          GO TO ELPRTCVP-EXIT.
+00072
+00073      MOVE '2'                    TO WS-FIRST-TIME-SW.
+00074      MOVE LOW-VALUES             TO WS-BUFFER-AREA.
+00075
+00076      SET BUFFER-INDEX TO +1
+00077
+00078      IF EIBTRMID IS EQUAL TO 'AFLP'
+00079          NEXT SENTENCE
+00080      ELSE
+00081          IF NOT TOP-PAGE
+00082              MOVE T-TP           TO WS-BUFFER-BYTE (BUFFER-INDEX)
+00083              SET BUFFER-INDEX UP BY +1.
+00084
+00085  ELPRTCVP-020.
+00086      IF WS-PROG-END = SPACES
+00087          GO TO ELPRTCVP-030.
+00088
+00089      MOVE SPACES                 TO WS-PROG-END.
+00090
+00091      IF BUFFER-INDEX GREATER +1
+00092          PERFORM ELPRTCVP-PRINT-BUFFER THRU ELPRTCVP-PRINT-EXIT.
+00093
+00094      MOVE '1'                    TO WS-FIRST-TIME-SW.
+00095
+00096      GO TO ELPRTCVP-EXIT.
+00097
+00098  ELPRTCVP-030.
+00099      IF WS-PASSED-DATA = SPACES
+00100          SET PRT-INDEX TO +1
+00101          GO TO ELPRTCVP-050.
+00102
+00103      SET PRT-INDEX TO WS-LINE-LEN.
+00104
+00105  ELPRTCVP-040.
+00106      IF WS-PRINT-BYTE (PRT-INDEX) NOT = SPACES
+00107          GO TO ELPRTCVP-050.
+00108
+00109      IF PRT-INDEX GREATER +1
+00110          SET PRT-INDEX DOWN BY +1
+00111          GO TO ELPRTCVP-040.
+00112
+00113  ELPRTCVP-050.
+00114      SET WS-LINE-LENGTH TO PRT-INDEX.
+00115      SET BUFFER-INDEX2 TO BUFFER-INDEX.
+00116      SET BUFFER-INDEX2 UP BY WS-LINE-LENGTH.
+00117
+00118      IF BUFFER-INDEX2 NOT LESS WS-BUFFER-SIZE
+00119          PERFORM ELPRTCVP-PRINT-BUFFER THRU ELPRTCVP-PRINT-EXIT.
+00120
+00121      IF TRIPLE-SPACE
+00122           ADD +2  TO  WS-LINE-CNT
+00123           MOVE T-SS           TO WS-BUFFER-BYTE (BUFFER-INDEX)
+00124                                  WS-BUFFER-BYTE (BUFFER-INDEX + 1)
+00125           SET BUFFER-INDEX UP BY +2.
+00126
+00127      IF DOUBLE-SPACE
+00128           ADD +1  TO  WS-LINE-CNT
+00129           MOVE T-SS             TO WS-BUFFER-BYTE (BUFFER-INDEX)
+00130           SET BUFFER-INDEX UP BY +1.
+00131
+00132      ADD +1 TO WS-LINE-CNT
+00133 ************************************************************
+00134 *     BYPASS NEW LINE SYMBOL                               *
+00135 *        IF FIRST BUFFER SENT AND TOP-OF-FORM SET.         *
+00136 *     OR IF FIRST LINE OF SUBSEQUENT BUFFERS.              *
+00137 ************************************************************
+00138
+00139      IF (BUFFER-INDEX GREATER +1 AND
+00140          WS-BUFFER-BYTE (BUFFER-INDEX - 1) = T-TP)  OR
+00141          FIRST-LINE-NEXT-BUFFER
+00142          MOVE ZERO               TO WS-FIRST-TIME-SW
+00143      ELSE
+00144          MOVE T-SS               TO WS-BUFFER-BYTE (BUFFER-INDEX)
+00145          SET BUFFER-INDEX UP BY +1.
+00146
+00147 **   NOTE, SINGLE SPACE IS REQUIRED BEFORE TOP PAGE CHAR
+00148
+00149      IF TOP-PAGE
+00150          MOVE +1                TO WS-LINE-CNT
+00151          MOVE T-TP              TO WS-BUFFER-BYTE (BUFFER-INDEX)
+00152          SET BUFFER-INDEX UP BY +1.
+00153
+00154      SET PRT-INDEX TO +1.
+00155
+00156  ELPRTCVP-060.
+00157      MOVE WS-PRINT-BYTE (PRT-INDEX)
+00158                                  TO WS-BUFFER-BYTE (BUFFER-INDEX).
+00159      SET BUFFER-INDEX UP BY +1.
+00160
+00161      IF PRT-INDEX LESS WS-LINE-LENGTH
+00162          SET PRT-INDEX UP BY +1
+00163          GO TO ELPRTCVP-060.
+00164
+00165  ELPRTCVP-EXIT.
+00166      EXIT.
+00167
+00168  ELPRTCVP-PRINT-BUFFER.
+00169      IF WS-BUFFER-BYTE (BUFFER-INDEX - 1) = T-SS
+00170         MOVE SPACE               TO WS-BUFFER-BYTE (BUFFER-INDEX)
+00171         SET BUFFER-INDEX UP BY 1.
+00172
+00173      MOVE  T-EM                  TO  WS-BUFFER-BYTE (BUFFER-INDEX)
+00174      SET WS-BUFFER-LENGTH TO BUFFER-INDEX.
+00175
+00176      
+      * EXEC CICS SEND
+00177 *        FROM    (WS-BUFFER-AREA)
+00178 *        LENGTH  (WS-BUFFER-LENGTH)
+00179 *        CTLCHAR (WS-WCC-CNTL)
+00180 *        ERASE
+00181 *    END-EXEC.
+      *    MOVE '$$    C E         L F ,   #00010248' TO DFHEIV0
+           MOVE X'242420202020432045202020' TO DFHEIV0(1:12)
+           MOVE X'2020202020204C2046202C20' TO DFHEIV0(13:12)
+           MOVE X'2020233030303130323438' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-BUFFER-AREA, 
+                 WS-BUFFER-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 WS-WCC-CNTL, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+00182
+00183      SET BUFFER-INDEX TO +1.
+00184      MOVE '2'                    TO WS-FIRST-TIME-SW.
+00185
+00186  ELPRTCVP-PRINT-EXIT.
+00187      EXIT.
+00188
+03767
+03768      EJECT
+03769  8100-DATE-RTN.
+03770      
+      * EXEC CICS LINK
+03771 *           PROGRAM  ('ELDATCV')
+03772 *           COMMAREA (DATE-CONVERSION-DATA)
+03773 *           LENGTH   (DC-COMM-LENGTH)
+03774 *    END-EXEC.
+           MOVE 'ELDATCV' TO DFHEIV1
+      *    MOVE '."C                   (   #00010264' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303130323634' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DATE-CONVERSION-DATA, 
+                 DC-COMM-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+03775
+03776  8100-EXIT.
+03777       EXIT.
+03778
+03779  8300-ABEND.
+03780      MOVE SPACES                 TO WS-PASSED-DATA.
+03781      MOVE DFHEIBLK               TO WS-PASSED-DATA.
+03782      
+      * EXEC CICS LINK
+03783 *        PROGRAM   ('EL004')
+03784 *        COMMAREA  (WS-PASSED-DATA)
+03785 *        LENGTH    (72)
+03786 *    END-EXEC.
+           MOVE 'EL004' TO DFHEIV1
+           MOVE 72
+             TO DFHEIV11
+      *    MOVE '."C                   (   #00010276' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303130323736' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 WS-PASSED-DATA, 
+                 DFHEIV11, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+03787
+pemuni     IF PI-COMPANY-ID = 'DMD' OR 'XXX'
+03789          IF DL34-RETURN-CODE NOT = 'OK'
+03790              MOVE  '**DLO034 OPEN ERROR - ABORT**'
+03791                                  TO WS-PASSED-DATA.
+03792
+03793      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03794
+03795      GO TO 9999-FINALIZE.
+03796
+03797  8900-PGMIDERR.
+03798      MOVE '* PROG NOT FOUND, NOTIFY DATA PROCESSING *'
+03799                           TO WS-PASSED-DATA.
+03800      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+03801      GO TO 9999-FINALIZE.
+03802
+03803  8900-EXIT.
+03804      EJECT
+03805
+03806  8999-RETURN-CICS.
+03807      MOVE WS-SAVED-PI-COMPANY-ID TO PI-COMPANY-ID.
+03808      IF PI-CALLING-PROGRAM = 'EL180'
+03809         MOVE 'EX50'              TO WS-NEXT-TRAN
+03810        ELSE
+03811         MOVE 'EX23'              TO WS-NEXT-TRAN.
+03812
+03813      MOVE EIBTRMID               TO WS-TERMINAL-ID
+03814      IF WS-TERM-PREFIX = 'DU'
+03815         
+      * EXEC CICS RETURN
+03816 *            TRANSID  (WS-NEXT-TRAN)
+03817 *            COMMAREA (PROGRAM-INTERFACE-BLOCK)
+03818 *            LENGTH   (PI-COMM-LENGTH)
+03819 *       END-EXEC
+      *    MOVE '.(CT                  ''   #00010309' TO DFHEIV0
+           MOVE X'2E2843542020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202720' TO DFHEIV0(13:12)
+           MOVE X'2020233030303130333039' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 WS-NEXT-TRAN, 
+                 PROGRAM-INTERFACE-BLOCK, 
+                 PI-COMM-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+03820        ELSE
+03821         
+      * EXEC CICS  RETURN
+03822 *       END-EXEC.
+      *    MOVE '.(                    ''   #00010315' TO DFHEIV0
+           MOVE X'2E2820202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202720' TO DFHEIV0(13:12)
+           MOVE X'2020233030303130333135' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+03823
+03824  8999-EXIT.
+03825       EXIT.
+03826
+03827  9800-LINK-REM-TERM.
+03828      
+      * EXEC CICS LINK
+03829 *        PROGRAM    ('ELRTRM')
+03830 *        COMMAREA   (CALCULATION-PASS-AREA)
+03831 *        LENGTH     (CP-COMM-LENGTH)
+03832 *        END-EXEC.
+           MOVE 'ELRTRM' TO DFHEIV1
+      *    MOVE '."C                   (   #00010322' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303130333232' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 CALCULATION-PASS-AREA, 
+                 CP-COMM-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+03833
+03834  9800-EXIT.
+03835       EXIT.
+03836
+101713 9900-ERROR-FORMAT.
+101713      IF NOT EMI-ERRORS-COMPLETE
+101713          
+      * EXEC CICS LINK
+101713*             PROGRAM    ('EL001')
+101713*             COMMAREA   (ERROR-MESSAGE-INTERFACE-BLOCK)
+101713*             LENGTH     (EMI-COMM-LENGTH)
+101713*         END-EXEC.
+           MOVE 'EL001' TO DFHEIV1
+      *    MOVE '."C                   (   #00010333' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303130333333' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 ERROR-MESSAGE-INTERFACE-BLOCK, 
+                 EMI-COMM-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.
+           
+101713
+101713 9900-EXIT.
+101713      EXIT.
+101713
+03837  9999-FINALIZE.
+03838
+03839      PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT.
+CIDMOD     MOVE 'X'  TO WS-PROG-END.
+CIDMOD     IF PI-COMPANY-ID = 'DMD' OR 'XXX'
+CIDMOD        CONTINUE
+CIDMOD     ELSE
+CIDMOD        PERFORM ELPRTCVP  THRU ELPRTCVP-EXIT
+CIDMOD     END-IF
+03842
+03843 * DLO034 CLOSE
+pemuni     IF PI-COMPANY-ID = 'DMD' OR 'XXX'
+03845          MOVE 'C'                TO DL34-PROCESS-TYPE
+03846          MOVE PI-COMPANY-ID      TO DL34-COMPANY-ID
+03847          MOVE THIS-PGM           TO DL34-PRINT-PROGRAM-ID
+03848          MOVE PI-PROCESSOR-ID    TO DL34-USERID
+03849          MOVE SPACES             TO DL34-PRINT-LINE
+03850                                     DL34-OVERRIDE-PRINTER-ID
+03851          
+      * EXEC CICS LINK
+03852 *            PROGRAM    ('DLO034')
+03853 *            COMMAREA   (DLO034-COMMUNICATION-AREA)
+03854 *            LENGTH     (DLO034-REC-LENGTH)
+03855 *        END-EXEC
+           MOVE 'DLO034' TO DFHEIV1
+      *    MOVE '."C                   (   #00010360' TO DFHEIV0
+           MOVE X'2E2243202020202020202020' TO DFHEIV0(1:12)
+           MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+           MOVE X'2020233030303130333630' TO DFHEIV0(25:11)
+           CALL 'kxdfhei1' USING DFHEIV0, 
+                 DFHEIV1, 
+                 DLO034-COMMUNICATION-AREA, 
+                 DLO034-REC-LENGTH, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99, 
+                 DFHEIV99
+           GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+03856
+03857          IF DL34-RETURN-CODE NOT = 'OK'
+03858              MOVE  '**DLO034 CLOSE ERROR - ABORT**'
+03859                                      TO WS-PASSED-DATA
+03860              GO TO 9999-FINALIZE.
+03861
+03862      GO TO 8999-RETURN-CICS.
+03863
+03864  9999-EXIT.
+03865      
+      * GOBACK.
+           MOVE '9%                    "   ' TO DFHEIV0
+           MOVE 'EL008' TO DFHEIV1
+           CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+           GOBACK.
+
+       9999-DFHBACK SECTION.
+           MOVE '9%                    "   ' TO DFHEIV0
+           MOVE 'EL008' TO DFHEIV1
+           CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+           GOBACK.
+       9999-DFHEXIT.
+           IF DFHEIGDJ EQUAL 0001
+               NEXT SENTENCE
+           ELSE IF DFHEIGDJ EQUAL 2
+               GO TO 8300-ABEND,
+                     8900-PGMIDERR,
+                     9999-FINALIZE
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 3
+               GO TO 0022-BYPASS
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 4
+               GO TO 1140-ENDBR,
+                     1140-ENDBR
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 5
+               GO TO 1190-ENDBR,
+                     1190-ENDBR
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 6
+               GO TO 1299-EXIT,
+                     1299-EXIT
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 7
+               GO TO 1301-NOTFND
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 8
+               GO TO 1401-NOTFND,
+                     1402-EOF
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 9
+               GO TO 1451-NOTFND
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 10
+               GO TO 1481-NOTFND
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 11
+               GO TO 1551-NOTFND,
+                     1552-EOF
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 12
+               GO TO 1601-NOTFND
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 13
+               GO TO 1605-NOTFND
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 14
+               GO TO 1610-NOTFND
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 15
+               GO TO 1701-NOTFND
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 16
+               GO TO 1752-ENDFILE
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 17
+               GO TO 1801-ERROR
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 18
+               GO TO 1851-ERROR
+               DEPENDING ON DFHEIGDI
+           ELSE IF DFHEIGDJ EQUAL 19
+               GO TO 2130-EXIT,
+                     2130-EXIT
+               DEPENDING ON DFHEIGDI.
+           MOVE '9%                    "   ' TO DFHEIV0
+           MOVE 'EL008' TO DFHEIV1
+           CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+           GOBACK.

@@ -1,0 +1,126 @@
+################################################################################
+# 
+#     Commercial Federal Tape Job
+#     JOB: cicomfpc             
+#
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+################################################################################
+LABEL name=CICFCNV 
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/staging/exe_bat'
+#  ********************************************************************* 
+#  *                                                                     
+#  *  CONVERT ACCOUNT NUMBERS ON COMMERCIAL FEDERAL FILE TO CSO          
+#  *  ACCOUNT NUMBERS FOR INPUT TO THE LOGIC SYSTEM.                     
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='SYS010' filename='\${TAPELDFILES}/new_cso.txt' disp='i' 
+ASSGNDD ddname='SYS012' dataset='CI.DD.COMFD800.CNV' filename='\${TAPELDFILES}/CI.DD.COMFD800.CNV' disp='o' normal='k' abend='d' recfmt='F' recsize='800' 
+
+EXECPGM pgmname='CICFCNV' stepname='CICFCNV' 
+
+################################################################################
+LABEL name=SORTCFED 
+################################################################################
+ASSGNDD ddname='SORTOUT' dataset='CI.DD.COMFD800.SORTED' filename='\${TAPELDFILES}/CI.DD.COMFD800.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='800' 
+ASSGNDD ddname='SORTIN' dataset='CI.DD.COMFD800.CNV' filename='\${TAPELDFILES}/CI.DD.COMFD800.CNV' disp='i-o' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(2 2)(4 10)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTCFED'
+
+################################################################################
+LABEL name=CICF511 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                     
+#  *  EXTRACT TRANSACTIONS FROM COMMERCIAL FEDERAL FILE FOR INPUT        
+#  *  TO LOGIC AND THE PP&A RECORDS FOR DOWNLOADING TO A PC FILE.        
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='SYS010' dataset='CI.DD.COMFD800.SORTED' filename='\${TAPELDFILES}/CI.DD.COMFD800.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS012' dataset='CI.DD.COMFD800.LOGIC' filename='\${TAPELDFILES}/CI.DD.COMFD800.LOGIC' disp='o' normal='k' abend='d' recsize='90' recfmt='F' 
+ASSGNDD  ddname='SYS013' type='SYSOUT' class='A' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD  ddname='SYS053' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='CICF511' stepname='CICF511' 
+
+################################################################################
+LABEL name=CPY511
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/${JOBNAME}/CICF511/SYS013_\${JON}' disp='i'
+ASSGNDD ddname='SYS011' filename='\${TAPELDFILES}/CI.DL.CIADM.FICH511.CFED' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY511' parm='ALL' 
+
+################################################################################
+LABEL name=SORTLGX 
+################################################################################
+ASSGNDD ddname='SORTOUT' dataset='CI.WW.COMFD800.LOGIC.SORT' filename='\${TAPELDFILES}/CI.WW.COMFD800.LOGIC.SORT' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SORTIN' dataset='CI.DD.COMFD800.LOGIC' filename='\${TAPELDFILES}/CI.DD.COMFD800.LOGIC' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 10)(1 10)(79 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTLGX'
+
+##  File CFCNTL is built each night in job cilgdbld
+
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                   * 
+#  *   PREPARE COMFD800 REFORMATTED RECORDS TO LOAD TO PEND. BUS. FILE * 
+#  *                                                                   * 
+#  ********************************************************************* 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' dataset='CI.WW.COMFD800.LOGIC.SORT' filename='\${TAPELDFILES}/CI.WW.COMFD800.LOGIC.SORT' disp='i-o' 
+ASSGNDD ddname='SYS011' dataset='CI.WW.COMFD800.EL512' filename='\${TAPELDFILES}/CI.WW.COMFD800.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.LG.VENDOR.DATECARD' filename='\${SEQFILES}/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='CFCNTL' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/${JOBNAME}/EL512/SYS008_\${JON}' disp='i'
+ASSGNDD ddname='SYS011' filename='\${TAPELDFILES}/CI.DL.CIADM.FICH512.CFED' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL' 
+
+################################################################################
+
+env > cicomfpc.env
+
+################################################################################
+
+ENDJOB 
+################################################################################

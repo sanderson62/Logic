@@ -1,0 +1,158 @@
+################################################################################
+#                                                                              
+#   CORP FINANCE A/P CHECK PROCESSING FOR CSO AND SMALL COMPANIES 
+#   (Interfaces with MICR system) 
+#
+#   Job: fnfrd83
+# 
+#   This job is not part of the CID daily subjobs process.   
+#   If this job abends, it should not hold up the CID daily cycle.
+#
+################################################################################
+BEGINJOB mode='MVS' verbose 
+
+if ($EBMSYS != "cid1t") then
+   echo "Job aborting, not TEST"
+   exit 1
+endif
+
+#*******************************************************************************
+#   Clear the original ap check data directory before getting new files
+#*******************************************************************************
+#####fnfrd83_rm.sh
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm /apps/test/cid1t/fnapchkdatao/*
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+
+#*******************************************************************************
+#   Get the check files from  //Ntcso1/userdata/bus_grp/fn/ap_checks
+#*******************************************************************************
+ftp -n ntcso1 < /apps/test/cid1t/jcl/ish/ftp-fnfrd83t-ajr
+
+#*******************************************************************************
+#   Make sure file names are all caps                                   
+#*******************************************************************************
+################################################################################
+LABEL name=STEP2
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+tst_fnfrd83_flnamcaps.sh
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP2' parm='SH'
+
+################################################################################
+#
+#   
+#
+################################################################################
+LABEL name=FNBCSO1 
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1t/src/batch'
+ASSGNDD  ddname='SYS010' filename='\${FNDATADIR}/CSOISSCK.DOC'  disp='i' normal='k' abend='k' 
+ASSGNDD  ddname='MICRDRFT'  filename='\${SEQFILES}/FN.DD.MICRCSO9.CSOISS'  disp='o' normal='k' abend='d' 
+ASSGNDD  ddname='TRNSFR'  type='DUMMY' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+
+EXECPGM  pgmname='FNB183T' stepname='FNBCSO1' parm='CSO9' 
+
+
+################################################################################
+LABEL name=FNB076a
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1t/src/batch'
+ASSGNDD  ddname='MICRDRFT' filename='\${SEQFILES}/FN.DD.MICRCSO9.CSOISS'  disp='i' normal='k' abend='k' 
+ASSGNDD  ddname='SYS007' type='SYSOUT'  
+ASSGNDD  ddname='SYS009' type='SYSOUT'  
+
+EXECPGM  pgmname='FNB076' stepname='FNB076a' 
+
+###############################################################################
+#
+#   C E N S T A T   C A S U A L T Y   C H E C K S
+#
+################################################################################
+LABEL name=FNBCEN5 
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1t/src/batch'
+ASSGNDD  ddname='SYS010' filename='\${FNDATADIR}/CENPC.DOC'  disp='i' normal='k' abend='k'
+ASSGNDD  ddname='MICRDRFT'  filename='\${SEQFILES}/FN.DD.MICRCEN9.CENPC'  disp='o' normal='k' abend='d' 
+ASSGNDD  ddname='TRNSFR'  type='DUMMY' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+
+EXECPGM  pgmname='FNB183T' stepname='FNBCEN5' parm='CEN9' 
+
+################################################################################
+LABEL name=FNB076f
+################################################################################
+ASSGNDD  ddname='MICRDRFT' filename='\${SEQFILES}/FN.DD.MICRCEN9.CENPC'  disp='i' normal='k' abend='k' 
+ASSGNDD  ddname='SYS007' type='SYSOUT'  
+ASSGNDD  ddname='SYS009' type='SYSOUT'  
+
+EXECPGM  pgmname='FNB076' stepname='FNB076f' 
+
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    ############################################################################
+    #  Put the micr check files out on LifePro
+    ############################################################################
+     "ftp -n ntis2 < /apps/test/cid1t/jcl/ish/ftp-fnfrd83t-ntis2-ajr"
+else 
+     echo " Job aborted prior to ftp ntlifepro"
+endif
+
+################################################################################
+#LABEL name=DELETE 
+################################################################################
+##ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+##  DELETE FN.DD.MICRCSO3.DCLISS
+##  SET  MAXCC=0
+##!
+##
+##EXECPGM pgmname='IDCAMS' stepname='DELETE'
+##
+################################################################################
+#
+if ($JOBSTATUS == 0) then
+##     "exelpr.sh p60w1s.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/FNBCSO1/SYS008_$JON"
+##     "exelpr.sh fnd06t.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/FNB076a/SYS007_$JON"
+##     "exelpr.sh fnd06t.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/FNB076a/SYS009_$JON"
+     "exelpr.sh isprog.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/FNBCSO1/SYS008_$JON"
+     "exelpr.sh fnd06tt.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/FNB076a/SYS007_$JON"
+     "exelpr.sh fnd06tt.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/FNB076a/SYS009_$JON"
+     "exelpr.sh isprog.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/FNBCEN5/SYS008_$JON"
+     "exelpr.sh fnd011t.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/FNB076f/SYS007_$JON"
+     "exelpr.sh fnd011t.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/FNB076f/SYS009_$JON"
+else 
+     echo " Job aborted, print not released " 
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 092002                 SMVA   INITIAL CONVERSION TO UNIX
+# 093002                 SMVA   ADD NEW COMPANIES STEPS e THRU h
+# 110402                 SMVA   MOD CSO AP CHK PROCESS TO INCLUDE VOIDS FOR BK
+#                               ADD TRNSFR FILE TO FNB183 STEPS
+# 111902 IR2002111800014 SMVA   ADD SHELL SCRIPT TO TRANSLATE FILE NAMES TO CAPS
+#                               AND POINT TO NEW FNDATADIR
+# 121702                 SMVA   CHG FNB183 STEP NAMES TO REFLECT FORM FOR OPS
+# 072803 CR2003052100011 SMVA   CHG FORM 0031 TO CSO1 FOR COMFED CONVERSION, CHG
+#                               STEP FNB0031 TO FNBCSO1, REMOVE FNB FILE TRNSFER
+#                               STEP FNB070, & CHG PGDEF/FRMDEF SRC TO FND06T
+# 052504                 SMVA   CONSOLIDATE NTLIFEPRO FTP SCRIPTS INTO 1, CHG 
+#                               NORM DISP FROM DEL TO KEEP ON FN.DD.MICR..FILES,
+#                               ADD IDCAMS DELETE STEP AT END AFTER LIFEPRO FTP 
+#091905                   PEMA   Change ftp location to ntis2
+#120805                  AJRA   ADD FORM CSO2
+#052306                  AJRA   ADD FORM CSO3
+#103106                  AJRA   Change CSO1 and CEN5 from BOTW/ComFed to Tier One

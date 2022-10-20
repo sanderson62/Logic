@@ -1,0 +1,64 @@
+################################################################################
+#                                                                              
+#   CORP FINANCE A/P CHECK BACKUP
+#
+#   Job: fnfrd83bkp
+# 
+#   This job is gets the check files from corp finance and backs them up
+#
+################################################################################
+BEGINJOB mode='MVS' verbose 
+
+#*******************************************************************************
+#   REMOVES ALL FILES FROM THE DIRECTORY
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f /apps/prod/cid1p/fnapchkdatao/*
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+#*******************************************************************************
+# delete the micr files from  //Ntis2/userapps/prod/cpsdrafts/workarea
+################################################################################
+LABEL name=STEP15
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntis2 < /apps/prod/cid1p/jcl/ish/ftp-fnfrd83del-ntis2
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP15' parm='SH'
+
+#*******************************************************************************
+#   Get the check files from  //Ntcso1/userdata/bus_grp/fn/ap_checks
+################################################################################
+LABEL name=STEP2
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-fnfrd83bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP2' parm='SH'
+
+#*******************************************************************************
+#   CREATES A TAR FILE AND KEEPS THE FILES FOR FUTURE USE
+################################################################################
+LABEL name=STEP3
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+tar cvf - /apps/prod/cid1p/fnapchkdatao > /apps/prod/cid1p/apbkp/apchkbkp`date +%Y%m%d%H%M%S`.tar
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP3' parm='SH'
+
+if ($JOBSTATUS == 0) then
+     echo " Files successfully backed up "
+else 
+     echo " Job aborted, print not released " 
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 091806                 PEMA   NEW JOB

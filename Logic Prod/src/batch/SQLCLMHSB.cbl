@@ -1,0 +1,305 @@
+      $SET SQL(dbman=ODBC, TARGETDB=MSSQLSERVER, NOAUTOCOMMIT)
+       identification division.
+       program-id. SQLCLMHSB.
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      * 020218  CR2017062000002  PEMA  New program to verify CLM HIST.
+031221* 031221  CR2019012500003  PEMA  Change connection to sdv-db01
+      ******************************************************************
+       environment division.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+       data division.
+       FILE SECTION.
+
+       working-storage section.
+       77  s1 pic s999 comp-3 value +0.
+       77  BYTE-OFFSET PIC S9(8) COMP VALUE +0.
+       77  ws-eof-sw                   pic x  value spaces.
+           88  end-of-input                  value 'Y'.
+       77  ws-error-sw                 pic x  value spaces.
+           88  error-found               value 'Y'.
+       77  ws-string-len               pic s999 comp-3 value zeros.
+      
+       01  P pointer.
+       01  KIXSYS                      pic X(7)  VALUE Z"KIXSYS".
+       01  var-ptr pointer.
+       01  env-var-len                 pic 9(4)  binary.
+       01  rc                          pic 9(9)  binary.
+      
+       01  WS-KIXSYS.
+           05  WS-KIX-FIL1             PIC X(10).
+           05  WS-KIX-APPS             PIC X(10).
+           05  WS-KIX-ENV              PIC X(10).
+           05  WS-KIX-MYENV            PIC X(10).
+           05  WS-KIX-SYS              PIC X(10).
+      
+      
+       EXEC SQL
+          INCLUDE SQLDA
+       END-EXEC
+      
+       EXEC SQL
+          INCLUDE SQLCA
+       END-EXEC
+
+       EXEC SQL
+          BEGIN DECLARE SECTION
+       END-EXEC
+
+       01  sqlcmd                      pic x(1024).
+       01  svr                         pic x(32).
+       01  usr                         pic x(32).
+       01  pass                        pic x(32).
+       01  usr-pass                    pic x(64).
+       01  ws-disp-code                pic s9(11).
+
+      ***-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_***
+      ***                                                            ***
+      ***  These indicators are used to determine if a variable      ***
+      ***  is passed nulls from sql. The indicator will be -1        ***
+      ***  if the value on sql is nulls and +0 if the value is       ***
+      ***  something other than nulls. Here is an example on how     ***
+      ***  to use the indicator variables.                           ***
+      ***                                                            ***
+      ***     EXEC SQL                                               ***
+      ***        fetch checkapp into                                 ***
+      ***           :db-app-status :nu-app-status,                   ***
+      ***           :db-app-by     :nu-app-by,                       ***
+      ***           :db-app-date   :nu-app-date,                     ***
+      ***           :db-app-batch  :nu-app-batch                     ***
+      ***     END-EXEC                                               ***
+      ***                                                            ***
+      ***_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-***
+
+       01  indicator-vaiables-for-nulls.
+           05  nu-state                pic s9(4) comp value +0.
+           05  nu-city                 pic s9(4) comp value +0.
+           05  nu-county               pic s9(4) comp value +0.
+
+       01  clm-hist-stuff.
+           05  CH-BATCH-NO             pic x(6).
+           05  ch-carrier              pic x.
+           05  ch-state                pic xx.
+           05  ch-account              pic x(10).
+           05  ch-eff-dt               pic x(10).
+           05  ch-cert-no              pic x(11).
+           05  ch-clm-count            pic 9(5).
+
+       EXEC SQL
+          END DECLARE SECTION
+       END-EXEC
+
+       01  ws-misc.
+           12  ws-file-in              pic x(26) value spaces.
+           12  ws-connect-sw               pic x  value ' '.
+               88  connected-to-db             value 'Y'.
+           12  ws-file-in-status       pic xx  value spaces.
+           12  ws-curl-return-cd       pic s9(8) comp-5 value +0.
+           12  ws-curl-string.
+               16  f                   pic x(16) value
+                'curl -o /tmp/zip'.
+               16  filename-zip        pic x(5)  value spaces.
+               16  f                   pic xxxx value '.txt'.
+               16  f                   pic x(15) value
+                ' --data "USZip='.
+               16  curl-zip            pic x(5) value zeros.
+               16  f                   pic x(48) value
+                '" http://webservicex.net/uszip.asmx/GetInfoByZIP'.
+               16  f                   pic x value low-values.
+
+       01  WS-RESPONSE                 PIC S9(8) COMP VALUE +0.
+           88  RESP-NORMAL                    VALUE +0.
+           88  resp-file-notfnd               value +12.
+           88  RESP-NOTFND                    VALUE +13.
+           88  resp-duprec                    value +14.
+           88  resp-dupkey                    value +15.
+           88  resp-invreq                    value +16.
+           88  RESP-NOTOPEN                   VALUE +19.
+           88  RESP-ENDFILE                   VALUE +20.
+           88  resp-lengtherr                 value +22.
+      
+       01  f.
+           05  ws-outputzip            pic x(5).
+           05  ws-city                 pic x(50).
+           05  ws-state                pic xx.
+
+       01  p1                          pic s999 comp-3 value +0.
+       01  clmhs-record.
+           03  filler occurs 200.
+               05  clmhs-batch-no      pic x(6).
+               05  clmhs-carrier       pic x.
+               05  clmhs-state         pic xx.
+               05  clmhs-account       pic x(10).
+               05  clmhs-eff-dt        pic x(10).
+               05  clmhs-cert-no       pic x(11).
+               05  clmhs-clm-count     pic 9(5).
+
+       LINKAGE SECTION.
+       
+       01  ws-return-area              pic x(9000). *> enough for 200
+
+       procedure division using ws-return-area.
+      
+           display ' entering program SQLCLMHSB'
+
+           perform 0020-connect        thru 0020-exit
+           perform 0010-init           thru 0010-exit
+           perform 0030-get-clmhs-data thru 0030-exit
+           perform 0050-bld-pass-area  thru 0050-exit
+           perform 0060-disconnect     thru 0060-exit
+
+           .
+       0000-return.
+
+           GOBACK
+
+           .
+       0010-init.
+
+           .
+       0010-exit.
+           exit.
+
+       0020-connect.
+
+           display ' about to connect '
+
+           move 'SDVDB01_ClmVer'       to svr
+           move 'appuser'              to usr
+           move 'appuser@cso'          to pass
+      
+           string
+               usr delimited space
+               "." delimited size
+               pass delimited space into usr-pass
+           end-string
+
+           EXEC SQL
+              CONNECT TO :svr USER :usr-pass
+           END-EXEC
+       
+           if sqlcode not = 0
+              display "Error: cannot connect "
+              display sqlcode
+              display sqlerrmc
+           end-if
+
+           set connected-to-db to true
+
+           .
+       0020-exit.
+           exit.
+      
+       0030-get-clmhs-data.
+
+           EXEC SQL DECLARE clmhist cursor for
+
+              CALL spch_CntFindClaims_batch
+              
+           END-EXEC
+
+           move sqlcode                to ws-disp-code
+           display ' sql ret code declare cursor ' ws-disp-code
+
+           if sqlcode not = 0 and 1 and 100
+              display "Error: cursor not declared "
+              display ' sql return code ' sqlcode
+              display ' sql err mess    ' sqlerrmc
+              display ' cert no         ' ch-cert-no
+              go to 0030-exit
+           end-if
+
+           EXEC SQL
+              open clmhist
+           END-EXEC
+
+           move sqlcode                to ws-disp-code
+           display ' sql ret code OPEN CURsor ' ws-disp-code
+
+           if sqlcode not = 0 and 1 and 100
+              display "Error: cursor not OPENED "
+              display ' sql return code ' sqlcode
+              display ' sql err mess    ' sqlerrmc
+              display ' cert no         ' ch-cert-no
+              go to 0030-exit
+           end-if
+
+           move 0 to sqlcode
+           perform until sqlcode not = 0 and 1
+              EXEC SQL fetch clmhist into
+                 :ch-batch-no,
+                 :ch-carrier,
+                 :ch-state,
+                 :ch-account,
+                 :ch-eff-dt,
+                 :ch-cert-no
+      *          :ch-clm-count
+              END-EXEC
+              if sqlcode not = 0 and 100 and 1
+                 move sqlcode          to ws-disp-code
+                 display ' well crap it didnt work ' ws-disp-code
+                 go to 0030-exit
+              end-if
+              display ' clmhs ' ch-batch-no ' ' ch-cert-no
+              add +1 to p1
+              move ch-batch-no to clmhs-batch-no(p1)
+              move ch-carrier to clmhs-carrier(p1)
+              move ch-state to clmhs-state(p1)
+              move ch-account to clmhs-account(p1)
+              move ch-eff-dt to clmhs-eff-dt(p1)
+              move ch-cert-no to clmhs-cert-no(p1)
+              move 1                   to clmhs-clm-count(p1)
+           end-perform
+           display ' total ret rec ' p1
+
+           EXEC SQL
+              close clmhist
+           END-EXEC
+
+           move sqlcode                to ws-disp-code
+           display ' sql ret code close CURsor ' ws-disp-code
+
+           if sqlcode not = 0 and 1 and 100
+              display "Error: cursor not close "
+              display ' sql return code ' sqlcode
+              display ' sql err mess    ' sqlerrmc
+              display ' cert no         ' ch-cert-no
+           end-if
+
+           .
+       0030-exit.
+           exit.
+
+       0050-bld-pass-area.
+
+           move clmhs-record              to ws-return-area
+
+           .           
+       0050-exit.
+           exit.
+
+       0060-disconnect.
+
+           display ' about to disconnect '
+
+           EXEC SQL
+              DISCONNECT ALL
+           END-EXEC
+
+           if sqlcode not = 0
+              display "Error: cannot disconnect zipcodes "
+              display ' sql return code ' sqlcode
+              display ' sql err mess    ' sqlerrmc
+           end-if
+
+           .
+       0060-exit.
+           exit.

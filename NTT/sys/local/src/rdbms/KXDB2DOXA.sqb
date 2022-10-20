@@ -1,0 +1,101 @@
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2016-2020 NTT DATA, Inc.                        *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID. KXDB2DOXA.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+      *---------------------------------------------------------------*
+      *  Code the DBMNAME, or use sit info to collect the
+      *  application name and connect using application name.
+      *---------------------------------------------------------------*
+	   EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+       01  DBMSNAME                       PIC X(8).
+       01  USERNAME                       PIC X(16).
+	   EXEC SQL END DECLARE SECTION END-EXEC.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+
+       01  SQLCODE-DISP                   PIC -9(9).
+      *---------------------------------------------------------------*
+      * This copy book gives the tct and system information 
+      *---------------------------------------------------------------*
+       COPY "KXINFO.CPY".
+      *---------------------------------------------------------------*
+      * Sample COBOL program which contains entry points for
+      * interfacing UniKix's user exits with db26000 software. The main
+      * entry point(KXDB2LGN) is for logging onto the db26000 server and
+      * is called by the UniKix transaction processors
+      * and batch vsam processor when they are
+      * initiated by the UniKix system. Entry point KXDB2LGF is for
+      * disconnecting from the db26000 server and is called by the UniKix 
+      * transaction processors and batch vsam processors when they terminate.
+      *
+      * Entry point KXDB2SAVE is for executing an SQL COMMIT statement and
+      * will be called at UniKix sync point time. If the user COBOL programs
+      * are already doing COMMITs, then this statement will have no effect.
+      * Entry point KXDB2UNDO is for executing an SQL ROLLBACK statement and
+      * will be called at UniKix rollback time. If the user COBOL programs
+      * are already doing ROLLBACKs, then this statement will have no effect.
+      *
+      *---------------------------------------------------------------*
+       PROCEDURE DIVISION.
+      *---------------------------------------------------------------*
+      *    This is called in a XA environment only as part of
+      *    unikixtran start-up after the xa_open().
+      *    This routine needs to execute a SQL statement and the
+      *    following SET CONNECTION fails with SQLCODE -1248
+      *    without changing anything.
+      *    It can be changed to do any post xa_open() processing
+      *    required by the user so long as it executes at least 1
+      *    SQL statement.
+      *---------------------------------------------------------------*
+           MOVE "KXDB2DOXA" TO KIX-MSG-ROUTINE.
+           EXEC SQL WHENEVER SQLERROR CONTINUE END-EXEC.
+           MOVE LOW-VALUES TO DBMSNAME.
+           EXEC SQL SET CONNECTION :DBMSNAME END-EXEC.
+           EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+      *---------------------------------------------------------------*
+      *    As an example the previous 4 lines can be replaced by the
+      *    following code if there is a requirement to change 
+      *    the schema name.  In this instance the schema name to use
+      *    is the database userID in the SIT.
+      *    EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+      *    CALL "kxsysinfo" using KIX-SYS-INFO.
+      *    MOVE KIX-SIT-USR-NAME TO USERNAME.
+      *    EXEC SQL SET CURRENT PACKAGESET :USERNAME END-EXEC.
+      *---------------------------------------------------------------*
+           SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       SQL-ABORT.
+      *---------------------------------------------------------------*
+      *    Set return-code to Failure (1) or Abort (-1)
+      *    Failure during allocation brings up the SERVER, without
+      *           the database connected.
+      *    Abort always aborts the  transaction SERVER
+      *    This example aborts the transaction SERVER
+      *---------------------------------------------------------------*
+	   MOVE SQLCODE TO SQLCODE-DISP.
+	   STRING "DATABASE ERROR. SQLCODE = ", SQLCODE-DISP
+		  DELIMITED BY SIZE INTO KIX-MSG-STR.
+           CALL "kxsetmsg" USING KIX-MSG-INFO.
+	   SET RETURN-CODE TO -1.
+           EXIT PROGRAM.
+       SQL-ERROR.
+      *---------------------------------------------------------------*
+      *    Set return-code to Failure (1) or Abort (-1)
+      *    Failure during other exits terminates the transaction
+      *    Abort always aborts the  transaction SERVER
+      *    This example terminates transaction.
+      *---------------------------------------------------------------*
+	   MOVE SQLCODE TO SQLCODE-DISP.
+	   STRING "DATABASE ERROR. SQLCODE = ", SQLCODE-DISP
+		  DELIMITED BY SIZE INTO KIX-MSG-STR.
+           CALL "kxsetmsg" USING KIX-MSG-INFO.
+	   SET RETURN-CODE TO 1.
+           EXIT PROGRAM.

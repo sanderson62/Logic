@@ -1,0 +1,359 @@
+################################################################################
+#                                                                              #
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#                                                                              #
+#     JOB: $JOBNAME              Translated  : Wed Aug 23 12:30:04 2000        #
+#                                                                              #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+#  *                                                                     
+#LIBDEF scope='JOB' type='PGM' dataset='IS.DD.PRD1.LOADLIB' lib='\${SEQFILES}/IS.DD.PRD1.LOADLIB' 
+
+#LIBDEF scope='JOB' type='PGM' concat='Y' dataset='SYS1.COB2LIB' lib='\${SEQFILES}/SYS1.COB2LIB' 
+
+
+################################################################################
+perl e:/cid1p/jcl/ish/comm_fed.pl e:/peer_logic/user_area/tapeuploads/commfed/cso_test.txt e:/peer_logic/user_area/tapeuploads/commfed/new_cso.txt
+#e:/cid1p/jcl/ish/comm_fed.bat
+
+################################################################################
+LABEL name=CICFCNV 
+################################################################################
+
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                     
+#  *  CONVERT ACCOUNT NUMBERS ON COMMERCIAL FEDERAL FILE TO CSO          
+#  *  ACCOUNT NUMBERS FOR INPUT TO THE LOGIC SYSTEM.                     
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                     
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+
+#  ### mvstrans ### //SYSUDUMP   DD       statement was not translated.                 ###
+
+#ASSGNDD ddname='SYS010' dataset='CI.XX.LG.CFEDCOPY' gdg='+1' filename='\${SEQFILES}/CI.XX.LG.CFEDCOPY' disp='i-o' 
+
+#ASSGNDD ddname='SYS010' dataset='CI.XX.LG.CFEDCOPY' gdg='+0' filename='\${SEQFILES}/CI.XX.LG.CFEDCOPY' disp='i-o' 
+
+ASSGNDD ddname='SYS010' filename='\e:/peer_logic/user_area/tapeuploads/commfed/new_cso.txt' disp='i' 
+
+#  *           DISP=SHR,VOL=REF=*.COPYFILE.SYSUT2 
+ASSGNDD ddname='SYS012' dataset='CI.DD.COMFD800.CNV' filename='\${SEQFILES}/CI.DD.COMFD800.CNV' disp='o' normal='k' abend='d' recfmt='F' recsize='800' 
+
+EXECPGM pgmname='CICFCNV' stepname='CICFCNV' 
+
+
+################################################################################
+LABEL name=DELPREV2 
+################################################################################
+
+#  ***//                                                                 
+#  ********************************************************************* 
+#  *                                                                     
+#  *        DELETE TRANSACTION FILE FROM PREVIOUS MONTH                  
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+
+#  ### mvstrans ### //SYSUDUMP   DD       statement was not translated.                 ###
+
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  DELETE  CI.DD.COMFD800.SORTED
+  SET  MAXCC=0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='DELPREV2' 
+
+################################################################################
+LABEL name=SORTCFED 
+################################################################################
+
+#  **                                                                    
+#  *****************************************************************     
+#  **                                                                    
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+
+#  ### mvstrans ### //SYSUDUMP   DD       statement was not translated.                 ###
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+
+#  *****************************************************************     
+ASSGNDD ddname='SORTOUT' dataset='CI.DD.COMFD800.SORTED' filename='\${SEQFILES}/CI.DD.COMFD800.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='800' 
+
+ASSGNDD ddname='SORTIN' dataset='CI.DD.COMFD800.CNV' filename='\${SEQFILES}/CI.DD.COMFD800.CNV' disp='i-o' 
+
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(2 2)(4 10)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTCFED'
+
+
+unikixbld -i -dCFCNTL
+
+
+
+
+################################################################################
+
+##  The following backs up ELCNTL  to cfcntl.txt (flat file) then copies it to
+##  CFCNTL  The following will run even if you restart after this
+
+unikixbld -t s -d ELCNTL -s cfcntl.txt
+
+unikixbld -t v -d CFCNTL -s cfcntl.txt
+
+
+################################################################################
+LABEL name=DELFILES 
+################################################################################
+
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                     
+#  *  DELETE AND UNCAT DISK DATASETS FROM PRIOR MONTH RUN.               
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                     
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+
+#  ### mvstrans ### //SYSUDUMP   DD       statement was not translated.                 ###
+
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  DELETE  CI.DD.COMFD800.LOGIC
+  SET  MAXCC=0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='DELFILES' 
+
+
+################################################################################
+LABEL name=CICF511 
+################################################################################
+
+#  ***  DELETE  CI.DD.COMFD800.PPA                                       
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                     
+#  *  EXTRACT TRANSACTIONS FROM COMMERCIAL FEDERAL FILE FOR INPUT        
+#  *  TO LOGIC AND THE PP&A RECORDS FOR DOWNLOADING TO A PC FILE.        
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                     
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='A' 
+
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+
+#  ### mvstrans ### //SYSUDUMP   DD       statement was not translated.                 ###
+
+ASSGNDD ddname='SYS010' dataset='CI.DD.COMFD800.SORTED' filename='\${SEQFILES}/CI.DD.COMFD800.SORTED' disp='i-o' 
+
+ASSGNDD ddname='SYS012' dataset='CI.DD.COMFD800.LOGIC' filename='\${SEQFILES}/CI.DD.COMFD800.LOGIC' disp='o' normal='k' abend='d' recsize='90' recfmt='F' 
+
+SETPRINT ddname='SYS013' forms='STD1' 
+ASSGNDD  ddname='SYS013' type='SYSOUT' class='A' 
+
+#  ***//SYS014   DD DSN=CI.DD.COMFD800.PPA,                              
+#  ***//            DISP=(NEW,CATLG,DELETE),                             
+#  ***//            DCB=(LRECL=115,BLKSIZE=0,RECFM=FB),                  
+#  ***//            SPACE=(CYL,(25,10),RLSE),                            
+#  ***//            UNIT=SYSDA                                           
+SETPRINT ddname='SYS008' forms='STD1' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+
+SETPRINT ddname='SYS053' forms='STD1' 
+ASSGNDD  ddname='SYS053' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='CICF511' stepname='CICF511' 
+
+################################################################################
+LABEL name=CPY511
+################################################################################
+
+#  ********************************************************************  
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+
+ASSGNDD ddname='SYS010' filename='\e:/cid1p/sysout/sysoutdir/$JOBNAME/cicf511/sys013_\${jon}' disp='i'
+
+ASSGNDD ddname='SYS011' filename='\${USEQFILES}/ZI.DL.CIADM.FICH511.cfed' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+
+EXECPGM pgmname='CIB009L' stepname='CPY511' parm='ALL' 
+
+################################################################################
+LABEL name=DELSRTCV 
+################################################################################
+
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                     
+#  *  STEP DELSRTCV                                                      
+#  *  UNCAT AND DELETE THE DATA SET THAT WILL BE CREATED IN THE SORT     
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                     
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+
+#  ### mvstrans ### //SYSUDUMP   DD       statement was not translated.                 ###
+
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  DELETE  CI.WW.COMFD800.LOGIC.SORT
+  SET  MAXCC=0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='DELSRTCV' 
+
+################################################################################
+LABEL name=SORTLGX 
+################################################################################
+
+#  **                                                                    
+#  *****************************************************************     
+#  **                                                                    
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+
+#  ### mvstrans ### //SYSUDUMP   DD       statement was not translated.                 ###
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+
+#  *****************************************************************     
+ASSGNDD ddname='SORTOUT' dataset='CI.WW.COMFD800.LOGIC.SORT' filename='\${SEQFILES}/CI.WW.COMFD800.LOGIC.SORT' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+
+ASSGNDD ddname='SORTIN' dataset='CI.DD.COMFD800.LOGIC' filename='\${SEQFILES}/CI.DD.COMFD800.LOGIC' disp='i-o' normal='k' abend='k' 
+
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 10)(1 10)(79 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTLGX'
+
+
+
+################################################################################
+LABEL name=DELEL512 
+################################################################################
+
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                     
+#  *  UNCAT AND DELETE THE DATA SET THAT WILL BE CREATED IN STEP EL512   
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                     
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+
+#  ### mvstrans ### //SYSUDUMP   DD       statement was not translated.                 ###
+
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  DELETE  CI.WW.COMFD800.EL512
+  SET  MAXCC=0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='DELEL512' 
+
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+
+#  *                                                                     
+#  ********************************************************************* 
+#  *                                                                   * 
+#  *   PREPARE COMFD800 REFORMATTED RECORDS TO LOAD TO PEND. BUS. FILE * 
+#  *                                                                   * 
+#  ********************************************************************* 
+#  *                                                                     
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='A' 
+
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+
+#  ### mvstrans ### //SYSUDUMP   DD       statement was not translated.                 ###
+
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+#ASSGNDD ddname='SYS006' type='DUMMY' 
+
+SETPRINT ddname='SYS008' forms='STD1' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+
+ASSGNDD ddname='SYS010' dataset='CI.WW.COMFD800.LOGIC.SORT' filename='\${SEQFILES}/CI.WW.COMFD800.LOGIC.SORT' disp='i-o' 
+
+ASSGNDD ddname='SYS011' dataset='CI.WW.COMFD800.EL512' filename='\${SEQFILES}/CI.WW.COMFD800.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+
+ASSGNDD ddname='SYS019' dataset='CI.DD.LG.VENDOR.DATECARD' filename='\${SEQFILES}/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+
+#ASSGNDD ddname='ELCNTL' dataset='CI.CFED.ELCNTL' filename='\${SEQFILES}/CI.CFED.ELCNTL' disp='i-o' 
+
+ASSGNDD ddname='ELCNTL' dataset='CI.CFED.ELCNTL' type='VS' filename='CFCNTL' disp='i-o' normal='k' 
+
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+
+#  ********************************************************************  
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+
+ASSGNDD ddname='SYS010' filename='\e:/cid1p/sysout/sysoutdir/$JOBNAME/el512/sys008_\${jon}' disp='i'
+
+ASSGNDD ddname='SYS011' filename='\${USEQFILES}/ZI.DL.CIADM.FICH512.cfed' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL' 
+
+################################################################################
+
+ENDJOB 
+
+

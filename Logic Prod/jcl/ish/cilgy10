@@ -1,0 +1,98 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: cilgy10               Translated  : Wed Aug 23 12:33:02 2000        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=UNCATL1 
+################################################################################
+#  ***----------------------------------------------------------------*  
+#  ***  JWBA 12/92 SPECIAL DATECARD ADDED FOR ECS019 PER CID ---------*  
+#  ***             REQUEST DURING YEAR-END TESTING;          ---------*  
+#  ****                                                                  
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  DELETE CI.DD.DATECARD.ECS019
+!
+
+EXECPGM pgmname='IDCAMS' stepname='UNCATL1' 
+
+################################################################################
+LABEL name=EL300 
+################################################################################
+#  ****                                                                  
+#  ****     THE FOLLOWING JCL BUILDS THE SYSTEM ENVIRONMENT ( DATE       
+#  ****     CARD) FILE FOR THE NEW CREDIT SYSTEM.                        
+#  ****                                                                  
+#  ***--------------------------------------------------------------***  
+#  ***--             DATE CARD LOAD                               --***  
+#  ***--             RESTARTABLE THIS JOB STEP                    --***  
+#  ***----------------------------------------------------------------*  
+#  **************************************************** INPUT FILES      
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' dataset='CI.DD.LG.ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' dataset='CI.DD.LG.ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' dataset='CI.DD.LG.ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.DATECARD.ECS019' filename='\${SEQFILES}/CI.DD.DATECARD.ECS019' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+#  ***                                                                   
+#  *****  THE FOLLOWING ARE CONTROL CARDS FOR THE DATE CARD LOAD         
+#  *****  CHANGE DATE TO MONTH OF RUN BEING MADE                         
+#  ***                                                                 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCCID1
+CLAS123121
+FMTO-019-3
+!
+
+EXECPGM pgmname='EL300' stepname='EL300' 
+
+################################################################################
+LABEL name=ECS019 
+################################################################################
+ASSGNDD  ddname='SYS008' type='DUMMY'  
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='ERMEBL' type='DUMMY' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.DATECARD.ECS019' filename='\${SEQFILES}/CI.DD.DATECARD.ECS019' disp='i-o' 
+ASSGNDD ddname='SYS010' dataset='CI.XX.EXTR019' gdg='0' filename='\${SEQFILES}/CI.XX.EXTR019' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SYS016' type='DUMMY'
+ASSGNDD ddname='SYS020' dataset='CI.EX.FICH019.YE' filename='\${SEQFILES}/CI.EX.FICH019.YE' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+CIDY
+!
+
+EXECPGM pgmname='ECS019' stepname='ECS019' 
+
+################################################################################
+LABEL name=CPY019
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.EX.FICH019.YE' filename='\${SEQFILES}/CI.EX.FICH019.YE' disp='i-o'
+ASSGNDD ddname='SYS011' dataset='CI.DL.CIADM.FICH019.YE' filename='\${SEQFILES}/CI.DL.CIADM.FICH019.YE' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY019' parm='ALL' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+   "ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-cilgy10"
+   "smtp -f slunikix -t pema -s '$JOBNAME is complete' -mf /apps/prod/cid1p/emails/$JOBNAME.txt"
+else
+        echo " Job aborted, print not released "
+endif
+
+################################################################################
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################

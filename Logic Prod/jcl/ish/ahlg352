@@ -1,0 +1,81 @@
+################################################################################
+#
+#     This job is submitted by AHLDAILY1 and replaces the "on-line" process
+#   to start the check writer for AHL
+#
+################################################################################    
+
+BEGINJOB mode='MVS' jobclass='M' 
+ONRETCODE GT 7 GOTO END_JOB 
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job aborting, not TEST"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=TRLRBKP 
+################################################################################
+ASSGNDD ddname='IN1' dataset='CI.DD.LG.ELTRLR' type='VS' filename='ELTRLR' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='OUT1' filename='\${SEQFILES}/AH.XX.LG.ELTRLR.EL352' disp='o' normal='k' abend='d' recfmt='F' recsize='200' 
+
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(IN1)  -
+         OFILE(OUT1)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='TRLRBKP' 
+
+################################################################################
+LABEL name=CHKQBKP 
+################################################################################
+ONRETCODE MAXRC GT '7' BYPASS scope='STEP'  
+ASSGNDD ddname='IN1' dataset='CI.DD.LG.ELCHKQ' type='VS' filename='ELCHKQ' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='OUT1' filename='\${SEQFILES}/AH.XX.LG.ELCHKQ.EL352' disp='o' normal='k' abend='d' recfmt='F' recsize='100' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(IN1)  -
+         OFILE(OUT1)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='CHKQBKP' 
+
+################################################################################
+LABEL name=EL352
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1t/src/batch'
+ASSGNDD ddname='MICRDRFT' type='VS' filename='MICRDRFT' DISP='i-o' 
+ASSGNDD ddname='ELCHKQ2' type='VS' filename='ELCHKQ2' DISP='i-o'
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' DISP='i-o'
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' DISP='i-o' 
+ASSGNDD ddname='ELCERT' type='VS' filename='ELCERT' DISP='i-o' 
+ASSGNDD ddname='ELMSTR' type='VS' filename='ELMSTR' DISP='i-o' 
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCT' DISP='i-o' 
+ASSGNDD ddname='ELBENE' type='VS' filename='ELBENE' DISP='i-o' 
+ASSGNDD ddname='ELCRTT' type='VS' filename='ELCRTT' DISP='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/AH.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' filename='\${SEQFILES}/EL352EXT_AHL.TXT' disp='o' normal='k' abend='k' recfmt='F' recsize='1500' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+#OPTION    1 = PRINT ALL OUTSTANDING CHECKS
+#|         2 = PRINT ONLY CONTROL GROUPS LISTED
+#|         3 = REPRINT CONTROL GROUPS LISTED     
+#| CONTROL GROUPS (FOR OPTIONS 2 AND 3)
+#| |                               NUMBER OF ALIGNMENT CHECKS (NOT USED)
+#| |                               | BEGINNING CHECK NUMBER (NOT USED)
+#| |                               | |       ASSIGNED CHECK NUMBERS (Y/N) (ALWAYS N)
+#| |                               | |       | ALTERNATE PRINTER ID (NOT USED)
+#| |                               | |       | |
+#1 1234567 1234567 1234567 1234567 0 1234567 N PRNT
+#1                                           N
+#2 0021911 0021912 0021913 0021914           N
+#3 0021906                                   N
+#3 0021907 0021908 0021909 0021910           N
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+1                                           N
+!
+EXECPGM PGMNAME='EL352' STEPNAME='EL352' parm='2022101920221021'
+
+###########################################################################
+
+ "ftp -n ntis2 < /apps/prod/cid1p/jcl/ish/ftp-ahlg352"
+
+ENDJOB 

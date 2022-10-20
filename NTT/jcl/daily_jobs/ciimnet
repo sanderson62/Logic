@@ -1,0 +1,186 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: ciimnet               Translated  : Tue May  8 18:44:55 2001        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' 
+
+################################################################################
+LABEL name=BKPMSTR
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ELMSTR -s $SEQFILES/CI.WW.ELMSTR.BKP
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPMSTR' parm='SH'
+
+################################################################################
+LABEL name=BKPPNDB
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERPNDB -s $SEQFILES/CI.WW.ERPNDB.BKP
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPPNDB' parm='SH'
+
+################################################################################
+LABEL name=BKPCRTC
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERCRTC -s $SEQFILES/CI.WW.ERCRTC.BKP
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPCRTC' parm='SH'
+
+################################################################################
+LABEL name=SORTCLMS 
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.WW.ELMSTR.BKP' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.SORTED.CLMS' disp='o' normal='k' abend='d' recfmt='F' recsize='350' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(7 5)
+ENDSORT:
+!
+EXECPGM pgmname='SORT' stepname='SORTCLMS'
+
+################################################################################
+LABEL name=SORTPNDB 
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.WW.ERPNDB.BKP' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.SORTED.PNDB' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(36 10)
+ENDSORT:
+!
+EXECPGM pgmname='SORT' stepname='SORTPNDB'
+
+################################################################################
+LABEL name=SORTCRTC 
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.WW.ERCRTC.BKP' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.SORTED.CRTC' disp='o' normal='k' abend='d' recfmt='F' recsize='300' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(25 10)
+ENDSORT:
+!
+EXECPGM pgmname='SORT' stepname='SORTCRTC'
+
+################################################################################
+LABEL name=BLDHDR 
+################################################################################
+#  *   BUILD IMNET HEADER RECORDS FROM CID CLAIM, CRTC AND PNDB          
+#  *      ONLINE FILES.                                                  
+#  *                                                                     
+#  *   ONLINE CERTIFICATE MASTER FILE IS NOT USED AT THIS TIME.          
+#  *                                                                     
+#  ********************************************************************* 
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='CLMFILE' filename='$SEQFILES/CI.SORTED.CLMS' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='CRTCFILE' filename='$SEQFILES/CI.SORTED.CRTC' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='PNDBFILE' filename='$SEQFILES/CI.SORTED.PNDB' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ELCERT' type='VS' filename='ELCERT' disp='i-o'
+ASSGNDD ddname='CLMSFILE' dataset='CI.XX.CIIMNET.CLMS' gdg='+1' filename='$SEQFILES/CI.XX.CIIMNET.CLMS' disp='o' normal='k' abend='d' recfmt='F' recsize='90'
+ASSGNDD ddname='CERTFILE' dataset='CI.XX.CIIMNET.CRTS' gdg='+1' filename='$SEQFILES/CI.XX.CIIMNET.CRTS' disp='o' normal='k' abend='d' recfmt='F' recsize='90'
+ASSGNDD ddname='SYS022' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS023' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+00/00/00 PREV CYC DATE = @PCMM-DD-YY
+!
+EXECPGM pgmname='CIDMNET' stepname='BLDHDR' 
+
+################################################################################
+LABEL name=CPYHDR1
+################################################################################
+#  **--                                                                  
+#  **--      BACKUP BATCH COMM FILE ON CART                              
+#  **--                                                                  
+#  ********************************************************************* 
+ASSGNDD ddname='INPUT' dataset='CI.XX.CIIMNET.CLMS' gdg='+1' filename='$SEQFILES/CI.XX.CIIMNET.CLMS' disp='i-o' normal='k' abend='k' recfmt='F'
+ASSGNDD ddname='OUTPUT' filename='$SEQFILES/CID.CLM.HDR.NEW' disp='o' normal='k' recsize='90' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(INPUT) -                                                 
+         OFILE(OUTPUT)                                                  
+!
+EXECPGM pgmname='IDCAMS' stepname='CPYHDR1'
+
+################################################################################
+LABEL name=CPYHDR2
+################################################################################
+#  **--                                                                  
+#  **--      BACKUP BATCH COMM FILE ON CART                              
+#  **--                                                                  
+#  ********************************************************************* 
+ASSGNDD ddname='INPUT' dataset='CI.XX.CIIMNET.CRTS' gdg='+1' filename='$SEQFILES/CI.XX.CIIMNET.CRTS' disp='i-o' normal='k' abend='k' recfmt='F'
+ASSGNDD ddname='OUTPUT' filename='$SEQFILES/CID.CRT.HDR.NEW' disp='o' normal='k' recsize='90' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(INPUT) -                                                 
+         OFILE(OUTPUT)                                                  
+!
+EXECPGM pgmname='IDCAMS' stepname='CPYHDR2'
+
+################################################################################
+#  *** P R O D U C T I O N                                               
+#  *** -------------------                                               
+#  *** THE ABOVE DATE WILL ALWAYS BE 00/00/00 FOR PRODUCTION.            
+#  *** (1ST 8 POSITIONS).                                                
+#  ***                                                                   
+#  *** S P E C I A L   R E Q U E S T   R U N S                           
+#  *** -------------   -------------   -------                           
+#  *** IF A SPECIFIC DAY IS REQUESTED, CHANGE THE ABOVE DATE TO THE      
+#  ***  REQUESTED DATE, IN THE FORMAT OF MM/DD/YY (1ST 8 POSITIONS).     
+#  ***                                            ==================     
+#  *** BE SURE THE ABOVE DATE IS RESET TO 00/00/00 AFTER THE "SPECIAL    
+#  ***  DATE" RUN HAS COMPLETED (1ST 8 POSITIONS).                       
+#  ***                          ==================                       
+#  ********************************************************************  
+################################################################################
+
+################################################################################
+LABEL name=BLDCNT 
+################################################################################
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ACCTOT' filename='$SEQFILES/CI.CONTRACT.NEW' disp='o' normal='k' recsize='70' recfmt='F' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='CIDAMX1' stepname='BLDCNT'
+
+################################################################################
+
+ftp -n ntcso1 < $JCLLIB/ftp-ciimnet
+
+if ($JOBSTATUS == 0) then
+# "exelpr.sh p81n1d.parms '-ode=Gail' $SYSOUTDIR/$JOBNAME/BLDHDR/SYS022_$JON"
+# "exelpr.sh p81n1d.parms '-ode=Gail' $SYSOUTDIR/$JOBNAME/BLDHDR/SYS023_$JON"
+else
+   echo "Job aborted print not released"
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 110303                 PEMA  CHANGE PGM NAME TO CIDAMX1 FROM PEMAMX2
+# 110303                 PEMA  ADD SYS019 PROCESSING TO CIIMNET AND CIDAMX1
+# 052004  2004052000002  SMVA  REMOVED DLTCNT STEP - CI.DL.CONTRACT OBSOLETE 
+# 062404                 SMVA  CHG PRINT TO NEW QUEUE DIRECT TO RECORDS AREA
+################################################################################

@@ -1,0 +1,68 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job aborted, not MDOFF"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=EL344 
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SYS002' dataset='CILGMCLM_WORK7' type='TEMP' recfmt='F' recsize='86' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/CI.EX.FICH344' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELMSTR' dataset='CI.DD.LG.ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ELREPT' dataset='CI.DD.LG.ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='ELTRLR' dataset='CI.DD.LG.ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ELCERT' dataset='CI.DD.LG.ELCERT' type='VS' filename='ELCERT' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='MPPLCY' type='DUMMY' 
+ASSGNDD ddname='MPPROD' type='DUMMY' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='EL344E' stepname='EL344' 
+
+################################################################################
+LABEL name=CPY344
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.EX.FICH344' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH344.EM' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY344' parm='ALL'
+
+################################################################################
+LABEL name=PERL03
+################################################################################
+#
+# This step reads the file from above and creates an Emerald only report
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/EL344_Emerald_Rpt.pl $SEQFILES/CI.DL.CIADM.FICH344.EM $SEQFILES/CI.DL.CIADM.FICH344.EMERALD
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL03' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/CI.DL.CIADM.FICH344.EMERALD $SEQFILES/CI.EL344.EMERALD.SPC.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+    "ftp -n ntcso1 < $JCLLIB/ftp-cilg344e"
+    "mutt -s 'Emerald Special EL344 Report Attached' -a $SEQFILES/CI.EL344.EMERALD.SPC.pdf pema@cso.com -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"
+    echo " There are no hardcopy reports in this job "
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+

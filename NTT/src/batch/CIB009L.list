@@ -1,0 +1,241 @@
+*>Copyright (c) 2016-2021 NTT DATA, Inc. All rights reserved.
+*>compiler version:  6.0.28692
+*>source file name:  CIB009L.cbl
+*>date generated  :  Mon Oct 03 09:52:46 CDT 2022
+*>compiler options:  -cv -apost -dcmi -cscs=preserve -dz -ld -sp=/apps/test/mdoff/copy:/apps/prod/cid1p/copy -dv=32 -od=/apps/test/mdoff/exe/bat -cirp1 -cmcd -csqq -pt2 -cax -sl2 -rw=FILE-ID
+*>source encoding :  UTF-8
+*>target encoding :  ISO-8859-1
+IDENTIFICATION DIVISION.                                         
+PROGRAM-ID. CIB009l.                                             
+AUTHOR.     DAN DRYDEN.                                          
+                                                                 
+*>**************************************************************** 
+*>                                                               * 
+*>  THIS PROGRAM SEARCHES THE FIRST 10 LINES OF A REPORT LOOKING * 
+*>  FOR THE VALUE IN THE PARAMETER.  IF THE PARM IS FOUND, THE   * 
+*>  ENTIRE PAGE IS PRINTED.                                      * 
+*>                                                               * 
+*>  THE PROGRAM ALSO INSERTS BLANK LINES INSTEAD OF PRINTER      * 
+*>  CARRIAGE CONTROL CHARACTERS.                                 * 
+*>                                                               * 
+*>**************************************************************** 
+                                                                 
+ENVIRONMENT DIVISION.                                            
+INPUT-OUTPUT SECTION.                                            
+FILE-CONTROL.                                                    
+                                                                 
+    SELECT OPTIONAL FICHE-FILE                                   
+        ASSIGN TO SYS010                                         
+        FILE STATUS IS SYS010-STATUS.                            
+                                                                 
+    SELECT REPORT-FILE                                           
+        ASSIGN TO SYS011                                         
+        organization is line sequential                          
+        FILE STATUS IS SYS011-STATUS.                            
+                                                                 
+                                                                 
+DATA DIVISION.                                                   
+FILE SECTION.                                                    
+                                                                 
+FD  FICHE-FILE                                                   
+    LABEL RECORDS ARE STANDARD                                   
+    RECORDING MODE IS F                                          
+    BLOCK CONTAINS 0 RECORDS.                                    
+01  FICHE-REC.                                                   
+    05  PRINT-CONTROL    PIC X.                                  
+    05  FICHE-RECORD     PIC X(132).                             
+                                                                 
+FD  REPORT-FILE                                                  
+    LABEL RECORDS ARE STANDARD                                   
+    RECORDING MODE IS F                                          
+    BLOCK CONTAINS 0 RECORDS.                                    
+01  REPORT-RECORD    PIC X(132).                                 
+                                                                 
+                                                                 
+WORKING-STORAGE SECTION.                                         
+                                                                 
+01  BINARY.                                                      
+    05  SUB         PIC S9(4)  VALUE +0.                         
+    05  STRT        PIC S9(4)  VALUE +0.                         
+    05  END-LINE    PIC S9(4)  VALUE +0.                         
+                                                                 
+01  FILLER.                                                      
+    05  BLANK-LINE      PIC X     VALUE SPACE.                   
+    05  S0C7            PIC X     VALUE SPACE.                   
+    05  FORCE-DUMP REDEFINES S0C7 PIC S9 COMP-3.                 
+    05  SYS010-STATUS   PIC XX    VALUE ZERO.                    
+        88  EOF                   VALUE '10'.                    
+    05  SYS011-STATUS   PIC XX    VALUE ZERO.                    
+    05  IN-CNT          PIC S9(9) COMP-3 VALUE +0.               
+    05  OUT-CNT         PIC S9(9) COMP-3 VALUE +0.               
+    05  PRINT-SW        PIC X(3)  VALUE SPACE.                   
+    05  WORKAREA.                                                
+        10  SAVE-REC OCCURS 10 TIMES PIC X(133).                 
+                                                                 
+                                                                 
+    EJECT                                                        
+*>                                                                 
+LINKAGE SECTION.                                                 
+                                                                 
+01  PARM.                                                        
+    05  PARM-LENGTH BINARY  PICTURE IS S9(4).                    
+    05  PARM-VALUE  DISPLAY PICTURE IS X(100).                   
+                                                                 
+*>                                                                 
+PROCEDURE DIVISION USING PARM.                                   
+*>                                                                 
+    PERFORM 000-INIT THRU 000-EXIT                               
+    PERFORM 100-PROCESS THRU 100-EXIT                            
+        UNTIL EOF                                                
+    PERFORM 900-END-PROGRAM THRU 900-EXIT                        
+    goback.                                                      
+                                                                 
+000-INIT.                                                        
+                                                                 
+    OPEN INPUT FICHE-FILE                                        
+    IF SYS010-STATUS NOT = '00'                                  
+       DISPLAY 'OPEN ERROR ' SYS010-STATUS ' ON SYS010'          
+       MOVE '10' TO SYS010-STATUS                                
+    END-IF                                                       
+                                                                 
+    OPEN OUTPUT REPORT-FILE                                      
+    IF SYS011-STATUS NOT = '00'                                  
+       DISPLAY 'OPEN ERROR ' SYS011-STATUS ' ON SYS011'          
+    END-IF                                                       
+                                                                 
+    COMPUTE END-LINE = LENGTH OF WORKAREA - PARM-LENGTH          
+                                                                 
+    if parm-length > +0                                          
+       inspect parm-value replacing                              
+          all '-' by ' '                                         
+    end-if                                                       
+                                                                 
+    .                                                            
+000-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+100-PROCESS.                                                     
+*>                                                                 
+    READ FICHE-FILE                                              
+         AT END GO TO 100-EXIT.                                  
+    ADD +1 TO IN-CNT                                             
+                                                                 
+    IF PRINT-CONTROL = '1'                                       
+       PERFORM 200-NEW-PAGE THRU 200-EXIT.                       
+                                                                 
+    IF PRINT-SW = 'YES'                                          
+       EVALUATE PRINT-CONTROL                                    
+          WHEN '0' WRITE REPORT-RECORD FROM BLANK-LINE           
+                   ADD +1 TO OUT-CNT                             
+          WHEN '-' WRITE REPORT-RECORD FROM BLANK-LINE           
+                   WRITE REPORT-RECORD FROM BLANK-LINE           
+                   ADD +2 TO OUT-CNT                             
+       END-EVALUATE                                              
+       WRITE REPORT-RECORD FROM FICHE-RECORD                     
+       ADD +1 TO OUT-CNT                                         
+    END-IF                                                       
+    .                                                            
+100-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+200-NEW-PAGE.                                                    
+                                                                 
+    IF PARM-LENGTH = +0                                          
+       MOVE 'YES' TO PRINT-SW                                    
+       GO TO 200-EXIT.                                           
+                                                                 
+    IF PARM-VALUE(1:PARM-LENGTH) = 'ALL'                         
+       MOVE 'YES' TO PRINT-SW                                    
+       GO TO 200-EXIT.                                           
+                                                                 
+    MOVE 'NO' TO PRINT-SW                                        
+                                                                 
+    MOVE SPACES     TO WORKAREA                                  
+    MOVE FICHE-REC  TO SAVE-REC(1)                               
+    PERFORM VARYING SUB FROM 2 BY 1                              
+      UNTIL SUB > 10 OR EOF                                      
+       READ FICHE-FILE INTO SAVE-REC(SUB)                        
+    END-PERFORM                                                  
+                                                                 
+    PERFORM VARYING STRT FROM 1 BY 1                             
+      UNTIL PRINT-SW = 'YES' OR STRT > END-LINE                  
+         IF WORKAREA(STRT:PARM-LENGTH) =                         
+            PARM-VALUE(1:PARM-LENGTH)                            
+               MOVE 'YES' TO PRINT-SW                            
+         END-IF                                                  
+    END-PERFORM                                                  
+                                                                 
+    IF PRINT-SW = 'YES'                                          
+       PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 9             
+         EVALUATE SAVE-REC(SUB)(1:1)                             
+           WHEN '0' WRITE REPORT-RECORD FROM BLANK-LINE          
+                    ADD +1 TO OUT-CNT                            
+           WHEN '-' WRITE REPORT-RECORD FROM BLANK-LINE          
+                    WRITE REPORT-RECORD FROM BLANK-LINE          
+                    ADD +2 TO OUT-CNT                            
+         END-EVALUATE                                            
+         WRITE REPORT-RECORD FROM SAVE-REC(SUB)(2:132)           
+         ADD +1 TO OUT-CNT                                       
+       END-PERFORM                                               
+    END-IF                                                       
+    .                                                            
+200-EXIT.                                                        
+    EXIT.                                                        
+900-END-PROGRAM.                                                 
+                                                                 
+    close FICHE-FILE                                             
+    CLOSE REPORT-FILE                                            
+    DISPLAY 'RECORDS IN....' IN-CNT                              
+    DISPLAY 'RECORDS OUT...' OUT-CNT                             
+    .                                                            
+900-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+*> ------------------------------------------------------------------------------------------------------------------
+*> The source line number references in the following sections are either of
+*> the form <line-number> or <file-number>:<line-number>. The first form is
+*> used as an abbreviation for 0:<line-number>.
+*> The following is a key allowing the determination of the file name from
+*> the <file-number>.
+*>  
+*>          0: CIB009L.cbl
+*>  
+*> ------------------------------------------------------------------------------------------------------------------
+*> DATA MAP KEY
+*>               Sec(Section) Fil = File Section                Type Flags: column O    ---> O = Occurs Item
+*>                            Wor = Working-Storage Section                 column R    ---> R = Redefines
+*>                            Loc = Local-Storage Section                   column X/G  ---> X = External
+*>                            Rep = Report Section                                           G = Global
+*>                            Lin = Linkage Section                         
+*> ------------------------------------------------------------------------------------------------------------------
+*> Data map for Program-Id: CIB009L
+*> ------------------------------------------------------------------------------------------------------------------
+*>     Line    Name                                                  Size Offset      Sec Flags Data Type
+*>                                                                                        O R X
+*>                                                                                            G
+*> ------------------------------------------------------------------------------------------------------------------
+*>       37 01 FICHE-REC                                              133             Fil       Group
+*>       38   05 PRINT-CONTROL                                          1 (000000000)           Display
+*>       39   05 FICHE-RECORD                                         132 (000000001)           Display
+*>       45 01 REPORT-RECORD                                          132             Fil       Display
+*>       50 01 FILLER                                                   6             Wor       Group
+*>       51   05 SUB                                                    2 (000000000)           Binary
+*>       52   05 STRT                                                   2 (000000002)           Binary
+*>       53   05 END-LINE                                               2 (000000004)           Binary
+*>       55 01 FILLER                                                1349             Wor       Group
+*>       56   05 BLANK-LINE                                             1 (000000000)           Display
+*>       57   05 S0C7                                                   1 (000000001)           Display
+*>       58   05 FORCE-DUMP                                             1 (000000001)       R   Packed Decimal
+*>       59   05 SYS010-STATUS                                          2 (000000002)           Display
+*>       60     88 EOF                                                                          
+*>       61   05 SYS011-STATUS                                          2 (000000004)           Display
+*>       62   05 IN-CNT                                                 5 (000000006)           Packed Decimal
+*>       63   05 OUT-CNT                                                5 (000000011)           Packed Decimal
+*>       64   05 PRINT-SW                                               3 (000000016)           Display
+*>       65   05 WORKAREA                                            1330 (000000019)           Group
+*>       66     10 SAVE-REC                                           133 (000000019)     O     Display
+*>       73 01 PARM                                                   102             Lin       Group
+*>       74   05 PARM-LENGTH                                            2 (000000000)           Binary
+*>       75   05 PARM-VALUE                                           100 (000000002)           Display
+*> ------------------------------------------------------------------------------------------------------------------
+*> --I: #14 Compiling CIB009L.cbl

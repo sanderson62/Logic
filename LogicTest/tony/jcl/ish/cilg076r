@@ -1,0 +1,42 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+ONRETCODE GT 8 GOTO END_JOB 
+
+if ($EBMSYS != "cid1t") then
+   echo "Job Aborted, Not CID1T"
+   exit 1
+endif
+
+################################################################################
+LABEL name=ECS076 
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' filename='$SEQFILES/rlic_new_acctr02' disp='i' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133'
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='ERPLAN' type='VS' filename='ERPLAN' disp='i-o' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/CI.EX.FICH076' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+
+EXECPGM pgmname='ECS076' stepname='ECS076' 
+
+################################################################################
+LABEL name=CPY076
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/ECS076/SYS008_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH076.RLIC.R02' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY076' parm='ALL'
+
+################################################################################
+LABEL name=CAT01
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cat $SEQFILES/h1 $SEQFILES/CI.DL.CIADM.FICH076.RLIC.R02 $SEQFILES/h2 > $SEQFILES/CI.DL.CIADM.FICH076.RLIC.R02.html
+!
+EXECPGM pgmname='BPXBATCH' stepname='CAT01' parm='SH'
+
+ENDJOB 
+################################################################################

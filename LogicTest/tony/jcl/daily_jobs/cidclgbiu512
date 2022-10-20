@@ -1,0 +1,89 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+#
+################################################################################
+
+
+#*******************************************************************************
+#   Get the file from  //Ntis2/userapps/prod/batch/biu
+#*******************************************************************************
+ftp -n ntis2 < /apps/prod/cid1p/jcl/ish/ftp-cidclgbiuin
+
+
+################################################################################
+LABEL name=SORTLGX 
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/DC.DD.BIU.LOGIC.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/BIUIssues.txt' disp='i-o' normal='k' abend='k' recsize='90'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 10)(1 10)(79 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTLGX'
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                   * 
+#  *   PREPARE COMFD800 REFORMATTED RECORDS TO LOAD TO PEND. BUS. FILE * 
+#  *                                                                   * 
+#  ********************************************************************* 
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/DC.DD.BIU.LOGIC.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.DD.BIU.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='CFCNTL' disp='i-o' normal='k' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+
+    "cp $SYSOUTDIR/$JOBNAME/EL512/SYS008_$JON /data/convertin"
+    "perl /export/home/mtpadmin/bin/dcc_new_paper.pl /export/home/mtpadmin/bin/dcc_paper_rpt_hash"
+    "cp /data/convertin/SYS008_${JON}.CVT /data/convertout/SYS008_${JON}_512"
+    "rm /data/convertin/*"
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='/data/convertout/SYS008_${JON}_512' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.DL.CIADM.FICH512.BIU' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+   "smtp -f slunikix -t ajra,jjva,djwb,amwa -s 'EL512 FOR BIU IS COMPLETE' -mf $SEQFILES/DC.DL.CIADM.FICH512.BIU"
+else
+   echo " Job aborted, print not released "
+endif
+
+ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-cidclgbiu512
+
+ENDJOB 
+################################################################################

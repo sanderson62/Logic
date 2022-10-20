@@ -1,0 +1,71 @@
+BEGINJOB mode='MVS' jobclass='Y' 
+
+SETPRINT printid='OUT1' scope='JOB' groupid='CI'
+SETPRINT printid='OUT2' scope='JOB' groupid='CI' pagedef='CID002' formdef='CID002'
+SETPRINT printid='OUT3' scope='JOB' groupid='CI' pagedef='CID005' formdef='CID005'
+
+#LIBDEF scope='JOB' type='PGM' dataset='IS.DD.PRD1.LOADLIB' lib='\${SEQFILES}/IS.DD.PRD1.LOADLIB' 
+
+################################################################################
+LABEL name=DACTVBKP 
+################################################################################
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='DAFIN' dataset='CI.DD.LG.DLYACTV' type='VS' filename='DLYACTV' disp='i-o' 
+ASSGNDD ddname='DAFOUT' filename='\${ESEQFILES}/zI.XX.DLYACTV.BKPONLY' disp='o' normal='k' abend='d' recfmt='F' recsize='25' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(DAFIN)  -
+         OFILE(DAFOUT)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='DACTVBKP' 
+
+################################################################################
+LABEL name=CLEXT 
+################################################################################
+ONRETCODE MAXRC GT '11' BYPASS scope='STEP'  
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='ELCERT' dataset='CI.DD.LG.ELCERT' type='VS' filename='ELCERT' disp='i-o' 
+ASSGNDD ddname='ELMSTR' dataset='CI.DD.LG.ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='ELTRLR' dataset='CI.DD.LG.ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='DLYACTV' dataset='CI.DD.LG.DLYACTV' type='VS' filename='DLYACTV' disp='i-o' 
+ASSGNDD ddname='CIEXTRS' filename='\${ESEQFILES}/zI.WW.LG.CIEXTRS' disp='o' normal='k' abend='d' recfmt='F' recsize='314' 
+SETPRINT ddname='SYS008' forms='STD1' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' printid='OUT1' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='CICLEXT' stepname='CLEXT' parm='07-08-02' 
+
+################################################################################
+LABEL name=INTFCE 
+################################################################################
+ONRETCODE MAXRC GT '11' BYPASS scope='STEP'  
+ONRETCODE CLEXT NE 0 BYPASS scope='STEP'  
+
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYS015' filename='\${ESEQFILES}/zI.WW.LG.CIEXTRS' disp='i-o' normal='d' abend='k' 
+ASSGNDD ddname='CLMACT' filename='\${ESEQFILES}/zI.WW.LG.CLMACT' disp='o' normal='k' abend='d' recfmt='F' recsize='648' 
+ASSGNDD ddname='DFTACT' filename='\${ESEQFILES}/zI.WW.LG.DFTACT' disp='o' normal='k' abend='d' recfmt='F' recsize='1138' 
+ASSGNDD ddname='ELBENE' dataset='CI.DD.LG.ELBENE' type='VS' filename='ELBENE' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+INTERFACE DATES 0703200207082002
+!
+
+EXECPGM pgmname='LGCIFCE' stepname='INTFCE' parm='07-08-02' 
+
+if ($jobstatus == 0) then
+   "pdpr -p IS_OPS -X e:/cid1p/jcl/l132std.parms -x department-text=CI e:/cid1p/sysout/sysoutdir/zilgextr/clext/sys008_$jon"
+else
+   echo "job aborted print not released "
+endif
+
+ENDJOB 
+
+
+

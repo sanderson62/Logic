@@ -1,0 +1,62 @@
+cd $PROJECT_ROOT/jcl
+
+setenv cdte `date +%m%d`
+
+echo "cidmtha is about to start"
+unikixjob cidmtha -ca -k $EBMSYS
+if ($status != 0) then
+    echo "cidmtha aborted"
+   "echo 'In CIDMTHA' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidmtha terminated successfully"
+
+echo "cidmthb is about to start"
+unikixjob cidmthb -w -ca -k $EBMSYS
+if ($status != 0) then
+    echo "cidmthb aborted"
+   "echo 'In CIDMTHB' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidmthb terminated successfully"
+
+"echo 'CIDMTHB COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+ftp -n ntis2 < $JCLLIB/ftp-rdsfiles
+
+rm $JCLLIB/date_hash
+
+#########################  B E G I N  S T E P  07   #########################
+"cat $PROJECT_ROOT/emails/printemail.txt | mutt -s 'Todays print list'  CPSPrintList@cso.com"
+cp $PROJECT_ROOT/reprints/dailycycle $PROJECT_ROOT/reprints/dailycycle.$cdte
+
+echo "@ccyyyymmdd" > $SEQFILES/Logic.daily.postcycle.done
+ftp -n ntcso1 < $JCLLIB/ftp-postcycle
+#########################    E N D    S T E P  07   #########################
+
+#########################  B E G I N  S T E P  08   #########################
+if (`date +%F` == 2016-12-29 || "@ccdow" == "Fri") then
+   echo "@ccyyyymmdd" > $SEQFILES/dailyslunikix.txt
+   ftp -n ntcso1 < $JCLLIB/ftp-cpsfrimedone
+endif
+#########################    E N D    S T E P  08   #########################
+
+#########################  B E G I N  S T E P  09   #########################
+echo "sqlbermebl is about to start"
+unikixjob sqlbermebl -w -ca -k $EBMSYS
+if ($status != 0) then
+    echo "sqlbermebl aborted"
+   "echo 'In SQLBERMEBL' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "sqlbermebl terminated successfully"
+
+
+"echo 'Logic Day 1 completee' | mutt -s 'Logic Month cycle@cso.com"
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOBS
+# 052914  2014042300003  TANA   CHANGE SMTP TO USE DIST GROUP

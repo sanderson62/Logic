@@ -1,0 +1,89 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' verbose 
+
+if ($EBMSYS != "tony") then
+   echo "Job aborted, not tony"
+   exit 1
+endif
+
+################################################################################
+LABEL name=GETCIDNS
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/ENCFILE.AHL.txt $SEQFILES/ENCFILE.CID.txt $SEQFILES/ENCFILE.DCC.txt
+ftp -n ntcso1 < $JCLLIB/ftp-get-zajrnsbld
+perl $HOME/bin/ConvENCRec.pl $SEQFILES/claimssort.enc.cps $SEQFILES/ENCFILE.CID.txt
+perl $HOME/bin/ConvENCRec.pl $SEQFILES/claimssort.enc.dcc $SEQFILES/ENCFILE.DCC.txt
+perl $HOME/bin/ConvENCRec.pl $SEQFILES/claimssort.enc.ahl $SEQFILES/ENCFILE.AHL.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='GETCIDNS' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+
+################################################################################
+LABEL name=BKPENCC
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ELENCC -s $SEQFILES/$JOBNAME.elencc.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPENCC' parm='SH'
+
+################################################################################
+LABEL name=DELENCC
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -i -d ELENCC
+!
+EXECPGM pgmname='BPXBATCH' stepname='DELENCC' parm='SH'
+
+################################################################################
+LABEL name=CIDNCB1
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/slunikix/apps/prod/cid1p/exe/bat'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ENCFILE.CID.txt' disp='i'
+ASSGNDD ddname='ELENCC' type='VS' filename='ELENCC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/slunikix/data/seqfiles/CI.DD.ER.DATECARD.DBLD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDNCB1' stepname='CIDNCB1'
+
+################################################################################
+LABEL name=DCCNCB1
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/slunikix/apps/prod/cid1p/exe/bat'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ENCFILE.DCC.txt' disp='i'
+ASSGNDD ddname='ELENCC' type='VS' filename='ELENCC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/slunikix/data/seqfiles/DC.DD.ER.DATECARD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDNCB1' stepname='DCCNCB1'
+
+################################################################################
+LABEL name=AHLNCB1
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/slunikix/apps/prod/cid1p/exe/bat'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ENCFILE.AHL.txt' disp='i'
+ASSGNDD ddname='ELENCC' type='VS' filename='ELENCC' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/data/test/ahltst/seqfiles/AH.DD.ER.DATECARD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDNCB1' stepname='AHLNCB1'
+
+if ($JOBSTATUS == 0) then
+        echo " Nothing to print "
+else
+        echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 091410                 PEMA   NEW JOB

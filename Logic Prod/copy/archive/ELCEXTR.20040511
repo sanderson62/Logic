@@ -1,0 +1,983 @@
+00001 ******************************************************************
+00002 *                                                                *
+00002 *                                                                *
+00003 *                            ELCEXTR.                            *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+00005 *                            VMOD=2.023                          *
+00006 *                                                                *
+00007 *   FILE DESCRIPTION = EXTRACT FILE FOR OFFLINE REPORTING        *
+00008 *                                                                *
+00009 *     THIS FILE IS CREATED DURING NIGHT-TIME PROCESSING (EL310). *
+00010 *  IT CONTAINS SEVERAL DIFFERENT SORT KEYS AND DATA FORMATS IN   *
+00011 *  ORDER TO SATISFY VARYING INPUT REQUIREMENTS.
+040902*
+040902******************************************************************
+040902*                   C H A N G E   L O G
+040902*
+040902* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+040902*-----------------------------------------------------------------
+040902*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+040902* EFFECTIVE    NUMBER
+040902*-----------------------------------------------------------------
+040902* 040902    2001120300002  SMVA  ADD TOTAL PAID AMT TO AA EXTR
+040902******************************************************************
+00012 *                                                                *
+00013 * EXTRACT RECORD   SORT                                    POSI  *
+00014 *  CODE    TYPE    CODE  PROGRAM USING                     CODE  *
+00015 * ------ --------  ----  --------------------------------  ----  *
+00016 *   A       A      INTRNL EL315  RESERVE REPORTING           1   *
+00017 *                   A     EL524  LOADING RESERVES TO ERPNDC      *
+00018 *                   A     ECS122 OPEN CLAIMS AUDIT               *
+00019 *           B       A     EL315  ADDITIONAL RESERVE REPORTING    *
+00020 *                   A     EL524  LOADING PAYMENTS TO ERPNDC      *
+00021 *                                                                *
+00022 *   B       A       B     EL317  CHECK REGISTER              9   *
+00023 *                  INTRNL EL325  PAYMENT REGISTER                *
+00024 *                  INTRNL EL327  EXPENSE REGISTER                *
+00025 *                                                                *
+00026 *   C       A       B     EL322  CHECK USAGE                 9   *
+00027 *                                                                *
+00028 *   D       A       F     EL323-A  AUTO PMTS GENERATED           *
+00029 *           B       E     EL323-B  CORRES. TO BE RESENT      2   *
+00030 *           C       E     EL323-C  NO ACTIVITY FOR 45 DAYS       *
+00031 *           D       A     EL323-D  AUTO CLAIM CLOSING            *
+00032 *           E       A     EL323-E  UNPROCESSED CHECKS            *
+00033 *           F       A     EL323-F  CLAIMS WITH UNRESOLVED ERRORS *
+00034 *           G       E3    EL323-G  AUTO PROMPT REQUESTS          *
+00035 *           H       A     EL323-H  UNAPPROVED PAYMENTS           *
+00036 *           I       A     EL323-I  DAILY MAIL RECEIVED REGISTER  *
+00037 *           J       H     EL323-J  LAG REPORT                    *
+00038 *           K       I     EL323-K  LAPSE REPORT                  *
+00039 *           L       J     EL323-L  INCOMPLETE REPORT             *
+00040 *                                                                *
+00041 *   E       A       E     EL324  CORRESPONDENCE REGISTER     5   *
+00042 *                                                                *
+00043 *   F       A       G     SPECIAL CLIENT CODED EXTRACTS          *
+00044 *           B       G                                            *
+00045 *           C       G                                            *
+00046 *                                                                *
+00047 *   G       A     INTRNL  GENERAL LEDGER (AIG)                   *
+00048 *                                                                *
+00049 * -------------------------------------------------------------- *
+00050 *                                                                *
+00051 *   FILE TYPE = SEQUENTIAL                                       *
+00052 *   RECORD SIZE = 314   RECFORM = FIX                            *
+00053 *                                                                *
+00054 *   FILENAME = ELEXTR                                            *
+00055 *                                                                *
+00056 ******************************************************************
+00057  01  REPORTS-EXTRACT-RECORD.                                      
+00058      12  EX-RECORD-ID                        PIC XX.              
+00059          88  VALID-EX-ID                        VALUE 'EX'.       
+00060                                                                   
+00061      12  EX-SORT-KEY-AREAS.                                       
+00062          16  EX-POSITIONING-CODE             PIC X.               
+00063              88  FRONT-OF-FILE                  VALUE '0'.        
+00064              88  BACK-OF-FILE                   VALUE '9'.        
+00065          16  EX-EXTRACT-CODE                 PIC X.               
+00066          16  EX-COMPANY-CD                   PIC X.               
+00067          16  EX-COMPANY-ID                   PIC XXX.             
+00068          16  EX-RECORD-TYPE                  PIC X.               
+00069                                                                   
+00070          16  EX-VARIABLE-ASCENDING-KEYS  PIC X(33).               
+00071                                                                   
+00072          16  EX-SORT-KEY-A  REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00073              20  EX-SA-CARRIER               PIC X.               
+00074              20  EX-SA-CLAIM-NO              PIC X(7).            
+00075              20  EX-SA-CERT-NO.                                   
+00076                  24  EX-SA-CERT-PRIME        PIC X(10).           
+00077                  24  EX-SA-CERT-SFX          PIC X.               
+00078              20  FILLER                      PIC X(14).           
+00079                                                                   
+00080          16  EX-SORT-KEY-B  REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00081              20  EX-SB-CARRIER               PIC X.               
+00082              20  EX-SB-CHECK-NO              PIC X(7).            
+00083              20  FILLER                      PIC X(25).           
+00084                                                                   
+00085          16  EX-SORT-KEY-C  REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00086              20  EX-SC-CARRIER               PIC X.               
+00087              20  EX-SC-ACCOUNT               PIC X(10).           
+00088              20  EX-SC-CLAIM-NO              PIC X(7).            
+00089              20  FILLER                      PIC X(15).           
+00090                                                                   
+00091          16  FILLER         REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00092              20  EX-SC2-PROCESSOR            PIC X(4).            
+00093              20  EX-SC2-CLAIM-NO             PIC X(7).            
+00094              20  EX-SC2-CERT-NO              PIC X(11).           
+00095              20  EX-SC2-CARRIER              PIC X.               
+00096              20  FILLER                      PIC X(10).           
+00097                                                                   
+00098          16  EX-SORT-KEY-D  REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00099              20  EX-SD-CARRIER               PIC X.               
+00100              20  EX-SD-STATE                 PIC XX.              
+00101              20  EX-SD-ACCOUNT               PIC X(10).           
+00102              20  EX-SD-CLAIM-NO              PIC X(7).            
+00103              20  EX-SD-CERT-NO.                                   
+00104                  24  EX-SD-CERT-PRIME        PIC X(10).           
+00105                  24  EX-SD-CERT-SFX          PIC X.               
+00106              20  FILLER                      PIC X(2).            
+00107                                                                   
+00108          16  EX-SORT-KEY-E  REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00109              20  EX-SE-ACTION-DATE           PIC XX.              
+00110              20  EX-SE-CARRIER               PIC X.               
+00111              20  EX-SE-CLAIM-NO              PIC X(7).            
+00112              20  EX-SE-CERT-NO.                                   
+00113                  24  EX-SE-CERT-PRIME        PIC X(10).           
+00114                  24  EX-SE-CERT-SFX          PIC X.               
+00115              20  FILLER                      PIC X(12).           
+00116                                                                   
+00117          16  FILLER         REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00118              20  EX-SE2-PROCESSOR            PIC X(4).            
+00119              20  EX-SE2-ACTION-DATE          PIC XX.              
+00120              20  EX-SE2-CARRIER              PIC X.               
+00121              20  EX-SE2-CLAIM-NO             PIC X(7).            
+00122              20  EX-SE2-CERT-NO              PIC X(11).           
+00123              20  FILLER                      PIC X(8).            
+00124                                                                   
+00125          16  FILLER         REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+DAN01              20  EX-SE3-SORT-CODE            PIC X.               
+00126              20  EX-SE3-ACTION-DATE          PIC XX.              
+00127              20  EX-SE3-PROCESSOR            PIC X(4).            
+00128              20  EX-SE3-CARRIER              PIC X.               
+00129              20  EX-SE3-CLAIM-NO             PIC X(7).            
+00130              20  EX-SE3-CERT-NO              PIC X(11).           
+DAN01*****         20  FILLER                      PIC X(8).            
+DAN01              20  FILLER                      PIC X(7).            
+00132                                                                   
+00133          16  EX-SORT-KEY-F  REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00134              20  EX-SF-CARRIER               PIC X.               
+00135              20  EX-SF-DAYS-TO-PAYMENT       PIC S9(3)  COMP-3.   
+00136              20  EX-SF-CLAIM-NO              PIC X(7).            
+00137              20  EX-SF-CERT-NO.                                   
+00138                  24  EX-SF-CERT-PRIME        PIC X(10).           
+00139                  24  EX-SF-CERT-SFX          PIC X.               
+00140              20  FILLER                      PIC X(12).           
+00141                                                                   
+00142          16  EX-SORT-KEY-G  REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00143              20  EX-SG-CARRIER               PIC X.               
+00144              20  EX-SG-STATE                 PIC XX.              
+00145              20  EX-SG-ACCOUNT-NO            PIC X(10).           
+00146              20  EX-SG-CLAIM-NO              PIC X(7).            
+00147              20  EX-SG-CERT-NO.                                   
+00148                  24  EX-SG-CERT-PRIME        PIC X(10).           
+00149                  24  EX-SG-CERT-SFX          PIC X.               
+00150              20  EX-SG-TRAILER-SEQ-NO        PIC S9(4)    COMP.   
+00151                                                                   
+00152          16  EX-SORT-KEY-H  REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00153              20  EX-SH-LAG-DAYS              PIC 9(04).           
+00154              20  EX-SH-CLAIM-NO              PIC X(7).            
+00155              20  FILLER                      PIC X(22).           
+00156                                                                   
+00157          16  EX-SORT-KEY-I  REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00158              20  EX-SI-PROCESSOR             PIC X(04).           
+00159              20  EX-SI-ACTIVITY-CODE         PIC XX.              
+00160              20  EX-SI-DAYS-NINES-COMPLEMENT PIC 9(04).           
+00161              20  EX-SI-DAYS                  PIC 9(04).           
+00162              20  FILLER                      PIC X(19).           
+00163                                                                   
+00164          16  EX-SORT-KEY-J  REDEFINES EX-VARIABLE-ASCENDING-KEYS. 
+00165              20  EX-SJ-LAST-NAME             PIC X(15).           
+00166              20  FILLER                      PIC X(18).           
+00167                                                                   
+00168 ******************************************************************
+00169                                                                   
+00170      12  EX-DATA-AREAS                       PIC X(272).          
+00171                                                                   
+00172      12  EX-EXTRACT-A-RECORD-A  REDEFINES EX-DATA-AREAS.          
+00173          16  EX-AA-CARRIER                   PIC X.               
+00174          16  EX-AA-STATE                     PIC XX.              
+00175          16  EX-AA-ACCOUNT                   PIC X(10).           
+00176          16  EX-AA-GROUPING                  PIC X(6).            
+00177          16  EX-AA-CERT-EFF-DT               PIC XX.              
+00178          16  EX-AA-CLAIM-TYPE                PIC X.               
+00179          16  EX-AA-CLAIM-PREM-TYPE           PIC X.               
+00180              88  EX-AA-SINGLE-PREM              VALUE '1'.        
+00181              88  EX-AA-O-B-COVERAGE             VALUE '2'.        
+00182              88  EX-AA-OPEN-END-COVERAGE        VALUE '3'.        
+00183          16  EX-AA-ORIG-TERM                 PIC S9(3)     COMP-3.
+00184          16  EX-AA-REMAINING-TERM            PIC S9(3)     COMP-3.
+00185          16  EX-AA-INSURED-NAME              PIC X(30).           
+00186          16  EX-AA-INSURED-ISSUE-AGE         PIC 99.              
+00187          16  EX-AA-INSURED-BIRTH-DT          PIC XX.              
+00188          16  EX-AA-INSURED-SEX-CD            PIC X.               
+00189          16  EX-AA-INCURRED-DT               PIC XX.              
+00190          16  EX-AA-REPORTED-DT               PIC XX.              
+00191          16  EX-AA-BENEFIT-AMT               PIC S9(9)V99  COMP-3.
+00192          16  EX-AA-REMAINING-BENEFIT         PIC S9(9)V99  COMP-3.
+00193          16  EX-AA-CDT-FACTOR                PIC S9(5)V9(6)       
+00194                                                            COMP-3.
+00195          16  EX-AA-CDT-TABLE                 PIC X.               
+00196          16  EX-AA-PAY-CURRENT-RESERVE       PIC S9(7)V99  COMP-3.
+00197          16  EX-AA-IBNR-RESERVE              PIC S9(7)V99  COMP-3.
+00198          16  EX-AA-FUTURE-RESERVE            PIC S9(7)V99  COMP-3.
+00199          16  EX-AA-MANUAL-RESERVE            PIC S9(7)V99  COMP-3.
+00200          16  EX-AA-NON-CHARGED-EXPENSES      PIC S9(5)V99  COMP-3.
+00201          16  EX-AA-CHARGED-EXPENSES          PIC S9(5)V99  COMP-3.
+00202          16  EX-AA-ACCOUNT-NAME              PIC X(30).           
+00203          16  EX-AA-PAID-THRU-DT              PIC XX.              
+00204          16  EX-AA-FUTURE-RESERVE-FLAG       PIC X.               
+00205          16  EX-AA-CLAIM-INTERFACE-SW        PIC X.               
+00206              88  EX-AA-NO-CLAIM-ATTACHED          VALUE SPACE.    
+00207              88  EX-AA-CERT-AND-CLAIM-ONLINE      VALUE '1'.      
+00208              88  EX-AA-CERT-CREATE-FOR-CLAIM      VALUE '2'.      
+00209          16  EX-AA-CERT-STATUS               PIC X.               
+00210          16  EX-AA-PROCESSOR-ID              PIC X(4).            
+00211          16  EX-AA-IND-GRP                   PIC X.               
+00212              88  EX-AA-IND                        VALUE 'I'.      
+00213              88  EX-AA-GRP                        VALUE 'G'.      
+00214          16  EX-AA-INCURRED-AGE              PIC S9(03) COMP-3.   
+00215                                                                   
+00216 ****  DATA NEEDED TO SUPPORT CIDA RESERVE CALCULATIONS  ****      
+00217                                                                   
+00218          16  EX-AA-CIDA-RSV-DATA.                                 
+00219              20  EX-AA-CIDA-FACTOR        PIC S9(5)V9(6) COMP-3.  
+00220              20  EX-AA-PAY-CURRENT-RSV-OPT                        
+00221                                           PIC S9(7)V99  COMP-3.   
+00222              20  EX-AA-IBNR-RSV-OPT       PIC S9(7)V99  COMP-3.   
+00223              20  EX-AA-FUTURE-RSV-OPT     PIC S9(7)V99  COMP-3.   
+00224              20  EX-AA-MANUAL-RSV-OPT     PIC S9(7)V99  COMP-3.   
+00225              20  EX-AA-FUTURE-RSV-OPT-FLAG                        
+00226                                           PIC X.                  
+00227              20  EX-AA-LAST-MAINT-DT      PIC XX.                 
+00228              20  EX-AA-MAINT-TYPE         PIC X.                  
+00229                  88  EX-AA-CLAIM-SET-UP           VALUE ' '.      
+00230                  88  EX-AA-PAYMENT-MADE           VALUE '1'.      
+00231                  88  EX-AA-LETTER-SENT            VALUE '2'.      
+00232                  88  EX-AA-MASTER-WAS-ALTERED     VALUE '3'.      
+00233                  88  EX-AA-MASTER-WAS-RESTORED    VALUE '4'.      
+00234                  88  EX-AA-INCURRED-DATE-CHANGED  VALUE '5'.      
+00235                  88  EX-AA-FILE-CONVERTED         VALUE '6'.      
+00236              20  EX-AA-PROJECT-CLOSE-DT   PIC XX.                 
+00237              20  EX-AA-LAST-PMT-DT        PIC XX.                 
+00238              20  EX-AA-LAST-PMT-AMT       PIC S9(7)V99   COMP-3.  
+00239              20  EX-AA-BENEFIT-CODE       PIC XX.                 
+00240          16  EX-AA-SYSTEM-IDENTIFIER      PIC XX.                 
+00241              88  EX-AA-CR-CLAIM-RESERVE      VALUES 'CR' '  '.    
+00242              88  EX-AA-CV-CLAIM-RESERVE      VALUE  'CV'.
+040902         16  EX-AA-TOTAL-PAID-AMT         PIC S9(7)V99  COMP-3.
+040902         16  FILLER                       PIC X(69).
+00244                                                                   
+00245      12  EX-EXTRACT-A-RECORD-B  REDEFINES EX-DATA-AREAS.          
+00246          16  EX-AB-CARRIER                   PIC X.               
+00247          16  EX-AB-STATE                     PIC XX.              
+00248          16  EX-AB-ACCOUNT                   PIC X(10).           
+00249          16  EX-AB-GROUPING                  PIC X(6).            
+00250          16  EX-AB-CERT-EFF-DT               PIC XX.              
+00251          16  EX-AB-CERT-NO                   PIC X(11).           
+00252          16  EX-AB-CLAIM-NO                  PIC X(7).            
+00253          16  EX-AB-CLAIM-TYPE                PIC X.               
+00254          16  EX-AB-CLAIM-PREM-TYPE           PIC X.               
+00255              88  EX-AB-SINGLE-PREM              VALUE '1'.        
+00256              88  EX-AB-O-B-COVERAGE             VALUE '2'.        
+00257              88  EX-AB-OPEN-END-COVERAGE        VALUE '3'.        
+00258          16  EX-AB-PAYMENT-TYPE              PIC X.               
+00259              88  EX-AB-PARTIAL-PAYMENT          VALUE '1'.        
+00260              88  EX-AB-FINAL-PAYMENT            VALUE '2'.        
+00261              88  EX-AB-LUMP-SUM-PAYMENT         VALUE '3'.        
+00262              88  EX-AB-ADDITIONAL-PAYMENT       VALUE '4'.        
+00263              88  EX-AB-CHARGABLE-EXPENSE        VALUE '5'.        
+00264              88  EX-AB-NON-CHARGEABLE-EXPENSE   VALUE '6'.        
+00265          16  EX-AB-CHECK-NO.                                      
+00266              20  FILLER                      PIC XX.              
+00267              20  EX-AB-CHECK-NUMBER          PIC X(5).            
+00268          16  EX-AB-PAID-FROM-DT              PIC XX.              
+00269          16  EX-AB-PAID-THRU-DT              PIC XX.              
+00270          16  EX-AB-INCURRED-DT               PIC XX.              
+00271          16  EX-AB-REPORTED-DT               PIC XX.              
+00272          16  EX-AB-CHECK-WRITTEN-DT          PIC XX.              
+00273          16  EX-AB-PAYMENT-AMOUNT            PIC S9(7)V99  COMP-3.
+00274          16  EX-AB-INCURRED-AGE              PIC 99.              
+00275          16  EX-AB-DAYS-IN-PERIOD            PIC S9(4)     COMP.  
+00276          16  EX-AB-FORCE-CONTROL             PIC X.               
+00277              88  EX-AB-PAYMENT-WAS-FORCED       VALUE '1'.        
+00278          16  EX-AB-ADDL-RESERVE              PIC S9(5)V99 COMP-3. 
+00279          16  EX-AB-1ST-PAYMENT-SW            PIC X.               
+00280              88  EX-AB-1ST-PAYMENT              VALUE '1'.        
+00281          16  EX-AB-CREATED-CERT-SW           PIC X.               
+00282              88  EX-AB-CREATED-CERTIFICATE      VALUE '1'.        
+00283          16  EX-AB-EXPENSE-TYPE              PIC X.               
+00284          16  EX-AB-VOID-DT                   PIC XX.              
+00285          16  EX-AB-BENEFIT-CODE              PIC XX.              
+00286          16  EX-AB-CLAIM-INTERFACE-SW        PIC X.               
+00287              88  EX-AB-NO-CLAIM-ATTACHED          VALUE SPACE.    
+00288              88  EX-AB-CERT-AND-CLAIM-ONLINE      VALUE '1'.      
+00289              88  EX-AB-CERT-CREATE-FOR-CLAIM      VALUE '2'.      
+00290          16  EX-AB-CERT-STATUS               PIC X.               
+00291          16  EX-AB-PAYMENT-ORIGIN            PIC X.               
+00292              88  EX-AB-ONLINE-MANUAL-PMT        VALUE '1'.        
+00293              88  EX-AB-ONLINE-AUTO-PMT          VALUE '2'.        
+00294              88  EX-AB-OFFLINE-PMT              VALUE '3'.        
+00295          16  EX-AB-TRAILER-SEQ-NO            PIC S9(04)  COMP.    
+00296          16  EX-AB-CAUSE-CD                  PIC X(6).            
+00297          16  EX-AB-VOID-SELECT-DT            PIC XX.              
+00298          16  EX-AB-PMT-SELECT-DT             PIC XX.              
+00299          16  EX-AB-SYSTEM-IDENTIFIER         PIC XX.              
+00300              88  EX-AB-CR-CLAIM-PMT             VALUES 'CR' '  '. 
+00301              88  EX-AB-CV-CLAIM-PMT             VALUE  'CV'.      
+00302                                                                   
+00303          16  FILLER                          PIC X(175).          
+00304                                                                   
+00305      12  EX-EXTRACT-B-RECORD-A  REDEFINES EX-DATA-AREAS.          
+00306          16  EX-BA-CERT-NO.                                       
+00307              20  EX-BA-CERT-NO-PRE           PIC X(10).           
+00308              20  EX-BA-CERT-NO-SUF           PIC X.               
+00309          16  EX-BA-CLAIM-NO                  PIC X(7).            
+00310          16  EX-BA-STATE                     PIC XX.              
+00311          16  EX-BA-ACCOUNT                   PIC X(10).           
+00312          16  EX-BA-ACCOUNT-NAME              PIC X(30).           
+00313          16  EX-BA-GROUPING                  PIC X(6).            
+00314          16  EX-BA-CERT-EFF-DT               PIC XX.              
+00315          16  EX-BA-CLAIM-TYPE                PIC X.               
+00316          16  EX-BA-CLAIM-PREM-TYPE           PIC X.               
+00317              88  EX-BA-SINGLE-PREM              VALUE '1'.        
+00318              88  EX-BA-O-B-COVERAGE             VALUE '2'.        
+00319              88  EX-BA-OPEN-END-COVERAGE        VALUE '3'.        
+00320          16  EX-BA-PAYMENT-TYPE              PIC X.               
+00321              88  EX-BA-PARTIAL-PAYMENT          VALUE '1'.        
+00322              88  EX-BA-FINAL-PAYMENT            VALUE '2'.        
+00323              88  EX-BA-LUMP-SUM-PAYMENT         VALUE '3'.        
+00324              88  EX-BA-ADDITIONAL-PAYMENT       VALUE '4'.        
+00325              88  EX-BA-CHARGABLE-EXPENSE        VALUE '5'.        
+00326              88  EX-BA-NON-CHARGEABLE-EXPENSE   VALUE '6'.        
+00327          16  EX-BA-PAID-FROM-DT              PIC XX.              
+00328          16  EX-BA-PAID-THRU-DT              PIC XX.              
+00329          16  EX-BA-INCURRED-DT               PIC XX.              
+00330          16  EX-BA-REPORTED-DT               PIC XX.              
+00331          16  EX-BA-CHECK-WRITTEN-DT          PIC XX.              
+00332          16  EX-BA-PAYMENT-AMOUNT            PIC S9(7)V99  COMP-3.
+00333          16  EX-BA-INSURED-AGE               PIC 99.              
+00334          16  EX-BA-INSURED-LAST-NAME         PIC X(30).           
+00335          16  EX-BA-DAYS-IN-PERIOD            PIC S9(4)     COMP.  
+00336          16  EX-BA-PAYEE-TYPE-CD             PIC X.               
+00337              88  EX-BA-INSURED-PAID             VALUE 'I'.        
+00338              88  EX-BA-BENEFICIARY-PAID         VALUE 'B'.        
+00339              88  EX-BA-ACCOUNT-PAID             VALUE 'A'.        
+00340              88  EX-BA-OTHER-1-PAID             VALUE 'O'.        
+00341              88  EX-BA-OTHER-2-PAID             VALUE 'Q'.        
+00342          16  EX-BA-PAYEES-NAME               PIC X(30).           
+00343          16  EX-BA-VOID-DT                   PIC XX.              
+00344          16  EX-BA-CLAIM-STATUS              PIC X.               
+00345          16  EX-BA-ORIG-TERM                 PIC S9(3)     COMP-3.
+00346          16  EX-BA-MEMBER-NUMBER             PIC X(12).           
+00347          16  EX-BA-SOC-SEC-NO                PIC X(11).           
+00348          16  EX-BA-PAYMENT-ORIGIN            PIC X.               
+00349              88  EX-BA-ONLINE-MANUAL-PMT        VALUE '1'.        
+00350              88  EX-BA-ONLINE-AUTO-PMT          VALUE '2'.        
+00351              88  EX-BA-OFFLINE-PMT              VALUE '3'.        
+00352          16  EX-BA-RESERVE-FLAG        PIC X.                     
+00353 *            88  PAYMENT-USED-FOR-RESERVE-REPORTING  VALUE '*'.   
+00354          16  EX-BA-BENEFIT-CD          PIC XX.                    
+00355          16  EX-BA-EXPENSE-TYPE        PIC X.                     
+00356          16  EX-BA-EXPENSE-PER-PMT     PIC S9(5)V99  COMP-3.      
+00357          16  EX-BA-CERT-STATUS         PIC X.                     
+00358          16  EX-BA-IND-GRP-TYPE        PIC X.                     
+00359              88  EX-BA-INDIVIDUAL               VALUE 'I'.        
+00360              88  EX-BA-GROUP                    VALUE 'G'.        
+00361          16  EX-BA-PMT-RECORDED-DT     PIC XX.                    
+00362          16  EX-BA-LOAN-TYPE           PIC XX.                    
+00363          16  EX-BA-BENEFICIARY         PIC X(10).                 
+00364          16  EX-BA-LOSS-CODE           PIC X(6).                  
+00365          16  EX-BA-ASSOCIATES          PIC X.                     
+00366          16  EX-BA-INSURED-SEX-CD      PIC X.                     
+00367          16  EX-BA-BENEFIT-AMT         PIC S9(9)V99  COMP-3.      
+00368          16  EX-BA-PREMIUM-AMT         PIC S9(7)V99  COMP-3.      
+00369          16  EX-BA-LEGAL-STATE         PIC XX.                    
+00370          16  EX-BA-SYSTEM-IDENTIFIER   PIC XX.                    
+00371              88  EX-BA-CR-CLAIM-PMT       VALUES 'CR' '  '.       
+00372              88  EX-BA-CV-CLAIM-PMT       VALUE  'CV'.            
+00373          16  EX-BA-LAST-PROCESS-DT     PIC XX.                    
+00374                                                                   
+00375          16  EX-BA-TOTAL-PAID-AMT      PIC S9(7)V99  COMP-3.      
+00376          16  EX-BA-LF-REMAINING-AMT    PIC S9(7)V99  COMP-3.      
+00377          16  EX-BA-INSURED-ADDR-SEQ    PIC S9(4)     COMP.        
+00378          16  EX-BA-PAYEE-ADDR-SEQ      PIC S9(4)     COMP.        
+00379          16  EX-BA-RECORDED-BY         PIC X(4).                  
+00380          16  EX-BA-FILE-ESTABLISHED-DT PIC XX.                    
+00381          16  EX-BA-LAST-PMT-DT         PIC XX.                    
+00382          16  EX-BA-LAST-REOPEN-DT      PIC XX.                    
+00383          16  EX-BA-INSURED-BIRTH-DT    PIC XX.                    
+00384          16  EX-BA-RESIDENT-STATE      PIC XX.                    
+00385                                                                   
+00386          16  FILLER                    PIC X(15).                 
+00387                                                                   
+00388      12  EX-EXTRACT-C-RECORD-A  REDEFINES EX-DATA-AREAS.          
+00389          16  EX-CA-CERT-NO                   PIC X(11).           
+00390          16  EX-CA-CLAIM-NO                  PIC X(7).            
+00391          16  EX-CA-CLAIM-TYPE                PIC X.               
+00392          16  EX-CA-ENTRY-TYPE                PIC X.               
+00393              88  EX-CA-CHECK-ON-QUE             VALUE 'Q'.        
+00394              88  EX-CA-ALIGNMENT-CHECK          VALUE 'A'.        
+00395              88  EX-CA-SPOILED-CHECK            VALUE 'S'.        
+00396              88  EX-CA-PAYMENT-ABORTED          VALUE 'X'.        
+00397          16  EX-CA-CONTROL-NUMBER            PIC S9(8)      COMP. 
+00398          16  EX-CA-CLAIM-PREM-TYPE           PIC X.               
+00399              88  EX-CA-SINGLE-PREM              VALUE '1'.        
+00400              88  EX-CA-O-B-COVERAGE             VALUE '2'.        
+00401              88  EX-CA-OPEN-END-COVERAGE        VALUE '3'.        
+00402          16  EX-CA-PAYMENT-TYPE              PIC X.               
+00403              88  EX-CA-PARTIAL-PAYMENT          VALUE '1'.        
+00404              88  EX-CA-FINAL-PAYMENT            VALUE '2'.        
+00405              88  EX-CA-LUMP-SUM-PAYMENT         VALUE '3'.        
+00406              88  EX-CA-ADDITIONAL-PAYMENT       VALUE '4'.        
+00407              88  EX-CA-CHARGABLE-EXPENSE        VALUE '5'.        
+00408              88  EX-CA-NON-CHARGEABLE-EXPENSE   VALUE '6'.        
+00409          16  EX-CA-TIMES-PRINTED             PIC S9(4)     COMP.  
+00410          16  EX-CA-PRINT-AT-HHMM             PIC S9(4)     COMP.  
+00411          16  EX-CA-PAYMENT-AMOUNT            PIC S9(7)V99  COMP-3.
+00412          16  EX-CA-CHECK-WRITTEN-DATE        PIC XX.              
+00413          16  EX-CA-CHECK-BY-USER             PIC X(4).            
+00414          16  EX-CA-CERT-STATUS               PIC X.               
+00415          16  EX-CA-VOID-DT                   PIC XX.              
+00416          16  EX-CA-PAYEE-TYPE-CD             PIC XX.              
+00417          16  EX-CA-PMT-SELECT-DT             PIC XX.              
+00418          16  EX-CA-SYSTEM-IDENTIFIER         PIC XX.              
+00419              88  EX-CA-CR-CLAIM-PMT             VALUES 'CR' '  '. 
+00420              88  EX-CA-CV-CLAIM-PMT             VALUE  'CV'.      
+00421          16  FILLER                          PIC X(222).          
+00422                                                                   
+00423      12  EX-EXTRACT-D-RECORD-A  REDEFINES EX-DATA-AREAS.          
+00424          16  EX-DA-CLAIM-PREM-TYPE           PIC X.               
+00425              88  EX-DA-SINGLE-PREM              VALUE '1'.        
+00426              88  EX-DA-O-B-COVERAGE             VALUE '2'.        
+00427              88  EX-DA-OPEN-END-COVERAGE        VALUE '3'.        
+00428          16  EX-DA-PAYMENT-TYPE              PIC X.               
+00429              88  EX-DA-PARTIAL-PAYMENT          VALUE '1'.        
+00430              88  EX-DA-FINAL-PAYMENT            VALUE '2'.        
+00431              88  EX-DA-LUMP-SUM-PAYMENT         VALUE '3'.        
+00432              88  EX-DA-ADDITIONAL-PAYMENT       VALUE '4'.        
+00433              88  EX-DA-CHARGABLE-EXPENSE        VALUE '5'.        
+00434              88  EX-DA-NON-CHARGEABLE-EXPENSE   VALUE '6'.        
+00435          16  EX-DA-PAYMENT-AMOUNT            PIC S9(7)V99  COMP-3.
+00436          16  EX-DA-INTERVAL-MONTHS           PIC S9(4)     COMP.  
+00437          16  EX-DA-PAID-THRU-DT              PIC XX.              
+00438          16  EX-DA-CHECK-NUMBER              PIC X(7).            
+00439          16  EX-DA-SCHEDULE-END-DT           PIC XX.              
+00440          16  EX-DA-LAST-PAYMENT-TYPE         PIC X.               
+00441              88  EX-DA-FINAL                    VALUE 'F'.        
+00442              88  EX-DA-PARTIAL                  VALUE 'P'.        
+00443          16  EX-DA-INSURED-NAME              PIC X(30).           
+00444          16  EX-DA-COMPANY-NAME              PIC X(30).           
+00445          16  EX-DA-PRINT-OPTION              PIC X.               
+00446              88  EX-DA-HARDCOPY                 VALUE 'P'.        
+00447              88  EX-DA-FICHE-TAPE               VALUE 'F'.        
+00448              88  EX-DA-BOTH-MEDIA               VALUE 'B'.        
+00449              88  EX-DA-ONLINE                   VALUE 'S'.        
+00450              88  EX-DA-PRINT-AND-ONLINE         VALUE 'B'.        
+00451          16  EX-DA-FORMAT-OPTION             PIC X.               
+00452          16  EX-DA-PROCESS-OPTION            PIC X.               
+00453          16  EX-DA-TOTAL-OPTION              PIC X.               
+00454          16  EX-DA-ALPHA-DATE                PIC X(20).           
+00455                                                                   
+00456          16  EX-DA-ERROR-FLAG-AREA.                               
+00457              20  EX-DA-ERROR-FLAG            PIC X                
+00458                  OCCURS 10 TIMES.                                 
+00459                                                                   
+00460 *                ERROR                                            
+00461 *                 FLAG   MEANING                                  
+00462 *                  1   PAYEE NOT SPECIFIED                        
+00463 *                  2   ADDRESS TRAILER NOT FOUND                  
+00464 *                  3   ACCOUNT NOT FOUND                          
+00465 *                  4   TRYING TO PAY PAST CANCEL DATE             
+00466                                                                   
+00467          16  EX-DA-PAID-THRU-TO              PIC X.               
+CSO            16  EX-DA-ACCT-NAME                 PIC X(30).           
+00468          16  FILLER                          PIC X(126).          
+00469                                                                   
+00470      12  EX-EXTRACT-D-RECORD-B  REDEFINES EX-DATA-AREAS.          
+00471          16  EX-DB-CLAIM-TYPE                PIC X.               
+00472          16  EX-DB-LETTER-ARCHIVE-NO         PIC S9(8)      COMP. 
+00473          16  EX-DB-STD-LETTER-FORM           PIC X(4).            
+00474          16  EX-DB-LETTER-SENT-DT            PIC XX.              
+00475          16  EX-DB-AUTO-RE-SEND-DT           PIC XX.              
+00476          16  EX-DB-RECORDED-BY               PIC X(4).            
+00477          16  EX-DB-ADDRESEE-TYPE             PIC X.               
+00478              88  EX-DB-INSURED-ADDRESS          VALUE 'I'.        
+00479              88  EX-DB-BENEFICIARY-ADDRESS      VALUE 'B'.        
+00480              88  EX-DB-ACCOUNT-ADDRESS          VALUE 'A'.        
+00481              88  EX-DB-PHYSICIAN-ADDRESS        VALUE 'P'.        
+00482              88  EX-DB-EMPLOYER-ADDRESS         VALUE 'E'.        
+00483              88  EX-DB-OTHER-ADDRESS-1          VALUE 'O'.        
+00484              88  EX-DB-OTHER-ADDRESS-2          VALUE 'Q'.        
+00485          16  EX-DB-REASON                    PIC X(70).           
+00486          16  EX-DB-INITIAL-PRINT-DT          PIC XX.              
+00487          16  EX-DB-OVERRIDE-L2               PIC X(2).            
+00488          16  FILLER                          PIC X(180).          
+00489                                                                   
+00490      12  EX-EXTRACT-D-RECORD-C  REDEFINES EX-DATA-AREAS.          
+00491          16  EX-DC-CLAIM-TYPE                PIC X.               
+00492          16  EX-DC-INCURRED-DT               PIC XX.              
+00493          16  EX-DC-FILE-ESTABLISH-DT         PIC XX.              
+00494          16  EX-DC-PAID-THRU-DT              PIC XX.              
+00495          16  EX-DC-LAST-MAINT-DT             PIC XX.              
+00496          16  EX-DC-RECORDED-BY               PIC X(4).            
+00497          16  EX-DC-MAINT-TYPE                PIC X.               
+00498              88  EX-DC-CLAIM-SET-UP             VALUE ' '.        
+00499              88  EX-DC-PAYMENT-MADE             VALUE '1'.        
+00500              88  EX-DC-LETTER-SENT              VALUE '2'.        
+00501              88  EX-DC-MASTER-WAS-ALTERED       VALUE '3'.        
+00502              88  EX-DC-MASTER-WAS-RESTORED      VALUE '4'.        
+00503              88  EX-DC-INCURRED-DATE-CHANGED    VALUE '5'.        
+00504              88  EX-DC-FILE-CONVERTED           VALUE '6'.        
+00505          16  EX-DC-OVERRIDE-L2               PIC X(2).            
+00506          16  EX-DC-INSURED-LAST-NAME         PIC X(15).           
+00507          16  EX-DC-INSURED-FIRST-NAME        PIC X(12).           
+00508          16  EX-DC-INSURED-MID-INIT          PIC X.               
+00509          16  EX-DC-CREDIT-CARD-NO            PIC X(20).           
+00510          16  FILLER                          PIC X(208).          
+00511                                                                   
+00512      12  EX-EXTRACT-D-RECORD-D  REDEFINES EX-DATA-AREAS.          
+00513          16  EX-DD-CLAIM-TYPE                PIC X.               
+00514          16  EX-DD-INCURRED-DT               PIC XX.              
+00515          16  EX-DD-FILE-ESTABLISH-DT         PIC XX.              
+00516          16  EX-DD-PAID-THRU-DT              PIC XX.              
+00517          16  EX-DD-LAST-MAINT-DT             PIC XX.              
+00518          16  EX-DD-RECORDED-BY               PIC X(4).            
+00519          16  EX-DD-MAINT-TYPE                PIC X.               
+00520              88  EX-DD-CLAIM-SET-UP             VALUE ' '.        
+00521              88  EX-DD-PAYMENT-MADE             VALUE '1'.        
+00522              88  EX-DD-LETTER-SENT              VALUE '2'.        
+00523              88  EX-DD-MASTER-WAS-ALTERED       VALUE '3'.        
+00524              88  EX-DD-MASTER-WAS-RESTORED      VALUE '4'.        
+00525              88  EX-DD-INCURRED-DATE-CHANGED    VALUE '5'.        
+00526              88  EX-DD-FILE-CONVERTED           VALUE '6'.        
+00527          16  EX-DD-CLAIM-PURGED-SW           PIC X.               
+00528              88  EX-DD-CLAIM-PURGED             VALUE ' '.        
+00529          16  EX-DD-OVERRIDE-L2               PIC X(2).            
+00530          16  EX-DD-INSURED-LAST-NAME         PIC X(15).           
+00531          16  EX-DD-ACCOUNT.                                       
+00532              20  EX-DD-ACCOUNT-PREFIX        PIC X(04).           
+00533              20  EX-DD-ACCOUNT-PRIME         PIC X(06).           
+00534          16  EX-DD-INSURED-FIRST-NAME        PIC X(12).           
+00535          16  FILLER                          PIC X(218).          
+00536                                                                   
+00537      12  EX-EXTRACT-D-RECORD-E  REDEFINES EX-DATA-AREAS.          
+00538          16  EX-DE-CERT-NO                   PIC X(11).           
+00539          16  EX-DE-CLAIM-NO                  PIC X(7).            
+00540          16  EX-DE-CLAIM-TYPE                PIC X.               
+00541          16  EX-DE-CONTROL-NUMBER            PIC S9(8)      COMP. 
+00542          16  EX-DE-CLAIM-PREM-TYPE           PIC X.               
+00543              88  EX-DE-SINGLE-PREM              VALUE '1'.        
+00544              88  EX-DE-O-B-COVERAGE             VALUE '2'.        
+00545              88  EX-DE-OPEN-END-COVERAGE        VALUE '3'.        
+00546          16  EX-DE-PAYMENT-TYPE              PIC X.               
+00547              88  EX-DE-PARTIAL-PAYMENT          VALUE '1'.        
+00548              88  EX-DE-FINAL-PAYMENT            VALUE '2'.        
+00549              88  EX-DE-LUMP-SUM-PAYMENT         VALUE '3'.        
+00550              88  EX-DE-ADDITIONAL-PAYMENT       VALUE '4'.        
+00551              88  EX-DE-CHARGABLE-EXPENSE        VALUE '5'.        
+00552              88  EX-DE-NON-CHARGEABLE-EXPENSE   VALUE '6'.        
+00553          16  EX-DE-TIMES-PRINTED             PIC S9(4)     COMP.  
+00554          16  EX-DE-PRINT-AT-HHMM             PIC S9(4)     COMP.  
+00555          16  EX-DE-PAYMENT-AMOUNT            PIC S9(7)V99  COMP-3.
+00556          16  EX-DE-CHECK-WRITTEN-DATE        PIC XX.              
+00557          16  EX-DE-CHECK-BY-USER             PIC X(4).            
+00558          16  EX-DE-OVERRIDE-L2               PIC X(2).            
+00559          16  EX-DE-CHECK-NO                  PIC X(07).           
+00560          16  FILLER                          PIC X(223).          
+00561                                                                   
+00562      12  EX-EXTRACT-D-RECORD-F  REDEFINES EX-DATA-AREAS.          
+00563          16  EX-DF-CLAIM-TYPE                PIC X.               
+00564          16  EX-DF-INCURRED-DT               PIC XX.              
+00565          16  EX-DF-FILE-ESTABLISH-DT         PIC XX.              
+00566          16  EX-DF-PAID-THRU-DT              PIC XX.              
+00567          16  EX-DF-LAST-MAINT-DT             PIC XX.              
+00568          16  EX-DF-RECORDED-BY               PIC X(4).            
+00569          16  EX-DF-FATAL-ERROR-CNT           PIC S9(4)      COMP. 
+00570          16  EX-DF-FORCABLE-ERROR-CNT        PIC S9(4)      COMP. 
+00571          16  EX-DF-MAINT-TYPE                PIC X.               
+00572              88  EX-DF-CLAIM-SET-UP             VALUE ' '.        
+00573              88  EX-DF-PAYMENT-MADE             VALUE '1'.        
+00574              88  EX-DF-LETTER-SENT              VALUE '2'.        
+00575              88  EX-DF-MASTER-WAS-ALTERED       VALUE '3'.        
+00576              88  EX-DF-MASTER-WAS-RESTORED      VALUE '4'.        
+00577              88  EX-DF-INCURRED-DATE-CHANGED    VALUE '5'.        
+00578              88  EX-DF-FILE-CONVERTED           VALUE '6'.        
+00579          16  EX-DF-OVERRIDE-L2               PIC X(2).            
+00580          16  FILLER                  PIC X(252).                  
+00581                                                                   
+00582      12  EX-EXTRACT-D-RECORD-G  REDEFINES EX-DATA-AREAS.          
+00583          16  EX-DG-CLAIM-TYPE                PIC X.               
+00584          16  EX-DG-INSURED-LAST-NAME         PIC X(18).           
+00585          16  EX-DG-FILE-LOCATION             PIC X(4).            
+00586          16  EX-DG-INCURRED-DT               PIC XX.              
+00587          16  EX-DG-RECORDED-BY               PIC X(4).            
+00588          16  EX-DG-TEXT-LINE-1.                                   
+00589              20  FILLER                      PIC X(12).           
+00590              20  EX-DG-LETTER-SENT-DT        PIC X(8).            
+00591              20  FILLER                      PIC X(4).            
+00592              20  EX-DG-ADRESSEE-NAME         PIC X(30).           
+00593              20  FILLER                      PIC X.               
+00594              20  EX-DG-ADRESSEE-TYPE         PIC X(11).           
+00595              20  FILLER                      PIC X(4).            
+00596                                                                   
+00597          16  EX-DG-TEXT-LINE-2               PIC X(80).           
+00598          16  EX-DG-OVERRIDE-L2               PIC X(2).            
+00599          16  FILLER                          PIC X(91).           
+00600                                                                   
+00601      12  EX-EXTRACT-D-RECORD-H  REDEFINES EX-DATA-AREAS.          
+00602          16  EX-DH-CLAIM-TYPE                PIC X.               
+00603          16  EX-DH-TRLR-SEQ-NO               PIC S9(4)      COMP. 
+00604          16  EX-DH-CLAIM-PREM-TYPE           PIC X.               
+00605              88  EX-DH-SINGLE-PREM              VALUE '1'.        
+00606              88  EX-DH-O-B-COVERAGE             VALUE '2'.        
+00607              88  EX-DH-OPEN-END-COVERAGE        VALUE '3'.        
+00608          16  EX-DH-PAYMENT-TYPE              PIC X.               
+00609              88  EX-DH-PARTIAL-PAYMENT          VALUE '1'.        
+00610              88  EX-DH-FINAL-PAYMENT            VALUE '2'.        
+00611              88  EX-DH-LUMP-SUM-PAYMENT         VALUE '3'.        
+00612              88  EX-DH-ADDITIONAL-PAYMENT       VALUE '4'.        
+00613              88  EX-DH-CHARGABLE-EXPENSE        VALUE '5'.        
+00614              88  EX-DH-NON-CHARGEABLE-EXPENSE   VALUE '6'.        
+00615          16  EX-DH-PAYMENT-AMOUNT            PIC S9(7)V99  COMP-3.
+00616          16  EX-DH-CHECK-WRITTEN-DATE        PIC XX.              
+00617          16  EX-DH-CHECK-BY-USER             PIC X(4).            
+00618          16  FILLER                          PIC X(256).          
+00619                                                                   
+00620      12  EX-EXTRACT-D-RECORD-I  REDEFINES EX-DATA-AREAS.          
+00621          16  EX-DI-CLAIM-TYPE                PIC X.               
+00622          16  EX-DI-LETTER-ARCHIVE-NO         PIC S9(8)      COMP. 
+00623          16  EX-DI-STD-LETTER-FORM           PIC X(4).            
+00624          16  EX-DI-LETTER-SENT-DT            PIC XX.              
+00625          16  EX-DI-AUTO-RE-SEND-DT           PIC XX.              
+00626          16  EX-DI-INITIAL-PRINT-DT          PIC XX.              
+00627          16  EX-DI-RESEND-PRINT-DT           PIC XX.              
+00628          16  EX-DI-LETTER-ANSWERED-DT        PIC XX.              
+00629          16  EX-DI-LETTER-ORIGIN             PIC X.               
+00630          16  EX-DI-RECORDED-BY               PIC X(4).            
+00631          16  EX-DI-INSURED-LAST-NAME         PIC X(20).           
+00632          16  EX-DI-ADDRESEE-NAME             PIC X(30).           
+00633          16  EX-DI-ADDRESEE-TYPE             PIC X.               
+00634              88  EX-DI-INSURED-ADDRESS          VALUE 'I'.        
+00635              88  EX-DI-BENEFICIARY-ADDRESS      VALUE 'B'.        
+00636              88  EX-DI-ACCOUNT-ADDRESS          VALUE 'A'.        
+00637              88  EX-DI-PHYSICIAN-ADDRESS        VALUE 'P'.        
+00638              88  EX-DI-EMPLOYER-ADDRESS         VALUE 'E'.        
+00639              88  EX-DI-OTHER-ADDRESS-1          VALUE 'O'.        
+00640              88  EX-DI-OTHER-ADDRESS-2          VALUE 'Q'.        
+00641          16  EX-DI-REASON                    PIC X(70).           
+00642          16  EX-DI-CORR-SOL-UNSOL            PIC X.               
+00643              88  EX-DI-CORR-SOL           VALUE 'S'.              
+00644              88  EX-DI-CORR-UNSOL         VALUE 'U'.              
+00645          16  FILLER                          PIC X(126).          
+00646                                                                   
+00647      12  EX-EXTRACT-D-RECORD-J  REDEFINES EX-DATA-AREAS.          
+00648          16  EX-DJ-ACTIVITY-CODE             PIC XX.              
+00649          16  EX-DJ-CARRIER                   PIC X.               
+00650          16  EX-DJ-STATE                     PIC XX.              
+00651          16  EX-DJ-CERT-NO                   PIC X(11).           
+00652          16  EX-DJ-INSURED-NAME              PIC X(15).           
+00653          16  EX-DJ-LAST-DATE                 PIC XX.              
+00654          16  FILLER                          PIC X(239).          
+00655                                                                   
+00656      12  EX-EXTRACT-D-RECORD-K  REDEFINES EX-DATA-AREAS.          
+00657          16  EX-DK-CARRIER                   PIC X.               
+00658          16  EX-DK-STATE                     PIC XX.              
+00659          16  EX-DK-CERT-NO                   PIC X(11).           
+00660          16  EX-DK-CLAIM-NO                  PIC X(7).            
+00661          16  EX-DK-INSURED-NAME              PIC X(15).           
+00662          16  EX-DK-LAST-DATE                 PIC XX.              
+00663          16  FILLER                          PIC X(234).          
+00664                                                                   
+00665      12  EX-EXTRACT-D-RECORD-L  REDEFINES EX-DATA-AREAS.          
+00666          16  EX-DL-CARRIER                   PIC X.               
+00667          16  EX-DL-CLAIM-NO                  PIC X(7).            
+00668          16  EX-DL-FIRST-NAME                PIC X(12).           
+00669          16  EX-DL-ESTABLISH-DT              PIC XX.              
+00670          16  EX-DL-PROCESSOR-ID              PIC X(4).            
+00671          16  EX-DL-LAST-MAINT-DT             PIC XX.              
+00672          16  EX-DL-LAST-MAINT-TYPE           PIC X.               
+00673          16  FILLER                          PIC X(243).          
+00674                                                                   
+00675      12  EX-EXTRACT-E-RECORD-A  REDEFINES EX-DATA-AREAS.          
+00676          16  EX-EA-CLAIM-TYPE                PIC X.               
+00677          16  EX-EA-LETTER-ARCHIVE-NO         PIC S9(8)      COMP. 
+00678          16  EX-EA-STD-LETTER-FORM           PIC X(4).            
+00679          16  EX-EA-LETTER-SENT-DT            PIC XX.              
+00680          16  EX-EA-AUTO-RE-SEND-DT           PIC XX.              
+00681          16  EX-EA-INITIAL-PRINT-DT          PIC XX.              
+00682          16  EX-EA-RESEND-PRINT-DT           PIC XX.              
+00683          16  EX-EA-LETTER-ANSWERED-DT        PIC XX.              
+00684          16  EX-EA-LETTER-ORIGIN             PIC X.               
+00685          16  EX-EA-RECORDED-BY               PIC X(4).            
+00686          16  EX-EA-INSURED-LAST-NAME         PIC X(20).           
+00687          16  EX-EA-ADDRESEE-NAME             PIC X(30).           
+00688          16  EX-EA-ADDRESEE-TYPE             PIC X.               
+00689              88  EX-EA-INSURED-ADDRESS          VALUE 'I'.        
+00690              88  EX-EA-BENEFICIARY-ADDRESS      VALUE 'B'.        
+00691              88  EX-EA-ACCOUNT-ADDRESS          VALUE 'A'.        
+00692              88  EX-EA-PHYSICIAN-ADDRESS        VALUE 'P'.        
+00693              88  EX-EA-EMPLOYER-ADDRESS         VALUE 'E'.        
+00694              88  EX-EA-OTHER-ADDRESS-1          VALUE 'O'.        
+00695              88  EX-EA-OTHER-ADDRESS-2          VALUE 'Q'.        
+00696          16  EX-EA-REASON                    PIC X(70).           
+00697                                                                   
+00698          16  EX-EA-CREDIT-CARD-NUMBER        PIC X(19).           
+00699          16  EX-EA-INCURRED-DT               PIC XX.              
+00700          16  EX-EA-BENEFICIARY               PIC X(10).           
+00701          16  EX-EA-FIRST-NAME                PIC X(10).           
+00702          16  EX-EA-FIRST-INIT                PIC X.               
+00703          16  EX-EA-CORR-TRLR-SEQ             PIC S9(4)   COMP.    
+00704          16  EX-EA-FAX-NUM                   PIC 9(11)   COMP-3.  
+00705          16  EX-EA-PHONE-NUM                 PIC 9(11)   COMP-3.  
+00706          16  EX-EA-FROM                      PIC X(30).           
+00707          16  EX-EA-DEPT                      PIC X(30).           
+00708          16  EX-EA-OUTPUT-TYPE               PIC X.               
+00709              88  EX-EA-FAX-OUTPUT               VALUE 'F'.        
+00710              88  EX-EA-PRINT-OUTPUT             VALUE 'P' ' '.    
+00711                                                                   
+00712          16  FILLER                          PIC X(10).           
+00713                                                                   
+00714      12  EX-EXTRACT-F-RECORD-A  REDEFINES  EX-DATA-AREAS.         
+00715          16  EX-FA-INSURED-NAME              PIC X(30).           
+00716          16  EX-FA-ACCOUNT-NAME              PIC X(30).           
+00717          16  EX-FA-INSURED-BIRTH-DT          PIC XX.              
+00718          16  EX-FA-INSURED-SEX-CD            PIC X.               
+00719          16  EX-FA-INSURED-OCC-CD            PIC XX.              
+00720          16  EX-FA-SOC-SEC-NO                PIC X(11).           
+00721          16  EX-FA-PROCESSOR-ID              PIC X(4).            
+00722                                                                   
+00723          16  EX-FA-PROCESSING-INFO.                               
+00724              20  EX-FA-CLAIM-STATUS         PIC X.                
+00725                  88  EX-FA-CLAIM-IS-OPEN          VALUE 'O'.      
+00726                  88  EX-FA-CLAIM-IS-CLOSED        VALUE 'C'.      
+00727              20  EX-FA-CLAIM-TYPE           PIC X.                
+00728                  88  EX-FA-AH-CLAIM               VALUE 'A'.      
+00729                  88  EX-FA-LIFE-CLAIM             VALUE 'L'.      
+00730              20  EX-FA-CLAIM-PREM-TYPE      PIC X.                
+00731                  88  EX-FA-SINGLE-PREMIUM         VALUE '1'.      
+00732                  88  EX-FA-O-B-COVERAGE           VALUE '2'.      
+00733                  88  EX-FA-OPEN-END-COVERAGE      VALUE '3'.      
+00734              20  EX-FA-INCURRED-DT          PIC XX.               
+00735              20  EX-FA-REPORTED-DT          PIC XX.               
+00736              20  EX-FA-FILE-ESTABLISH-DT    PIC XX.               
+00737              20  EX-FA-EST-END-OF-DISAB-DT  PIC XX.               
+00738              20  EX-FA-LAST-PMT-DT          PIC XX.               
+00739              20  EX-FA-LAST-PMT-AMT         PIC S9(7)V99  COMP-3. 
+00740              20  EX-FA-PAID-THRU-DT         PIC XX.               
+00741              20  EX-FA-TOTAL-PAID-AMT       PIC S9(7)V99  COMP-3. 
+00742              20  EX-FA-NO-OF-PMTS-MADE      PIC S9(3)     COMP-3. 
+00743              20  EX-FA-NO-OF-DAYS-PAID      PIC S9(4)     COMP.   
+00744              20  EX-FA-PMT-CALC-METHOD      PIC X.                
+00745                  88  EX-FA-360-DAY-YR          VALUE '1'.         
+00746                  88  EX-FA-365-DAY-YR          VALUE '2'.         
+00747                  88  EX-FA-FULL-MONTHS         VALUE '3'.         
+00748              20  EX-FA-CAUSE-CD             PIC X(6).             
+00749              20  EX-FA-DIAGNOSIS-DESCRIP    PIC X(26).            
+00750              20  EX-FA-LAST-REOPEN-DT       PIC XX.               
+00751              20  EX-FA-LAST-CLOSE-DT        PIC XX.               
+00752              20  EX-FA-LAST-CLOSE-REASON    PIC X.                
+00753                  88  EX-FA-FINAL-PAID             VALUE '1'.      
+00754                  88  EX-FA-CLAIM-DENIED           VALUE '2'.      
+00755                  88  EX-FA-AUTO-CLOSE             VALUE '3'.      
+00756                                                                   
+00757          16  EX-FA-CERTIFICATE-DATA.                              
+00758              20  EX-FA-CERT-ORIGIN          PIC X.                
+00759                  88  EX-FA-CERT-WAS-ONLINE        VALUE '1'.      
+00760                  88  EX-FA-CERT-WAS-CREATED       VALUE '2'.      
+00761                  88  EX-FA-COVERAGE-WAS-ADDED     VALUE '3'.      
+00762                                                                   
+00763          16  EX-FA-STATUS-CONTROLS.                               
+00764              20  EX-FA-PRIORITY-CD          PIC X.                
+00765                  88  EX-FA-HIGHEST-PRIORITY       VALUE '9'.      
+00766              20  EX-FA-SUPV-ATTN-CD         PIC X.                
+00767                  88  EX-FA-SUPV-NOT-REQUIRED      VALUE ' ' 'N'.  
+00768                  88  EX-FA-SUPV-IS-REQUIRED       VALUE 'Y'.      
+00769              20  EX-FA-PURGED-DT            PIC XX.               
+00770              20  EX-FA-RESTORED-DT          PIC XX.               
+00771              20  EX-FA-NEXT-AUTO-PAY-DT     PIC XX.               
+00772              20  EX-FA-NEXT-RESEND-DT       PIC XX.               
+00773              20  EX-FA-NEXT-FOLLOWUP-DT     PIC XX.               
+00774              20  FILLER                     PIC XX.               
+00775              20  EX-FA-LAST-MAINT-DT        PIC XX.               
+00776              20  EX-FA-LAST-MAINT-USER      PIC X(4).             
+00777              20  EX-FA-LAST-MAINT-HHMMSS    PIC S9(6)     COMP-3. 
+00778              20  EX-FA-LAST-MAINT-TYPE      PIC X.                
+00779                  88  EX-FA-CLAIM-SET-UP           VALUE ' '.      
+00780                  88  EX-FA-PAYMENT-MADE           VALUE '1'.      
+00781                  88  EX-FA-LETTER-SENT            VALUE '2'.      
+00782                  88  EX-FA-MASTER-WAS-ALTERED     VALUE '3'.      
+00783                  88  EX-FA-MASTER-WAS-RESTORED    VALUE '4'.      
+00784                  88  EX-FA-INCURRED-DATE-CHANGED  VALUE '5'.      
+00785                  88  EX-FA-FILE-CONVERTED         VALUE '6'.      
+00786              20  EX-FA-RELATED-CLAIM-NO     PIC X(7).             
+00787              20  EX-FA-HISTORY-ARCHIVE-DT   PIC XX.               
+00788                                                                   
+00789          16  EX-FA-TRAILER-CONTROLS.                              
+00790              20  EX-FA-TRAILER-SEQ-CNT      PIC S9(4)     COMP.   
+00791                  88  EX-FA-1ST-TRL-AVAIL       VALUE +4095.       
+00792                  88  EX-FA-LAST-TRL-AVAIL      VALUE +100.        
+00793                  88  EX-FA-RESV-EXP-HIST-TRLR  VALUE +0.          
+00794              20  EX-FA-LAST-INC-DT-CHANGE   PIC S9(4)     COMP.   
+00795              20  FILLER                     PIC XX.               
+00796              20  EX-FA-AUTO-PAY-SEQ         PIC S9(4)     COMP.   
+00797              20  EX-FA-ACCOUNT-ADDR-CNT     PIC S9.               
+00798                  88  EX-FA-ACCOUNT-IS-ONLINE  VALUE ZERO.         
+00799                                                                   
+00800          16  EX-FA-FILE-LOCATION            PIC X(4).             
+00801          16  EX-FA-BENEFICIARY              PIC X(10).            
+00802                                                                   
+00803          16  FILLER                         PIC X(67).            
+00804                                                                   
+00805      12  EX-EXTRACT-F-RECORD-B  REDEFINES  EX-DATA-AREAS.         
+00806          16  EX-FB-INSURED-NAME              PIC X(30).           
+00807          16  EX-FB-EFFECTIVE-DT              PIC XX.              
+00808          16  EX-FB-SSN                       PIC X(11).           
+00809          16  EX-FB-MEMBER-NO                 PIC X(12).           
+00810          16  EX-FB-INSURED-ISSUE-AGE         PIC 99.              
+00811          16  EX-FB-SPOUSE-ISSUE-AGE          PIC 99.              
+00812          16  EX-FB-INSURED-SEX               PIC X.               
+00813                                                                   
+00814          16  EX-FB-LIFE-DATA.                                     
+00815              20  EX-FB-LF-BENEFIT-CD        PIC XX.               
+00816              20  EX-FB-LF-ORIG-TERM         PIC S9(3)     COMP-3. 
+00817              20  EX-FB-LF-BENEFIT-AMT       PIC S9(9)V99  COMP-3. 
+00818              20  EX-FB-LF-PREMIUM-AMT       PIC S9(7)V99  COMP-3. 
+00819              20  EX-FB-LF-REMAINING-AMT     PIC S9(9)V99  COMP-3. 
+00820              20  EX-FB-LF-ITD-CANCEL-AMT    PIC S9(5)V99  COMP-3. 
+00821              20  EX-FB-LF-ITD-DEATH-AMT     PIC S9(7)V99  COMP-3. 
+00822              20  EX-FB-LF-DEV-CODE          PIC XXX.              
+00823                                                                   
+00824          16  EX-FB-AH-DATA.                                       
+00825              20  EX-FB-AH-BENEFIT-CD        PIC XX.               
+00826              20  EX-FB-AH-ORIG-TERM         PIC S9(3)     COMP-3. 
+00827              20  EX-FB-AH-BENEFIT-AMT       PIC S9(9)V99  COMP-3. 
+00828              20  EX-FB-AH-PREMIUM-AMT       PIC S9(7)V99  COMP-3. 
+00829              20  EX-FB-AH-ITD-CANCEL-AMT    PIC S9(5)V99  COMP-3. 
+00830              20  EX-FB-AH-ITD-LUMP-PMT      PIC S9(7)V99  COMP-3. 
+00831              20  EX-FB-AH-DEV-CODE          PIC XXX.              
+00832                                                                   
+00833          16  EX-FB-LOAN-INFORMATION.                              
+00834              20  EX-FB-LOAN-APR             PIC S999V9999 COMP-3. 
+00835              20  EX-FB-PAY-FREQUENCY        PIC S99.              
+00836              20  EX-FB-LOAN-TERM            PIC S999      COMP-3. 
+00837              20  EX-FB-RATE-CLASS           PIC XX.               
+00838              20  EX-FB-POLICY-FORM-NO       PIC X(12).            
+00839                                                                   
+00840              20  EX-FB-PREMIUM-TYPE         PIC X.                
+00841                  88  EX-FB-SING-PRM            VALUE '1'.         
+00842                  88  EX-FB-O-B-COVERAGE        VALUE '2'.         
+00843                  88  EX-FB-OPEN-END            VALUE '3'.         
+00844              20  EX-FB-IND-GRP-TYPE         PIC X.                
+00845                  88  EX-FB-INDIVIDUAL          VALUE 'I'.         
+00846                  88  EX-FB-GROUP               VALUE 'G'.         
+00847              20  EX-FB-SKIP-CODE            PIC X.                
+00848                  88  NO-MONTHS-SKIPPED      VALUE SPACE.          
+00849                  88  SKIP-JULY              VALUE '1'.            
+00850                  88  SKIP-AUGUST            VALUE '2'.            
+00851                  88  SKIP-SEPTEMBER         VALUE '3'.            
+00852                  88  SKIP-JULY-AUG          VALUE '4'.            
+00853                  88  SKIP-AUG-SEPT          VALUE '5'.            
+00854                  88  SKIP-JULY-AUG-SEPT     VALUE '6'.            
+00855              20  EX-FB-PAYMENT-MODE         PIC X.                
+00856                  88  PAY-MONTHLY            VALUE SPACE.          
+00857                  88  PAY-WEEKLY             VALUE '1'.            
+00858                  88  PAY-SEMI-MONTHLY       VALUE '2'.            
+00859                  88  PAY-BI-WEEKLY          VALUE '3'.            
+00860                  88  PAY-SEMI-ANUALLY       VALUE '4'.            
+00861                                                                   
+00862              20  EX-FB-LOAN-NUMBER          PIC X(8).             
+00863              20  EX-FB-LOAN-BALANCE         PIC S9(7)V99  COMP-3. 
+00864                                                                   
+00865              20  EX-FB-REIN-TABLE           PIC X(3).             
+00866              20  EX-FB-SPECIAL-REIN-CODE    PIC X.                
+00867                                                                   
+00868          16  EX-FB-STATUS-DATA.                                   
+00869              20  EX-FB-AH-CANCEL-DT         PIC XX.               
+00870              20  EX-FB-LF-CANCEL-DT         PIC XX.               
+00871              20  EX-FB-AH-SETTLEMENT-DT     PIC XX.               
+00872              20  EX-FB-LF-DEATH-DT          PIC XX.               
+00873              20  EX-FB-ENTRY-DT             PIC XX.               
+00874              20  EX-FB-AH-CANCEL-EXIT-DT    PIC XX.               
+00875              20  EX-FB-AH-SETTLEMENT-EXIT-DT PIC XX.              
+00876              20  EX-FB-LF-CANCEL-EXIT-DT    PIC XX.               
+00877              20  EX-FB-LF-DEATH-EXIT-DT     PIC XX.               
+00878              20  EX-FB-LF-CURRENT-STATUS    PIC X.                
+00879                  88  EX-FB-LF-POLICY-IS-ACTIVE     VALUE '1' '2'  
+00880                                                  '3' '4' '5' '9'. 
+00881                  88  EX-FB-LF-NORMAL-ENTRY         VALUE '1'.     
+00882                  88  EX-FB-LF-POLICY-PENDING       VALUE '2'.     
+00883                  88  EX-FB-LF-POLICY-IS-RESTORE    VALUE '3'.     
+00884                  88  EX-FB-LF-CONVERSION-ENTRY     VALUE '4'.     
+00885                  88  EX-FB-LF-POLICY-IS-REISSUE    VALUE '5'.     
+00886                  88  EX-FB-LF-LUMP-SUM-DISAB       VALUE '6'.     
+00887                  88  EX-FB-LF-DEATH-CLAIM-APPLIED  VALUE '7'.     
+00888                  88  EX-FB-LF-CANCEL-APPLIED       VALUE '8'.     
+00889                  88  EX-FB-LF-IS-REIN-ONLY         VALUE '9'.     
+00890                  88  EX-FB-LF-POLICY-IS-DECLINED   VALUE 'D'.     
+00891                  88  EX-FB-LF-POLICY-IS-VOID       VALUE 'V'.     
+00892                                                                   
+00893              20  EX-FB-LF-STATUS-AT-DEATH   PIC X.                
+00894              20  EX-FB-LF-STATUS-AT-CANCEL  PIC X.                
+00895                                                                   
+00896              20  EX-FB-AH-CURRENT-STATUS    PIC X.                
+00897                  88  EX-FB-AH-POLICY-IS-ACTIVE     VALUE '1' '2'  
+00898                                                  '3' '4' '5' '9'. 
+00899                  88  EX-FB-AH-NORMAL-ENTRY         VALUE '1'.     
+00900                  88  EX-FB-AH-POLICY-PENDING       VALUE '2'.     
+00901                  88  EX-FB-AH-POLICY-IS-RESTORE    VALUE '3'.     
+00902                  88  EX-FB-AH-CONVERSION-ENTRY     VALUE '4'.     
+00903                  88  EX-FB-AH-POLICY-IS-REISSUE    VALUE '5'.     
+00904                  88  EX-FB-AH-LUMP-SUM-DISAB       VALUE '6'.     
+00905                  88  EX-FB-AH-DEATH-CLAIM-APPLIED  VALUE '7'.     
+00906                  88  EX-FB-AH-CANCEL-APPLIED       VALUE '8'.     
+00907                  88  EX-FB-AH-IS-REIN-ONLY         VALUE '9'.     
+00908                  88  EX-FB-AH-POLICY-IS-DECLINED   VALUE 'D'.     
+00909                  88  EX-FB-AH-POLICY-IS-VOID       VALUE 'V'.     
+00910                                                                   
+00911              20  EX-FB-AH-STATUS-AT-LUMP-SUM PIC X.               
+00912              20  EX-FB-AH-STATUS-AT-CANCEL   PIC X.               
+00913                                                                   
+00914              20  EX-FB-CLAIM-INTERFACE-SW  PIC X.                 
+00915                  88  EX-FB-NO-CLAIM-ATTACHED          VALUE SPACE.
+00916                  88  EX-FB-CERT-AND-CLAIM-ONLINE      VALUE '1'.  
+00917                  88  EX-FB-CERT-WAS-CREATED           VALUE '2'.  
+00918                                                                   
+00919              20  EX-FB-CLAIM-ATTACHED-COUNT PIC S9(4)       COMP. 
+00920                                                                   
+00921              20  EX-FB-ENTRY-BATCH          PIC X(6).             
+00922              20  EX-FB-LAST-MONTH-END       PIC XX.               
+00923                                                                   
+00924              20  EX-FB-AH-PAID-THRU-DT      PIC XX.               
+00925                  88  EX-FB-NO-AH-CLAIMS-PAID    VALUE LOW-VALUE.  
+00926                                                                   
+00927          16  EX-FB-CREDIT-INTERFACE-SW-1    PIC X.                
+00928              88  EX-FB-CERT-ADDED-BATCH           VALUE ' '.      
+00929              88  EX-FB-CERT-ADDED-ONLINE          VALUE '1'.      
+00930              88  EX-FB-CERT-PEND-ISSUE-ERROR      VALUE '2'.      
+00931              88  EX-FB-CERT-PURGED-OFFLINE        VALUE '3'.      
+00932          16  EX-FB-CREDIT-INTERFACE-SW-2    PIC X.                
+00933              88  EX-FB-CERT-AS-LOADED             VALUE ' '.      
+00934              88  EX-FB-CERT-CANCELLED-ONLINE      VALUE '1'.      
+00935              88  EX-FB-CERT-CLAIM-ONLINE          VALUE '2'.      
+00936              88  EX-FB-CERT-CLAIM-CANCEL-ONLINE   VALUE '3'.      
+00937              88  EX-FB-CERT-PEND-CANCEL-ERROR     VALUE '4'.      
+00938              88  EX-FB-CERT-PEND-CANCEL-VOID      VALUE '5'.      
+00939              88  EX-FB-CERT-PEND-CAN-VOID-ERROR   VALUE '6'.      
+00940                                                                   
+00941          16  EX-FB-ACCOUNT-COMM-PCTS.                             
+00942              20  EX-FB-LIFE-COMM-PCT        PIC SV9(5)    COMP-3. 
+00943              20  EX-FB-AH-COMM-PCT          PIC SV9(5)    COMP-3. 
+00944                                                                   
+00945          16  FILLER                         PIC X(64).            
+00946                                                                   
+00947      12  EX-EXTRACT-F-RECORD-C  REDEFINES  EX-DATA-AREAS.         
+00948          16  EX-FC-INSURED-NAME              PIC X(30).           
+00949          16  EX-FC-TRAILER-TYPE              PIC X.               
+00950              88  EX-FC-RESERVE-EXPENSE-TR         VALUE '1'.      
+00951              88  EX-FC-PAYMENT-TR                 VALUE '2'.      
+00952              88  EX-FC-AUTO-PAY-TR                VALUE '3'.      
+00953              88  EX-FC-CORRESPONDENCE-TR          VALUE '4'.      
+00954              88  EX-FC-ADDRESS-TR                 VALUE '5'.      
+00955              88  EX-FC-GENERAL-INFO-TR            VALUE '6'.      
+00956              88  EX-FC-AUTO-PROMPT-TR             VALUE '7'.      
+00957              88  EX-FC-DENIAL-TR                  VALUE '8'.      
+00958              88  EX-FC-INCURRED-CHG-TR            VALUE '9'.      
+00959              88  EX-FC-FORM-CONTROL-TR            VALUE 'A'.      
+00960          16  EX-FC-RECORDED-DT               PIC XX.              
+00961          16  EX-FC-RECORDED-BY               PIC X(4).            
+00962          16  EX-FC-LAST-MAINT-HHMMSS         PIC S9(6)    COMP-3. 
+00963          16  FILLER                          PIC X(66).           
+00964          16  EX-FC-TRAILER-BODY              PIC X(165).          
+00965                                                                   
+00966      12  EX-EXTRACT-G-RECORD-A  REDEFINES EX-DATA-AREAS.          
+00967          16  EX-GA-GENERAL-LEDGER-DATA       PIC X(272).          

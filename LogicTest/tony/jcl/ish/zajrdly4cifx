@@ -1,0 +1,80 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+ONRETCODE GT 11 GOTO END_JOB 
+
+#setenv cdte `date +%m%d`
+setenv cdte "0828"
+echo " cdte = " $cdte
+
+if ($EBMSYS != "tony") then
+   echo "Job aborting, not Tony"
+   exit 1
+endif
+
+################################################################################
+LABEL name=EL317CI
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ELACTQ' type='VS' filename='ELACTQ' disp='i-o' 
+ASSGNDD ddname='ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.WW.CLMINT.EXTR' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.EL317CI' disp='i-o' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/ZI.EX.FICH317CI' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='SYS021' filename='$SEQFILES/$cdte\_interest.freedom' disp='o' normal='k' abend='d' recfmt='F' recsize='400' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='EL317CIT' stepname='EL317CI' 
+
+################################################################################
+LABEL name=CPY317
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.EX.FICH317CI' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.FICH317CI' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY317' parm='ALL'
+
+#"smtp -f slunikix -t pema -s 'CLM INT RPT READY' -mf /apps/prod/cid1p/emails/$JOBNAME.txt"
+################################################################################
+
+################################################################################
+LABEL name=EL317CIAK
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ELACTQ' type='VS' filename='ELACTQ' disp='i-o' 
+ASSGNDD ddname='ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.WW.CLMINT.EXTR' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.EL317CI' disp='i-o' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/ZI.EX.FICH317CIAK' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='SYS021' filename='$SEQFILES/$cdte\_ak.interest.freedom' disp='o' normal='k' abend='d' recfmt='F' recsize='400' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='EL317CIAK' stepname='EL317CIAK' 
+
+################################################################################
+LABEL name=CPY317AK
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.EX.FICH317CIAK' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.FICH317CIAK' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY317AK' parm='ALL'
+
+#"smtp -f slunikix -t pema -s 'CLM INT RPT READY' -mf /apps/prod/cid1p/emails/$JOBNAME.txt"
+################################################################################
+LABEL name=ENDSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+#smtp -f slunikix -t jxsa,pema,djwb,sjma,jmsb,ksoa,lmpa,drfa -s 'CLM INT RPT READY' -mf $SEQFILES/CI.DL.CIADM.FICH317CI
+rm -f $JCLLIB/ftp-zajr317ci-tmp
+sed 's/\$cdte/$cdte/' < $JCLLIB/ftp-zajr317ci > $JCLLIB/ftp-zajr317ci-tmp
+ftp -n ntcso1 < $JCLLIB/ftp-zajr317ci-tmp
+!
+EXECPGM pgmname='BPXBATCH' stepname='ENDSTEP' parm='SH'
+
+ENDJOB 
+################################################################################

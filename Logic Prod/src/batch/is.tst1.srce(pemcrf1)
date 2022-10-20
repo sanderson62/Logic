@@ -1,0 +1,287 @@
+00001  IDENTIFICATION DIVISION.                                         10/08/97
+00003  PROGRAM-ID. PEMFIXCR.                                               LV002
+00007  AUTHOR.     PABLO                                                PEMFIXCR
+00010  DATE-COMPILED.                                                   PEMFIXCR
+00026  ENVIRONMENT DIVISION.                                            PEMFIXCR
+00027  INPUT-OUTPUT SECTION.                                            PEMFIXCR
+00028  FILE-CONTROL.                                                    PEMFIXCR
+00029                                                                   PEMFIXCR
+00031      SELECT  CERT-IN       ASSIGN TO CERTIN.                      PEMFIXCR
+00032      SELECT  CERT-OUT      ASSIGN TO CERTOT.                      PEMFIXCR
+00033  EJECT                                                            PEMFIXCR
+00034  DATA DIVISION.                                                   PEMFIXCR
+00035  FILE SECTION.                                                    PEMFIXCR
+00057                                                                   PEMFIXCR
+00058  FD  CERT-IN                                                      PEMFIXCR
+00059      RECORDING MODE F                                             PEMFIXCR
+00060      LABEL RECORDS STANDARD                                       PEMFIXCR
+00061      BLOCK CONTAINS 0 RECORDS.
+
+00063                              COPY ECSCRT01.                       PEMFIXCR
+00064                                                                   PEMFIXCR
+00065  FD  CERT-OUT                                                     PEMFIXCR
+00066      RECORDING MODE F                                             PEMFIXCR
+00067      LABEL RECORDS STANDARD                                       PEMFIXCR
+00068      BLOCK CONTAINS 0 RECORDS.
+00070  01  CERT-RECORD             PIC X(1056).                         PEMFIXCR
+00071  EJECT                                                            PEMFIXCR
+00072  WORKING-STORAGE SECTION.                                         PEMFIXCR
+00073  77  FILLER  PIC X(32) VALUE '********************************'.  PEMFIXCR
+00074  77  FILLER  PIC X(32) VALUE '   PEMFIXCR  WORKING-STORAGE    '.  PEMFIXCR
+00075  77  FILLER  PIC X(32) VALUE '********************************'.     CL**2
+
+       77  WS-EOF-SW               PIC X VALUE SPACES.
+           88  THERE-ARE-NO-MORE-RECORDS VALUE 'Y'.
+           88  THERE-ARE-MORE-RECORDS    VALUE ' '.
+       77  CERT-RECS-IN            PIC 9(9) VALUE ZEROS.
+       77  CERT-RECS-OUT           PIC 9(9) VALUE ZEROS.
+       77  CERT-RECS-FIX           PIC 9(9) VALUE ZEROS.
+       77  CERT-RECS-SKIP          PIC 9(9) VALUE ZEROS.
+       77  CERT-CO-FIX             PIC 9(9) VALUE ZEROS.
+00076                                                                   PEMFIXCR
+00077  PROCEDURE DIVISION.                                              PEMFIXCR
+00079                                                                   PEMFIXCR
+       0000-MAIN.
+
+           PERFORM 0400-OPEN-FILES THRU 0400-EXIT
+
+           PERFORM 0600-INITIALIZE THRU 0600-EXIT
+
+           PERFORM 0100-PROCESS-CERT THRU 0100-EXIT UNTIL
+                 THERE-ARE-NO-MORE-RECORDS
+
+           PERFORM 0500-CLOSE-FILES THRU 0500-EXIT
+
+           DISPLAY ' CERT RECORDS READ    ' CERT-RECS-IN
+           DISPLAY ' CERT RECORDS WRITTEN ' CERT-RECS-OUT
+           DISPLAY ' CERT RECORDS FIXED   ' CERT-RECS-FIX
+           DISPLAY ' CERT RECORDS SKIPPED ' CERT-RECS-SKIP
+           DISPLAY ' CERT RECORDS CO      ' CERT-CO-FIX
+           GOBACK
+
+           .
+       0100-PROCESS-CERT.
+
+PEMTST     IF (CR-STATE = 'AZ') AND
+PEMTST        (CR-ACCOUNT = '0000710600')
+PEMTST        DISPLAY ' CERT FIXED AZ ' CR-FULL-CONTROL
+PEMTST        MOVE '0000596100'        TO CR-COM-AGT (1)
+PEMTST        MOVE '0000713100'        TO CR-COM-AGT (2)
+PEMTST        MOVE '0000000000'        TO CR-COM-AGT (3)
+PEMTST        MOVE ' '                 TO CR-AGT-TYPE (3)
+PEMTST        MOVE 02                  TO CR-REMIT-TO
+PEMTST        ADD 1                    TO CERT-RECS-FIX
+PEMTST     END-IF
+
+PEMTST     IF (CR-STATE = 'IA') AND
+PEMTST        (CR-ACCOUNT = '000606509A' OR '000606513A') AND
+PEMTST        (CR-DT > 19980731)
+PEMTST        DISPLAY ' CERT FIXED IA ' CR-FULL-CONTROL
+PEMTST        MOVE '0000610400'        TO CR-COM-AGT (1)
+PEMTST        MOVE '0000843300'        TO CR-COM-AGT (2)
+PEMTST        MOVE '0000713100'        TO CR-COM-AGT (3)
+PEMTST        MOVE 03                  TO CR-REMIT-TO
+PEMTST        ADD 1                    TO CERT-RECS-FIX
+PEMTST     END-IF
+
+
+      *    IF CR-DT > 19991231
+      *       IF CR-STATE = 'AR' OR 'MT'
+      *          MOVE 'L130'           TO CR-MORT
+      *          ADD 1                 TO CERT-RECS-FIX
+      *       END-IF
+      *    END-IF
+
+      *    IF CR-DT > 19991231
+      *       IF CR-STATE = 'IL' OR 'OK'
+      *          MOVE 'L130'           TO CR-MORT
+      *          ADD 1                 TO CERT-RECS-FIX
+      *       ELSE
+      *        IF CR-STATE = 'NM'
+      *           MOVE 'L170'          TO CR-MORT
+      *           ADD 1                TO CERT-RECS-FIX
+      *        ELSE
+      *         IF CR-STATE = 'PA'
+      *            MOVE 'L180'         TO CR-MORT
+      *            ADD 1               TO CERT-RECS-FIX
+      *         END-IF
+      *        END-IF
+      *       END-IF
+      *    END-IF
+
+PEMTST*    IF (CR-STATE = 'CO') AND
+PEMTST*       (CR-ACCOUNT = '0000629900')
+PEMTST*       MOVE '0000017500'        TO CR-COM-AGT (1)
+PEMTST*       MOVE '0000713100'        TO CR-COM-AGT (4)
+PEMTST*       MOVE 04                  TO CR-REMIT-TO
+PEMTST*       ADD 1                    TO CERT-CO-FIX
+PEMTST*    END-IF
+PEMTST*
+PEMTST*    IF (CR-STATE = 'KS') AND
+PEMTST*       (CR-ACCOUNT = '0000434700' OR '0000543300' OR
+PEMTST*       '0000543400' OR '0000544500' OR '0000644200' OR
+PEMTST*       '0000644201' OR '0000646400')
+PEMTST*       MOVE '0000019580'        TO CR-COM-AGT (1)
+PEMTST*       MOVE '0000713100'        TO CR-COM-AGT (3)
+PEMTST*       MOVE 03                  TO CR-REMIT-TO
+PEMTST*       ADD 1                    TO CERT-RECS-FIX
+PEMTST*    ELSE
+PEMTST*       IF (CR-STATE = 'IA') AND
+PEMTST*          (CR-ACCOUNT = '0000677200')
+PEMTST*          MOVE '0000610400'     TO CR-COM-AGT (1)
+PEMTST*          MOVE '0000713100'     TO CR-COM-AGT (3)
+PEMTST*          MOVE 03               TO CR-REMIT-TO
+PEMTST*          ADD 1                 TO CERT-RECS-FIX
+PEMTST*       ELSE
+PEMTST*          IF (CR-STATE = 'IA') AND
+PEMTST*             (CR-ACCOUNT = '0000015141')
+PEMTST*             MOVE '0000610400'  TO CR-COM-AGT (1)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*          ELSE
+PEMTST*             IF (CR-STATE = 'NE') AND
+PEMTST*                (CR-ACCOUNT = '0000015140')
+PEMTST*                MOVE '0000015860'
+PEMTST*                                TO CR-COM-AGT (1)
+PEMTST*                ADD 1           TO CERT-RECS-FIX
+PEMTST*             END-IF
+PEMTST*          END-IF
+PEMTST*       END-IF
+PEMTST*    END-IF
+PEMTST*    IF (CR-ACCOUNT (1:8) = '00006065') AND
+PEMTST*       (CR-ACCOUNT (9:2) NOT = 'OB')
+PEMTST*       EVALUATE CR-STATE
+PEMTST*          WHEN 'IA'
+PEMTST*             MOVE '0000610400'  TO CR-COM-AGT (1)
+PEMTST*             MOVE '0000713100'  TO CR-COM-AGT (3)
+PEMTST*             ADD 1                 TO CERT-RECS-FIX
+PEMTST*          WHEN 'CO'
+PEMTST*             MOVE '0000017500'  TO CR-COM-AGT (1)
+PEMTST*             MOVE '0000713100'  TO CR-COM-AGT (3)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*          WHEN 'NE'
+PEMTST*             MOVE '0000015860'  TO CR-COM-AGT (1)
+PEMTST*             MOVE '0000713100'  TO CR-COM-AGT (3)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*          WHEN 'MO'
+PEMTST*             MOVE '0000610500'  TO CR-COM-AGT (1)
+PEMTST*             MOVE '0000713100'  TO CR-COM-AGT (3)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*          WHEN 'OK'
+PEMTST*             MOVE '0000490700'  TO CR-COM-AGT (1)
+PEMTST*             MOVE '0000713100'  TO CR-COM-AGT (3)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*          WHEN 'AZ'
+PEMTST*             MOVE '0000596100'  TO CR-COM-AGT (1)
+PEMTST*             MOVE '0000713100'  TO CR-COM-AGT (3)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*          WHEN 'IL'
+PEMTST*             MOVE '0000596200'  TO CR-COM-AGT (1)
+PEMTST*             MOVE '0000713100'  TO CR-COM-AGT (3)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*          WHEN 'IN'
+PEMTST*             MOVE '0000596300'  TO CR-COM-AGT (1)
+PEMTST*             MOVE '0000713100'  TO CR-COM-AGT (3)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*          WHEN 'SD'
+PEMTST*             MOVE '0000596500'  TO CR-COM-AGT (1)
+PEMTST*             MOVE '0000713100'  TO CR-COM-AGT (3)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*          WHEN 'KS'
+PEMTST*             MOVE '0000019580'  TO CR-COM-AGT (1)
+PEMTST*             MOVE '0000713100'  TO CR-COM-AGT (3)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*       END-EVALUATE
+PEMTST*    ELSE
+PEMTST*       IF (CR-STATE = 'AZ') AND
+PEMTST*          (CR-ACCOUNT = '0000710600')
+PEMTST*          MOVE '0000596100'     TO CR-COM-AGT (1)
+PEMTST*          MOVE '0000713100'     TO CR-COM-AGT (3)
+PEMTST*          ADD 1                 TO CERT-RECS-FIX
+PEMTST*       ELSE
+PEMTST*          IF (CR-STATE = 'CO') AND
+PEMTST*             (CR-ACCOUNT = '0000794500')
+PEMTST*             MOVE '0000017500'  TO CR-COM-AGT (1)
+PEMTST*             ADD 1              TO CERT-RECS-FIX
+PEMTST*          ELSE
+PEMTST*             IF (CR-STATE = 'IA') AND
+PEMTST*                (CR-ACCOUNT = '0000610401' OR '0000610402' OR
+PEMTST*                '0000610403' OR '0000610404' OR '0000610405' OR
+PEMTST*                '0000610406' OR '0000610407' OR '0000610408')
+PEMTST*                MOVE '0000610400'
+PEMTST*                                TO CR-COM-AGT (1)
+PEMTST*                MOVE '0000713100'
+PEMTST*                                TO CR-COM-AGT (3)
+PEMTST*                ADD 1           TO CERT-RECS-FIX
+PEMTST*             END-IF
+PEMTST*          END-IF
+PEMTST*       END-IF
+PEMTST*    END-IF
+
+           PERFORM 0300-WRITE-CERT THRU 0300-EXIT
+           PERFORM 0200-READ-CERT THRU 0200-EXIT
+
+           .
+
+       0100-EXIT.
+           EXIT.
+
+       0200-READ-CERT.
+
+           READ CERT-IN AT END
+                SET THERE-ARE-NO-MORE-RECORDS TO TRUE
+           END-READ
+
+           IF THERE-ARE-MORE-RECORDS
+              ADD 1 TO CERT-RECS-IN
+           END-IF
+
+           .
+
+       0200-EXIT.
+           EXIT.
+
+       0300-WRITE-CERT.
+
+      *    IF CR-CERT-NO = '000000TEST ' OR '000000TEST1' OR
+      *                    '000TESTREF ' OR '0TESTTESAR '
+           IF CR-CERT-NO = '000000TEST '
+              DISPLAY ' CERT DROPPED ' CR-FULL-CONTROL
+              ADD 1 TO CERT-RECS-SKIP
+           ELSE
+              WRITE CERT-RECORD FROM CERTIFICATE-RECORD
+              ADD 1 TO CERT-RECS-OUT
+           END-IF
+
+           .
+
+       0300-EXIT.
+           EXIT.
+
+       0400-OPEN-FILES.
+
+           OPEN INPUT CERT-IN
+               OUTPUT CERT-OUT
+
+           .
+
+       0400-EXIT.
+           EXIT.
+00085                                                                   PEMFIXCR
+       0500-CLOSE-FILES.
+
+           CLOSE CERT-IN CERT-OUT
+
+           .
+
+       0500-EXIT.
+           EXIT.
+00085                                                                   PEMFIXCR
+       0600-INITIALIZE.
+
+           PERFORM 0200-READ-CERT THRU 0200-EXIT
+
+           .
+
+       0600-EXIT.
+           EXIT.
+

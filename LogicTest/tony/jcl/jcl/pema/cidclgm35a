@@ -1,0 +1,72 @@
+################################################################################
+#                                                                              #
+#     JOB: cidclgm35a                                                          #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job aborting, not TEST"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+unikixbld -i -d ERRPTC
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=CIDBLDRPTC
+################################################################################
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERRPTC' type='VS' filename='ERRPTC' disp='i-o' 
+
+EXECPGM pgmname='CIDBLDRPTC' stepname='CIDBLDRPTC' 
+
+################################################################################
+LABEL name=CIRE020
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/DC.EX.FICH562' disp='i'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.EX.FICH562.TEMP' disp='o' normal='k' abend='k' recfmt='F' recsize='162'
+ASSGNDD ddname='ERRPTC' type='VS' filename='ERRPTC' disp='i-o' 
+
+EXECPGM pgmname='CIRE020' stepname='CIRE020' 
+
+################################################################################
+LABEL name=SORT562A
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/DC.EX.FICH562.TEMP' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/DC.EX.FICH562A.RPTCDE1' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 19 CHAR)
+	 ARRANGE=(30,133)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT562A'
+
+################################################################################
+LABEL name=COPY562A
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/DC.EX.FICH562A.RPTCDE1' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.DL.CIADM.FICH562.RPTCDE1' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='COPY562A' parm='ALL' 
+
+if ($JOBSTATUS == 0) then
+    echo " No print for this job "
+else
+    echo " Job aborted, print not released "
+endif
+
+
+ENDJOB 

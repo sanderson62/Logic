@@ -1,0 +1,45 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: CILGEXTR              Translated  : Wed Aug 23 12:31:16 2000        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+if ($EBMSYS != "tony") then
+   echo "Job aborting, not Tony"
+   exit 1
+endif
+
+#LIBDEF scope='JOB' type='PGM' lib='/slunikix/apps/prod/cid1p/exe/bat'
+
+################################################################################
+LABEL name=CPY323
+################################################################################
+ASSGNDD ddname='SYS010' filename='/slunikix/apps/prod/cid1p/sysout/sysoutdir/cilgextr/EL323/SYS008_117' disp='i'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.DL.CIADM.FICH323' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY323' parm='ALL'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/ZI.DL.CIADM.FICH323 $SEQFILES/EL323.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+if ($JOBSTATUS == 0) then
+    "uuencode $SEQFILES/EL323.pdf EL323.pdf|mailx -s 'EL323 Report Attached' -r 'slunikix@cso.com' ajra@cso.com"
+#     "/apps/test/tony/bin/exelprtony.sh l150prog.parms '-ode=AT' $SYSOUTDIR/$JOBNAME/PRTWORK2SP/SYS011_$JON"
+else
+	echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

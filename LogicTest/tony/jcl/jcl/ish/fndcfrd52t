@@ -1,0 +1,117 @@
+################################################################################
+#
+#  Job:  fndcfrd52
+#
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=FNB165 
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYS010' type='VS' filename='ERPYAJ' disp='i-o' 
+
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o'
+#  DOWNLOAD
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZN.DL.FX.DCCPYAJ' disp='o' normal='k' abend='d' 
+ASSGNDD ddname='SYS012' filename='\${SEQFILES}/ZN.DL.FX.CSIPYAJ' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='FNB165T' stepname='FNB165' parm='12232005_12272005' 
+
+################################################################################
+LABEL name=DCC170 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                     PRINT SUMMARY REPORT 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYS007' filename='\${SEQFILES}/ZNDCFRD52A' disp='o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZN.DL.FX.DCCPYAJ' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='DCC170' parm='DCCPYADJ'
+
+################################################################################
+LABEL name=CSI170 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                     PRINT SUMMARY REPORT 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYS007' filename='\${SEQFILES}/ZNDCFRD52B' disp='o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZN.DL.FX.CSIPYAJ' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='CSI170' parm='CSIPYADJ'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/ZNDCFRD52A' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=PRINT2 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/ZNDCFRD52B' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT2' 
+
+################################################################################
+LABEL name=COPY1
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR DCC pyaj 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/ZN.DL.FX.DCCPYAJ' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/TST_LPACPYAJ_12-27-05.DAT' disp='o' abend='d' normal='k' recsize='250' recfmt='F'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY1'
+
+################################################################################
+LABEL name=COPY2   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CSI pyaj 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/ZN.DL.FX.CSIPYAJ' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/CSIDCCPYAJ_12-27-05.DAT' disp='o' abend='d' normal='k' recsize='250' recfmt='F'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY2'   
+
+################################################################################
+
+ftp -n ntfree2 < /apps/prod/cid1p/jcl/ish/ftp-fndcfrd52t
+
+################################################################################
+
+#if ($JOBSTATUS == 0) then
+#     "exelpr.sh l133std.parms '-ode=DCCO' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+#     "exelpr.sh l133std.parms '-ode=DCCO' $SYSOUTDIR/$JOBNAME/PRINT2/SYSUT2_$JON"
+#else
+#   echo "job aborted print not released"
+#endif
+
+################################################################################
+
+
+ENDJOB
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#011604                 SMVA    ADD CLIENT ID/FILE ID PARM TO FNB170

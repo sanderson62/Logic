@@ -1,0 +1,268 @@
+00001 ***************************************************************** 04/15/98
+00002 *                                                               * ELCRAMTN
+00002 *                                                               * ELCRAMTN
+00003 *                            ELCRAMTN.                          *    LV002
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE               CL**2
+00005 *                            VMOD=2.008                         *    CL**2
+00006 *                                                               * ELCRAMTN
+00007 *             CALCULATE NET PAY REMAINING AMOUNT                * ELCRAMTN
+00008 *****************************************************************.ELCRAMTN
+00009                                                                   ELCRAMTN
+00010      MOVE NP-APR                 TO  ANNUAL-INT-RATE.             ELCRAMTN
+00011      MOVE NP-ORIG                TO  ORIGINAL-TERM.               ELCRAMTN
+00012      MOVE NP-REM                 TO  REMAINING-TERM.              ELCRAMTN
+00013                                                                   ELCRAMTN
+00014  1000-EDIT-DATA.                                                  ELCRAMTN
+00015      MOVE +0 TO FACTOR.                                           ELCRAMTN
+00016                                                                   ELCRAMTN
+00017      IF ANNUAL-INT-RATE = ZERO                                    ELCRAMTN
+00018          GO TO 9000-ERROR.                                        ELCRAMTN
+00019                                                                   ELCRAMTN
+00020      IF ORIGINAL-TERM  = ZERO OR                                  ELCRAMTN
+00021         REMAINING-TERM = ZERO                                     ELCRAMTN
+00022          GO TO 9500-RETURN.                                       ELCRAMTN
+00023                                                                   ELCRAMTN
+00024      IF NP-LOAN-TERM NOT NUMERIC                                  ELCRAMTN
+00025         MOVE +0 TO NP-LOAN-TERM.                                  ELCRAMTN
+00026                                                                   ELCRAMTN
+00027      IF NP-LOAN-TERM EQUAL +0                                     ELCRAMTN
+00028         MOVE ORIGINAL-TERM TO NP-LOAN-TERM.                       ELCRAMTN
+00029                                                                   ELCRAMTN
+00030      IF REMAINING-TERM GREATER ORIGINAL-TERM                      ELCRAMTN
+00031          GO TO 9000-ERROR.                                        ELCRAMTN
+00032                                                                   ELCRAMTN
+00033      IF ANNUAL-INT-RATE LESS THAN +3                              ELCRAMTN
+00034          COMPUTE ANNUAL-INT-RATE = ANNUAL-INT-RATE * +10.         ELCRAMTN
+00035      IF ANNUAL-INT-RATE LESS THAN +3                              ELCRAMTN
+00036          COMPUTE ANNUAL-INT-RATE = ANNUAL-INT-RATE * +10.         ELCRAMTN
+00037      IF ANNUAL-INT-RATE LESS THAN +3                              ELCRAMTN
+00038          COMPUTE ANNUAL-INT-RATE = ANNUAL-INT-RATE * +10.         ELCRAMTN
+00039                                                                   ELCRAMTN
+00040      IF NPO-SIMPLE                                                ELCRAMTN
+00041          MOVE 'S'                TO  NP-TYPE                      ELCRAMTN
+00042      ELSE                                                         ELCRAMTN
+00043          MOVE 'N'                TO  NP-TYPE.                     ELCRAMTN
+00044                                                                   ELCRAMTN
+00045      COMPUTE I ROUNDED = (ANNUAL-INT-RATE / K100) / K12.          ELCRAMTN
+00046                                                                   ELCRAMTN
+00047      COMPUTE V ROUNDED = K1 / (K1 + I).                           ELCRAMTN
+00048                                                                   ELCRAMTN
+00049      IF (NP-LOAN-TERM GREATER THAN NP-ORIG)                       ELCRAMTN
+00050                 AND                                               ELCRAMTN
+00051         (CP-TRUNCATED-LIFE OR CP-SPECIAL-CALC-CD = 'N')           ELCRAMTN
+00052          MOVE NP-LOAN-TERM TO MAX-X                               ELCRAMTN
+00053          COMPUTE REMAINING-TERM EQUAL REMAINING-TERM +            ELCRAMTN
+00054              (NP-LOAN-TERM - NP-ORIG)                             ELCRAMTN
+00055      ELSE                                                         ELCRAMTN
+00056          MOVE ORIGINAL-TERM TO MAX-X.                             ELCRAMTN
+00057                                                                   ELCRAMTN
+00058      COMPUTE X1 = MAX-X - ORIGINAL-TERM.                          ELCRAMTN
+00059                                                                   ELCRAMTN
+00060      MOVE B1 TO X1 SX.                                            ELCRAMTN
+00061      MOVE V TO VX  SV.                                            ELCRAMTN
+00062                                                                   ELCRAMTN
+00063      IF MAX-X = B1                                                ELCRAMTN
+00064          GO TO 1000-COMPUTE-REMAINING-FACTOR.                     ELCRAMTN
+00065                                                                   ELCRAMTN
+00066  1000-VX-LOOP.                                                    ELCRAMTN
+00067      COMPUTE VX ROUNDED = VX * V.                                 ELCRAMTN
+00068                                                                   ELCRAMTN
+00069      ADD B1 TO X1.                                                ELCRAMTN
+00070                                                                   ELCRAMTN
+00071      IF X1 = REMAINING-TERM                                       ELCRAMTN
+00072          MOVE VX TO SV.                                           ELCRAMTN
+00073                                                                   ELCRAMTN
+00074      IF X1 = X2                                                   ELCRAMTN
+00075          MOVE VX TO SX.                                           ELCRAMTN
+00076                                                                   ELCRAMTN
+00077      IF X1 NOT = MAX-X                                            ELCRAMTN
+00078          GO TO 1000-VX-LOOP.                                      ELCRAMTN
+00079                                                                   ELCRAMTN
+00080  1000-COMPUTE-REMAINING-FACTOR.                                   ELCRAMTN
+00081      COMPUTE WK1 = K1 - VX.                                       ELCRAMTN
+00082                                                                   ELCRAMTN
+00083      COMPUTE WK2 = K1 - SV.                                       ELCRAMTN
+00084                                                                   ELCRAMTN
+00085      IF CP-COMPANY-ID IS EQUAL TO 'NCL'       AND                 ELCRAMTN
+00086         CP-EARN-AS-NET-PAY                                        ELCRAMTN
+00087          GO TO 2100-CHECK-NCL-NET-PAY.                            ELCRAMTN
+00088                                                                   ELCRAMTN
+00089      IF CP-COMPANY-ID IS EQUAL TO 'NCL'                           ELCRAMTN
+00090         IF CP-SPECIAL-CALC-CD IS EQUAL TO 'N'                     ELCRAMTN
+00091             IF CP-LOAN-TERM IS GREATER THAN CP-ORIGINAL-TERM      ELCRAMTN
+00092                 GO TO 2100-NCL-NET-TRUNC                          ELCRAMTN
+00093             ELSE                                                  ELCRAMTN
+00094                 GO TO 2100-NCL-NET-PAY.                           ELCRAMTN
+00095                                                                   ELCRAMTN
+00096 *    IF CP-TRUNCATED-LIFE                                         ELCRAMTN
+00097 *        IF CP-LOAN-TERM = REMAINING-TERM                         ELCRAMTN
+00098 *            GO TO 2000-PREMIUM-RATE.                             ELCRAMTN
+00099                                                                   ELCRAMTN
+00100 *    IF NOT CP-TRUNCATED-LIFE                                     ELCRAMTN
+00101 *        IF ORIGINAL-TERM = REMAINING-TERM                        ELCRAMTN
+00102 *            GO TO 2000-PREMIUM-RATE.                             ELCRAMTN
+00103                                                                   ELCRAMTN
+00104      COMPUTE WK3 ROUNDED = (WK2 * K1000) / WK1.                   ELCRAMTN
+00105                                                                   ELCRAMTN
+00106      MOVE WK3 TO FACTOR.                                          ELCRAMTN
+00107                                                                   ELCRAMTN
+00108      GO TO 9500-RETURN.                                           ELCRAMTN
+00109                                                                   ELCRAMTN
+00110  2000-PREMIUM-RATE.                                               ELCRAMTN
+00111                                                                   ELCRAMTN
+00112      COMPUTE K-I = K1 + I                                         ELCRAMTN
+00113                                                                   ELCRAMTN
+00114      IF NPO-ALT OR NPO-TRUNC                                      ELCRAMTN
+00115          MOVE K1                 TO  K-I.                         ELCRAMTN
+00116                                                                   ELCRAMTN
+00117      IF NPO-2MO OR NPO-TRUNC-2                                    ELCRAMTN
+00118          COMPUTE K-I = K1 + (2 * I).                              ELCRAMTN
+00119                                                                   ELCRAMTN
+00120      COMPUTE RA ROUNDED = 1 -                                     ELCRAMTN
+00121          ((X2 * (X2 + 1)) /                                       ELCRAMTN
+00122           (MAX-X * (MAX-X + 1))).                                 ELCRAMTN
+00123                                                                   ELCRAMTN
+00124      IF NET-STD                                                   ELCRAMTN
+00125          COMPUTE WK3 ROUNDED =                                    ELCRAMTN
+00126              ((I * ORIGINAL-TERM) + VX - SX) * 2 * MAX-X          ELCRAMTN
+00127          COMPUTE WK3 ROUNDED =                                    ELCRAMTN
+00128              WK3 / (( 1 - VX) * ORIGINAL-TERM * I)                ELCRAMTN
+00129          COMPUTE WK3 ROUNDED =                                    ELCRAMTN
+00130              WK3 / ((2 * MAX-X) - ORIGINAL-TERM + 1)              ELCRAMTN
+00131          COMPUTE WK3 ROUNDED =                                    ELCRAMTN
+00132              WK3 * RA * K-I.                                      ELCRAMTN
+00133                                                                   ELCRAMTN
+00134      IF NET-SMP                                                   ELCRAMTN
+00135          COMPUTE N2 = MAX-X * MAX-X                               ELCRAMTN
+00136          COMPUTE N3 = N2 * MAX-X                                  ELCRAMTN
+00137          COMPUTE WK3 ROUNDED = 2 * N2 * WK1                       ELCRAMTN
+00138          COMPUTE WK3 ROUNDED = WK3 + (N3 * I) - (N2 * I)          ELCRAMTN
+00139          COMPUTE WK3 ROUNDED = WK3 + (4 * MAX-X * WK1)            ELCRAMTN
+00140          COMPUTE WK3 ROUNDED = WK3 * (1 + I) * 10                 ELCRAMTN
+00141          COMPUTE WK3 ROUNDED = WK3 / (36 * (MAX-X + 1) * WK1).    ELCRAMTN
+00142                                                                   ELCRAMTN
+00143      MOVE WK3                    TO  FACTOR.                      ELCRAMTN
+00144      GO TO 9500-RETURN.                                           ELCRAMTN
+00145                                                                   ELCRAMTN
+00146  2100-CHECK-NCL-NET-PAY.                                          ELCRAMTN
+00147                                                                   ELCRAMTN
+00148      IF CP-STATE-STD-ABBRV IS EQUAL TO 'MN'    AND                ELCRAMTN
+00149         CP-ORIGINAL-TERM IS GREATER THAN +63   AND                ELCRAMTN
+00150         CP-TRUNCATED-LIFE                                         ELCRAMTN
+00151          GO TO 2100-CHECK-MINN-TRUNC.                             ELCRAMTN
+00152                                                                   ELCRAMTN
+00153      IF CP-STATE-STD-ABBRV IS EQUAL TO 'MN' AND                   ELCRAMTN
+00154         CP-ORIGINAL-TERM IS GREATER THAN +63                      ELCRAMTN
+00155          GO TO 2100-CHECK-MINN.                                   ELCRAMTN
+00156                                                                   ELCRAMTN
+00157      IF CP-STATE-STD-ABBRV IS EQUAL TO 'MT'    AND                ELCRAMTN
+00158         CP-ORIGINAL-TERM IS GREATER THAN +63   AND                ELCRAMTN
+00159         CP-TRUNCATED-LIFE                                         ELCRAMTN
+00160          GO TO 2100-CHECK-MONTANA-TRUNC.                          ELCRAMTN
+00161                                                                   ELCRAMTN
+00162      IF CP-STATE-STD-ABBRV IS EQUAL TO 'MT' AND                   ELCRAMTN
+00163         CP-ORIGINAL-TERM IS GREATER THAN +63                      ELCRAMTN
+00164          GO TO 2100-CHECK-MONTANA.                                ELCRAMTN
+00165                                                                   ELCRAMTN
+00166      IF CP-TRUNCATED-LIFE                                         ELCRAMTN
+00167          GO TO 2100-NCL-NET-TRUNC.                                ELCRAMTN
+00168                                                                   ELCRAMTN
+00169  2100-NCL-NET-PAY.                                                ELCRAMTN
+00170                                                                   ELCRAMTN
+00171      COMPUTE ANGLEN = WK1 / I.                                    ELCRAMTN
+00172                                                                   ELCRAMTN
+00173      COMPUTE ANGLEU = WK2 / I.                                    ELCRAMTN
+00174                                                                   ELCRAMTN
+00175      COMPUTE ANGLEN1 = ANGLEN * ODF.                              ELCRAMTN
+00176                                                                   ELCRAMTN
+00177      COMPUTE FACTOR = (ANGLEU / ANGLEN1) * 1000.                  ELCRAMTN
+00178                                                                   ELCRAMTN
+00179      COMPUTE WS-REMAINING-AMT ROUNDED =                           ELCRAMTN
+00180          (CP-ORIGINAL-BENEFIT * ANGLEU) / ANGLEN1.                ELCRAMTN
+00181                                                                   ELCRAMTN
+00182      GO TO 9500-RETURN.                                           ELCRAMTN
+00183                                                                   ELCRAMTN
+00184  2100-NCL-NET-TRUNC.                                              ELCRAMTN
+00185                                                                   ELCRAMTN
+00186      COMPUTE ANGLEM = WK1 / I.                                    ELCRAMTN
+00187                                                                   ELCRAMTN
+00188      COMPUTE ANGLEU = WK2 / I.                                    ELCRAMTN
+00189                                                                   ELCRAMTN
+00190      COMPUTE ANGLEM1 = ANGLEM * ODF.                              ELCRAMTN
+00191                                                                   ELCRAMTN
+00192      COMPUTE FACTOR = (ANGLEU / ANGLEM1) * 1000.                  ELCRAMTN
+00193                                                                   ELCRAMTN
+00194      COMPUTE WS-REMAINING-AMT ROUNDED =                           ELCRAMTN
+00195          (CP-ORIGINAL-BENEFIT * ANGLEU) / ANGLEM1.                ELCRAMTN
+00196                                                                   ELCRAMTN
+00197      GO TO 9500-RETURN.                                           ELCRAMTN
+00198                                                                   ELCRAMTN
+00199  2100-CHECK-MINN-TRUNC.                                           ELCRAMTN
+00200                                                                   ELCRAMTN
+00201      COMPUTE ANGLEM = WK1 / I.                                    ELCRAMTN
+00202                                                                   ELCRAMTN
+00203      COMPUTE ANGLEU = WK2 / I.                                    ELCRAMTN
+00204                                                                   ELCRAMTN
+00205      COMPUTE ANGLEM1 = ANGLEM * ODF.                              ELCRAMTN
+00206                                                                   ELCRAMTN
+00207      COMPUTE FACTOR = ((ANGLEU + 2) / ANGLEM1) * 1000.            ELCRAMTN
+00208                                                                   ELCRAMTN
+00209      COMPUTE WS-REMAINING-AMT ROUNDED =                           ELCRAMTN
+00210          (CP-ORIGINAL-BENEFIT * (ANGLEU + 2)) / ANGLEM1.          ELCRAMTN
+00211                                                                   ELCRAMTN
+00212      GO TO 9500-RETURN.                                           ELCRAMTN
+00213                                                                   ELCRAMTN
+00214  2100-CHECK-MINN.                                                 ELCRAMTN
+00215                                                                   ELCRAMTN
+00216      COMPUTE ANGLEN = WK1 / I.                                    ELCRAMTN
+00217                                                                   ELCRAMTN
+00218      COMPUTE ANGLEU = WK2 / I.                                    ELCRAMTN
+00219                                                                   ELCRAMTN
+00220      COMPUTE ANGLEN1 = ANGLEN * ODF.                              ELCRAMTN
+00221                                                                   ELCRAMTN
+00222      COMPUTE FACTOR = ((ANGLEU + 2) / ANGLEN1) * 1000.            ELCRAMTN
+00223                                                                   ELCRAMTN
+00224      COMPUTE WS-REMAINING-AMT ROUNDED =                           ELCRAMTN
+00225          (CP-ORIGINAL-BENEFIT * (ANGLEU + 2)) / ANGLEN1.          ELCRAMTN
+00226                                                                   ELCRAMTN
+00227      GO TO 9500-RETURN.                                           ELCRAMTN
+00228                                                                   ELCRAMTN
+00229  2100-CHECK-MONTANA-TRUNC.                                        ELCRAMTN
+00230                                                                   ELCRAMTN
+00231      COMPUTE ANGLEM = WK1 / I.                                    ELCRAMTN
+00232                                                                   ELCRAMTN
+00233      COMPUTE ANGLEU = WK2 / I.                                    ELCRAMTN
+00234                                                                   ELCRAMTN
+00235      COMPUTE ANGLEM1 = ANGLEM * ODF.                              ELCRAMTN
+00236                                                                   ELCRAMTN
+00237      COMPUTE FACTOR = ((ANGLEU + 4) / ANGLEM1) * 1000.            ELCRAMTN
+00238                                                                   ELCRAMTN
+00239      COMPUTE WS-REMAINING-AMT ROUNDED =                           ELCRAMTN
+00240          (CP-ORIGINAL-BENEFIT * (ANGLEU + 4)) / ANGLEM1.          ELCRAMTN
+00241                                                                   ELCRAMTN
+00242      GO TO 9500-RETURN.                                           ELCRAMTN
+00243                                                                   ELCRAMTN
+00244  2100-CHECK-MONTANA.                                              ELCRAMTN
+00245                                                                   ELCRAMTN
+00246      COMPUTE ANGLEN = WK1 / I.                                    ELCRAMTN
+00247                                                                   ELCRAMTN
+00248      COMPUTE ANGLEU = WK2 / I.                                    ELCRAMTN
+00249                                                                   ELCRAMTN
+00250      COMPUTE ANGLEN1 = ANGLEN * ODF.                              ELCRAMTN
+00251                                                                   ELCRAMTN
+00252      COMPUTE FACTOR = ((ANGLEU + 4) / ANGLEN1) * 1000.            ELCRAMTN
+00253                                                                   ELCRAMTN
+00254      COMPUTE WS-REMAINING-AMT ROUNDED =                           ELCRAMTN
+00255          (CP-ORIGINAL-BENEFIT * (ANGLEU + 4)) / ANGLEN1.          ELCRAMTN
+00256                                                                   ELCRAMTN
+00257      GO TO 9500-RETURN.                                           ELCRAMTN
+00258                                                                   ELCRAMTN
+00259  9000-ERROR.                                                      ELCRAMTN
+00260      GO TO 9500-RETURN.                                           ELCRAMTN
+00261                                                                   ELCRAMTN
+00262  9500-RETURN.                                                     ELCRAMTN
+00263      MOVE FACTOR                 TO  NP-FACTOR.                   ELCRAMTN
+00264                                                                   ELCRAMTN
+00265  9999-EXIT.                                                       ELCRAMTN
+00266      EXIT.                                                        ELCRAMTN
+00267                                                                   ELCRAMTN

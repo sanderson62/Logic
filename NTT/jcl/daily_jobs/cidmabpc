@@ -1,0 +1,84 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job Aborted, Not CID1T"
+#   exit 1
+#endif
+
+setenv dtetme `date +%m%d%H%M%S`
+
+################################################################################
+LABEL name=BEGSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/Logic.PostCard.Status.txt
+ftp -n ntcso1 < $JCLLIB/ftp-cidmabpc
+!
+EXECPGM pgmname='BPXBATCH' stepname='BEGSTEP' parm='SH'
+
+################################################################################
+LABEL name=STEP0
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ -a $SEQFILES/Logic.PostCard.Status.txt ] ; then
+   echo "we got a file " ;
+else
+   echo "No file today "
+   exit 1
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP0' parm='SH'
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cp $SEQFILES/Logic.PostCard.Status.txt $SEQFILES/postcard.file.$dtetme
+tr -d '\011\032' < $SEQFILES/Logic.PostCard.Status.txt > $SEQFILES/postcard.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=ERMAILBKP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+unikixbld -t s -d ERMAIL -s $SEQFILES/ermail.postcard.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='ERMAILBKP' parm='SH'
+
+################################################################################
+LABEL name=ELCERTBKP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+unikixbld -t s -d ELCERT -s $SEQFILES/elcert.postcard.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='ELCERTBKP' parm='SH'
+
+################################################################################
+LABEL name=CIDMABPC
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+
+ASSGNDD ddname='SYS010' filename='$SEQFILES/postcard.txt' disp='i-o'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELCERT' type='VS' filename='ELCERT' disp='i-o'
+ASSGNDD ddname='ERMAIL' type='VS' filename='ERMAIL' disp='i-o'
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='CIDMABPC' stepname='CIDMABPC'
+
+################################################################################
+LABEL name=ENDSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+mutt -s ' PROCCESSED CID POST CARD FILE FROM SDGA' pema@cso.com < /dev/null
+!
+EXECPGM pgmname='BPXBATCH' stepname='ENDSTEP' parm='SH'
+
+ENDJOB 
+################################################################################

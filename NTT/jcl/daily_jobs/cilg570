@@ -1,0 +1,82 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' verbose
+ONRETCODE GT 11 GOTO END_JOB 
+
+setenv cdte `date +%m%d`
+#setenv cdte "0129"
+echo " cdte = " $cdte
+echo " JOBLIB = " $JOBLIB
+#if ($EBMSYS != "paul") then
+#   echo "Job aborted, not PAUL"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=EL300A
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLOG' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='J' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.EL570' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCCID1
+CLAS@CCMMDDYY
+!
+
+EXECPGM pgmname='EL300' stepname='EL300A'
+
+################################################################################
+LABEL name=EL570
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='ERMAIL' type='VS' filename='ERMAIL' disp='i-o' 
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERARCH' type='VS' filename='ERARCH' disp='i-o' 
+ASSGNDD ddname='ELCERT' type='VS' filename='ELCERT' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERCNOT' type='VS' filename='ERCNOT' disp='i-o' 
+ASSGNDD ddname='ELLETR' type='VS' filename='ELLETR' disp='i-o' 
+ASSGNDD ddname='ELENCC' type='VS' filename='ELENCC' disp='i-o' 
+ASSGNDD ddname='NSASEXTR' type='VS' filename='NSASEXTR' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.EL570' disp='i-o' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/CI.EX.FICH570' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='SYS021' filename='$SEQFILES/$cdte\_refund.freedom' disp='o' normal='k' abend='d' recfmt='F' recsize='400' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='EL570' stepname='EL570' 
+
+################################################################################
+LABEL name=CPY570
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.EX.FICH570' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH570' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY570' parm='ALL'
+
+if ($JOBSTATUS == 0) then
+   rm -f $JCLLIB/ftp-cilg570-tmp
+   sed 's/\$cdte/$cdte/' < $JCLLIB/ftp-cilg570 > $JCLLIB/ftp-cilg570-tmp
+else
+        echo " Job aborted, print not released "
+endif
+
+################################################################################
+LABEL name=ENDSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+mutt -s 'REF INT RPT READY' -i $SEQFILES/CI.DL.CIADM.FICH570 -e 'my_hdr FROM:pema@cso.com' dcpscid570@cso.com < /dev/null
+ftp -n ntcso1 < $JCLLIB/ftp-cilg570-tmp
+!
+EXECPGM pgmname='BPXBATCH' stepname='ENDSTEP' parm='SH'
+
+ENDJOB 
+################################################################################

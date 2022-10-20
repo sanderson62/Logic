@@ -1,0 +1,62 @@
+################################################################################
+#   cidclg538
+################################################################################
+BEGINJOB mode='MVS' 
+
+if ($EBMSYS != 'tony') then
+   echo "Job Aborting, not Tony"
+   exit 1
+endif
+
+
+################################################################################
+LABEL name=EL524 
+################################################################################
+#  ******************************************************************    
+#  **--                                                                  
+#  **--          PENDING CLAIMS FILE LOAD                                
+#  **--   OKAY TO RERUN THIS STEP
+#  ******************************************************************    
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='ELREPT' dataset='CI.DD.LG.ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYS010' dataset='ZI.XX.CLMDLY.EXTR' filename='\${SEQFILES}/ZI.XX.CLMDLY.EXTR' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZC.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** I/O FILES        
+ASSGNDD ddname='ERPNDB' dataset='CI.DD.LG.ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='ERPNDC' dataset='CI.DD.LG.ERPNDC' type='VS' filename='ERPNDC' disp='i-o' 
+ASSGNDD ddname='ELCERT' dataset='CI.DD.LG.ELCERT' type='VS' filename='ELCERT' disp='i-o' 
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/\${JOBNAME}.EL524.ME.BAL.AMTS' disp='o' normal='k' abend='k' recfmt='F'
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS020' filename='\${SEQFILES}/ZC.EX.FICH524' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+
+EXECPGM pgmname='EL524' stepname='EL524' 
+
+################################################################################
+LABEL name=CPY524
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZC.EX.FICH524' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZC.DL.CIADM.FICH524' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY524' parm='ALL' 
+
+################################################################################
+################################################################################
+
+"cp /data/test/tony/seqfiles/ZC.DL.CIADM.FICH524 /data/test/tony/convertin"
+"perl /export/home/mtpadmin/bin/dcc_new_dl_tony.pl /export/home/mtpadmin/bin/dcc_rpt_hash_file"
+"cp -p /data/test/tony/convertin/ZC.DL.CIADM.FICH524.CVT /data/test/tony/convertout"
+"rm /data/test/tony/convertin/*"
+
+if ($JOBSTATUS == 0) then
+ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajrdc524
+  echo " Test job, print not wanted "
+
+else
+  echo " Job aborted, print not released "
+endif
+
+ENDJOB 

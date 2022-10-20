@@ -1,0 +1,587 @@
+* Micro Focus Server Express         V5.1 revision 000 18-Feb-21 09:37 Page   1
+* WSZIPCDB.cbl
+* Options: int("WSZIPCDB.int") anim csi verbose NOBOUND PARAMCOUNTCHECK
+*          VERBOSE directives(cobopt.bth) endp list("WSZIPCDB.lst")
+     1$SET SQL(dbman=ODBC, TARGETDB=MSSQLSERVER, NOAUTOCOMMIT)
+* Setting: NOACCEPTREFRESH NOADV ALIGN"8" ALPHASTART"1" NOALTER NOAMODE ANIM
+*          NOANIMPREP ANS85 APOST NOAREACHECK ARITHMETIC"OSVS" ASSIGN
+*          "EXTERNAL" NOASSIGN-PRINTER NOAUTOLOCK NOBELL NOBOUND NOBRIEF
+*          NOBS2000 BWZSTAR NOBYTEMODEMOVE CALLFH"ebmlsfile" NOCALLMCS
+*          NOCALLRECOVERY CALLSORT"EXTSM" CANCEL CANCELLBR NOCHANGEMESSAGE
+*          CHARSET"ASCII" NOCHECKDIV NOCHECKREFMOD NOCICS CICS-CPY
+*          NOCICSOPTIMIZE NOCMPR2 NOCOBFSTATCONV NOCOBIDY NOCOBOL370 COBOLDIR
+*          NOCOMP COMP-5"2" COMP-6"2" NOCOMS85 CONFIRM NOCONVERTRET CONVSPACE
+*          COPYEXT",cbl,cpy" NOCOPYLBR COPYLIST COPYLISTCOMMENT"1" CSI
+*          CURRENCY-SIGN"36" CURRENT-DATE"MMDDYY" NODATA DATACOMPRESS"0"
+*          NODATA-CONTEXT DATE DBCHECK DBCS"2" NODBCSSOSI DBSPACE DE-EDIT"2"
+*          DEFAULTBYTE"32" NODEFAULTCALLS DETECTLOCK NODG DIALECT"MF"
+*          NODIRECTIVES-IN-COMMENTS NODOSVS NODPCINSUBSCRIPT DYNAM
+*          NOEARLY-RELEASE ECHO NOECHOALL NOEDITOR ENSUITE"0" NOENTCOBOL
+*          ERRFORMAT"1" ERRLIST"EMBED" NOERRQ FASTSORT NOFCD3 NOFCDREG
+*          NOFDCLEAR NOFILESHARE FILETYPE"0" NOFLAG NOFLAGAS NOFLAGCD
+*          NOFLAGEUC NOFLAGMIG NOFLAGQ FLAGSINEDIT NOFLAGSTD NOFOLDCALLNAME
+*          NOFOLDCOPYNAME FORM"60" NOFP-ROUNDING NOHOSTARITHMETIC
+*          NOHOSTCONTZERO NOHOST-NUMCOMPARE NOHOST-NUMMOVE NOHOSTFD NOHOSTRW
+*          NOIBM-MS IBMCOMP IDXFORMAT"0" NOILGEN IMPLICITSCOPE NOINDD
+*          INFORETURN"0" NOINITCALL INITPTR INT"WSZIPCDB.int" INTDATE"ANSI"
+*          INTLEVEL"2" IOCONV NOISO2002 NOIXNLSKEY NOIXNUMKEY KEEP-INT
+*          KEYCHECK KEYCOMPRESS"0" LIBRARIAN"2" NOLINE-COUNT LIST
+*          "WSZIPCDB.lst" LISTPATH"" LISTWIDTH"80" LITVAL-SIZE"4" LOCKTYPE"0"
+*          NOMAPNAME NOMAXERROR METHODDEFAULT"REFERENCE" MF"15" MFCOMMENT
+*          NOMOVELENCHECK NOMS NOMVS NATIVE"ASCII" NONATIVEFLOATINGPOINT
+*          NONCHAR NONEWBASENAME NONLS NSYMBOL"DBCS" NOODOOSVS NOODOSLIDE
+*          NOOLDBLANKLINE NOOLDCOPY NOOLDINDEX NOOLDNEXTSENTENCE NOOLDREADINTO
+*          NOOLDSTRMIX OOCTRL"-C-E-G-P+Q+R-S+W" OPTIONAL-FILE NOOS390 OSEXT""
+*          NOOSVS NOOUTDD NOP64 NOPANVALET PERFORM-TYPE"OSVS" NOPREPLIST
+*          NOPREPROCESS NOPRINT-EXT NOPROFILE NOPROGID-COMMENT
+*          NOPROGID-INT-NAME NOPROTECT-LINKAGE PROTOTYPE"RELAXED" QUAL
+*          QUALPROC NOQUERY NOQUOTE NORAWLIST NORDW RECMODE"F" NOREENTRANT
+*          NOREF NOREFNO REMAINDER"1" REPORT-LINE"256" RESEQ NORETRYLOCK
+*          REWRITE-LS NORM RTNCODE-SIZE"4" NORWHARDPAGE NOSAA SEG NOSEQCHK
+*          SEQUENTIAL"RECORD" NOSERIAL SETTING"LINE" NOSHAREOUTDD NOSHOW-DIR
+*          SIGN"ASCII" NOSIGNDISCARD NOSIGNFIXUP SORTTYPE"DFSORT" SOURCEFORMAT
+*          "FIXED" SOURCETABSTOP"8" NOSPZERO NOSSRANGE STDERR NOSTICKY-LINKAGE
+*          NOSTICKY-PERFORM SUPFF SWITCHTYPE"1" SYMBSTART"1" SYSPUNCH"132"
+*          TERMPAGE TIME NOTRACE NOTRUNC NOTRUNCCALLNAME NOTRUNCCOPY TRUNCINC
+*          "10" UNICODE"NATIVE" VERBOSE VSC2"2" WARNING"1" NOWB NOWB2 NOWB3
+*          WEBSERVER"CGI" NOWRITELOCK NOWRITETHRU NOXOPEN NOXREF
+*          NOZEROLENGTHFALSE NOZEROSEQ NOZWB
+     2 identification division.
+     3 program-id. WSZIPCD.
+     4******************************************************************
+     5*                   C H A N G E   L O G
+     6*
+     7* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+     8*-----------------------------------------------------------------
+     9*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+    10* EFFECTIVE    NUMBER
+    11*-----------------------------------------------------------------
+    12* 101017  CR2016091600001  PEMA  New program to verify zipcode.
+    13* 021521  CR2020121600001  PEMA  Switch to different table
+* Micro Focus Server Express         V5.1 revision 000 18-Feb-21 09:37 Page   2
+* WSZIPCDB.cbl
+    14******************************************************************
+    15 environment division.
+    16 INPUT-OUTPUT SECTION.
+    17 FILE-CONTROL.
+    18
+    19 data division.
+    20 FILE SECTION.
+    21
+    22 working-storage section.
+    23 77  s1 pic s999 comp-3 value +0.
+    24 77  BYTE-OFFSET PIC S9(8) COMP VALUE +0.
+    25 77  ws-eof-sw                   pic x  value spaces.
+    26     88  end-of-input                  value 'Y'.
+    27 77  ws-error-sw                 pic x  value spaces.
+    28     88  error-found               value 'Y'.
+    29 77  ws-string-len               pic s999 comp-3 value zeros.
+    30
+    31 01  P pointer.
+    32 01  KIXSYS                      pic X(7)  VALUE Z"KIXSYS".
+    33 01  var-ptr pointer.
+    34 01  env-var-len                 pic 9(4)  binary.
+    35 01  rc                          pic 9(9)  binary.
+    36
+    37 01  WS-KIXSYS.
+    38     05  WS-KIX-FIL1             PIC X(10).
+    39     05  WS-KIX-APPS             PIC X(10).
+    40     05  WS-KIX-ENV              PIC X(10).
+    41     05  WS-KIX-MYENV            PIC X(10).
+    42     05  WS-KIX-SYS              PIC X(10).
+    43
+    44 01  ws-xml-stuff.
+    45     05  ws-fld-1                pic x(20) value spaces.
+    46     05  ws-fld-2                pic x(20) value spaces.
+    47     05  ws-fld-3                pic x(50) value spaces.
+    48     05  ws-error-cd redefines
+    49         ws-fld-3                pic 9.
+    50     05  ws-len-of-5 redefines
+    51         ws-fld-3                pic 9(5).
+    52     05  ws-model-year redefines
+    53         ws-fld-3                pic 9999.
+    54     05  ws-base-price redefines
+    55         ws-fld-3                pic 9(11).
+    56     05  ws-fld-4                pic x(20) value spaces.
+    57     05  ws-fld-5                pic x(20) value spaces.
+    58
+*   59 EXEC SQL
+*   60    INCLUDE SQLDA
+*   61 END-EXEC
+    62 01 SQLDA sync.
+    63    05 SQLDAID               PIC X(8)  VALUE "SQLDA  ".
+    64    05 SQLDABC               PIC S9(9) COMP-5 value 0.
+    65    05 SQLN                  PIC S9(4) COMP-5 value 0.
+    66    05 SQLD                  PIC S9(4) COMP-5 value 0.
+    67    05 SQLVAR OCCURS 0 TO 1489 TIMES DEPENDING ON SQLD.
+    68       10 SQLTYPE            PIC S9(4) COMP-5.
+    69       10 SQLLEN             PIC S9(4) COMP-5.
+    70$IF P64 SET
+    71X      *> For 64-bit environments, ensure that SQLDATA is
+* Micro Focus Server Express         V5.1 revision 000 18-Feb-21 09:37 Page   3
+* WSZIPCDB.cbl (/opt/lib/cobol/cpylib/sqlda.cpy)
+    72X      *> aligned on an 8-byte boundary.
+    73X      10 FILLER             PIC S9(9) COMP-5.
+    74$END
+    75       10 SQLDATA            USAGE POINTER.
+    76       10 SQLIND             USAGE POINTER.
+    77       10 SQLNAME.
+    78          15 SQLNAMEL        PIC S9(4) COMP-5.
+    79          15 SQLNAMEC        PIC X(30).
+    80
+    81* Values for SQLTYPE
+    82
+    83 78  ESQL-DATE-CHAR              VALUE 384.
+    84 78  ESQL-DATE-CHAR-NULL         VALUE 385.
+    85 78  ESQL-DATE-REC               VALUE 386.
+    86 78  ESQL-DATE-REC-NULL          VALUE 387.
+    87 78  ESQL-TIME-CHAR              VALUE 388.
+    88 78  ESQL-TIME-CHAR-NULL         VALUE 389.
+    89 78  ESQL-TIME-REC               VALUE 390.
+    90 78  ESQL-TIME-REC-NULL          VALUE 391.
+    91 78  ESQL-TIMESTAMP-CHAR         VALUE 392.
+    92 78  ESQL-TIMESTAMP-CHAR-NULL    VALUE 393.
+    93 78  ESQL-TIMESTAMP-REC          VALUE 394.
+    94 78  ESQL-TIMESTAMP-REC-NULL     VALUE 395.
+    95 78  ESQL-TS-OFFSET-CHAR         VALUE 396. *> added nx51sp1
+    96 78  ESQL-TS-OFFSET-CHAR-NULL    VALUE 397.
+    97 78  ESQL-TS-OFFSET-REC          VALUE 398.
+    98 78  ESQL-TS-OFFSET-REC-NULL     VALUE 399. *> end adds nx51sp1
+    99 78  ESQL-LONGVARBINARY          VALUE 404.
+   100 78  ESQL-LONGVARBINARY-NULL     VALUE 405.
+   101 78  ESQL-LONGVARCHAR            VALUE 408.
+   102 78  ESQL-LONGVARCHAR-NULL       VALUE 409.
+   103 78  ESQL-BINARY                 VALUE 444.
+   104 78  ESQL-BINARY-NULL            VALUE 445.
+   105 78  ESQL-VARBINARY              VALUE 446.
+   106 78  ESQL-VARBINARY-NULL         VALUE 447.
+   107 78  ESQL-VARCHAR                VALUE 448.
+   108 78  ESQL-VARCHAR-NULL           VALUE 449.
+   109
+   110 78  ESQL-CHARVARYING            VALUE 450.  *> added esq03n31
+   111 78  ESQL-CHARVARYING-NULL       VALUE 451.  *> added esq03n31
+   112
+   113 78  ESQL-CHAR                   VALUE 452.
+   114 78  ESQL-CHAR-NULL              VALUE 453.
+   115
+   116 78  ESQL-CHAR-FIXED             VALUE 454.  *> added esq03n31
+   117 78  ESQL-CHAR-FIXED-NULL        VALUE 455.  *> added esq03n31
+   118
+   119 78  ESQL-DOUBLE                 VALUE 480.
+   120 78  ESQL-DOUBLE-NULL            VALUE 481.
+   121 78  ESQL-REAL                   VALUE 482.
+   122 78  ESQL-REAL-NULL              VALUE 483.
+   123 78  ESQL-DECIMAL                VALUE 484.
+   124 78  ESQL-DECIMAL-NULL           VALUE 485.
+   125 78  ESQL-INTEGER                VALUE 496.
+   126 78  ESQL-INTEGER-NULL           VALUE 497.
+   127 78  ESQL-SMALLINT               VALUE 500.
+   128 78  ESQL-SMALLINT-NULL          VALUE 501.
+   129 78  ESQL-TINYINT                VALUE 502.
+* Micro Focus Server Express         V5.1 revision 000 18-Feb-21 09:37 Page   4
+* WSZIPCDB.cbl
+   130 78  ESQL-TINYINT-NULL           VALUE 503.
+   131
+*  132 EXEC SQL
+*  133    INCLUDE SQLCA
+*  134 END-EXEC
+   135 01 SQLCA.
+   136     05  SQLCAID         PIC X(8)         VALUE "SQLCA   ".
+   137     05  SQLCABC         PIC S9(9) COMP-5 VALUE 136.
+   138     05  SQLCODE         PIC S9(9) COMP-5 VALUE 0.
+   139     05  SQLERRM.
+   140         49  SQLERRML    PIC S9(4) COMP-5.
+   141         49  SQLERRMC    PIC X(70).
+   142     05  SQLERRP         PIC X(8).
+   143     05  SQLERRD         PIC S9(9) COMP-5 OCCURS 6 VALUE 0.
+   144     05  SQLWARN.
+   145         10  SQLWARN0    PIC X.
+   146         10  SQLWARN1    PIC X.
+   147         10  SQLWARN2    PIC X.
+   148         10  SQLWARN3    PIC X.
+   149         10  SQLWARN4    PIC X.
+   150         10  SQLWARN5    PIC X.
+   151         10  SQLWARN6    PIC X.
+   152         10  SQLWARN7    PIC X.
+   153     05  SQLEXT.
+   154         10  SQLWARN8    PIC X.
+   155         10  SQLWARN9    PIC X.
+   156         10  SQLWARN10   PIC X.
+   157         10  SQLWARNA    REDEFINES SQLWARN10 PIC X .
+   158     05  SQLSTATE    PIC X(5).
+   159
+   160 EXEC SQL
+   161    BEGIN DECLARE SECTION
+   162 END-EXEC
+   163
+   164 01  sqlcmd                      pic x(1024).
+   165 01  svr                         pic x(32).
+   166 01  usr                         pic x(32).
+   167 01  pass                        pic x(32).
+   168 01  usr-pass                    pic x(64).
+   169 01  ws-disp-code                pic s9(11).
+   170
+   171***-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_***
+   172***                                                            ***
+   173***  These indicators are used to determine if a variable      ***
+   174***  is passed nulls from sql. The indicator will be -1        ***
+   175***  if the value on sql is nulls and +0 if the value is       ***
+   176***  something other than nulls. Here is an example on how     ***
+   177***  to use the indicator variables.                           ***
+   178***                                                            ***
+   179***     EXEC SQL                                               ***
+   180***        fetch checkapp into                                 ***
+   181***           :db-app-status :nu-app-status,                   ***
+   182***           :db-app-by     :nu-app-by,                       ***
+   183***           :db-app-date   :nu-app-date,                     ***
+   184***           :db-app-batch  :nu-app-batch                     ***
+   185***     END-EXEC                                               ***
+   186***                                                            ***
+   187***_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-***
+* Micro Focus Server Express         V5.1 revision 000 18-Feb-21 09:37 Page   5
+* WSZIPCDB.cbl
+   188
+   189 01  indicator-vaiables-for-nulls.
+   190     05  nu-state                pic s9(4) comp value +0.
+   191     05  nu-city                 pic s9(4) comp value +0.
+   192     05  nu-county               pic s9(4) comp value +0.
+   193
+   194 01  zip-codes.
+   195     05  zc-zipcode              pic x(5).
+   196     05  zc-state                pic xx.
+   197     05  zc-city                 pic x(30).
+   198     05  zc-county               pic x(40).
+   199
+   200 EXEC SQL
+   201    END DECLARE SECTION
+   202 END-EXEC
+   203
+   204 01  ws-misc.
+   205     12  ws-file-in              pic x(26) value spaces.
+   206     12  ws-connect-sw               pic x  value ' '.
+   207         88  connected-to-db             value 'Y'.
+   208     12  ws-file-in-status       pic xx  value spaces.
+   209     12  ws-curl-return-cd       pic s9(8) comp-5 value +0.
+   210     12  ws-curl-string.
+   211         16  f                   pic x(16) value
+   212          'curl -o /tmp/zip'.
+   213         16  filename-zip        pic x(5)  value spaces.
+   214         16  f                   pic xxxx value '.txt'.
+   215         16  f                   pic x(15) value
+   216          ' --data "USZip='.
+   217         16  curl-zip            pic x(5) value zeros.
+   218         16  f                   pic x(48) value
+   219          '" http://webservicex.net/uszip.asmx/GetInfoByZIP'.
+   220         16  f                   pic x value low-values.
+   221
+   222 01  WS-RESPONSE                 PIC S9(8) COMP VALUE +0.
+   223     88  RESP-NORMAL                    VALUE +0.
+   224     88  resp-file-notfnd               value +12.
+   225     88  RESP-NOTFND                    VALUE +13.
+   226     88  resp-duprec                    value +14.
+   227     88  resp-dupkey                    value +15.
+   228     88  resp-invreq                    value +16.
+   229     88  RESP-NOTOPEN                   VALUE +19.
+   230     88  RESP-ENDFILE                   VALUE +20.
+   231     88  resp-lengtherr                 value +22.
+   232
+   233 01  f.
+   234     05  ws-outputzip            pic x(5).
+   235     05  ws-city                 pic x(50).
+   236     05  ws-state                pic xx.
+   237
+   238 LINKAGE SECTION.
+   239
+   240 01  ws-pass-area.
+   241     03  PA-ZIP                  PIC X(5).
+   242     03  PA-ErrorCode            PIC X(10).
+   243     03  PA-city                 PIC x(50).
+   244     03  PA-state                PIC XX.
+   245
+* Micro Focus Server Express         V5.1 revision 000 18-Feb-21 09:37 Page   6
+* WSZIPCDB.cbl
+   246 procedure division using ws-pass-area.
+   247
+   248*    display ' entering program WSZIPCDB'
+   249
+   250     if ws-pass-area (1:7) = 'CONNECT'
+   251        perform 0020-connect     thru 0020-exit
+   252        go to 0000-return
+   253     end-if
+   254
+   255     if ws-pass-area (1:10) = 'DISCONNECT'
+   256        perform 0060-disconnect  thru 0060-exit
+   257        go to 0000-return
+   258     end-if
+   259
+   260     perform 0010-init           thru 0010-exit
+   261     perform 0030-get-zipcd-data thru 0030-exit
+   262     perform 0050-bld-pass-area  thru 0050-exit
+   263
+   264     .
+   265 0000-return.
+   266
+   267     GOBACK
+   268
+   269     .
+   270 0010-init.
+   271
+   272     move pa-zip                 to zc-zipcode
+   273     move pa-city                to zc-city
+   274     move pa-state               to zc-state
+   275
+   276     .
+   277 0010-exit.
+   278     exit.
+   279
+   280 0020-connect.
+   281
+   282     display ' about to connect '
+   283
+   284     move 'NTCSO2_Repos'         to svr
+   285*    move 'HOV-TSTDB01_Repos'    to svr
+   286     move 'appuser'              to usr
+   287     move 'appuser@cso'          to pass
+   288
+   289     string
+   290         usr delimited space
+   291         "." delimited size
+   292         pass delimited space into usr-pass
+   293     end-string
+   294
+   295     EXEC SQL
+   296        CONNECT TO :svr USER :usr-pass
+   297     END-EXEC
+   298
+   299     if sqlcode not = 0
+   300        display "Error: cannot connect "
+   301        display sqlcode
+   302        display sqlerrmc
+   303     end-if
+* Micro Focus Server Express         V5.1 revision 000 18-Feb-21 09:37 Page   7
+* WSZIPCDB.cbl
+   304
+   305     set connected-to-db to true
+   306
+   307     .
+   308 0020-exit.
+   309     exit.
+   310
+   311 0030-get-zipcd-data.
+   312
+   313     EXEC SQL
+   314        SELECT
+   315           County
+   316        INTO
+   317           :zc-county
+   318        FROM
+   319           ZIPCodes
+   320        WHERE
+   321           ZipCode = :zc-zipcode
+   322           and State = :zc-state
+   323           and City = :zc-city
+   324     END-EXEC
+   325
+   326     if sqlcode not = 0
+   327        move 'NOTFOUND'          to pa-errorcode
+   328        display "Error: cannot read row "
+   329        display ' sql return code ' sqlcode
+   330        display ' sql err mess    ' sqlerrmc
+   331        display ' zip code        ' zc-zipcode
+   332        display ' city            ' zc-city
+   333        display ' state           ' zc-state
+   334     end-if
+   335
+   336     .
+   337 0030-exit.
+   338     exit.
+   339
+   340 0050-bld-pass-area.
+   341
+   342     move function upper-case(zc-city)
+   343                                 to pa-city
+   344     move zc-state               to pa-state
+   345
+   346     .
+   347 0050-exit.
+   348     exit.
+   349
+   350 0060-disconnect.
+   351
+   352     display ' about to disconnect '
+   353
+   354     EXEC SQL
+   355        DISCONNECT ALL
+   356     END-EXEC
+   357
+   358     if sqlcode not = 0
+   359        display "Error: cannot disconnect zipcodes "
+   360        display ' sql return code ' sqlcode
+   361        display ' sql err mess    ' sqlerrmc
+* Micro Focus Server Express         V5.1 revision 000 18-Feb-21 09:37 Page   8
+* WSZIPCDB.cbl
+   362     end-if
+   363
+   364     .
+   365 0060-exit.
+   366     exit.
+*
+* Program-Id : WSZIPCD
+* Line   Data Name                       Address    Size      Attributes
+* 000023 S1. . . . . . . . . . . . . . . 0000000352 00000002  WS E    Comp-3
+* 000024 BYTE-OFFSET . . . . . . . . . . 0000000360 00000004  WS E    Comp
+* 000025 WS-EOF-SW . . . . . . . . . . . 0000000368 00000001  WS E    AlphNum
+* 000027 WS-ERROR-SW . . . . . . . . . . 0000000376 00000001  WS E    AlphNum
+* 000029 WS-STRING-LEN . . . . . . . . . 0000000384 00000002  WS E    Comp-3
+* 000031 P . . . . . . . . . . . . . . . 0000000392 00000004  WS E    Pointer
+* 000032 KIXSYS. . . . . . . . . . . . . 0000000400 00000007  WS E    AlphNum
+* 000033 VAR-PTR . . . . . . . . . . . . 0000000408 00000004  WS E    Pointer
+* 000034 ENV-VAR-LEN . . . . . . . . . . 0000000416 00000002  WS E    Comp
+* 000035 RC. . . . . . . . . . . . . . . 0000000424 00000004  WS E    Comp
+* 000037 WS-KIXSYS . . . . . . . . . . . 0000000432 00000050  WS G    AlphNum
+* 000038 WS-KIX-FIL1 . . . . . . . . . . 0000000432 00000010  WS E    AlphNum
+* 000039 WS-KIX-APPS . . . . . . . . . . 0000000442 00000010  WS E    AlphNum
+* 000040 WS-KIX-ENV. . . . . . . . . . . 0000000452 00000010  WS E    AlphNum
+* 000041 WS-KIX-MYENV. . . . . . . . . . 0000000462 00000010  WS E    AlphNum
+* 000042 WS-KIX-SYS. . . . . . . . . . . 0000000472 00000010  WS E    AlphNum
+* 000044 WS-XML-STUFF. . . . . . . . . . 0000000488 00000130  WS G    AlphNum
+* 000045 WS-FLD-1. . . . . . . . . . . . 0000000488 00000020  WS E    AlphNum
+* 000046 WS-FLD-2. . . . . . . . . . . . 0000000508 00000020  WS E    AlphNum
+* 000047 WS-FLD-3. . . . . . . . . . . . 0000000528 00000050  WS E    AlphNum
+* 000048 WS-ERROR-CD . . . . . . . . . . 0000000528 00000001  WS E    Display    R
+* 000050 WS-LEN-OF-5 . . . . . . . . . . 0000000528 00000005  WS E    Display    R
+* 000052 WS-MODEL-YEAR . . . . . . . . . 0000000528 00000004  WS E    Display    R
+* 000054 WS-BASE-PRICE . . . . . . . . . 0000000528 00000011  WS E    Display    R
+* 000056 WS-FLD-4. . . . . . . . . . . . 0000000578 00000020  WS E    AlphNum
+* 000057 WS-FLD-5. . . . . . . . . . . . 0000000598 00000020  WS E    AlphNum
+* 000062 SQLDA . . . . . . . . . . . . . 0000000624 00065532  WS G    AlphNum
+* 000063 SQLDAID . . . . . . . . . . . . 0000000624 00000008  WS E    AlphNum
+* 000064 SQLDABC . . . . . . . . . . . . 0000000632 00000004  WS E    Comp-5
+* 000065 SQLN. . . . . . . . . . . . . . 0000000636 00000002  WS E    Comp-5
+* 000066 SQLD. . . . . . . . . . . . . . 0000000638 00000002  WS E    Comp-5
+* 000067 SQLVAR. . . . . . . . . . . . . 0000000640 00000044  WS GO   AlphNum
+* 000068 SQLTYPE . . . . . . . . . . . . 0000000640 00000002  WS ESO  Comp-5
+* 000069 SQLLEN. . . . . . . . . . . . . 0000000642 00000002  WS ESO  Comp-5
+* 000075 SQLDATA . . . . . . . . . . . . 0000000644 00000004  WS ESO  Pointer
+* 000076 SQLIND. . . . . . . . . . . . . 0000000648 00000004  WS ESO  Pointer
+* 000077 SQLNAME . . . . . . . . . . . . 0000000652 00000032  WS GSO  AlphNum
+* 000078 SQLNAMEL. . . . . . . . . . . . 0000000652 00000002  WS ESO  Comp-5
+* 000079 SQLNAMEC. . . . . . . . . . . . 0000000654 00000030  WS ESO  AlphNum
+* 000135 SQLCA . . . . . . . . . . . . . 0000066160 00000136  WS G    AlphNum
+* 000136 SQLCAID . . . . . . . . . . . . 0000066160 00000008  WS E    AlphNum
+* 000137 SQLCABC . . . . . . . . . . . . 0000066168 00000004  WS E    Comp-5
+* 000138 SQLCODE . . . . . . . . . . . . 0000066172 00000004  WS E    Comp-5
+* 000139 SQLERRM . . . . . . . . . . . . 0000066176 00000072  WS G    AlphNum
+* 000140 SQLERRML. . . . . . . . . . . . 0000066176 00000002  WS E    Comp-5
+* 000141 SQLERRMC. . . . . . . . . . . . 0000066178 00000070  WS E    AlphNum
+* 000142 SQLERRP . . . . . . . . . . . . 0000066248 00000008  WS E    AlphNum
+* 000143 SQLERRD . . . . . . . . . . . . 0000066256 00000004  WS EO   Comp-5
+* 000144 SQLWARN . . . . . . . . . . . . 0000066280 00000008  WS G    AlphNum
+* 000145 SQLWARN0. . . . . . . . . . . . 0000066280 00000001  WS E    AlphNum
+* Micro Focus Server Express         V5.1 revision 000 18-Feb-21 09:37 Page   9
+* WSZIPCDB.cbl
+* 000146 SQLWARN1. . . . . . . . . . . . 0000066281 00000001  WS E    AlphNum
+* 000147 SQLWARN2. . . . . . . . . . . . 0000066282 00000001  WS E    AlphNum
+* 000148 SQLWARN3. . . . . . . . . . . . 0000066283 00000001  WS E    AlphNum
+* 000149 SQLWARN4. . . . . . . . . . . . 0000066284 00000001  WS E    AlphNum
+* 000150 SQLWARN5. . . . . . . . . . . . 0000066285 00000001  WS E    AlphNum
+* 000151 SQLWARN6. . . . . . . . . . . . 0000066286 00000001  WS E    AlphNum
+* 000152 SQLWARN7. . . . . . . . . . . . 0000066287 00000001  WS E    AlphNum
+* 000153 SQLEXT. . . . . . . . . . . . . 0000066288 00000003  WS G    AlphNum
+* 000154 SQLWARN8. . . . . . . . . . . . 0000066288 00000001  WS E    AlphNum
+* 000155 SQLWARN9. . . . . . . . . . . . 0000066289 00000001  WS E    AlphNum
+* 000156 SQLWARN10 . . . . . . . . . . . 0000066290 00000001  WS E    AlphNum
+* 000157 SQLWARNA. . . . . . . . . . . . 0000066290 00000001  WS E    AlphNum    R
+* 000158 SQLSTATE. . . . . . . . . . . . 0000066291 00000005  WS E    AlphNum
+* 000164 SQLCMD. . . . . . . . . . . . . 0000066296 00001024  WS E    AlphNum
+* 000165 SVR . . . . . . . . . . . . . . 0000067320 00000032  WS E    AlphNum
+* 000166 USR . . . . . . . . . . . . . . 0000067352 00000032  WS E    AlphNum
+* 000167 PASS. . . . . . . . . . . . . . 0000067384 00000032  WS E    AlphNum
+* 000168 USR-PASS. . . . . . . . . . . . 0000067416 00000064  WS E    AlphNum
+* 000169 WS-DISP-CODE. . . . . . . . . . 0000067480 00000011  WS E    Display
+* 000189 INDICATOR-VAIABLES-FOR-NULLS. . 0000067496 00000006  WS G    AlphNum
+* 000190 NU-STATE. . . . . . . . . . . . 0000067496 00000002  WS E    Comp
+* 000191 NU-CITY . . . . . . . . . . . . 0000067498 00000002  WS E    Comp
+* 000192 NU-COUNTY . . . . . . . . . . . 0000067500 00000002  WS E    Comp
+* 000194 ZIP-CODES . . . . . . . . . . . 0000067504 00000077  WS G    AlphNum
+* 000195 ZC-ZIPCODE. . . . . . . . . . . 0000067504 00000005  WS E    AlphNum
+* 000196 ZC-STATE. . . . . . . . . . . . 0000067509 00000002  WS E    AlphNum
+* 000197 ZC-CITY . . . . . . . . . . . . 0000067511 00000030  WS E    AlphNum
+* 000198 ZC-COUNTY . . . . . . . . . . . 0000067541 00000040  WS E    AlphNum
+* 000204 WS-MISC . . . . . . . . . . . . 0000067584 00000127  WS G    AlphNum
+* 000205 WS-FILE-IN. . . . . . . . . . . 0000067584 00000026  WS E    AlphNum
+* 000206 WS-CONNECT-SW . . . . . . . . . 0000067610 00000001  WS E    AlphNum
+* 000208 WS-FILE-IN-STATUS . . . . . . . 0000067611 00000002  WS E    AlphNum
+* 000209 WS-CURL-RETURN-CD . . . . . . . 0000067613 00000004  WS E    Comp-5
+* 000210 WS-CURL-STRING. . . . . . . . . 0000067617 00000094  WS G    AlphNum
+* 000211 F . . . . . . . . . . . . . . . 0000067617 00000016  WS E    AlphNum
+* 000213 FILENAME-ZIP. . . . . . . . . . 0000067633 00000005  WS E    AlphNum
+* 000214 F . . . . . . . . . . . . . . . 0000067638 00000004  WS E    AlphNum
+* 000215 F . . . . . . . . . . . . . . . 0000067642 00000015  WS E    AlphNum
+* 000217 CURL-ZIP. . . . . . . . . . . . 0000067657 00000005  WS E    AlphNum
+* 000218 F . . . . . . . . . . . . . . . 0000067662 00000048  WS E    AlphNum
+* 000220 F . . . . . . . . . . . . . . . 0000067710 00000001  WS E    AlphNum
+* 000222 WS-RESPONSE . . . . . . . . . . 0000067712 00000004  WS E    Comp
+* 000233 F . . . . . . . . . . . . . . . 0000067720 00000057  WS G    AlphNum
+* 000234 WS-OUTPUTZIP. . . . . . . . . . 0000067720 00000005  WS E    AlphNum
+* 000235 WS-CITY . . . . . . . . . . . . 0000067725 00000050  WS E    AlphNum
+* 000236 WS-STATE. . . . . . . . . . . . 0000067775 00000002  WS E    AlphNum
+* 000238 MFSQLECM-DATA-AREA. . . . . . . 0000067784 00065999  WS G    AlphNum
+* 000238 MFSQLECM-PID. . . . . . . . . . 0000067784 00000340  WS E    AlphNum
+* 000238 MFSQLECM-SQLCODE. . . . . . . . 0000068124 00000004  WS E    Comp-5
+* 000238 MFSQLECM-SQLCODE-2. . . . . . . 0000068128 00000004  WS E    Comp-5
+* 000238 MFSQLECM-SPARE. . . . . . . . . 0000068132 00000002  WS E    Comp-5
+* 000238 MFSQLECM-HOST-VAR-LENGTH. . . . 0000068134 00000002  WS E    Comp-5
+* 000238 MFSQLECM-IX-SELF. . . . . . . . 0000068136 00000004  WS E    Comp-5
+* 000238 MFSQLECM-PER-IDX. . . . . . . . 0000068140 00000004  WS E    Comp-5
+* 000238 MFSQLECM-SESSION-ID . . . . . . 0000068144 00000004  WS E    Comp-5
+* 000238 MFSQLECM-STMT-ID. . . . . . . . 0000068148 00000002  WS E    Comp-5
+* 000238 MFSQLECM-SQLDSIZE . . . . . . . 0000068150 00000002  WS E    Comp-5
+* 000238 MFSQLECM-SQLDA-ID . . . . . . . 0000068152 00000002  WS E    Comp-5
+* Micro Focus Server Express         V5.1 revision 000 18-Feb-21 09:37 Page  10
+* WSZIPCDB.cbl
+* 000238 MFSQLECM-DATA-TYPE. . . . . . . 0000068154 00000002  WS E    Comp-5
+* 000238 MFSQLECM-VAR-INDEX. . . . . . . 0000068156 00000002  WS E    Comp-5
+* 000238 MFSQLECM-OCCURS . . . . . . . . 0000068158 00000004  WS E    Comp-5
+* 000238 MFSQLECM-CALL-TYPE. . . . . . . 0000068162 00000002  WS E    Comp-5
+* 000238 MFSQLECM-SECTION-NUMBER . . . . 0000068164 00000002  WS E    Comp-5
+* 000238 MFSQLECM-INPUT-SQLDA-ID . . . . 0000068166 00000002  WS E    Comp-5
+* 000238 MFSQLECM-OUTPUT-SQLDA-ID. . . . 0000068168 00000002  WS E    Comp-5
+* 000238 MFSQLECM-SETSLEN. . . . . . . . 0000068170 00000002  WS E    Comp-5
+* 000238 MFSQLECM-SWAP-IX. . . . . . . . 0000068172 00000004  WS E    Comp-5
+* 000238 MFSQLECM-MSGLEN . . . . . . . . 0000068176 00000002  WS E    Comp-5
+* 000238 MFSQLECM-SAVE-RC. . . . . . . . 0000068178 00000004  WS E    Comp-5
+* 000238 MFSQLECM-INIT-FLAG. . . . . . . 0000068182 00000001  WS E    Comp-X
+* 000238 MFSQLECM-PPTR . . . . . . . . . 0000068183 00000004  WS E    Pointer
+* 000238 MFSQLECM-SWAP-AREA. . . . . . . 0000068187 00000001  WS E    AlphNum
+* 000238 MFSQLECM-SQL-TEXT . . . . . . . 0000068188 00065535  WS E    AlphNum
+* 000238 MFSQLECM-SQLWARN. . . . . . . . 0000133723 00000001  WS E    AlphNum
+* 000238 MFSQLECM-SQLSTATE-2 . . . . . . 0000133724 00000002  WS E    AlphNum
+* 000238 MFSQLECM-LIT1 . . . . . . . . . 0000133726 00000019  WS E    AlphNum
+* 000238 MFSQLECM-LIT2 . . . . . . . . . 0000133745 00000019  WS E    AlphNum
+* 000238 MFSQLECM-LIT3 . . . . . . . . . 0000133764 00000019  WS E    AlphNum
+* 000240 WS-PASS-AREA. . . . . . . . . . 0000000000 00000067  LS G    AlphNum
+* 000241 PA-ZIP. . . . . . . . . . . . . 0000000000 00000005  LS E    AlphNum
+* 000242 PA-ERRORCODE. . . . . . . . . . 0000000005 00000010  LS E    AlphNum
+* 000243 PA-CITY . . . . . . . . . . . . 0000000015 00000050  LS E    AlphNum
+* 000244 PA-STATE. . . . . . . . . . . . 0000000065 00000002  LS E    AlphNum
+* 000000 XML-TEXT. . . . . . . . . . . . 0000000000 00000001  LS E    AlphNum      G
+* 000000 XML-NTEXT . . . . . . . . . . . 0000000000 00000002  LS E    AlphNum      G
+* 000000 XML-CODE. . . . . . . . . . . . 0000133792 00000004  PG E    Comp         G
+* 000000 XML-EVENT . . . . . . . . . . . 0000133796 00000030  PG E    AlphNum      G
+* 000000 RETURN-CODE . . . . . . . . . . 0000133828 00000004  PG E    Comp         G
+* 000000 SORT-RETURN . . . . . . . . . . 0000133832 00000002  PG E    Comp         G
+* 000000 TALLY . . . . . . . . . . . . . 0000133836 00000004  PG E    Comp         G
+* 000000 SORT-MESSAGE. . . . . . . . . . 0000133840 00000008  PG E    AlphNum      G
+* 000000 SORT-FILE-SIZE. . . . . . . . . 0000133848 00000004  PG E    Comp         G
+* 000000 SORT-MODE-SIZE. . . . . . . . . 0000133852 00000004  PG E    Comp         G
+* 000000 SORT-CORE-SIZE. . . . . . . . . 0000133856 00000004  PG E    Comp         G
+* 000000 SORT-CONTROL. . . . . . . . . . 0000133860 00000008  PG E    AlphNum      G
+* 000000 SHIFT-OUT . . . . . . . . . . . 0000133868 00000001  PG E    AlphNum      G
+* 000000 SHIFT-IN. . . . . . . . . . . . 0000133872 00000001  PG E    AlphNum      G
+*
+* Micro Focus Server Express         V5.1 revision 000 Compiler
+* Copyright (C) Micro Focus IP Development Limited 1984-2012.
+*                                                        REF GNR-008065005AF
+* Total Messages:     0
+* Data:      134312     Code:        2116

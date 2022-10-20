@@ -1,0 +1,264 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE EQ 64 GOTO END_JOB 
+
+################################################################################
+LABEL name=BKPCNTL 
+################################################################################
+#  ********************************************************************  
+#  ***                                                                   
+#  **  creates backup of prod elcntl FILE                                     
+#  ***                                                                   
+#  ********************************************************************  
+ASSGNDD ddname='SYSUT1' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYSUT2' filename='/tmp/elcntl.bkp' type='FS' disp='o' normal='k' abend='d' recsize='750' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO INFILE(SYSUT1) OUTFILE(SYSUT2)                                  
+  SET MAXCC=0                                   
+!
+
+EXECPGM pgmname='IDCAMS' stepname='BKPCNTL' 
+
+################################################################################
+LABEL name=LOADCNTL 
+################################################################################
+#  ********************************************************************  
+#  ***                                                                   
+#  **  LOADS THE DUMMY "ELCNTL" FILE                                     
+#  ***                                                                   
+#  ********************************************************************  
+ASSGNDD ddname='SYSUT1' filename='/tmp/elcntl.bkp' disp='i' 
+ASSGNDD ddname='SYSUT2' dataset='CI.TT.LG.ELCNTL' type='VS' filename='ELCNTLT' disp='i-o' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO INFILE(SYSUT1) OUTFILE(SYSUT2)                                  
+  SET MAXCC=0                                   
+!
+
+EXECPGM pgmname='IDCAMS' stepname='LOADCNTL' 
+
+################################################################################
+LABEL name=EL349 
+################################################################################
+#  ********************************************************************  
+#  ***                                                                   
+#  **  LOADS ONE DUMMY RECORD INTO "ERCOMP" TO INITIALIZE THE FILE.      
+#  ***                                                                   
+#  ********************************************************************  
+ASSGNDD ddname='ERCOMP' dataset='CI.TT.LG.ERCOMP' type='VS' filename='ERCOMPT' disp='i-o' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+ERCOMP  LOAD                                                            
+!
+
+EXECPGM pgmname='EL349' stepname='EL349' 
+
+################################################################################
+LABEL name=EL509 
+################################################################################
+#  ********************************************************************* 
+#  **--                                                                  
+#  **--       BATCH TO ONLINE COMPENSATION LOAD                          
+#  **--   SEE RESTART INSTRUCTIONS BEFORE RESTARTING                     
+#  **--                                                                  
+#  ********************************************************************* 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZI.ME.COMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERCOMP' dataset='CI.TT.LG.ERCOMP' type='VS' filename='ERCOMPT' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.TT.LG.ELCNTL' type='VS' filename='ELCNTLT' disp='i-o' 
+ASSGNDD ddname='ELREPT' dataset='CI.DD.LG.ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+ASSGNDD ddname='SYS013' type='DUMMY'
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='EL509' stepname='EL509' 
+
+################################################################################
+LABEL name=CIB007 
+################################################################################
+#  ******************************************************************** 
+#  *                                                                  * 
+#  *   READ THE PRINT LINES AND PRINT THE BILLING STATEMENTS          * 
+#  *                                                                  * 
+#  ******************************************************************** 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/CI.EX.FICH562' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERCOMP' dataset='CI.TT.LG.ERCOMP' type='VS' filename='ERCOMPT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+****************************** REMIT STMTS      
+ASSGNDD ddname='SYS020' filename='\${SEQFILES}/CI.WW.REMIT.STMT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+****************************** REFUND STMTS     
+ASSGNDD ddname='SYS021' filename='\${SEQFILES}/CI.WW.REFUND1.STMT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS024' filename='\${SEQFILES}/CI.WW.REFUND2.STMT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS025' filename='\${SEQFILES}/CI.WW.REFUND3.STMT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+******************************  TYPE S STMTS     
+ASSGNDD ddname='SYS022' filename='\${SEQFILES}/CI.WW.TYPE.S.STMT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+******************************  TYPE T STMTS     
+ASSGNDD ddname='SYS023' filename='\${SEQFILES}/CI.WW.TYPE.T.STMT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS026' filename='\${SEQFILES}/CI.WW.TYPE.E.STMT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS027' filename='$SEQFILES/CI.WW.TYPE.R.STMT' disp='o' normal='k' abend='d' recsize='148' recfmt='F' 
+ASSGNDD ddname='SYS030' filename='\${SEQFILES}/ci.ul.remit.ltr.txt' disp='i-o' 
+ASSGNDD ddname='SYS031' filename='\${SEQFILES}/ci.ul.refund.ltr.txt' disp='i-o' 
+ASSGNDD ddname='SYS032' filename='\${SEQFILES}/ci.ul.zero.ltr.txt' disp='i-o' 
+
+EXECPGM pgmname='CIB007' stepname='CIB007' 
+
+################################################################################
+LABEL name=SORT1
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.WW.TYPE.R.STMT' disp='i' normal='k' abend='k' recsize='148' recfmt='F'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.WW.TYPE.R.STMT.REC1' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       INCLUDE=(1 1 EQ '1')
+       KEYS=(1 1) (2 5 PDEC) (7 9)
+       ARRANGE=(16,133)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT1'
+
+################################################################################
+LABEL name=SORT2
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.WW.TYPE.R.STMT' disp='i' normal='k' abend='k' recsize='148' recfmt='F'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.WW.TYPE.R.STMT.REC2' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       INCLUDE=(1 1 EQ '2')
+       KEYS=(1 1) (2 5 PDEC) (7 9)
+       ARRANGE=(16,133)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT2'
+
+################################################################################
+LABEL name=SORT3
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/CI.WW.TYPE.R.STMT' disp='i' normal='k' abend='k' recsize='148' recfmt='F'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/CI.WW.TYPE.R.STMT.REC3' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       INCLUDE=(1 1 EQ '3')
+       KEYS=(1 1) (2 5 PDEC) (7 9)
+       ARRANGE=(16,133)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT3'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/CI.WW.REMIT.STMT' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='C' recfmt='F'  
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=PRINT2A
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/CI.WW.REFUND1.STMT' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='C' recfmt='F'  
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT2A' 
+
+################################################################################
+LABEL name=PRINT2B
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/CI.WW.REFUND2.STMT' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='C' recfmt='F'  
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT2B' 
+################################################################################
+LABEL name=PRINT2C
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/CI.WW.REFUND3.STMT' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='C' recfmt='F'  
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT2C' 
+
+################################################################################
+LABEL name=PRINT3 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/CI.WW.TYPE.S.STMT' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' recfmt='F'  
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT3' 
+
+################################################################################
+LABEL name=PRINT4 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/CI.WW.TYPE.T.STMT' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT4' 
+
+################################################################################
+LABEL name=PRINT5 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/CI.WW.TYPE.E.STMT' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT5' 
+
+################################################################################
+LABEL name=RDS562
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/CI.EX.FICH562' disp='i'
+ASSGNDD ddname='SYS011' filename='/$RDSFILES/CI.RDS.PAPER.EL562' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='RDS562' parm='ALL'
+
+################################################################################
+LABEL name=PRINT6 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/CI.EX.FICH562' disp='i-o' normal='k' abend='k' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' recfmt='F'  
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT6' 
+
+################################################################################
+#  ******************************************************************** 
+#  *                                                                  * 
+#  *   CREATE GL A/P TRANSACTIONS, LOGIC PAYMENT TRANSACTIONS AND     * 
+#  *   AND REPORTS.                                                   * 
+#  *                                                                  * 
+#  ******************************************************************** 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+##    "exelpr.sh cim010.parms '-ode=CI -oti=REMIT' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+##    "exelpr.sh cim012.parms '-ode=CI -oti=REFUNDS_EXT1' $SYSOUTDIR/$JOBNAME/PRINT2A/SYSUT2_$JON"
+##    "exelpr.sh cim011.parms '-ode=CI -oti=REFUNDS_EXT2' $SYSOUTDIR/$JOBNAME/PRINT2B/SYSUT2_$JON"
+##    "exelpr.sh cim012.parms '-ode=CI -oti=REFUNDS_ZERO_BAL' $SYSOUTDIR/$JOBNAME/PRINT2C/SYSUT2_$JON"
+##    "exelpr.sh cim005.parms '-ode=CI -oti=SPECIALS' $SYSOUTDIR/$JOBNAME/PRINT3/SYSUT2_$JON"
+##    "exelpr.sh cim005.parms '-ode=CI -oti=T_STATEMENTS' $SYSOUTDIR/$JOBNAME/PRINT4/SYSUT2_$JON"
+##    "exelpr.sh cim005.parms '-ode=CI -oti=E_STATEMENTS' $SYSOUTDIR/$JOBNAME/PRINT5/SYSUT2_$JON"
+##    "exelpr.sh cim005.parms '-ode=CI -oti=NEG_R_STATEMENTS' $SEQFILES/CI.WW.TYPE.R.STMT.REC1"
+##    "exelpr.sh cim005.parms '-ode=CI -oti=ZERO_R_STATEMENTS' $SEQFILES/CI.WW.TYPE.R.STMT.REC2"
+##    "exelpr.sh cim005.parms '-ode=CI -oti=POS_R_STATEMENTS' $SEQFILES/CI.WW.TYPE.R.STMT.REC3"
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

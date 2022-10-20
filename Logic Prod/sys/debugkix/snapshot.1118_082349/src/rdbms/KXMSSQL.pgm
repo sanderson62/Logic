@@ -1,0 +1,153 @@
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2007-2013 Dell Inc.                             *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+      $SET SQL(DBMAN=ODBC,TARGETDB=MSSQLSERVER,CHECK)
+       IDENTIFICATION  DIVISION.
+       PROGRAM-ID. KXMSQLGN.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+	   EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+      *---------------------------------------------------------------*
+      * Either put the USERID and USERPASS values here or use the SIT
+      * application name to login 
+      *---------------------------------------------------------------*
+       01  DBMSNAME                       PIC X(32).
+       01  USERPASS                       PIC X(32).
+       01  USERNAME                       PIC X(8).
+	   EXEC SQL END DECLARE SECTION END-EXEC.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+
+       01  BG-FLAG                        PIC 9.
+       01  SQLCODE-DISP                   PIC -9(5).
+      *---------------------------------------------------------------*
+      * This copy book gives the tct and system information 
+      *---------------------------------------------------------------*
+       COPY "KXINFO.CPY".
+      *---------------------------------------------------------------*
+      * Sample COBOL program which contains entry points for
+      * interfacing UniKix's user exits with SQL SERVER software. The main
+      * entry point(KXMSQLGN) is for logging onto the SQL SERVER server and
+      * is called by the UniKix transaction processors
+      * and batch vsam processor when they are
+      * initiated by the UniKix system. Entry point KXMSQLGF is for
+      * logging off from the SQL SERVER server and is called by the UniKix 
+      * transaction processors and batch vsam processors when they terminate.
+      *
+      * Entry point KXMSQSAVE is for executing an SQL COMMIT statement and
+      * will be called at UniKix sync point time. If the user COBOL programs
+      * are already doing COMMITs, then this statement will have no effect.
+      * Entry point KXMSQUNDO is for executing an SQL ROLLBACK statement and
+      * will be called at UniKix rollback time. If the user COBOL programs
+      * are already doing ROLLBACKs, then this statement will have no effect.
+      *
+      *---------------------------------------------------------------*
+       PROCEDURE DIVISION.
+	   MOVE "KXMSQLGN" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ABORT END-EXEC.
+	   EXEC SQL WHENEVER SQLWARNING GOTO SQL-ERROR END-EXEC.
+      *---------------------------------------------------------------*
+      * This call update the  sit information
+      * user can use this information to set the userid  or servername
+      * in this example, application name is used as the userid and
+      * password.
+      *---------------------------------------------------------------*
+       	   CALL "kxsysinfo" using KIX-SYS-INFO.
+           STRING KIX-SIT-SRV-NAME, ". ", KIX-SIT-DB-NAME
+              delimited by " " into dbmsname.
+           string kix-sit-usr-name, ". ", kix-sit-usr-pass
+              delimited by " " into userpass.
+           EXEC SQL CONNECT TO :dbmsname USER :userpass END-EXEC.
+           SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXMSQLGF".
+	   MOVE "KXMSQLGF" TO KIX-MSG-ROUTINE.
+	   IF BG-FLAG NOT EQUAL 1
+	      EXEC SQL BEGIN TRANSACTION END-EXEC.
+	   EXEC SQL ROLLBACK WORK END-EXEC.
+           EXEC SQL DISCONNECT ALL END-EXEC.
+	   MOVE 0 to BG-FLAG.
+           SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXMSQBTRN".
+	   MOVE "KXMSQBTRN" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ABORT END-EXEC.
+	   IF BG-FLAG NOT EQUAL 1
+	      EXEC SQL BEGIN TRANSACTION END-EXEC.
+           MOVE 1 TO BG-FLAG.
+      *---------------------------------------------------------------*
+      * This call update the tct information
+      *---------------------------------------------------------------*
+       	   CALL "kxtctinfo" using KIX-TCT-INFO.
+      *---------------------------------------------------------------*
+      * SQL SERVER specific security feature
+      *---------------------------------------------------------------*
+      *    MOVE KIX-USRNAM TO USERNAME.
+      *    EXEC SQL SETUSER :USERNAME END-EXEC.
+           SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXMSQETRN".
+	   MOVE "KXMSQETRN" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+	   IF BG-FLAG NOT EQUAL 1
+	      EXEC SQL BEGIN TRANSACTION END-EXEC.
+           EXEC SQL COMMIT WORK END-EXEC.
+           SET RETURN-CODE TO 0.
+	   MOVE 0 TO BG-FLAG.
+           EXIT PROGRAM.
+       ENTRY "KXMSQSAVE".
+	   MOVE "KXMSQSAVE" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+	   IF BG-FLAG NOT EQUAL 1
+	      EXEC SQL BEGIN TRANSACTION END-EXEC.
+           EXEC SQL COMMIT WORK END-EXEC.
+	   EXEC SQL BEGIN TRANSACTION END-EXEC.
+	   MOVE 1 TO BG-FLAG.
+           SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXMSQUNDO".
+	   MOVE "KXMSQUNDO" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+	   IF BG-FLAG NOT EQUAL 1
+	      EXEC SQL BEGIN TRANSACTION END-EXEC.
+           EXEC SQL ROLLBACK WORK END-EXEC.
+	   EXEC SQL BEGIN TRANSACTION END-EXEC.
+	   MOVE 1 TO BG-FLAG.
+           SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       SQL-ABORT.
+      *---------------------------------------------------------------*
+      *    Set return-code to Failure (1) or Abort (-1)
+      *    Failure during allocation brings up the SERVER, without
+      *           the database connected.
+      *    Abort always aborts the  transaction SERVER
+      *    This example aborts the transaction SERVER
+      *---------------------------------------------------------------*
+	   MOVE SQLCODE TO SQLCODE-DISP.
+	   STRING "DATABASE ERROR. SQLCODE = ", SQLCODE-DISP
+		  DELIMITED BY SIZE INTO KIX-MSG-STR.
+           CALL "kxsetmsg" USING KIX-MSG-INFO.
+           MOVE SQLERRMC TO KIX-MSG-STR.
+           CALL "kxsetmsg" USING KIX-MSG-INFO.
+	   SET RETURN-CODE TO -1.
+           EXIT PROGRAM.
+       SQL-ERROR.
+      *---------------------------------------------------------------*
+      *    Set return-code to Failure (1) or Abort (-1)
+      *    Failure during other exits terminates the transaction
+      *    Abort always aborts the  transaction SERVER
+      *    This example terminates transaction.
+      *---------------------------------------------------------------*
+	   MOVE SQLCODE TO SQLCODE-DISP.
+	   STRING "DATABASE ERROR. SQLCODE = ", SQLCODE-DISP
+		  DELIMITED BY SIZE INTO KIX-MSG-STR.
+           CALL "kxsetmsg" USING KIX-MSG-INFO.
+           MOVE SQLERRMC TO KIX-MSG-STR.
+           CALL "kxsetmsg" USING KIX-MSG-INFO.
+	   SET RETURN-CODE TO 1.
+           EXIT PROGRAM.

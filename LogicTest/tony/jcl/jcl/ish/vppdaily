@@ -1,0 +1,60 @@
+cd /apps/prod/cid1p/jcl
+
+#########################  B E G I N  S T E P  01   #########################
+echo "Begin Cycle Date Tests "
+
+setenv prevcydte `cat $SEQFILES/PrevCycleDate`
+setenv curcydte `cat $SEQFILES/CurCycleDate`
+
+if (`date +%Y%m%d` != 20221018) then
+   echo "Cycle Date NOT equal Current date, aborting "
+   "smtp -f slunikix -t pager.pema,cycle -s 'VPP Daily Cycle Aborted' -ml 'Bad Current cycle date'"
+   exit 1
+endif
+
+if (`cat $SEQFILES/PrevCycleDate` != 20221017) then
+   echo " Previous cycle date not = last cycle date "
+   "smtp -f slunikix -t pager.pema,cycle -s 'VPP Daily Cycle Aborted' -ml 'Bad Prev cycle date'"
+   exit 1
+endif
+
+if (`cat $SEQFILES/CurCycleDate` == 20221018) then
+   echo " Current cycle already ran "
+   "smtp -f slunikix -t pager.pema,cycle -s 'VPP Daily Cycle Aborted' -ml 'Cycle already ran for today'"
+   exit 1
+endif
+
+echo "Cycle Date Tests Complete"
+
+#########################    E N D    S T E P  01   #########################
+
+echo "vppdaily1 is about to start"
+unikixjob vppdaily1 -w -ca
+if ($status != 0) then
+    echo "vppdaily1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'VPP Daily Cycle Aborted' -ml 'In VPPDAILY1'"
+    exit 1
+endif
+echo "vppdaily1 terminated successfully"
+
+if (`date +%Y%m%d` == 20221027 || `date +%Y%m%d` == 20221028) then
+   echo "vplgedit is about to start"
+   unikixjob vplgedit -w -ca
+   if ($status != 0) then
+       echo "vplgedit aborted"
+      "smtp -f slunikix -t pager.pema,cycle -s 'VPP Daily Cycle Aborted' -ml 'In VPLGEDIT'"
+       exit 1
+   endif
+   echo "vplgedit terminated successfully"
+endif
+
+"smtp -f slunikix -t pager.pema,cycle,pager.sdga -s 'VPP Daily Cycle Complete' -ml 'VPP Daily Cycle Complete'"
+
+#########################    E N D    S T E P  05   #########################
+
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 040517 CR2015082500001 PEMA   NEW JOB for VPP

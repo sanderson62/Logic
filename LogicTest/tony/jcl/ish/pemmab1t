@@ -1,0 +1,48 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+if ($EBMSYS != "cid1t") then
+   echo "Job Aborted, Not CID1T"
+   exit 1
+endif
+
+setenv dtetme `date +%m%d%H%M%S`
+
+################################################################################
+LABEL name=BEGSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/Logic.PostCard.Status.txt
+ftp -n ntcso1 < $JCLLIB/ftp-cidmab1
+!
+EXECPGM pgmname='BPXBATCH' stepname='BEGSTEP' parm='SH'
+
+################################################################################
+LABEL name=STEP0
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ -a /data/test/seqfiles/Logic.PostCard.Status.txt ] ; then
+   echo "we got a file " ;
+else
+   echo "No file today "
+   exit 1
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP0' parm='SH'
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cp $SEQFILES/Logic.PostCard.Status.txt $SEQFILES/postcard.file.$dtetme
+tr -d '\011' < $SEQFILES/Logic.PostCard.Status.txt > $SEQFILES/postcard.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+ENDJOB 
+################################################################################

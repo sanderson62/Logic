@@ -1,0 +1,662 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    EL547R.
+       AUTHOR.        CENTRAL STATES HEALTH AND LIFE.
+       DATE-COMPILED.
+
+      *REMARKS.
+      *    THIS PROGRAM READS THE MONTH END CERT FILE
+      *    AND BUILDS AN EXTRACT BY ISSUE YEAR.  THE EXTRACT IS
+      *    PRIMARLIY USED BY ACTUARY.    THE REFUNDS SELECTED ARE
+      *    PLACED IN THE VALUATION YEAR BASED ON THE CANCEL DATE.
+      *    THE LOWEST ISSUE YEAR WILL BE 1997. IF YOU NEED TO CHANGE
+      *    THAT, SIMPLY CHANGE THE HARD CODING WHERE YOU FIND 1997.
+
+020122******************************************************************
+020122*                   C H A N G E   L O G
+020122*
+020122* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+020122*-----------------------------------------------------------------
+020122*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+020122* EFFECTIVE    NUMBER
+020122*-----------------------------------------------------------------
+020122* 020122 IR2022020100005   PEMA  Increase table sizes.
+
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT CERTS                ASSIGN TO SYS010.
+           SELECT EXTRACT              ASSIGN TO SYS011
+              ORGANIZATION IS LINE SEQUENTIAL.
+           SELECT DISK-DATE            ASSIGN TO SYS019.
+           SELECT PRINTX               ASSIGN TO SYS008.
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  CERTS
+                                       COPY ECSCRIFD.
+                                       COPY ECSCRT01.
+
+       FD  EXTRACT
+           BLOCK CONTAINS 0 RECORDS
+           RECORDING MODE IS F.
+
+       01  EXTRACT-RECORD-OUT          PIC X(165).
+       01  EXTRACT-RECORD-OUT-HD       PIC X(139).
+
+
+       FD  DISK-DATE
+                                       COPY ELCDTEFD.
+       FD  PRINTX
+                                       COPY ELCPRTFD.
+       WORKING-STORAGE SECTION.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  FILLER  PIC X(32) VALUE '      EL547R  WORKING STORAGE   '.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+
+       77  WS-EOF-SW                   PIC X  VALUE SPACES.
+           88  END-OF-INPUT               VALUE 'Y'.
+       77  IYR                         PIC S999   COMP-3 VALUE +0.
+       77  VYR                         PIC S999   COMP-3 VALUE +0.
+020122 77  MAX-IYR                     PIC S999   COMP-3 VALUE +360.
+020122 77  MAX-VYR                     PIC S999   COMP-3 VALUE +360.
+       77  BT                          PIC S9     COMP-3 VALUE +0.
+       77  PAGE-CTR                    PIC S9(07) VALUE +0  COMP-3.
+       77  LINE-CTR                    PIC S9(03) VALUE +99 COMP-3.
+       77  X                           PIC X      VALUE ' '.
+       77  WS-CRT-CNT                  PIC S9(9)  COMP-3 VALUE +0.
+       77  WS-CRT-CNT-TOT              PIC S9(9)  COMP-3 VALUE +0.
+       77  INTERMED                    PIC S9(9)V9(6)  COMP-3.
+
+       01  WS-INIT-EXT-RECORD          PIC X(165)  VALUE LOW-VALUES.
+
+       01  WS-EXTRACT-RECORD.
+           05  EXT-ISSUE-CCYYMM        PIC 9(6).
+           05  WS-TAB1                 PIC X.
+           05  EXT-VALUE-CCYYMM        PIC 9(6).
+           05  WS-TAB2                 PIC X.
+           05  EXT-LF-WRITTEN          PIC ZZZ,ZZZ,ZZ9.99.
+           05  WS-TAB3                 PIC X.
+           05  EXT-AH-WRITTEN          PIC ZZZ,ZZZ,ZZ9.99.
+           05  WS-TAB4                 PIC X.
+           05  EXT-LF-REFUNDS          PIC ZZZ,ZZZ,ZZ9.99.
+           05  WS-TAB5                 PIC X.
+           05  EXT-LF-REF-CALC         PIC ZZZ,ZZZ,ZZ9.99.
+           05  WS-TAB5A                PIC X.
+           05  EXT-AH-REFUNDS          PIC ZZZ,ZZZ,ZZ9.99.
+           05  WS-TAB6                 PIC X.
+           05  EXT-AH-REF-CALC         PIC ZZZ,ZZZ,ZZ9.99.
+           05  WS-TAB6A                PIC X.
+           05  EXT-LF-ISS-CNT          PIC ZZZ,ZZZ,ZZ9.
+           05  WS-TAB7                 PIC X.
+           05  EXT-AH-ISS-CNT          PIC ZZZ,ZZZ,ZZ9.
+           05  WS-TAB8                 PIC X.
+           05  EXT-LF-CNC-CNT          PIC ZZZ,ZZZ,ZZ9.
+           05  WS-TAB9                 PIC X.
+           05  EXT-AH-CNC-CNT          PIC ZZZ,ZZZ,ZZ9.
+           05  WS-TAB10                PIC X.
+           05  EXT-BUS-TYPE            PIC X(4).
+
+       01  WS-HEAD-RECORD.
+           05  FILLER                  PIC X(8)    VALUE 'ISS DATE'.
+           05  WS-HTAB1                PIC X.
+           05  FILLER                  PIC X(8)    VALUE 'VAL DATE'.
+           05  WS-HTAB2                PIC X.
+           05  FILLER                  PIC X(10)   VALUE 'LF WRITTEN'.
+           05  WS-HTAB3                PIC X.
+           05  FILLER                  PIC X(10)   VALUE 'AH WRITTEN'.
+           05  WS-HTAB4                PIC X.
+           05  FILLER                  PIC X(10)   VALUE 'LF REFUNDS'.
+           05  WS-HTAB5                PIC X.
+           05  FILLER                  PIC X(10)   VALUE 'LF REF CAL'.
+           05  WS-HTAB5A               PIC X.
+           05  FILLER                  PIC X(10)   VALUE 'AH REFUNDS'.
+           05  WS-HTAB6                PIC X.
+           05  FILLER                  PIC X(10)   VALUE 'AH REF CAL'.
+           05  WS-HTAB6A               PIC X.
+           05  FILLER                  PIC X(10)   VALUE 'LF ISS CNT'.
+           05  WS-HTAB7                PIC X.
+           05  FILLER                  PIC X(10)   VALUE 'AH ISS CNT'.
+           05  WS-HTAB8                PIC X.
+           05  FILLER                  PIC X(10)   VALUE 'LF REF CNT'.
+           05  WS-HTAB9                PIC X.
+           05  FILLER                  PIC X(10)   VALUE 'AH REF CNT'.
+           05  WS-HTAB10               PIC X.
+           05  FILLER                  PIC X(8)    VALUE 'BUS TYPE'.
+
+       01  WS-ISSUE-YR-TABLE.
+020122     05  WS-ISSUE         OCCURS 360.
+               10  WS-ISSUE-CCYYMM     PIC 9(6).
+               10  FILLER              PIC XX.
+020122         10  WS-VALUATION OCCURS 360.
+                 12  WS-RECORD.
+                   15  WS-VALUATION-CCYYMM PIC 9(6).
+                   15  FILLER OCCURS 3.
+                    16  WS-LF-WRITTEN   PIC S9(9)V99 COMP-3.
+                    16  WS-AH-WRITTEN   PIC S9(9)V99 COMP-3.
+                    16  WS-LF-REFUNDS   PIC S9(9)V99 COMP-3.
+                    16  WS-LF-REF-CALC  PIC S9(9)V99 COMP-3.
+                    16  WS-AH-REFUNDS   PIC S9(9)V99 COMP-3.
+                    16  WS-AH-REF-CALC  PIC S9(9)V99 COMP-3.
+                    16  WS-LF-ISS-CNT   PIC S9(9)    COMP-3.
+                    16  WS-AH-ISS-CNT   PIC S9(9)    COMP-3.
+                    16  WS-LF-CNC-CNT   PIC S9(9)    COMP-3.
+                    16  WS-AH-CNC-CNT   PIC S9(9)    COMP-3.
+
+       01  FILLER                  PIC X(400)  VALUE LOW-VALUES.
+
+       01  WS-DISPLAY-DATE         PIC ZZZ9(8).
+       01  WS-DISPLAY-TERM         PIC Z99.
+       01  WS-DISPLAY-RTERM        PIC Z99.99.
+       01  WS-DISPLAY-AMT          PIC ZZZZZZZ.99.
+       01  WS-DISPLAY-PRM          PIC ZZZZZZZ.99.
+       01  WS-BIN-CR-DT            PIC XX  VALUE LOW-VALUES.
+       01  WS-BIN-LF-END-DATE      PIC XX  VALUE LOW-VALUES.
+       01  WS-BIN-AH-END-DATE      PIC XX  VALUE LOW-VALUES.
+       01  FILLER. 
+           05  WS-END-YEAR             PIC 9(11)  VALUE ZEROS.
+           05  FILLER REDEFINES WS-END-YEAR.
+               10  FILLER              PIC 999.
+               10  WS-CCYYMM           PIC 9(6).
+               10  FILLER REDEFINES WS-CCYYMM.
+                   15  WS-CCYY         PIC 9999.
+                   15  WS-MM           PIC 99.
+               10  WS-DD               PIC 99.
+       01  WS-DEBUG-AREA.
+           12  WS-DEBUG-SW             PIC X(01) VALUE ' '.
+               88  DEBUG-IS-ON                VALUES '1' '2' '3' '4'.
+               88  DEBUG-LF-INFORCE-CNT       VALUE '1'.
+               88  DEBUG-AH-INFORCE-CNT       VALUE '2'.
+               88  DEBUG-LF-STATUTORY         VALUE '3'.
+               88  DEBUG-AH-STATUTORY         VALUE '4'.
+
+       01  WS-ABEND-AREA.
+           05  WS-ABEND-FILE-STATUS    PIC X(02).
+           05  WS-ABEND-MESSAGE        PIC X(80) VALUE SPACES.
+           05  WS-RETURN-CODE          PIC S9(04)  COMP VALUE +0.
+           05  WS-ZERO                 PIC S9(01) VALUE +0 COMP-3.
+
+       01  WORK-ABEND-CODE.
+           12  WAC-1                   PIC X.
+           12  WAC-2                   PIC X.
+           12  WAC-3-4.
+               16  WAC-3               PIC X.
+               16  WAC-4               PIC X.
+
+       01  FILLER.
+           05  WS-WORK-DATE            PIC 9(11).
+           05  FILLER REDEFINES WS-WORK-DATE.
+               10  FILLER              PIC XXX.
+               10  WS-WORK-CCYYMM      PIC 9(6).
+               10  FILLER REDEFINES WS-WORK-CCYYMM.
+                   15  WS-WORK-CCYY    PIC 9999.
+                   15  WS-WORK-MM      PIC 99.
+               10  WS-WORK-DD          PIC 99.
+       01  FILLER.
+           05  WS-EFFECT-DATE          PIC 9(11).
+           05  FILLER REDEFINES WS-EFFECT-DATE.
+               10  FILLER              PIC 999.
+               10  WS-EFFECT-CCYYMM     PIC 9(6).
+               10  WS-EFFECT-DD        PIC 99.
+       01  FILLER.
+           05  WS-ENTRY-DATE           PIC 9(11).
+           05  FILLER REDEFINES        WS-ENTRY-DATE.
+               10  FILLER              PIC 999.
+               10  WS-ENTRY-CCYYMM     PIC 9(6).
+               10  WS-ENTRY-DD         PIC 99.
+       01  FILLER.
+           05  WS-CANCEL-DATE          PIC 9(11).
+           05  FILLER REDEFINES WS-CANCEL-DATE.
+               10  FILLER              PIC 999.
+               10  WS-CANCEL-CCYYMM    PIC 9(6).
+               10  WS-CANCEL-DD        PIC 99.
+       01  FILLER.
+           05  WS-CLAIM-DATE           PIC 9(11).
+           05  FILLER REDEFINES WS-CLAIM-DATE.
+               10  FILLER              PIC 999.
+               10  WS-CLAIM-CCYYMM     PIC 9(6).
+               10  WS-CLAIM-DD         PIC 99.
+       01  FILLER.
+           05  WS-HI-ISSUE-CCYYMM      PIC 9(6) VALUE ZEROS.
+           05  WS-LO-ISSUE-CCYYMM      PIC 9(6) VALUE ZEROS.
+       01  FILLER.
+           05  WS-HI-VALUATION-CCYYMM  PIC 9(6) VALUE ZEROS.
+           05  WS-LO-VALUATION-CCYYMM  PIC 9(6) VALUE ZEROS.
+           05  FILLER REDEFINES WS-LO-VALUATION-CCYYMM.
+               10  WS-LO-VAL-CCYY      PIC 9999.
+               10  WS-LO-VAL-MM        PIC 99.
+       01  FILLER.
+020122     05  WS-BIN-VAL-DATES OCCURS 360
+                                       PIC XX.
+
+       01  ABEND-FIELDS.
+           12  PGM-SUB                 PIC S999 COMP  VALUE +158.
+           12  FIRST-TIME-SW           PIC X  VALUE 'Y'.
+               88  FIRST-TIME                 VALUE 'Y'.
+
+                                       COPY ELCCALC.
+
+                                       COPY ELCDATE.
+                                       COPY ELCFUNDT.
+
+                                       COPY ELCDTECX.
+
+                                       COPY ELCDTEVR.
+
+       PROCEDURE DIVISION.
+
+       0001-DT-CRD-READ SECTION.
+                                       COPY ELCDTERX.
+
+           MOVE FUNCTION CURRENT-DATE  TO FUNCTION-DATE
+           MOVE 'Y'                    TO DC-FORCE-EL310-DATE-SW
+           MOVE FUNCTION-DATE          TO DC-EL310-DATE
+
+
+           PERFORM 0010-INITIALIZE     THRU 0010-EXIT
+
+           PERFORM 0020-OPEN-FILES     THRU 0020-EXIT
+
+           PERFORM 0050-PROCESS-FILE   THRU 0050-EXIT
+
+           PERFORM 0030-CLOSE-FILES    THRU 0030-EXIT
+
+
+           GOBACK
+
+           .
+       0010-INITIALIZE.
+
+020122*    DISPLAY ' MADE IT TO 0010 '
+           MOVE RUN-DATE               TO WS-WORK-DATE
+
+           MOVE 199701                 TO WS-LO-ISSUE-CCYYMM
+                                          WS-LO-VALUATION-CCYYMM
+
+           MOVE WS-WORK-CCYYMM         TO WS-HI-ISSUE-CCYYMM
+           PERFORM VARYING IYR FROM +1 BY +1 UNTIL
+020122            (IYR > MAX-IYR) OR
+                  (WS-ISSUE-CCYYMM (IYR) > WS-HI-ISSUE-CCYYMM)
+              MOVE WS-LO-VALUATION-CCYYMM TO WS-ISSUE-CCYYMM (IYR)
+              ADD +1 TO WS-LO-VALUATION-CCYYMM
+              IF WS-LO-VAL-MM > 12
+                 MOVE 01               TO WS-LO-VAL-MM
+                 ADD 1                 TO WS-LO-VAL-CCYY
+              END-IF
+           END-PERFORM
+
+           MOVE WS-LO-ISSUE-CCYYMM     TO WS-LO-VALUATION-CCYYMM
+                                          WS-WORK-CCYYMM
+
+           PERFORM VARYING VYR FROM +1 BY +1 UNTIL
+020122            VYR > MAX-VYR
+                PERFORM VARYING IYR FROM +1 BY +1 UNTIL
+020122             IYR > MAX-IYR
+                   MOVE WS-WORK-CCYYMM TO WS-VALUATION-CCYYMM (IYR VYR)
+                END-PERFORM
+              MOVE WS-WORK-CCYYMM      TO WS-CCYYMM
+              
+              IF WS-MM = 01 OR 03 OR 05 OR 07 OR 08 OR 10 OR 12
+                 MOVE 31               TO WS-DD
+              ELSE
+                 IF WS-MM = 04 OR 06 OR 09 OR 11
+                    MOVE 30            TO WS-DD
+                 ELSE
+                    MOVE 01            TO WS-DD
+                    MOVE WS-END-YEAR   TO DC-GREG-DATE-CYMD
+                    MOVE 'L'           TO DC-OPTION-CODE
+                    PERFORM 8510-DATE-CONVERSION
+                                       THRU 8590-EXIT
+                    IF NO-CONVERSION-ERROR
+020122*                DISPLAY ' FEB DAYS ' DC-DAYS-IN-MONTH
+                       MOVE DC-DAYS-IN-MONTH
+                                       TO WS-DD
+                    ELSE
+                       DISPLAY ' PROBLEMOS WITH FEB VAL DTE CONV '
+                       PERFORM ABEND-PGM
+                    END-IF
+                 END-IF
+              END-IF
+              
+              MOVE WS-END-YEAR         TO DC-GREG-DATE-CYMD
+              MOVE 'L'                 TO DC-OPTION-CODE
+              PERFORM 8510-DATE-CONVERSION
+                                       THRU 8590-EXIT
+              MOVE DC-BIN-DATE-1       TO WS-BIN-VAL-DATES (VYR)
+              ADD 1                    TO WS-WORK-CCYYMM
+              IF WS-WORK-MM > 12
+                 MOVE 01               TO WS-WORK-MM
+                 ADD 1                 TO WS-WORK-CCYY
+              END-IF
+           END-PERFORM
+
+           SUBTRACT +1 FROM WS-WORK-CCYYMM
+           IF WS-WORK-MM = ZEROS
+              MOVE 12                  TO WS-WORK-MM
+              SUBTRACT 1               FROM WS-WORK-CCYY
+           END-IF
+           MOVE WS-WORK-CCYYMM         TO WS-HI-VALUATION-CCYYMM
+
+           PERFORM VARYING IYR FROM +1 BY +1 UNTIL
+020122         IYR > MAX-IYR
+               PERFORM VARYING VYR FROM +1 BY +1 UNTIL
+020122            VYR > MAX-VYR
+                PERFORM VARYING BT FROM +1 BY +1 UNTIL
+                  BT > +3
+                  MOVE +0              TO WS-LF-WRITTEN (IYR VYR BT)
+                                          WS-AH-WRITTEN (IYR VYR BT)
+                                          WS-LF-REFUNDS (IYR VYR BT)
+                                          WS-LF-REF-CALC (IYR VYR BT)
+                                          WS-AH-REFUNDS (IYR VYR BT)
+                                          WS-AH-REF-CALC (IYR VYR BT)
+                                          WS-LF-ISS-CNT (IYR VYR BT)
+                                          WS-AH-ISS-CNT (IYR VYR BT)
+                                          WS-LF-CNC-CNT (IYR VYR BT)
+                                          WS-AH-CNC-CNT (IYR VYR BT)
+                END-PERFORM
+               END-PERFORM
+           END-PERFORM
+
+           MOVE SPACES                 TO WS-EXTRACT-RECORD
+           MOVE ';'                    TO WS-TAB1
+                                          WS-TAB2
+                                          WS-TAB3
+                                          WS-TAB4
+                                          WS-TAB5
+                                          WS-TAB5A
+                                          WS-TAB6
+                                          WS-TAB6A
+                                          WS-TAB7
+                                          WS-TAB8
+                                          WS-TAB9
+                                          WS-TAB10
+           MOVE WS-EXTRACT-RECORD      TO WS-INIT-EXT-RECORD
+           
+           MOVE ';'                    TO WS-HTAB1
+                                          WS-HTAB2
+                                          WS-HTAB3
+                                          WS-HTAB4
+                                          WS-HTAB5
+                                          WS-HTAB5A
+                                          WS-HTAB6
+                                          WS-HTAB6A
+                                          WS-HTAB7
+                                          WS-HTAB8
+                                          WS-HTAB9
+                                          WS-HTAB10
+
+           DISPLAY '  LO ISSUE  ' WS-LO-ISSUE-CCYYMM
+                 '    HI ISSUE  ' WS-HI-ISSUE-CCYYMM
+           DISPLAY '  LO VALUE  ' WS-LO-VALUATION-CCYYMM
+                 '    HI VALUE  ' WS-HI-VALUATION-CCYYMM
+
+           .
+       0010-EXIT.
+           EXIT.
+
+       0020-OPEN-FILES.
+
+020122*    DISPLAY ' MADE IT TO 0020 '
+           OPEN INPUT CERTS
+               OUTPUT EXTRACT
+
+           .
+       0020-EXIT.
+           EXIT.
+
+       0030-CLOSE-FILES.
+020122*    DISPLAY ' MADE IT TO 0030 '
+
+           CLOSE CERTS
+               EXTRACT
+
+           .
+       0030-EXIT.
+           EXIT.
+
+       0050-PROCESS-FILE.
+
+020122*    DISPLAY ' MADE IT TO 0050 '
+
+           PERFORM 0060-READ-CERT      THRU 0060-EXIT
+           PERFORM 0080-PROCESS-CERT   THRU 0080-EXIT UNTIL
+              END-OF-INPUT
+
+           DISPLAY ' FINISHED CERTS '
+
+           PERFORM 0500-EMPTY-TABLE    THRU 0500-EXIT
+
+           .
+       0050-EXIT.
+           EXIT.
+
+       0060-READ-CERT.
+
+      *    DISPLAY ' MADE IT TO 0060 '
+           READ CERTS AT END
+               SET END-OF-INPUT TO TRUE
+           END-READ
+
+           IF NOT END-OF-INPUT
+              ADD +1                   TO WS-CRT-CNT
+                                          WS-CRT-CNT-TOT
+              IF WS-CRT-CNT = +10000
+                 DISPLAY ' CERTS READ ' WS-CRT-CNT-TOT
+                 MOVE +0               TO WS-CRT-CNT
+              END-IF
+              IF CR-CERT-NO = '0000109489 '
+                 DISPLAY ' FOUND BAD CERT '
+              END-IF
+           END-IF
+
+           .
+       0060-EXIT.
+           EXIT.
+
+       0080-PROCESS-CERT.
+
+      *    DISPLAY ' MADE IT TO 0080 '
+           MOVE CR-DT                  TO WS-EFFECT-DATE
+           MOVE CR-ENTRY-DATE          TO WS-ENTRY-DATE
+
+           IF (WS-EFFECT-CCYYMM < WS-LO-ISSUE-CCYYMM) OR
+              (WS-EFFECT-CCYYMM > WS-HI-ISSUE-CCYYMM) OR
+              (WS-ENTRY-CCYYMM < WS-LO-ISSUE-CCYYMM)  OR
+              (CR-ENTRY-STATUS = '9' OR 'D' OR 'V' OR 'M')
+              CONTINUE
+           ELSE
+              IF CR-GRPTYP = '01'
+                 MOVE +1               TO BT
+              ELSE
+                 IF CR-GRPTYP = '02' OR '03' OR '04' OR '05'
+                    MOVE +2            TO BT
+                 ELSE
+                    MOVE +3            TO BT
+                 END-IF
+              END-IF
+              PERFORM VARYING IYR FROM +1 BY +1 UNTIL
+                 (WS-EFFECT-CCYYMM = WS-ISSUE-CCYYMM (IYR))
+020122           OR (IYR > MAX-IYR)
+              END-PERFORM
+020122        IF IYR > MAX-IYR
+                 DISPLAY ' BLEW OUT ISSUE YR ' WS-EFFECT-CCYYMM
+                 PERFORM ABEND-PGM
+              END-IF
+              PERFORM VARYING VYR FROM +1 BY +1 UNTIL
+                 (WS-ENTRY-CCYYMM = WS-VALUATION-CCYYMM (IYR VYR))
+020122           OR (VYR > MAX-VYR)
+              END-PERFORM
+020122        IF VYR > MAX-VYR
+                 DISPLAY ' BLEW OUT ENTRY YR ' WS-ENTRY-CCYYMM
+                 PERFORM ABEND-PGM
+              END-IF
+PEMTST        IF CR-ENTRY-STATUS = '5'
+PEMTST           CONTINUE
+PEMTST        ELSE
+                 IF CR-LFTYP NOT = '00' AND '  '
+                    COMPUTE WS-LF-WRITTEN (IYR VYR BT) =
+                       WS-LF-WRITTEN (IYR VYR BT) +
+                       CR-LFPRM + CR-LFPRM-ALT
+                    COMPUTE WS-LF-ISS-CNT (IYR VYR BT) =
+                       WS-LF-ISS-CNT (IYR VYR BT) + 1
+                 END-IF
+                 IF CR-AHTYP NOT = '00' AND '  '
+                    COMPUTE WS-AH-WRITTEN (IYR VYR BT) =
+                       WS-AH-WRITTEN (IYR VYR BT) + CR-AHPRM
+                    COMPUTE WS-AH-ISS-CNT (IYR VYR BT) =
+                       WS-AH-ISS-CNT (IYR VYR BT) + 1
+                 END-IF
+PEMTST        END-IF
+      *       IF (CR-LF-CANC-DT NOT = ZEROS)
+      *       IF (CR-LF-CANCEL-EXIT-DATE > 19961231)
+      *          MOVE CR-LF-CANCEL-EXIT-DATE    TO WS-CANCEL-DATE
+              IF (CR-LF-CANC-DT > 19961231)
+                 MOVE CR-LF-CANC-DT    TO WS-CANCEL-DATE
+                 PERFORM VARYING VYR FROM +1 BY +1 UNTIL
+                    (WS-CANCEL-CCYYMM = WS-VALUATION-CCYYMM (IYR VYR))
+020122              OR (VYR > MAX-VYR)
+                 END-PERFORM
+020122           IF VYR > MAX-VYR
+                    DISPLAY ' BLEW OUT LF CANCEL ' WS-CANCEL-CCYYMM
+                    PERFORM ABEND-PGM
+                 END-IF
+                 COMPUTE WS-LF-REFUNDS (IYR VYR BT) =
+                    WS-LF-REFUNDS (IYR VYR BT) + CR-LFRFND
+                 COMPUTE WS-LF-REF-CALC (IYR VYR BT) =
+                    WS-LF-REF-CALC (IYR VYR BT) + CR-LFRFND-CALC
+                 COMPUTE WS-LF-CNC-CNT (IYR VYR BT) =
+                    WS-LF-CNC-CNT (IYR VYR BT) + 1
+              END-IF
+      *       IF (CR-AH-CANC-DT NOT = ZEROS)
+              IF (CR-AH-CANC-DT > 19961231)
+                 MOVE CR-AH-CANC-DT    TO WS-CANCEL-DATE
+      *       IF (CR-AH-CANCEL-EXIT-DATE > 19961231)
+      *          MOVE CR-AH-CANCEL-EXIT-DATE    TO WS-CANCEL-DATE
+                 PERFORM VARYING VYR FROM +1 BY +1 UNTIL
+                    (WS-CANCEL-CCYYMM = WS-VALUATION-CCYYMM (IYR VYR))
+020122              OR (VYR > MAX-VYR)
+                 END-PERFORM
+020122           IF VYR > MAX-VYR
+                    DISPLAY ' BLEW OUT AH CANCEL ' WS-CANCEL-CCYYMM
+                    PERFORM ABEND-PGM
+                 END-IF
+                 COMPUTE WS-AH-REFUNDS (IYR VYR BT) =
+                    WS-AH-REFUNDS (IYR VYR BT) + CR-AHRFND
+                 COMPUTE WS-AH-REF-CALC (IYR VYR BT) =
+                    WS-AH-REF-CALC (IYR VYR BT) + CR-AHRFND-CALC
+                 COMPUTE WS-AH-CNC-CNT (IYR VYR BT) =
+                    WS-AH-CNC-CNT (IYR VYR BT) + 1
+              END-IF
+           END-IF
+
+           PERFORM 0060-READ-CERT      THRU 0060-EXIT
+
+           .
+       0080-EXIT.
+           EXIT.
+
+       0500-EMPTY-TABLE.
+
+           WRITE EXTRACT-RECORD-OUT-HD FROM WS-HEAD-RECORD
+           MOVE WS-INIT-EXT-RECORD     TO WS-EXTRACT-RECORD
+020122*    DISPLAY ' MADE IT TO 0500 '
+           PERFORM VARYING IYR FROM +1 BY +1 UNTIL
+020122             IYR > MAX-IYR
+               PERFORM VARYING VYR FROM +1 BY +1 UNTIL
+020122                VYR > MAX-VYR
+                PERFORM VARYING BT FROM +1 BY +1 UNTIL
+                      BT > +3
+                   MOVE WS-ISSUE-CCYYMM (IYR)
+                                       TO EXT-ISSUE-CCYYMM
+                   MOVE WS-VALUATION-CCYYMM (IYR VYR)
+                                       TO EXT-VALUE-CCYYMM
+                   MOVE WS-LF-WRITTEN (IYR VYR BT)
+                                       TO EXT-LF-WRITTEN
+                   MOVE WS-AH-WRITTEN (IYR VYR BT)
+                                       TO EXT-AH-WRITTEN
+                   MOVE WS-LF-REFUNDS (IYR VYR BT)
+                                       TO EXT-LF-REFUNDS
+                   MOVE WS-LF-REF-CALC (IYR VYR BT)
+                                       TO EXT-LF-REF-CALC
+                   MOVE WS-AH-REFUNDS (IYR VYR BT)
+                                       TO EXT-AH-REFUNDS
+                   MOVE WS-AH-REF-CALC (IYR VYR BT)
+                                       TO EXT-AH-REF-CALC
+                   MOVE WS-LF-ISS-CNT (IYR VYR BT)
+                                       TO EXT-LF-ISS-CNT
+                   MOVE WS-AH-ISS-CNT (IYR VYR BT)
+                                       TO EXT-AH-ISS-CNT
+                   MOVE WS-LF-CNC-CNT (IYR VYR BT)
+                                       TO EXT-LF-CNC-CNT
+                   MOVE WS-AH-CNC-CNT (IYR VYR BT)
+                                       TO EXT-AH-CNC-CNT
+                   IF (EXT-ISSUE-CCYYMM > EXT-VALUE-CCYYMM) OR
+                      (ZERO = WS-LF-WRITTEN (IYR VYR BT) AND
+                              WS-AH-WRITTEN (IYR VYR BT) AND
+                              WS-LF-ISS-CNT (IYR VYR BT) AND
+                              WS-AH-ISS-CNT (IYR VYR BT) AND
+                              WS-LF-CNC-CNT (IYR VYR BT) AND
+                              WS-AH-CNC-CNT (IYR VYR BT) AND
+                              WS-LF-REFUNDS (IYR VYR BT) AND
+                              WS-AH-REFUNDS (IYR VYR BT) AND
+                              WS-LF-REF-CALC (IYR VYR BT) AND
+                              WS-AH-REF-CALC (IYR VYR BT))
+                      CONTINUE
+                   ELSE
+                      IF BT = +1
+                         MOVE 'AUTO'   TO EXT-BUS-TYPE
+                      ELSE
+                         IF BT = +2
+                            MOVE 'BANK' TO EXT-BUS-TYPE
+                         ELSE
+                            MOVE 'OTHR' TO EXT-BUS-TYPE
+                         END-IF
+                      END-IF
+                      WRITE EXTRACT-RECORD-OUT
+                                       FROM WS-EXTRACT-RECORD
+                   END-IF
+                END-PERFORM
+               END-PERFORM
+           END-PERFORM
+
+           .
+       0500-EXIT.
+           EXIT.
+
+       2900-DISPLAY-AMTS.
+
+      *    DISPLAY ' MADE IT TO 2900 '
+      *    IF (CR-DT > 19921231) AND
+      *       (CR-DT < 19940101) AND
+      *    IF (WS-BIN-VAL-DATES (VYR) = X'95FF')
+      *       MOVE CR-DT TO WS-DISPLAY-DATE
+      *       MOVE CR-LF-TERM TO WS-DISPLAY-TERM
+      *       MOVE LF-REM-TRM2 TO WS-DISPLAY-RTERM
+      *       MOVE CR-LFPRM TO WS-DISPLAY-PRM
+      *       IF CLAS-I-EP (CLAS-INDEXL) EQUAL 'B' OR 'K' OR 'L'
+      *          ADD CR-LFAMT CR-LFAMT-ALT GIVING WS-DISPLAY-AMT
+      *       ELSE
+      *          MOVE CR-LFAMT     TO WS-DISPLAY-AMT
+      *       END-IF
+      *       MOVE WS-REM-AMT   TO WS-DISPLAY-RAMT
+      *       DISPLAY '  ' CR-CERT-NO '  ' WS-DISPLAY-DATE '   '
+      *        WS-DISPLAY-TERM '  ' WS-DISPLAY-RTERM '   '
+      *        WS-DISPLAY-AMT '   ' WS-DISPLAY-RAMT
+      *    END-IF
+
+           .
+       2999-CALC-REM-AMT-X.
+           EXIT.
+       EJECT
+       8510-DATE-CONVERSION.
+
+      *    DISPLAY ' MADE IT TO 8510 '
+           CALL 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+       8590-EXIT.
+           EXIT.
+
+       ABEND-PGM.
+                                       COPY ELCABEND.

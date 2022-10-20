@@ -1,0 +1,876 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. ELAGGO.
+       AUTHOR.     Cowtown.
+       DATE-COMPILED.
+      *SECURITY.   *****************************************************
+      *            *                                                   *
+      *            *   THIS PROGRAM IS THE PROPERTY OF CSO             *
+      *            *                                                   *
+      *            *   USE OF THIS PROGRAM BY OTHER THAN THE EMPLOYEES *
+      *            *   OF     CSO     IS EXPRESSLY PROHIBITED WITHOUT  *
+      *            *   THE PRIOR WRITTEN PERMISSION OF CSO.            *
+      *            *                                                   *
+      *            *****************************************************
+
+051115******************************************************************
+051115*REMARKS.                                                        *
+051115*        Reads the pending issue record passed to it.            *
+051115*        Checks to see if there is a pending cancel record.
+051115*        Next, reads all the pending issues that match the
+051115*        acct#, last name and 1st initial and builds the table
+051115*        with the matching issues. However, if a cancel is found,
+051115*        the program move zeros to that benefit code in the table.
+051115*        Next, reads the eralph looking for matching accout#, 
+051115*        last name, 1st initial that don't have a pending cancel
+051115*        record and adds those to the table as well. if not
+051115*        cancelled looks for an ah claim.
+051115******************************************************************
+051115*                   C H A N G E   L O G
+051115*
+051115* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+051115*-----------------------------------------------------------------
+051115*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+051115* EFFECTIVE    NUMBER
+051115*-----------------------------------------------------------------
+051115* 051115   2015022600002   PEMA  New Program
+092215* 092215 IR2015092200002   PEMA  EXPAND TO 1ST 3 OF 1ST NAME
+051115******************************************************************
+       ENVIRONMENT DIVISION.
+
+       DATA DIVISION.
+
+
+       WORKING-STORAGE SECTION.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  FILLER  PIC X(32) VALUE '   PRGMTBD  WORKING STORAGE     '.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+
+       77  WS-EOF-SW                   PIC X VALUE SPACES.
+           88  END-OF-ERPNDB                VALUE 'Y'.
+       77  WS-ERALPH-SW                PIC X VALUE SPACES.
+           88  END-OF-ERALPH                VALUE 'Y'.
+       77  WS-ERPNDB5-SW               PIC X VALUE SPACES.
+           88  END-OF-ERPNDB5               VALUE 'Y'.
+       77  ERPNDB-RECS-IN              PIC 9(9) VALUE ZEROS.
+       77  ERPNDB-RECS-OUT             PIC 9(9) VALUE ZEROS.
+       77  SUB1                        PIC S9(5) VALUE +0 COMP-3.
+       77  WS-PREV-PNDB-KEY            PIC X(23) VALUE LOW-VALUES.
+       77  a1                          pic s999 value +0 comp-3.
+       77  c1                          pic s999 value +0 comp-3.
+       77  p1                          pic s999 value +0 comp-3.
+       77  ws-match-sw                 pic x value spaces.
+           88  no-matching-alpha           value 'N'.
+       77  ws-save-issue-key           pic x(36)  value spaces.
+       77  ws-last-name                pic x(15)  value spaces.
+092215 77  ws-first-three              pic xxx  value spaces.
+       77  ws-age                      pic 999 value zeros.
+       77  ws-cov-sw                   pic x value spaces.
+           88  processing-primary         value 'P'.
+           88  processing-secondary        value 'S'.
+       77  ws-erpndb2-startbr-sw       pic x  value spaces.
+           88  erpndb2-startbr           value 'Y'.
+       77  ws-eralph2-startbr-sw       pic x  value spaces.
+           88  eralph2-startbr           value 'Y'.
+       77  ws-elmstr5-startbr-sw       pic x  value spaces.
+           88  elmstr5-startbr           value 'Y'.
+
+      ******************************************************************
+       01  ws-alpha-table.
+           05  ws-eralph-table occurs 20.
+               10  ws-eralph-cert      pic x(11).
+               10  ws-eralph-lf-cd     pic xx.
+               10  ws-eralph-lf-remamt pic s9(9)v99.
+               10  ws-eralph-ah-cd     pic xx.
+               10  ws-eralph-ah-amt    pic s9(7)v99.
+               10  ws-eralph-ah-remamt pic s9(9)v99.
+
+           05  ws-eralph-print-table occurs 20.
+               10  pt-eralph-cert      pic x(11).
+               10  pt-eralph-lf-cd     pic xx.
+               10  pt-eralph-lf-remamt pic -zzz,zz9,999.99.
+               10  pt-eralph-ah-cd     pic xx.
+               10  pt-eralph-ah-amt    pic -z,zzz,z99.99.
+               10  pt-eralph-ah-remamt pic -zzz,zzz,999.99.
+
+       01  WS-RESPONSE                 PIC S9(8) COMP VALUE +0.
+           88  RESP-NORMAL                    VALUE +0.
+           88  resp-file-notfnd               value +12.
+           88  RESP-NOTFND                    VALUE +13.
+           88  resp-duprec                    value +14.
+           88  resp-dupkey                    value +15.
+           88  resp-invreq                    value +16.
+           88  RESP-NOTOPEN                   VALUE +19.
+           88  RESP-ENDFILE                   VALUE +20.
+           88  resp-lengtherr                 value +22.
+
+       01  ws-age-from-pndb            pic 99.
+       01  ws-lf-tot-benefit           pic s9(9)v99 comp-3 value +0.
+       01  ws-ah-tot-benefit           pic s9(9)v99 comp-3 value +0.
+       01  pt-lf-tot-benefit           pic -zzz,zzz,999.99.
+       01  pt-ah-tot-benefit           pic -zzz,zzz,999.99.
+       01  WS-ERPNDB-REC-HOLD          PIC X(585) VALUE SPACES.
+       01  WS-MISC.
+           05  PGM-SUB                 PIC S9(4)   VALUE +515.
+           05  WS-RETURN-CODE          PIC S9(3)   VALUE ZERO.
+           05  WS-ABEND-MESSAGE        PIC X(80)   VALUE SPACES.
+           05  WS-ZERO                 PIC S9      VALUE ZERO.
+           05  WS-ABEND-FILE-STATUS    PIC XX      VALUE ZERO.
+           05  ERPNDB-FILE-STATUS      PIC XX    VALUE ZEROS.
+           05  ERPNDB5-FILE-STATUS     PIC XX    VALUE ZEROS.
+           05  ERALPH-FILE-STATUS      PIC XX    VALUE ZEROS.
+           05  ELMSTR5-FILE-STATUS     PIC XX    VALUE ZEROS.
+           05  WS-DATE                 PIC 9(11) VALUE ZEROS.
+           05  lf-joint-ind            pic x   value spaces.
+           05  ah-joint-ind            pic x   value spaces.
+
+       01  ws-elcntl-key.
+           05  ws-elcntl-company-id    pic xxx.
+           05  ws-elcntl-rec-type      pic x.
+               88  ws-elcntl-lf-ben-cd    value '4'.
+               88  ws-elcntl-ah-ben-cd    value '5'.
+           05  filler                  pic xx.
+           05  ws-elcntl-hi-ben-cd     pic xx.
+           05  ws-elcntl-seq-no        pic s9(4) comp.
+
+       01  ws-erpndb-key.
+           05  ws-erpndb-company-cd    pic x.
+           05  ws-erpndb-carrier       pic x.
+           05  ws-erpndb-grouping      pic x(6).
+           05  ws-erpndb-state         pic xx.
+           05  ws-erpndb-account       pic x(10).
+           05  ws-erpndb-eff-dt        pic xx.
+           05  ws-erpndb-cert-no       pic x(11).
+           05  ws-erpndb-seq-no        pic s9(4) comp.
+           05  ws-erpndb-rec-type      pic x.
+
+       01  ws-erpndb5-key.
+           05  ws-erpndb5-company-cd   pic x.
+           05  ws-erpndb5-carrier      pic x.
+           05  ws-erpndb5-grouping     pic x(6).
+           05  ws-erpndb5-state        pic xx.
+           05  ws-erpndb5-account      pic x(10).
+           05  ws-erpndb5-eff-dt       pic xx.
+           05  ws-erpndb5-cert-no      pic x(11).
+           05  ws-erpndb5-seq-no       pic s9(4) comp.
+           05  ws-erpndb5-rec-type     pic x.
+
+       01  ws-elmstr5-key.
+           05  ws-elmstr5-company-cd  pic x.
+           05  ws-elmstr5-cert-no     pic x(11).
+
+       01  ws-eralph-aix-key.
+           05  ws-eralph-aix-company-cd pic x.
+           05  ws-eralph-aix-account   pic x(10).
+           05  ws-eralph-aix-lname     pic x(15).
+           05  ws-eralph-aix-fname.
+092215         10  ws-eralph-aix-1st-three
+092215                                 pic xxx.
+               10  filler              pic x(7).
+           05  ws-eralph-aix-mid-init  pic x.
+
+       01  ws-eralph-key.
+           05  ws-eralph-company-cd    pic x.
+           05  ws-eralph-carrier       pic x.
+           05  ws-eralph-grouping      pic x(6).
+           05  ws-eralph-state         pic xx.
+           05  ws-eralph-account       pic x(10).
+           05  ws-eralph-eff-dt        pic xx.
+           05  ws-eralph-cert-no       pic x(11).
+           05  ws-eralph-rec-type      pic x.
+
+       01  ws-pass-to-pemaggo.
+           05  ws-passed-erpndb        pic x(585).
+           05  ws-exceed-limit-yn      pic x.
+           05  ws-has-claim-yn         pic x.
+
+                                       copy ELCCNTL.
+                                       copy ELCMSTR.
+                                       copy ERCALPH.
+                                       COPY ERCPNDB.
+                                       COPY ERCPNDB
+            REPLACING LEADING ==PB== BY ==P5==
+            PENDING-BUSINESS BY P5-PENDING-BUSINESS.
+                                       COPY ELCDATE.
+                                       COPY ELCDTECX.
+                                       COPY ELCDTEVR.
+       LINKAGE SECTION.
+       
+       01  DFHCOMMAREA                 PIC X(587).
+
+       PROCEDURE DIVISION.
+
+      *    display ' Entering PEMAGGO '
+           move dfhcommarea            to ws-pass-to-pemaggo
+      *    display ' exceed 1 ' ws-exceed-limit-yn
+
+           PERFORM 0020-INITIALIZE     THRU 0020-EXIT
+
+           PERFORM 0050-PROCESS-INPUT  THRU 0050-EXIT
+
+           move ws-pass-to-pemaggo     to dfhcommarea
+           exec cics return
+           end-exec
+
+
+           GOBACK
+
+           .
+       0020-INITIALIZE.
+
+           move spaces                 to ws-alpha-table
+      *    PERFORM 0030-START-ERPNDB   THRU 0030-EXIT
+
+      *    if not end-of-erpndb
+           move ws-passed-erpndb       to pending-business
+           move pb-control-by-account  to ws-erpndb-key
+           perform 0045-get-ben-codes  thru 0045-exit
+
+      *    PERFORM 0040-READ-ERPNDB    THRU 0040-EXIT
+      *    end-if
+
+           .
+       0020-EXIT.
+           EXIT.
+
+       0030-START-ERPNDB.
+
+           exec cics startbr
+              dataset      ('ERPNDB2')
+              ridfld       (ws-erpndb-key)
+              gteq
+              resp         (ws-response)
+           end-exec
+
+           if resp-endfile or resp-notfnd
+              display ' end of file on start ' 
+              set end-of-erpndb        to true
+           else
+              if not resp-normal
+                 DISPLAY ' ERROR ON ERPNDB - START  '
+                    ERPNDB-FILE-STATUS
+                 set end-of-erpndb     to true
+              end-if
+           end-if
+
+           .
+       0030-EXIT.
+           EXIT.
+
+       0040-READ-ERPNDB.
+
+      **    exec cics readnext
+      **       dataset     ('ERPNDB2')
+      **       into        (pending-business)
+      **       ridfld      (ws-erpndb-key)
+      **       resp        (ws-response)
+      **    end-exec
+      *
+      *     display ' about to read erpndb initial '
+      *     move pb-control-by-account  to ws-erpndb-key
+      *     exec cics read
+      *        dataset     ('ERPNDB2')
+      *        into        (pending-business)
+      *        ridfld      (ws-erpndb-key)
+      *        resp        (ws-response)
+      *     end-exec
+      *
+      *     if (resp-endfile)
+      **       or (resp-notfnd)
+      *        or (ws-erpndb-key <> ws-passed-pend-key)
+      *        display ' did not find pending issue '
+      *           ws-passed-pend-key (2:19) ' '
+      *           ws-passed-pend-key (23:11) ' '
+      *           ws-passed-pend-key (36:1)
+      *        display ' key ' ws-erpndb-key (2:19) ' '
+      *           ws-erpndb-key (23:11) ' '
+      *           ws-erpndb-key (36:1)
+      *        set end-of-erpndb        to true
+      *     else
+      *        if not resp-normal
+      *           DISPLAY ' ERROR ON ERPNDB - READ  '
+      *              ws-response
+      *           set end-of-erpndb     to true
+      *        end-if
+      *     end-if
+
+           .
+       0040-EXIT.
+           EXIT.
+
+       0045-get-ben-codes.
+
+           move spaces                 to lf-joint-ind ah-joint-ind
+           if pb-i-lf-benefit-cd = '00' or '  '
+              go to 0045-check-ah
+           end-if
+           move pb-company-id          to ws-elcntl-key
+           set ws-elcntl-lf-ben-cd     to true
+           move pb-i-lf-benefit-cd     to ws-elcntl-hi-ben-cd
+           move zeros                  to ws-elcntl-seq-no
+
+           exec cics read
+              dataset     ('ELCNTL')
+              into        (control-file)
+              ridfld      (ws-elcntl-key)
+              gteq
+              resp        (ws-response)
+           end-exec
+
+           if resp-normal
+              perform varying c1 from +1 by +1 until
+                 (c1 > +8)
+                 or (cf-benefit-code (c1) = pb-i-lf-benefit-cd)
+              end-perform
+              if c1 < +9
+                 move cf-joint-indicator (c1) to lf-joint-ind
+              end-if
+           end-if
+
+           .
+       0045-check-ah.
+
+           if pb-i-ah-benefit-cd = '00' or '  '
+              go to 0045-exit
+           end-if
+
+           move pb-company-id          to ws-elcntl-key
+           set ws-elcntl-ah-ben-cd     to true
+           move pb-i-ah-benefit-cd     to ws-elcntl-hi-ben-cd
+           move zeros                  to ws-elcntl-seq-no
+
+           exec cics read
+              dataset     ('ELCNTL')
+              into        (control-file)
+              ridfld      (ws-elcntl-key)
+              gteq
+              resp        (ws-response)
+           end-exec
+
+           if resp-normal
+              perform varying c1 from +1 by +1 until
+                 (c1 > +8)
+                 or (cf-benefit-code (c1) = pb-i-ah-benefit-cd)
+              end-perform
+              if c1 < +9
+                 move cf-joint-indicator (c1) to ah-joint-ind
+              end-if
+
+           .
+       0045-exit.
+           exit.
+
+       0050-PROCESS-INPUT.
+
+           perform 0100-check-cancel   thru 0100-exit
+           if (pb-valid-life or pb-valid-ah)
+092215        and (pb-i-entry-status not = '5' AND '9' AND
+092215                             'D' AND 'V')
+              move 'P'                 to ws-cov-sw
+              move pb-i-age            to ws-age
+              MOVE PB-i-insured-last-name
+                                       to ws-last-name
+092215        move pb-i-insured-first-name (1:3)
+092215                                 to ws-first-three
+              perform 0150-process-eralph
+                                       thru 0150-exit
+              if (lf-joint-ind = 'J')
+                 or (ah-joint-ind = 'J')
+      *       if pb-i-joint-insured not = spaces
+                 move zeros to ws-lf-tot-benefit ws-ah-tot-benefit
+                 move 'S'              to ws-cov-sw
+                 move pb-i-joint-age   to ws-age
+                 move pb-i-joint-last-name
+                                       to ws-last-name
+092215           move pb-i-joint-first-name (1:3)
+092215                                 to ws-first-three
+                 perform 0150-process-eralph
+                                       thru 0150-exit
+              end-if
+              
+           end-if
+
+           .
+       0050-EXIT.
+           EXIT.
+
+       0100-check-cancel.
+
+      *** check to see if there is a pending cancel for the issue **
+
+           move ws-erpndb-key          to ws-erpndb5-key
+           move +0                     to ws-erpndb5-seq-no
+           move '2'                    to ws-erpndb5-rec-type
+           exec cics read
+              dataset       ('ERPNDB2')
+              ridfld        (ws-erpndb5-key)
+              into          (p5-pending-business)
+              resp          (ws-response)
+           end-exec
+
+           if resp-normal
+              if p5-ci-lf-benefit-cd not = '00' and '  '
+                 if p5-c-lf-cancel-dt <> low-values
+                    move '00'             to pb-i-lf-benefit-cd
+                 end-if
+              end-if
+              if p5-ci-ah-benefit-cd not = '00' and '  '
+                 if p5-c-ah-cancel-dt <> low-values
+                    move '00'             to pb-i-ah-benefit-cd
+                 end-if
+              end-if
+           end-if
+
+           .
+       0100-exit.
+           exit.
+
+       0150-process-eralph.
+
+      ****  this reads 
+           move +1                     to a1
+           move spaces                 to ws-alpha-table
+           move ' '                    to ws-match-sw
+              move ' ' to ws-eralph-sw
+
+           move low-values             to ws-eralph-aix-key
+           move pb-company-cd          TO ws-eralph-aix-company-cd
+           MOVE PB-ACCOUNT             TO ws-eralph-aix-account
+           MOVE ws-last-name           to ws-eralph-aix-lname
+092215     move ws-first-three         to ws-eralph-aix-1st-three
+
+           move ws-age                 to ws-age-from-pndb
+
+           move pb-cert-no             to ws-eralph-cert (a1)
+           move pb-i-lf-benefit-cd     to ws-eralph-lf-cd (a1)
+
+           if ((ws-cov-sw = 'S')
+              and (lf-joint-ind = 'J'))
+                     or
+              (ws-cov-sw = 'P')
+              compute ws-eralph-lf-remamt (a1) =
+                 pb-i-lf-benefit-amt + pb-i-lf-alt-benefit-amt
+              move ws-eralph-lf-remamt (a1)
+                                       to ws-lf-tot-benefit
+           end-if
+           move pb-i-ah-benefit-cd     to ws-eralph-ah-cd (a1)
+           if ((ws-cov-sw = 'S')
+              and (ah-joint-ind = 'J'))
+                     or
+              (ws-cov-sw = 'P')
+              move pb-i-ah-benefit-amt    to ws-eralph-ah-amt (a1)
+              compute ws-eralph-ah-remamt (a1) =
+                 pb-i-ah-term * pb-i-ah-benefit-amt
+              move ws-eralph-ah-amt (a1)  to ws-ah-tot-benefit
+           end-if
+
+           perform 0170-ERpndb5        thru 0170-exit
+
+           if erpndb2-startbr
+              exec cics endbr
+                 dataset     ('ERPNDB2')
+              end-exec
+           end-if
+
+           compute p1 = a1 + 1
+
+           move spaces                 to ws-eralph2-startbr-sw
+
+           exec cics startbr
+              dataset     ('ERALPH2')
+              ridfld      (ws-eralph-aix-key)
+              gteq
+              resp        (ws-response)
+           end-exec
+
+           if (resp-endfile)
+              or (resp-notfnd)
+              display ' no matching eralph record ' 
+              set no-matching-alpha to true
+              go to 0150-exit
+           else
+              if not resp-normal
+                 display ' error-eralph-start ' ws-response
+                 set no-matching-alpha to true
+                 go to 0150-exit
+              end-if
+           end-if
+
+           perform 0155-read-eralph    thru 0155-exit
+           if (not resp-normal) and (not resp-dupkey)
+              display ' Error-eralph-1stread ' eralph-file-status
+              go to 0150-exit
+           end-if
+
+           perform 0160-accum-eralph   thru 0160-exit until
+              (af-company-cd-a1  not = pb-company-cd)
+              or (af-account-a1  not = pb-account)
+              or (af-lname       not = ws-last-name)
+092215        or (af-fname (1:3) not = ws-first-three)
+              or (end-of-eralph)
+              or ((not resp-normal) and (not resp-dupkey))
+
+           if eralph2-startbr
+              exec cics endbr
+                 dataset     ('ERALPH2')
+              end-exec
+           end-if
+
+           if a1 > +1
+              if ((ws-age > 65)
+                 and ((ws-lf-tot-benefit > 25000.00)
+                 or (ws-ah-tot-benefit > 400.00)))
+                           or
+
+                 ((ws-lf-tot-benefit > 50000.00)
+                 or (ws-ah-tot-benefit > 750.00))
+      *          or (ws-age-from-pndb > 65)
+      *          if processing-primary
+      *             display ' *********  P R I M A R Y  **********'
+      *          else
+      *             display ' *******  S E C O N D A R Y   *******'
+      *          end-if
+                 move 'Y'                 to ws-exceed-limit-yn
+      *          display ' '
+      *          display ' **********  P E N D I N G   ************'
+                 perform varying a1 from +1 by +1 until
+                    (ws-eralph-cert (a1) = spaces)
+                    or (a1 > +20)
+                    move ws-eralph-cert (a1)
+                                       to pt-eralph-cert (a1)
+                    move ws-eralph-lf-cd (a1)
+                                       to pt-eralph-lf-cd (a1)
+                    move ws-eralph-lf-remamt (a1)
+                                       to pt-eralph-lf-remamt (a1)
+                    move ws-eralph-ah-cd (a1)
+                                       to pt-eralph-ah-cd (a1)
+                    move ws-eralph-ah-amt (a1)
+                                       to pt-eralph-ah-amt (a1)
+                    move ws-eralph-ah-remamt (a1)
+                                       to pt-eralph-ah-remamt (a1)
+                 end-perform
+      *          perform varying a1 from +1 by +1 until
+      *             (ws-eralph-cert (a1) = spaces)
+      *             or (a1 > +20)
+      *             if a1 = p1
+      *                display ' **********  A L P H A   ************'
+      *             end-if
+      *             display
+      *                pt-eralph-cert      (a1) '   '
+      *                pt-eralph-lf-cd     (a1) '   '
+      *                pt-eralph-lf-remamt (a1) '    A&H   '
+      *                pt-eralph-ah-cd     (a1) '   '
+      *                pt-eralph-ah-amt    (a1) '   '
+      *                pt-eralph-ah-remamt (a1) '   '
+      *          end-perform
+      *          display ' '
+                 move ws-lf-tot-benefit to pt-lf-tot-benefit
+                 move ws-ah-tot-benefit to pt-ah-tot-benefit
+              end-if
+           end-if
+
+           .
+       0150-exit.
+           exit.
+
+       0155-READ-ERALPH.
+
+           exec cics readnext
+              dataset      ('ERALPH2')
+              ridfld       (ws-eralph-aix-key)
+              into         (alpha-file-rec)
+              resp         (ws-response)
+           end-exec
+
+           if (not resp-normal and not resp-dupkey)
+              or (pb-company-cd not = ws-eralph-aix-company-cd)
+              or (pb-account not = ws-eralph-aix-account)
+              or (ws-last-name not = ws-eralph-aix-lname)
+092215        or (ws-first-three not = ws-eralph-aix-1st-three)
+              set end-of-eralph to true
+              exec cics endbr dataset    ('ERALPH2') end-exec
+           end-if
+
+           .
+       0155-EXIT.
+           EXIT.
+
+       0160-accum-eralph.
+
+      *** check to see if there is a pending cancel for the alpha rec **
+      *** if not, then accumulate alpha's in table.
+
+           move af-control-primary     to ws-erpndb5-key
+           move +0                     to ws-erpndb5-seq-no
+           move '2'                    to ws-erpndb5-rec-type
+           exec cics read
+              dataset       ('ERPNDB2')
+              ridfld        (ws-erpndb5-key)
+              into          (p5-pending-business)
+              resp          (ws-response)
+           end-exec
+
+           if resp-normal
+              if p5-ci-lf-benefit-cd not = '00' and '  '
+                 if p5-c-lf-cancel-dt <> low-values
+      *             display ' found lf alpha cancel ' af-account
+      *                ' ' af-cert-no
+                    move '00'             to af-lf-typ
+                 end-if
+              end-if
+              if p5-ci-ah-benefit-cd not = '00' and '  '
+                 if p5-c-ah-cancel-dt <> low-values
+      *             display ' found ah alpha cancel ' af-account
+      *                ' ' af-cert-no
+                    move '00'             to af-ah-typ
+                 end-if
+              end-if
+           end-if
+
+           if (af-lf-typ not = '00')
+              or (af-ah-typ not = '00')
+              add +1 to a1
+           end-if
+           if af-lf-typ not = '00' and '  '
+              move af-cert-no          to ws-eralph-cert (a1)
+              move af-lf-typ           to ws-eralph-lf-cd (a1)
+              move af-lf-remamt        to ws-eralph-lf-remamt (a1)
+              compute ws-lf-tot-benefit =
+                 ws-lf-tot-benefit + af-lf-remamt + af-lf-remamt-alt
+           end-if
+
+           if af-ah-typ not = '00' and '  '
+              move af-cert-no          to ws-eralph-cert (a1)
+              move af-ah-typ           to ws-eralph-ah-cd (a1)
+              move af-ah-amt           to ws-eralph-ah-amt (a1)
+              move af-ah-remamt        to ws-eralph-ah-remamt (a1)
+              compute ws-ah-tot-benefit =
+                 ws-ah-tot-benefit + af-ah-amt
+      *       perform 0165-check-for-ah-claim
+      *                                thru 0165-exit
+           end-if
+
+           .
+       0160-continue.
+
+           perform 0155-read-eralph    thru 0155-exit
+
+           .
+       0160-exit.
+           exit.
+
+       0165-check-for-ah-claim.
+
+           move pb-company-cd          to ws-elmstr5-company-cd
+           move af-cert-no             to ws-elmstr5-cert-no
+           move spaces                 to ws-elmstr5-startbr-sw
+           exec cics startbr
+              dataset         ('ELMSTR5')
+              ridfld          (ws-elmstr5-key)
+              gteq
+              resp            (ws-response)
+           end-exec
+
+           if resp-normal
+              set elmstr5-startbr to true
+           else
+              if (resp-notfnd)
+                 or (resp-endfile)
+                 go to 0165-exit
+              else
+                 display 'error-elmstr5-startbr '
+                 ws-response ' ' af-cert-no
+              end-if
+           end-if
+
+           .
+       0165-read-next.
+       
+           exec cics readnext
+              dataset     ('ELMSTR5')
+              ridfld      (ws-elmstr5-key)
+              into        (claim-master)
+              resp        (ws-response)
+           end-exec
+
+           if resp-normal
+              continue
+           else
+              display ' error-elmstr5-readnext ' ws-response ' '
+                 af-cert-no
+              go to 0165-exit
+           end-if
+
+           if (cl-company-cd-a4 not = af-company-cd)
+              or (cl-cert-no-a4 not = af-cert-no)
+              go to 0165-exit
+           end-if
+
+           if (cl-cert-carrier = af-carrier)
+              and (cl-cert-grouping = af-grouping)
+              and (cl-cert-state    = af-state)
+              and (cl-cert-account  = af-account)
+              and (cl-cert-eff-dt   = af-dt)
+              and (cl-cert-no-a4    = af-cert-no)
+              move cl-incurred-dt      to dc-bin-date-1
+              move pb-cert-eff-dt      to dc-bin-date-2
+              move '1'                 to dc-option-code
+              perform 9700-date-convert thru 9700-exit
+              if (no-conversion-error)
+                 and (dc-elapsed-months > 11)
+                 display ' Found A & H claim ' cl-cert-no-a4 ' '
+                    cl-claim-status ' ' cl-total-paid-amt
+              end-if
+           end-if
+
+           go to 0165-read-next
+
+           .
+       0165-exit.
+           exit.
+
+       0170-erpndb5.
+
+      ***  this routine reads all the pending records that 
+      ***  match the acct#, last name & 1st init
+      ***  and if it's not cancelled add to the accum table
+
+           move spaces                 to ws-erpndb2-startbr-sw
+           move low-values             to ws-erpndb5-key
+           move pb-company-cd-a1       to ws-erpndb5-company-cd
+           move pb-carrier             to ws-erpndb5-carrier
+           move pb-grouping            to ws-erpndb5-grouping
+           move pb-state               to ws-erpndb5-state
+           move pb-account             to ws-erpndb5-account
+
+           exec cics startbr
+              dataset      ('ERPNDB2')
+              ridfld       (ws-erpndb5-key)
+              gteq
+              resp         (ws-response)
+           end-exec
+
+           if not resp-normal
+              display ' error-erpndb5-start ' ws-response ' '
+                 ws-erpndb5-key (2:19)
+              go to 0170-exit
+           end-if
+           set erpndb2-startbr to true
+           perform 0175-read-erpndb5   thru 0175-exit
+           if not resp-normal
+              display ' Error-erpndb5-1stread '
+                 pb-control-by-account (2:19) ' '
+                 pb-control-by-account (22:11)
+              go to 0170-exit
+           end-if
+           perform 0180-accum-erpndb5  thru 0180-exit until
+              (p5-company-cd-a1  not = pb-company-cd)
+              or (p5-account     not = pb-account)
+              or (end-of-erpndb5)
+              or (not resp-normal)
+      *    end-perform
+
+           .
+       0170-exit.
+           exit.
+
+       0175-READ-ERPNDB5.
+
+      *    display ' made it to 0175 '
+
+           exec cics readnext
+              dataset    ('ERPNDB2')
+              ridfld     (ws-erpndb5-key)
+              into       (p5-pending-business)
+              resp       (ws-response)
+           end-exec
+               
+           if (resp-endfile)
+              or (resp-notfnd)
+              or (ws-erpndb5-key (1:20) <>
+                 pb-control-by-account (1:20))
+              display ' end of file on read next ' 
+              set end-of-erpndb5       to true
+           else
+              if not resp-normal
+                 display ' error-erpndb5-readnext ' ws-response
+                    ' ' ws-erpndb5-key (2:19)
+                 set end-of-erpndb5    to true
+              end-if
+           end-if
+
+           .
+       0175-EXIT.
+           EXIT.
+
+       0180-accum-erpndb5.
+
+           if pb-control-by-account = p5-control-by-account
+              display ' found my equal '
+              continue
+           else
+              if (p5-control-by-account (1:33) =
+                            ws-save-issue-key (1:33))
+                 and (p5-record-type = '2')
+                 display ' found cancelled accum pend '
+                 move spaces           to ws-save-issue-key
+                 if p5-ci-lf-benefit-cd not = '00' and '  '
+                    if p5-c-lf-cancel-dt <> low-values
+      *                display ' found lf accum cancel ' p5-account
+      *                   ' ' p5-cert-no
+                       move '00'             to ws-eralph-lf-cd (a1)
+                    end-if
+                 end-if
+                 if p5-ci-ah-benefit-cd not = '00' and '  '
+                    if p5-c-ah-cancel-dt <> low-values
+      *                display ' found ah accum cancel ' p5-account
+      *                   ' ' p5-cert-no
+                       move '00'             to ws-eralph-ah-cd (a1)
+                    end-if
+                 end-if
+              end-if
+              if ((p5-i-insured-last-name = ws-last-name)
+092215            and (p5-i-insured-first-name (1:3) = ws-first-three)
+                  and (p5-record-type = '1'))
+                              or
+                  ((p5-i-joint-last-name = ws-last-name)
+092215            and (p5-i-joint-first-name (1:3) = ws-first-three)
+                  and (p5-record-type = '1'))
+                 add +1 to a1
+                 move p5-control-by-account to ws-save-issue-key
+                 move p5-cert-no       to ws-eralph-cert  (a1)
+                 move p5-i-lf-benefit-cd
+                                       to ws-eralph-lf-cd (a1)
+                 move p5-i-lf-benefit-amt
+                                       to ws-eralph-lf-remamt (a1)
+                 compute ws-lf-tot-benefit = ws-lf-tot-benefit +
+                    p5-i-lf-benefit-amt + p5-i-lf-alt-benefit-amt
+                 move p5-i-ah-benefit-cd
+                                       to ws-eralph-ah-cd (a1)
+                 move p5-i-ah-benefit-amt
+                                       to ws-eralph-ah-amt (a1)
+                 compute ws-ah-tot-benefit =
+                    ws-ah-tot-benefit + p5-i-ah-benefit-amt
+                 compute ws-eralph-ah-remamt (a1) =
+                    p5-i-ah-term * p5-i-ah-benefit-amt
+              end-if
+           end-if
+
+           perform 0175-read-erpndb5   thru 0175-exit
+
+           .
+       0180-exit.
+           exit.
+
+       9700-DATE-CONVERT.
+
+           EXEC CICS LINK
+                PROGRAM  ('ELDATCV')
+                COMMAREA (DATE-CONVERSION-DATA)
+                LENGTH   (DC-COMM-LENGTH)
+           END-EXEC.
+
+       9700-EXIT.
+            EXIT.
+
+       ABEND-PGM.
+                                       COPY ELCABEND.

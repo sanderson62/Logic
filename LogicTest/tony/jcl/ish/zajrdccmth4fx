@@ -1,0 +1,83 @@
+################################################################################
+#   cidclg341
+################################################################################
+BEGINJOB mode='MVS'
+
+if ($EBMSYS != 'tony') then
+   echo "Job Aborting, not Tony"
+   exit 1
+endif
+
+
+################################################################################
+LABEL name=FNB168CCC
+################################################################################
+#  DATE: MMDDYYYY   
+#  FROM: CILGM17    
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='SYS010' dataset='ZC.XX.EPEC.CLP' filename='$SEQFILES/ZC.XX.EPEC.CLP' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o' 
+#  ** DOWNLOAD LIFE **    
+ASSGNDD ddname='SYS012' filename='$SEQFILES/ZC.DL.FN.FX.CCCRSRV' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+
+EXECPGM pgmname='FNB168CCC' stepname='FNB168CCC' parm='02282009'
+
+################################################################################
+LABEL name=FNB170CCC
+################################################################################
+#  *                                                                     
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='$SEQFILES/FNDCFRM56C' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZC.DL.FN.FX.CCCRSRV' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170LR' stepname='FNB170CCC'
+
+
+################################################################################
+LABEL name=CPYM56C
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/FNDCFRM56C' disp='i'
+ASSGNDD  ddname='SYS011' filename='$SEQFILES/ZC.DL.FN.FX.FRM56.CCC' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPYM56C' parm='ALL'
+
+################################################################################
+LABEL name=PRINT3
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/FNDCFRM56C' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT3'
+
+################################################################################
+LABEL name=COPY3   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CCCDCC 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/ZC.DL.FN.FX.CCCRSRV' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/CCCDCCRSRV_02-28-09.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+EXECPGM pgmname='IDCAMS' stepname='COPY3'   
+################################################################################
+
+
+ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajrdccmth4-fix
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    echo " Test Job, print not released "
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 

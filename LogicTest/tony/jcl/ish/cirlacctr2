@@ -1,0 +1,95 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+#
+################################################################################
+
+if ($EBMSYS != "cid1t") then
+   echo "Job Aborted, Not CID1T"
+   exit 1
+endif
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+tr -d '\012' < $SEQFILES/rlicacct02b > $SEQFILES/rlicwrk1
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=SORT01
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/rlicwrk1' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/rlicwrk2' disp='o' normal='k' abend='d' recfmt='F' recsize='476'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(11 2 CHAR) (1 10 CHAR)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT01'
+
+################################################################################
+LABEL name=STEP2
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+tr -d '\012' < $SEQFILES/rlic_acct_xref_r01 > $SEQFILES/rlictmp
+tr -d '\015' < $SEQFILES/rlictmp > $SEQFILES/rlicxrfwrk1
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP2' parm='SH'
+
+################################################################################
+LABEL name=SORT02
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/rlicxrfwrk1' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/rlicxrfwrk2' disp='o' normal='k' abend='d' recfmt='F' recsize='20'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(14 07 CHAR)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT02'
+
+################################################################################
+LABEL name=RLACCTR2
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS004' type='DUMMY'
+#ASSGNDD ddname='SYS004' filename='$SEQFILES/rlic_ga_xref_r01' disp='i'
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS005' filename='$SEQFILES/rlicncb02' disp='i'
+#ASSGNDD ddname='SYS009' filename='$SEQFILES/unilicr24' disp='i'
+ASSGNDD ddname='SYS009' type='DUMMY'
+ASSGNDD ddname='SYS007' filename='$SEQFILES/rlic_rptcd1_tbl' disp='i-o' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/rlicwho02' disp='i-o' 
+#ASSGNDD ddname='SYS012' type='DUMMY'
+ASSGNDD ddname='SYS020' filename='$SEQFILES/rliccomm02' disp='i-o' 
+#ASSGNDD ddname='SYS020' type='DUMMY'
+ASSGNDD ddname='SYS014' filename='$SEQFILES/rlicxrfwrk2' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/rlicwrk2' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/rlic_new_acctr02' disp='o' normal='k' abend='d' recsize='2000' recfmt='F' 
+ASSGNDD ddname='SYS017' filename='$SEQFILES/rlic_new_noter02' disp='o' normal='k' abend='d' recsize='120' recfmt='F' 
+ASSGNDD ddname='SYS013' filename='$SEQFILES/rlic_new_compr02' disp='o' normal='k' abend='d' recsize='700' recfmt='F' 
+ASSGNDD ddname='SYS015' filename='$SEQFILES/rlic_new_planr02' disp='o' normal='k' abend='d' recsize='420' recfmt='F' 
+ASSGNDD ddname='SYS016' filename='$SEQFILES/rlic_acct_xref_r02' disp='o' normal='k' abend='d' recsize='20' recfmt='F'
+ASSGNDD ddname='SYS018' filename='$SEQFILES/rlic_ga_xref_r02' disp='o' normal='k' abend='d' recsize='20' recfmt='F'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='RLACCTR2' stepname='RLACCTR2' parm='RW02' 
+
+ENDJOB 
+################################################################################

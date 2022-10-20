@@ -1,0 +1,236 @@
+BEGINJOB mode='MVS' jobclass='M' 
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job aborted, not mdoff"
+#   exit 1
+#endif
+
+GOTO BKPACCT
+
+################################################################################
+LABEL name=REMOVE
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/*us2chgs.xlsx *us2out.*
+!
+EXECPGM pgmname='BPXBATCH' stepname='REMOVE' parm='SH'
+
+################################################################################
+LABEL name=FTP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < /apps/test/cid1s/jcl/ish/ftp-cpsamfus2
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+################################################################################
+LABEL name=BKPACCT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERACCT -s $SEQFILES/eracct.us2.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPACCT' parm='SH'
+
+################################################################################
+LABEL name=BKPACNT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERACNT -s $SEQFILES/eracnt.us2.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPACNT' parm='SH'
+
+################################################################################
+LABEL name=CHKCID
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ -a /data/test/mdoff/seqfiles/cidus2chgs.xlsx ] ; then
+   echo "we got a CID file " ;
+else
+   GOTO CHKDCC
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='CHKCID' parm='SH'
+
+################################################################################
+LABEL name=CIDPERL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/readamus2ss.pl /data/test/mdoff/seqfiles/cidus2chgs.xlsx $SEQFILES/cidus2out.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='CIDPERL' parm='SH'
+
+################################################################################
+LABEL name=CIDSORT
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/cidus2out.txt' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/cidus2out.srtd.txt' disp='o' normal='k' abend='d' recfmt='F' recsize='171'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 21 CHAR)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='CIDSORT'
+
+################################################################################
+LABEL name=CIDAMFUS
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERACNT' type='VS' filename='ERACNT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o'
+ASSGNDD ddname='SYS007' filename='$SEQFILES/cidus2out.srtd.txt' disp='i-o'
+
+EXECPGM pgmname='CPSAMFUS2' stepname='CIDAMFUS'
+
+################################################################################
+LABEL name=CIDSTAT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ $JOBSTATUS = 0 ]; then
+   echo  | mutt -s 'CID US2 Update successful' pema@cso.com
+else
+   echo  | mutt -s 'CID US2 Update  F A I L E D ' pema@cso.com
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='CIDSTAT' parm='SH'
+
+GOTO END_JOB
+
+################################################################################
+LABEL name=CHKDCC
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ -a /data/test/mdoff/seqfiles/dccus2chgs.xlsx ] ; then
+   echo "we got a DCC file " ;
+else
+   GOTO CHKAHL
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='CHKDCC' parm='SH'
+
+################################################################################
+LABEL name=DCCPERL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/readamus2ss.pl $SEQFILES/dccus2chgs.xlsx $SEQFILES/dccus2out.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='DCCPERL' parm='SH'
+
+################################################################################
+LABEL name=DCCSORT
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/dccus2out.txt' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/dccus2out.srtd.txt' disp='o' normal='k' abend='d' recfmt='F' recsize='171'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 21 CHAR)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='DCCSORT'
+
+################################################################################
+LABEL name=DCCAMFUS
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERACNT' type='VS' filename='ERACNT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o'
+ASSGNDD ddname='SYS007' filename='$SEQFILES/dccus2out.srtd.txt' disp='i-o'
+
+EXECPGM pgmname='CPSAMFUS2' stepname='DCCAMFUS' 
+
+################################################################################
+LABEL name=DCCSTAT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ $JOBSTATUS = 0 ]; then
+   echo  | mutt -s 'DCC US2 Update successful' pema@cso.com
+else
+   echo  | mutt -s 'DCC US2 Update  F A I L E D ' pema@cso.com
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='DCCSTAT' parm='SH'
+
+#GOTO END_JOB
+
+################################################################################
+LABEL name=CHKAHL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ -a /data/test/mdoff/seqfiles/ahlus2chgs.xlsx ] ; then
+   echo "we got a AHL file " ;
+else
+   GOTO END_JOB
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='CHKAHL' parm='SH'
+
+################################################################################
+LABEL name=AHLPERL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/readamus2ss.pl $SEQFILES/ahlus2chgs.xlsx $SEQFILES/ahlus2out.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='AHLPERL' parm='SH'
+
+################################################################################
+LABEL name=AHLSORT
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/ahlus2out.txt' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/ahlus2out.srtd.txt' disp='o' normal='k' abend='d' recfmt='F' recsize='171'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 21 CHAR)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='AHLSORT'
+
+################################################################################
+LABEL name=AHLAMFUS
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERACNT' type='VS' filename='ERACNT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i-o'
+ASSGNDD ddname='SYS007' filename='$SEQFILES/ahlus2out.srtd.txt' disp='i-o'
+
+EXECPGM pgmname='CPSAMFUS2' stepname='AHLAMFUS' 
+
+################################################################################
+LABEL name=AHLSTAT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ $JOBSTATUS = 0 ]; then
+   echo  | mutt -s 'AHL US2 Update successful' pema@cso.com
+else
+   echo  | mutt -s 'AHL US2 Update  F A I L E D ' pema@cso.com
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='AHLSTAT' parm='SH'
+
+if ($JOBSTATUS == 0) then
+   "echo  | mutt -s 'JOB US2 Update successful' pema@cso.com"
+else
+   "echo  | mutt -s 'JOB US2 Update  F A I L E D ' pema@cso.com"
+  echo " Job aborted, print not released"
+endif
+
+ENDJOB 

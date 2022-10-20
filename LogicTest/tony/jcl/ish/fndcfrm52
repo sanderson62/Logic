@@ -1,0 +1,85 @@
+################################################################################
+#
+#  Job:  fndcfrm52
+#
+################################################################################
+BEGINJOB mode='MVS'
+
+#*******************************************************************************
+#*****
+#* This job is submitted via a job script <dccmth...> that may submit other
+#* jobs. Files beginning with DC.DL.CIADM... are ftp'd at the start of the next
+#* job script.  Other files not starting with DC.DL.. that are being
+#* transferred should be noted below.
+#*****
+#*******************************************************************************
+
+################################################################################
+LABEL name=FNB184T
+################################################################################
+#  DATE: MMDDYYYY 
+#  FROM: CICRMBK 
+ASSGNDD ddname='SYS010' dataset='CI.ME.LG.ERREPY' gdg='0' filename='\${SEQFILES}/CI.ME.LG.ERREPY' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/DC.FN.DL.FX.CIDRET' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+
+EXECPGM pgmname='FNB184T' stepname='FNB184T' parm='09302003' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *                                                                     
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='\${SEQFILES}/FNDCFRM52' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/DC.FN.DL.FX.CIDRET' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+EXECPGM pgmname='FNB170' stepname='FNB170' 
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+#  ***                                                                   
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/FNDCFRM52' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID CLAIMS 
+#  *
+#  *  SYSUT2 is ftp'd to ntfree
+#  *------------------------------------------------------------------- 
+#  * 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/DC.FN.DL.FX.CIDRET' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/CIDDCCRETRO_09-30-03_20030930.FPR' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "exelpr.sh l133std.parms '-ode=DCCI' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+    "exelpr.sh l133std.parms '-ode=DCCO' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 042503                 SMVA   NEW JOB FOR DCC, MODELED AFTER CID JOB

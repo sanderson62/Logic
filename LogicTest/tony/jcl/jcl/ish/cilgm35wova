@@ -1,0 +1,232 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE EQ 64 GOTO END_JOB 
+
+################################################################################
+LABEL name=ECS061 
+################################################################################
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS006' type='DUMMY' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.XX.CTRN' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' dataset='CI.XX.COMM' gdg='0' filename='\${SEQFILES}/CI.XX.COMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS013' dataset='CI.WW.PAYADJS' filename='\${SEQFILES}/CI.WW.PAYADJS' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS012' filename='/tmp/${JOBNAME}_PMT3800' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SYS015' dataset='CI.DD.COMPMSTR.OUT061' filename='\${SEQFILES}/CI.DD.COMPMSTR.OUT061' disp='o' normal='k' abend='d' recsize='700' recfmt='F' 
+ASSGNDD ddname='SYS018' dataset='CI.DD.PREMCOMP.OUT061' filename='\${SEQFILES}/CI.DD.PREMCOMP.OUT061' disp='o' normal='k' abend='d' recsize='270' recfmt='F' 
+ASSGNDD ddname='SYS020' dataset='CI.EX.FICH061' filename='\${SEQFILES}/CI.EX.FICH061' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS017' filename='/tmp/${JOBNAME}_PYMTFILE' disp='o' normal='k' abend='d' recsize='80' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS061T' stepname='ECS061' 
+
+################################################################################
+LABEL name=CPY061 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.EX.FICH061' filename='\${SEQFILES}/CI.EX.FICH061' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' dataset='CI.DL.CIADM.FICH061' filename='\${SEQFILES}/CI.DL.CIADM.FICH061' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY061' parm='ALL' 
+
+################################################################################
+LABEL name=DELDEF 
+################################################################################
+#  ********************************************************************  
+#  ***                                                                   
+#  ***  DEL / DEF  - - TEMP. ERPNDE FILE                                 
+#  ***                                                                   
+#  *****************************************************************     
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ DELETE  CI.WW.EL562.RPT                                                
+!
+
+EXECPGM pgmname='IDCAMS' stepname='DELDEF' 
+
+unikixbld -i -dERPNDE
+unikixbld -i -dERPNDE2
+
+################################################################################
+LABEL name=EL349 
+################################################################################
+#  ********************************************************************  
+#  **                                                                    
+#  **                       LOAD ERPNDE FILE                             
+#  **    -- NOTE --  ONE DUMMY RECORD IS ALL THAT IS LOADED              
+#  **                                                                    
+#  ********************************************************************  
+#  *************************************************    INPUT FILES      
+ASSGNDD ddname='ERPNDE' dataset='CI.TT.LG.ERPNDE' type='VS' filename='ERPNDE' disp='i-o' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+ERPNDE  LOAD                                                            
+!
+
+EXECPGM pgmname='EL349' stepname='EL349' 
+
+################################################################################
+LABEL name=EL560 
+################################################################################
+#  ********************************************************************  
+#  *                                                                     
+#  * INPUT IS 'CI.XX.EXTR521' FROM CI MONTH-END CILGM15             
+#  *                                                                     
+#  ********************************************************************  
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS010' dataset='CI.XX.EXTR521' gdg='0' filename='\${SEQFILES}/CI.XX.EXTR521' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERPNDE' dataset='CI.TT.LG.ERPNDE' type='VS' filename='ERPNDE' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+EXECPGM pgmname='EL560' stepname='EL560' 
+
+################################################################################
+LABEL name=CPY560
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/$JOBNAME/EL560/SYS008_${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.CIADM.FICH560' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY560' parm='ALL'
+
+################################################################################
+LABEL name=EL562 
+################################################################################
+#  ********************************************************************  
+#  ***            PRINT COMPENSATION STATEMENTS                          
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS015' dataset='CI.DD.COMPMSTR.OUT061' filename='\${SEQFILES}/CI.DD.COMPMSTR.OUT061' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS017' dataset='CI.DD.PREMCOMP.OUT061' filename='\${SEQFILES}/CI.DD.PREMCOMP.OUT061' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERNOTE' dataset='CI.DD.LG.ERNOTE' type='VS' filename='ERNOTE' disp='i-o' 
+ASSGNDD ddname='ERCHEK' dataset='CI.DD.LG.ERCHEK' type='VS' filename='ERCHEK' disp='i-o' 
+ASSGNDD ddname='ELERRS' dataset='CI.DD.LG.ELERRS' type='VS' filename='ELERRS' disp='i-o' 
+ASSGNDD ddname='ERPNDE2' dataset='CI.TT.LG.ERPNDE2' type='VS' filename='ERPNDE2' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' dataset='CI.WW.EL562.RPT' filename='\${SEQFILES}/CI.WW.EL562.RPT' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS016' filename='/tmp/${JOBNAME}_COMPTRAN' disp='o' normal='k' abend='d' recsize='700' recfmt='F' 
+ASSGNDD ddname='SYS018' filename='/tmp/${JOBNAME}_SUMMTRAN' disp='o' normal='k' abend='d' recsize='136' recfmt='F' 
+ASSGNDD ddname='SYS020' dataset='CI.EX.FICH562' filename='\${SEQFILES}/CI.EX.FICH562' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+
+EXECPGM pgmname='EL562T' stepname='EL562' 
+
+################################################################################
+LABEL name=CPY562 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.WW.EL562.RPT' filename='\${SEQFILES}/CI.WW.EL562.RPT' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.CIADM.FICH562.fix' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY562' parm='ALL' 
+
+################################################################################
+LABEL name=ECS063 
+################################################################################
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS015' filename='/tmp/${JOBNAME}_COMPTRAN' disp='i-o' normal='k' abend='d' 
+ASSGNDD ddname='SYS017' filename='/tmp/${JOBNAME}_SUMMTRAN' disp='i-o' normal='k' abend='d' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='B'  
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZI.ME.COMM' disp='o' normal='k' abend='d' recfmt='F' recsize='700' 
+ASSGNDD ddname='SYS020' dataset='CI.EX.FICH063' filename='\${SEQFILES}/CI.EX.FICH063' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS063' stepname='ECS063' 
+
+################################################################################
+LABEL name=CPY063 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.EX.FICH063' filename='\${SEQFILES}/CI.EX.FICH063' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' dataset='CI.DL.CIADM.FICH063' filename='\${SEQFILES}/CI.DL.CIADM.FICH063' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY063' parm='ALL' 
+
+################################################################################
+LABEL name=ECS064 
+################################################################################
+#  ********************************************************************  
+#  ***--                                                          --***  
+#  ***--            AGED ACCOUNTS RECEIVABLE                      --***  
+#  ***--    SEE RESTART INSTRUCTIONS BEFORE RESTARTING            --***  
+#  ***--                                                          --***  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZI.ME.COMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS012' filename='\${SEQFILES}/\${JOBNAME}.ECS064.ME50.BAL.AMTS' disp='o' normal='k' abend='k' recfmt='F'
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='B'  
+ASSGNDD ddname='SYS020' dataset='CI.EX.FICH064' filename='\${SEQFILES}/CI.EX.FICH064' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+
+EXECPGM pgmname='ECS064' stepname='ECS064' 
+
+################################################################################
+LABEL name=CPY064 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.EX.FICH064' filename='\${SEQFILES}/CI.EX.FICH064' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' dataset='CI.DL.CIADM.FICH064' filename='\${SEQFILES}/CI.DL.CIADM.FICH064' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY064' parm='ALL' 
+
+################################################################################
+LABEL name=ECS193 
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZI.ME.COMM' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS011' type='DUMMY' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+EXECPGM pgmname='ECS193' stepname='ECS193' 
+
+################################################################################
+LABEL name=CPY193 
+################################################################################
+ASSGNDD ddname='SYS010' filename='/$SYSOUTDIR/$JOBNAME/ECS193/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.CIADM.FICH193' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY193' parm='ALL' 
+
+################################################################################
+LABEL name=ECS060 
+################################################################################
+#  ********************************************************************  
+#  ***--                                                          --***  
+#  ***--              COMPENSATION SUMMARY                        --***  
+#  ***--    SEE RESTART INSTRUCTIONS BEFORE RESTARTING            --***  
+#  ***--                                                          --***  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZI.ME.COMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='SYS020' dataset='CI.EX.FICH060' filename='\${SEQFILES}/CI.EX.FICH060' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+
+EXECPGM pgmname='ECS060' stepname='ECS060' 
+
+################################################################################
+LABEL name=CPY060 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.EX.FICH060' filename='\${SEQFILES}/CI.EX.FICH060' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' dataset='CI.DL.CIADM.FICH060' filename='\${SEQFILES}/CI.DL.CIADM.FICH060' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY060' parm='ALL' 
+
+################################################################################
+
+ENDJOB 
+################################################################################

@@ -1,0 +1,65 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' verbose
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job Aborted, Not MDOFF "
+#   exit 1
+#endif
+
+setenv ODBCINI /usr/local/etc/odbc.ini
+setenv ODBCSYSINI /usr/local/etc
+
+echo $ODBCINI
+echo $ODBCSYSINI
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/balance_eom.pl @PMEYYYYMMDD @MEMMDDYYYY CID $SEQFILES/
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+#
+#  The value in CIDbalstat.txt will be 0 if everything balanced okay
+#  If it's not, then we don't want to initiate submission of day 2
+#  The users will deal with it in the morning and we will go from there
+#
+################################################################################
+
+if (`cat $SEQFILES/CIDbalstat.txt` != 0) then
+   GOTO NOBAL
+endif
+
+################################################################################
+LABEL name=YESBAL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+echo "@YYYYMMDD" > $SEQFILES/M50.CID.Balancing.Trigger.txt
+ftp -n ntcso1 < $JCLLIB/ftp-cilgchkbal
+echo 'The CID Month end reports are in balance ' | mutt -s 'CID Month end is in Balance '  CIDMEBalanced@cso.com
+mutt -s 'CID Month end balanced ' -a $SEQFILES/CIDMebal.xlsx -- MEAutoBalance@cso.com < /dev/null
+!
+EXECPGM pgmname='BPXBATCH' stepname='YESBAL' parm='SH'
+
+################################################################################
+LABEL name=PERL2
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/eom2constr.pl @YYYYMMDD CID
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL2' parm='SH'
+
+GOTO END_JOB
+
+################################################################################
+LABEL name=NOBAL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+mutt -s 'CID Month end DID NOT balance ' -a $SEQFILES/CIDMebal.xlsx -- MEDidNotBalanceEmail@cso.com < /dev/null
+echo 'Action needed ' | mutt -s 'CID Month end DID NOT balance '  MEDidNotBalanceText@cso.com
+!
+EXECPGM pgmname='BPXBATCH' stepname='NOBAL' parm='SH'
+
+ENDJOB 

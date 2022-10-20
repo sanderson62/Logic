@@ -1,0 +1,77 @@
+###############################################################################
+#                                                                              #
+#     JOB: cilg036s                                                            #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 8 GOTO END_JOB 
+
+################################################################################
+LABEL name=ECS036 
+################################################################################
+#  ********************************************************************  
+#  **--                                                                  
+#  **--     PRODUCTION REPORTS WITH DETAIL & SUMMARY TOTALS              
+#  **--   SEE RESTART INSTRUCTIONS BEFORE RESTARTING                     
+#  **--                                                                  
+#  ********************************************************************  
+ASSGNDD ddname='SYS012' filename='$SEQFILES/CI.WW.INPUT036.SVCLIFE' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+#ASSGNDD  ddname='SYS008' type='SYSOUT'
+ASSGNDD ddname='SYS008' filename='$SEQFILES/ECS036.SVCLIFE.PRT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS050' type='SYSOUT'
+ASSGNDD ddname='SYS020' filename='$SEQFILES/CI.EX.FICH036.SVCLIFE' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS036' stepname='ECS036' parm='NORMAL' 
+
+################################################################################
+LABEL name=CPY036
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.EX.FICH036.SVCLIFE' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH036D.SVCLIFE' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY036' parm='ECS036D' 
+
+################################################################################
+LABEL name=UTIL1
+################################################################################
+#
+# This step reads the files from above and creates pdf files
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+sed 's/MONTHLY RPT CODE 1 PRODUCTION REPORT/    MONTHLY PRODUCTION REPORT       /' < $SEQFILES/CI.DL.CIADM.FICH036D.SVCLIFE > $SEQFILES/ECS036D.SVCLIFE
+sed 's/RPT CODE 1 /           /' < $SEQFILES/ECS036D.SVCLIFE > $SEQFILES/ECS036.SVCLIFE
+!
+EXECPGM pgmname='BPXBATCH' stepname='UTIL1' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the files from above and creates pdf files
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/rpt2pdf $SEQFILES/ECS036.SVCLIFE $SEQFILES/ECS036.SVCLIFE.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+	  echo " Nothing to print at this time "
+    "echo 'ecs036.pdf | mutt -s '$JOBNAME is complete'  pema@cso.com"
+#    "uuencode $SEQFILES/ECS036.SVCLIFE.pdf ECS036.SVCLIFE.pdf|mailx -s 'SVCLIFE ECS036' -r 'slunikix@cso.com' pema@cso.com,ndouglas@sgifs.com"
+#    "mutt -s 'SVCLIFE ECS036' -a $SEQFILES/ECS036.SVCLIFE.pdf pema@cso.com,ndouglas@sgifs.com -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"
+else
+	echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOBS
+# 052914 2014042300003   TANA   CHANGE MAILX TO MUTT EMAIL

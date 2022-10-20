@@ -1,0 +1,221 @@
+/**********************************************************************/
+/*                                                                    */
+/* Copyright (c) 2016-2020 NTT DATA, Inc.                             */
+/* All rights reserved.                                               */
+/*                                                                    */
+/**********************************************************************/
+/* Module kxoracle.pc code as a result of BT=4653490/4653492          */
+/**********************************************************************/
+/* Sample C program which contains entry points for
+ * interfacing UniKix's user exits with ORACLE software. The main
+ * entry point(KXORALGN) is for logging onto the ORACLE server and
+ * is called by the UniKix transaction processors
+ * and batch vsam processor when they are
+ * initiated by the UniKix system. Entry point KXORALGF is for
+ * logging off from the ORACLE server and is called by the UniKix
+ * transaction processors and batch vsam processors when they terminate.
+ *
+ * Entry point KXORASAVE is for executing an SQL COMMIT statement and
+ * will be called at UniKix sync point time. If the user COBOL programs
+ * are already doing COMMITs, then this statement will have no effect.
+ * Entry point KXORAUNDO is for executing an SQL ROLLBACK statement and
+ * will be called at UniKix rollback time. If the user COBOL programs
+ * are already doing ROLLBACKs, then this statement will have no effect.
+ **********************************************************************/
+
+
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
+#include <errno.h>
+
+void kx_sql_errmsg_rtn();
+
+/*---------------------------------------------------------------*
+ *  Code the userid and password, or use sit info to collect the
+ *  application name and connect using application name.
+ *---------------------------------------------------------------*/
+
+EXEC SQL BEGIN DECLARE SECTION;
+   char userid[9];
+   char passwrd[31];
+   char username[8];
+   char server[13];
+   char sql_string[40];
+EXEC SQL END DECLARE SECTION;
+
+EXEC SQL INCLUDE sqlca;
+
+/*---------------------------------------------------------------*
+ * This copy book gives the tct and system information
+ *---------------------------------------------------------------*/
+
+#include "kxinfo.h"
+
+struct lsyspar kix_sys_info;
+struct lextpar kix_tct_info;
+struct lmsgstr kix_msg_info;
+
+/************************************************************
+KXORALGN()
+*************************************************************/
+int KXORALGN()
+{
+   strcpy(kix_msg_info.cur_func, "KXORALGN");
+
+   EXEC SQL WHENEVER SQLERROR GOTO sql_abort;
+   /*
+   *---------------------------------------------------------------*
+   * This call update the  sit information
+   * user can use this information to set the userid .
+   * In this example, databasename is used for the connection
+   *---------------------------------------------------------------*
+   */
+
+   kxsysinfo(&kix_sys_info);
+   memset (userid, '\0', sizeof(userid));
+   memset (passwrd, '\0', sizeof(passwrd));
+   memset (server, '\0', sizeof(server));
+   memcpy(userid, kix_sys_info.cur_usrname, 8);
+   memcpy(passwrd, kix_sys_info.cur_usrpass, 30);
+   memcpy(server, kix_sys_info.cur_svrname, 12);
+
+   if (strcmp(server, "            ") != 0) {
+      EXEC SQL CONNECT       :userid
+               IDENTIFIED BY :passwrd
+               USING         :server;
+   } else {
+      EXEC SQL CONNECT       :userid
+               IDENTIFIED BY :passwrd;
+   }
+
+   return(0); /* Good return code */
+
+sql_abort:
+   kx_sql_errmsg_rtn();
+   return(-1); /* This is a fatal and need to abort */
+
+} /* End of KXORALGN function */
+
+
+/************************************************************
+KXORALGF()
+*************************************************************/
+int KXORALGF()
+{
+   strcpy(kix_msg_info.cur_func, "KXORALGF");
+
+   EXEC SQL WHENEVER SQLERROR GOTO sql_error;
+   EXEC SQL COMMIT WORK RELEASE;
+   return(0); /* Good return code */
+
+sql_error:
+   kx_sql_errmsg_rtn();
+   return(1); /* This is a fatal and need to abort */
+
+} /* End of KXORALGF function */
+
+
+/************************************************************
+KXORABTRN()
+*************************************************************/
+int KXORABTRN()
+{
+   strcpy(kix_msg_info.cur_func, "KXORABTRN");
+
+   EXEC SQL WHENEVER SQLERROR GOTO sql_abort;
+
+   /*--------------------------------------------------------------*
+   * This call updates the tct information
+   * you can use this information to inquire on current user info.
+   *--------------------------------------------------------------*/
+
+   kxtctinfo(&kix_tct_info);
+
+   /*--------------------------------------------------------------*
+   *    Oracle7 specific security features.  Uncomment the code
+   *    to implement the feature.
+   *--------------------------------------------------------------*/
+   /*    strncpy(username,kix_tct_info.cur_usrname,8);
+    *    STRING "SET ROLE " username DELIMITED BY SIZE
+    *            INTO sql_string;
+    *    EXEC SQL EXECUTE IMMEDIATE :sql_string;
+    */
+
+   EXEC SQL SAVEPOINT oracle_savepoint;
+
+   return(0); /* Good return code */
+
+sql_abort:
+   kx_sql_errmsg_rtn();
+   return(-1); /* This is a fatal and need to abort */
+
+} /* End of KXORABTRN function */
+
+
+/************************************************************
+KXORAETRN()
+*************************************************************/
+int KXORAETRN()
+{
+   strcpy(kix_msg_info.cur_func, "KXORAETRN");
+
+   EXEC SQL WHENEVER SQLERROR GOTO sql_error;
+   EXEC SQL COMMIT WORK;
+   return(0); /* Good return code */
+
+sql_error:
+   kx_sql_errmsg_rtn();
+   return(1); /* This is a fatal and need to abort */
+
+} /* End of KXORAETRN function */
+
+
+/************************************************************
+KXORASAVE()
+*************************************************************/
+int KXORASAVE()
+{
+   strcpy(kix_msg_info.cur_func, "KXORASAVE");
+
+   EXEC SQL WHENEVER SQLERROR GOTO sql_error;
+   EXEC SQL COMMIT WORK;
+   EXEC SQL SAVEPOINT oracle_savepoint;
+   return(0); /* Good return code */
+
+sql_error:
+   kx_sql_errmsg_rtn();
+   return(1); /* This is a fatal and need to abort */
+
+} /* End of KXORASAVE function */
+
+
+/************************************************************
+KXORAUNDO()
+*************************************************************/
+int KXORAUNDO()
+{
+   strcpy(kix_msg_info.cur_func, "KXORAUNDO");
+
+   EXEC SQL WHENEVER SQLERROR GOTO sql_error;
+   EXEC SQL ROLLBACK WORK;
+   return(0); /* Good return code */
+
+sql_error:
+   kx_sql_errmsg_rtn();
+   return(1); /* This is a fatal and need to abort */
+
+} /* End of KXORAUNDO function */
+
+/*
+*---------------------------------------------------------------
+* kx_sql_errmsg_rtn to process error messages
+*---------------------------------------------------------------
+*/
+void kx_sql_errmsg_rtn()
+{
+   sprintf(kix_msg_info.cur_errno, "1098\n"); /* Set errno to 1098 */
+   sprintf(kix_msg_info.cur_msg,
+           "Database Error. Sqlcode = %d\n", sqlca.sqlcode);
+   kxsetmsg(&kix_msg_info);
+}

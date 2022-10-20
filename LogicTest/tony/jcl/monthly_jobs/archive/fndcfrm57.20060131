@@ -1,0 +1,83 @@
+################################################################################
+#  DCC DEALER INCENTIVE FREEDOM INTERFACE 
+#
+#  Job:  fndcfrm57
+#
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=FNB169
+################################################################################
+ASSGNDD ddname='SYS010' dataset='DC.XX.DET010' gdg='0' filename='\${SEQFILES}/DC.XX.DET010' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/DC.FN.DL.FX.DCCFEES' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYS012' type='DUMMY' 
+
+EXECPGM pgmname='FNB169' stepname='FNB169' parm='@MEMMDDYYYY' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='\${SEQFILES}/FNDCFRM57' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/DC.FN.DL.FX.DCCFEES' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='DCCFEES'
+
+################################################################################
+LABEL name=CPYM57
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/FNDCFRM57' disp='i'
+ASSGNDD  ddname='SYS011' filename='\${SEQFILES}/DC.DL.FN.FX.FRM57' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPYM57' parm='ALL'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/FNDCFRM57' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY1   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *             FREEDOM INTERFACE FOR DCC DEALER INCENTIVE
+#  *
+#  *  SYSUT2 is ftp'd to ntfree2
+#  *------------------------------------------------------------------- 
+#  * 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/DC.FN.DL.FX.DCCFEES' disp='i' abend='k' normal='k' recfmt='F'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/LPACFEES_@MEMM-DD-YY.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+EXECPGM pgmname='IDCAMS' stepname='COPY1'   
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+#    "exelpr.sh p60w1s.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+    "exelpr.sh p60w1s.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 042503                 SMVA   NEW JOB FOR DCC, MODELED AFTER FNDCFRM50
+# 042205  2005042100001  PEMA   ADD PRINT COPIES FOR CI AND CO

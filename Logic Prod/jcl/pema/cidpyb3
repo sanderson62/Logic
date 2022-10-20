@@ -1,0 +1,74 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job Aborted, Not CID1T"
+#   exit 1
+#endif
+
+setenv dtetme `date +%m%d%H%M%S`
+
+################################################################################
+LABEL name=BEGSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/Cash.Receipts.txt $SEQFILES/cashrecpts.txt
+##ftp -n ntcso1 < $JCLLIB/ftp-cidpyb3
+!
+EXECPGM pgmname='BPXBATCH' stepname='BEGSTEP' parm='SH'
+
+################################################################################
+LABEL name=STEP0
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ -a /data/seqfiles/Cash.Receipts.txt ] ; then
+   echo "we got a file " ;
+else
+   echo "No file today "
+   exit 1
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP0' parm='SH'
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cp $SEQFILES/Cash.Receipts.txt $SEQFILES/Cash.Receipts.txt.cpy.$dtetme
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/scan_pyaj_conv.pl $SEQFILES/Cash.Receipts.txt $SEQFILES/cashrecpts.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=ERPYAJBKP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+unikixbld -t s -d ERPYAJ -s $SEQFILES/erpyaj.cashrecpts.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='ERPYAJBKP' parm='SH'
+
+################################################################################
+LABEL name=CIDPYB3
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+
+ASSGNDD ddname='SYS010' filename='$SEQFILES/cashrecpts.txt' disp='i'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i' 
+ASSGNDD ddname='ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o'
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='CIDPYB3' stepname='CIDPYB3' 
+
+ENDJOB 
+################################################################################

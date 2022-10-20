@@ -1,0 +1,60 @@
+################################################################################
+#
+# Job salcerthst
+# 
+################################################################################
+BEGINJOB mode='MVS' 
+ONRETCODE GT 7 GOTO END_JOB 
+
+################################################################################
+#LABEL name=SORT1
+################################################################################
+ASSGNDD ddname='SORTIN' filename='\${SEQFILES}/DC.XX.CERT_00' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='\${SEQFILES}/DC.XX.CERT.ECS057' disp='o' normal='k' abend='d' recfmt='F' recsize='1056' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(13 10) (414 6 PDEC) (992 6) (23 6 PDEC)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT1' 
+
+################################################################################
+LABEL name=ECS057
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/DC.XX.CERT.ECS057' disp='i-o' normal='k' abend='k' recfmt='F' recsize='1056' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o'
+ASSGNDD  ddname='SYS008' type='SYSOUT' recfmt='F' recsize='133'
+
+EXECPGM pgmname='ECS057' stepname='ECS057' 
+
+################################################################################
+LABEL name=CPY057
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/ECS057/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/DC.DL.CIADM.FICH057' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPY057' parm='ALL'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+     "exelpr.sh p60w1s.parms '-ode=DCCI' $SYSOUTDIR/$JOBNAME/ECS057/SYS008_$JON"
+else
+   echo "job aborted print not released "
+endif
+
+################################################################################
+
+ENDJOB 
+  
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 040303   2001061800003 SMVA   NEW JOB

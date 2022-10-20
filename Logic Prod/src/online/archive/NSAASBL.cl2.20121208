@@ -1,0 +1,287 @@
+       IDENTIFICATION DIVISION.                                         
+
+       PROGRAM-ID.   NSAASBL.
+
+      *AUTHOR.     PABLO
+      *            COLLEYVILLE, TEXAS.                                       
+
+      *REMARKS.    EXECUTED FROM NSAASLTR.cl2
+
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      * 071111    2011022800001  PEMA  NEW PROGRAM
+      ******************************************************************
+       ENVIRONMENT DIVISION.                                            
+
+       DATA DIVISION.                                                   
+
+       working-storage section.
+       
+       77  SAVE-DATE                   PIC X(8)    VALUE SPACES.
+       77  SAVE-BIN-DATE               PIC XX      VALUE SPACES.
+       77  S1                          PIC S999 COMP-3 VALUE +0.
+       77  WS-ARCHIVE-NO               PIC S9(8)  COMP VALUE +0.
+       77  WS-FOLLOW-UP-DT             PIC XX  VALUE LOW-VALUES.
+       77  WS-RESEND-DT                PIC XX  VALUE LOW-VALUES.
+
+       01 response-code         pic s9(8) comp.
+       01 display-response      pic 9(8).
+       01 bl-index              pic 9(8) comp.
+       01 max-last-name         pic x(18).
+       01 first-initial         pic x.
+       01 name-in-range-flag    pic 9.
+       01 max-entries           pic s9(8) comp value 100.
+       
+       01 lower-case    pic x(26) value
+                  "abcdefghijklmnopqrstuvwxyz".
+       01 upper-case    pic x(26) value
+                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".
+       01  MISC.
+           12  WS-RESPONSE             PIC S9(8)   COMP.
+               88  RESP-NORMAL                  VALUE +00.
+               88  RESP-NOTFND                  VALUE +13.
+               88  RESP-DUPREC                  VALUE +14.
+               88  RESP-DUPKEY                  VALUE +15.
+               88  RESP-NOTOPEN                 VALUE +19.
+               88  RESP-ENDFILE                 VALUE +20.
+
+      *** Z CONTROL LAYOUT MOVED TO COPYBOOK ELCZREC
+                                COPY ELCZREC.
+
+
+       01  WS-ERARCH-KEY.
+           05  WS-ERARCH-COMPANY-CD    PIC X.
+           05  WS-ERARCH-ARCH-NO       PIC S9(8) BINARY.
+
+       01  WS-ERENDT2-KEY.
+           05  WS-ERENDT-COMPANY-CD    PIC X.
+           05  WS-ERENDT-ARCH-NO       PIC 9(8) BINARY.
+
+       01  WS-NSASEXTR-KEY.
+           05  WS-EXTR-COMPANY-CD    PIC X.
+           05  WS-EXTR-ARCH-NO       PIC 9(8) BINARY.
+           05  WS-EXTR-SEQ-NO        PIC 9(4) BINARY.
+
+       01  WS-ELLETR-KEY.
+           05  WS-ELLETR-COMPANY-CD    PIC X.
+           05  WS-ELLETR-LETTER-ID     PIC X(12).
+           05  WS-ELLETR-SEQ-NO        PIC S9(4) COMP VALUE +0.
+
+
+       01 srch-commarea.
+                                       copy ELCADLTRSPI.
+
+
+                                       COPY ELCDATE.
+                                       COPY ERCARCH.
+                                       COPY ERCENDT.
+                                       COPY NSCASEXTR.
+
+       linkage section.
+       
+       01 dfhcommarea                  pic x(200).
+
+       procedure division.
+
+           display ' entering nsaasbl '
+
+           MOVE EIBDATE                TO DC-JULIAN-YYDDD
+           MOVE '5'                    TO DC-OPTION-CODE
+           PERFORM 9700-DATE-LINK      THRU 9700-EXIT
+           MOVE DC-GREG-DATE-1-EDIT    TO  SAVE-DATE
+           MOVE DC-BIN-DATE-1          TO  SAVE-BIN-DATE
+           MOVE DFHCOMMAREA            TO BL-INPUT
+      *****************************************************
+      * Using the information passed to this program,
+      * it will update the erarch record with a "Q"
+      * in the status field
+      *****************************************************
+
+PEMTST*    DISPLAY ' BL INPUT ' BL-INPUT
+
+           IF BL-COMP-ID = 'DCC'
+              MOVE X'05'               TO WS-ERARCH-COMPANY-CD
+           ELSE
+072321        IF BL-COMP-ID = 'AHL'
+072321           MOVE X'06'               TO WS-ERARCH-COMPANY-CD
+072321        ELSE
+072321           MOVE X'04'               TO WS-ERARCH-COMPANY-CD
+072321        END-IF
+           END-IF
+           MOVE WS-ERARCH-COMPANY-CD   TO WS-ERENDT-COMPANY-CD
+                                          WS-EXTR-COMPANY-CD
+           MOVE BL-ARCHIVE-NO          TO WS-ERARCH-ARCH-NO
+                                          WS-ERENDT-ARCH-NO
+                                          WS-EXTR-ARCH-NO
+
+           SET BL-FAIL TO TRUE
+
+           EXEC CICS READ
+                DATASET    ('ERARCH')
+                INTO       (LETTER-ARCHIVE)
+                RIDFLD     (WS-ERARCH-KEY)
+                UPDATE
+                RESP       (WS-RESPONSE)
+           END-EXEC
+
+           IF RESP-NORMAL
+              SET BL-OK TO TRUE
+              IF (BL-PRINT-NOW-SW = 'P')
+                 or (bl-process-type = 'cancel')
+                 PERFORM 0050-DELETE-RECORDS
+                                       THRU 0050-EXIT
+              ELSE
+                 IF BL-PROCESS-TYPE = 'process'
+                    MOVE 'Q'           TO LA-ARCHIVE-STATUS
+                    IF BL-PRINT-NOW-SW = 'Y'
+                       MOVE SAVE-BIN-DATE TO LA-INITIAL-PRINT-DATE
+072312                 IF (LA-RESEND-DATE EQUAL LOW-VALUES OR SPACES)
+072312                  AND (LA-FOLLOW-UP-DATE EQUAL 
+072312                                 LOW-VALUES OR SPACES)
+072312                    MOVE 'C'             TO LA-STATUS
+072312                 END-IF
+                    END-IF
+                 ELSE
+                    MOVE 'T'           TO LA-ARCHIVE-STATUS
+                 END-IF
+              END-IF
+              EXEC CICS REWRITE
+                 FROM      (LETTER-ARCHIVE)
+                 DATASET   ('ERARCH')
+                 RESP       (WS-RESPONSE)
+              END-EXEC
+           ELSE
+              MOVE ' BAD READ UPDATE ON ERARCH '
+                                       TO BL-MESSAGE
+              display ' bad read on erarch ' ws-response
+                ' ' bl-archive-no
+           END-IF
+           MOVE BL-INPUT               TO DFHCOMMAREA
+
+           exec cics return end-exec.	
+
+       0050-DELETE-RECORDS.
+
+           DISPLAY ' ABOUT TO DELETE RECS ' BL-ARCHIVE-NO ' ' BL-FUNC
+           IF BL-FUNC = 'ClmResc' or 'ClmRefo'
+              display ' bypass delete ' bl-func
+              go to 0050-exit
+           end-if
+
+           EXEC CICS DELETE
+              DATASET    ('ERARCH')
+              RESP       (WS-RESPONSE)
+           END-EXEC
+           IF NOT RESP-NORMAL
+              DISPLAY ' BAD DELETE ERARCH ' WS-RESPONSE
+              GO TO 0050-EXIT
+           END-IF
+
+           EXEC CICS READ
+                DATASET    ('ERENDT2')
+                INTO       (ENDORSEMENT-RECORD)
+                RIDFLD     (WS-ERENDT2-KEY)
+                UPDATE
+                RESP       (WS-RESPONSE)
+           END-EXEC
+
+           IF NOT RESP-NORMAL
+              DISPLAY ' BAD READ ON ERENDT2 ' WS-RESPONSE
+           ELSE
+              EXEC CICS DELETE
+                 DATASET    ('ERENDT2')
+                 RESP       (WS-RESPONSE)
+              END-EXEC
+              IF NOT RESP-NORMAL
+                 DISPLAY ' BAD DELETE ON ERENDT2 ' WS-RESPONSE
+              END-IF
+           END-IF
+
+           MOVE 0                      TO WS-EXTR-SEQ-NO
+           EXEC CICS READ
+                DATASET    ('NSASEXTR')
+                INTO       (NSAS-EXTRACT-RECORD)
+                RIDFLD     (WS-NSASEXTR-KEY)
+                UPDATE
+                RESP       (WS-RESPONSE)
+           END-EXEC
+
+           IF NOT RESP-NORMAL
+              DISPLAY ' BAD READ ON 0 NSASEXTR ' WS-RESPONSE
+              GO TO 0050-EXIT
+           ELSE
+              EXEC CICS DELETE
+                 DATASET    ('NSASEXTR')
+                 RESP       (WS-RESPONSE)
+              END-EXEC
+              IF NOT RESP-NORMAL
+                 DISPLAY ' BAD DELETE ON 0 NSASEXTR ' WS-RESPONSE
+                 GO TO 0050-EXIT
+              END-IF
+           END-IF
+
+           MOVE 1                      TO WS-EXTR-SEQ-NO
+           EXEC CICS READ
+                DATASET    ('NSASEXTR')
+                INTO       (NSAS-EXTRACT-RECORD)
+                RIDFLD     (WS-NSASEXTR-KEY)
+                UPDATE
+                RESP       (WS-RESPONSE)
+           END-EXEC
+
+           IF NOT RESP-NORMAL
+              DISPLAY ' BAD READ ON 1 NSASEXTR ' WS-RESPONSE
+           ELSE
+              EXEC CICS DELETE
+                 DATASET    ('NSASEXTR')
+                 RESP       (WS-RESPONSE)
+              END-EXEC
+              IF NOT RESP-NORMAL
+                 DISPLAY ' BAD DELETE ON 1 NSASEXTR ' WS-RESPONSE
+              END-IF
+           END-IF
+
+           MOVE 2                      TO WS-EXTR-SEQ-NO
+           EXEC CICS READ
+                DATASET    ('NSASEXTR')
+                INTO       (NSAS-EXTRACT-RECORD)
+                RIDFLD     (WS-NSASEXTR-KEY)
+                UPDATE
+                RESP       (WS-RESPONSE)
+           END-EXEC
+
+           IF NOT RESP-NORMAL
+              DISPLAY ' BAD READ ON 2 NSASEXTR ' WS-RESPONSE
+           ELSE
+              EXEC CICS DELETE
+                 DATASET    ('NSASEXTR')
+                 RESP       (WS-RESPONSE)
+              END-EXEC
+              IF NOT RESP-NORMAL
+                 DISPLAY ' BAD DELETE ON 2 NSASEXTR ' WS-RESPONSE
+              END-IF
+           END-IF
+
+           .
+       0050-EXIT.
+           EXIT.
+
+       9700-DATE-LINK.                                                  
+
+           EXEC CICS LINK                                               
+               PROGRAM   ('ELDATCV')
+               COMMAREA  (DATE-CONVERSION-DATA)                         
+               LENGTH    (DC-COMM-LENGTH)                               
+           END-EXEC.                                                    
+                                                                        
+                                                                        
+       9700-EXIT.                                                       
+            EXIT.                                                       
+                                                                        
+

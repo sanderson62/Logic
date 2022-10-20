@@ -1,0 +1,626 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.                CIDNSASX.
+      *AUTHOR.     AJRA.
+      *REMARKS.
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      * 090112    2011022800001  AJRA  NEW PROGRAM
+091012* 091012    2012090600001  AJRA  FIX STRING OF EXTRACT
+110612* 110612    2012101700002  AJRA  ADD NEW FIELDS
+110912* 110912    2012110900001  PEMA  remove display of packed data
+091713* 091713    2013090300001  AJRA  CREATE STOP QWS LETTER FILE
+121213* 121213    2013090300001  AJRA  ADD 1 TO MAX-FIELDS FOR NEXT BUS DT
+121015* 121015    2015100900001  TANA  ADD VIN NUMBER
+070622* 070622    2020061200002  TANA  ADD REFUND CHECK INFO
+      ******************************************************************
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT ERARCH           ASSIGN TO ERARCH
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS DYNAMIC
+                                   RECORD KEY IS LA-CONTROL-PRIMARY
+                                   FILE STATUS IS ERARCH-FILE-STATUS.
+
+           SELECT NSASEXTR         ASSIGN TO NSASEXTR
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS DYNAMIC
+                                   RECORD KEY IS NSAS-CONTROL-PRIMARY
+                                   FILE STATUS IS NSAS-FILE-STATUS.
+
+           SELECT ELCERT           ASSIGN TO ELCERT
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS DYNAMIC
+                                   RECORD KEY IS CM-CONTROL-PRIMARY
+                                   FILE STATUS IS ELCERT-FILE-STATUS.
+
+           SELECT ERARCT           ASSIGN TO ERARCT
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS DYNAMIC
+                                   RECORD KEY IS LT-CONTROL-PRIMARY
+                                   FILE STATUS IS ERARCT-FILE-STATUS.
+
+           SELECT  EXT-OUT             ASSIGN TO SYS011
+                   ORGANIZATION IS LINE SEQUENTIAL. 
+
+           SELECT  EXT-VA-OUT          ASSIGN TO SYS012
+                   ORGANIZATION IS LINE SEQUENTIAL. 
+
+091713     SELECT STOP-QWS         ASSIGN TO STOPQWS
+091713             ORGANIZATION IS LINE SEQUENTIAL.
+091713
+           SELECT DISK-DATE        ASSIGN TO SYS019.
+                   
+
+       DATA DIVISION.
+
+       FILE SECTION.
+
+       FD  ERARCH.
+                                       COPY ERCARCH.
+
+       FD  NSASEXTR.
+                                       COPY NSCASEXTR.                         
+
+       FD  ELCERT.
+
+           COPY ELCCERT.
+
+       FD  ERARCT.
+                                       COPY ERCARCT.
+
+       FD  EXT-OUT
+           RECORDING MODE F
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+       01  EXT-RECORD                 PIC X(4500).
+
+
+       FD  EXT-VA-OUT
+           RECORDING MODE F
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+       01  EXT-VA-RECORD              PIC X(4500).
+
+091713
+091713 FD  STOP-QWS
+091713     RECORDING MODE F
+091713     LABEL RECORDS STANDARD
+091713     BLOCK CONTAINS 0 RECORDS.
+091713
+091713 01  STOP-QWS-RECORD            PIC X(50).
+
+       FD  DISK-DATE
+           COPY ELCDTEFD.
+
+
+         WORKING-STORAGE SECTION.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  FILLER  PIC X(32) VALUE '   PEMEPC2  WORKING-STORAGE     '.
+       77  FILLER  PIC X(32) VALUE '*********** VMOD=2.001. ********'.
+
+       77  WS-ABEND-FILE-STATUS        PIC XX            VALUE ZERO.    
+       77  WS-ABEND-MESSAGE            PIC X(80)         VALUE SPACES.  
+       77  WS-ABEND-PROGRAM            PIC X(8)          VALUE SPACES.  
+       77  WS-RETURN-CODE              PIC S9(4)         VALUE +0.      
+       77  WS-ZERO                     PIC S9(3)  COMP-3 VALUE +0.      
+       77  WS-ZEROS                    PIC S9(3)  COMP-3 VALUE +0.      
+       77  WS-EOF-SW                   PIC X VALUE SPACES.
+           88  END-OF-ARCH             VALUE 'Y'.
+       77  WS-DONE-SW                  PIC X VALUE SPACES.
+           88  DONE-WITH-ARCH          VALUE 'Y'.
+       77  ARCH-RECS-IN                PIC 9(9) VALUE ZEROS.
+       77  NSAS-RECS-OUT               PIC 9(9) VALUE ZEROS.
+       77  NSAS-RECS-DEL               PIC 9(9) VALUE ZEROS.
+091713 77  QWS-RECS-STOPPED            PIC 9(9) VALUE ZEROS.
+       77  ERARCH-FILE-STATUS          PIC XX  VALUE LOW-VALUES.
+       77  ELCERT-FILE-STATUS          PIC XX  VALUE LOW-VALUES.
+       77  ERARCT-FILE-STATUS          PIC XX  VALUE LOW-VALUES.
+       77  NSAS-FILE-STATUS            PIC XX  VALUE LOW-VALUES.
+       77  PGM-SUB                     COMP-3 PIC S9(04) VALUE +585.
+       77  WS-CURRENT-BIN-DT           PIC X(02)  VALUE LOW-VALUES.
+       77  WS-CURRENT-TIME             PIC S9(7)   VALUE ZERO.
+       77  WS-CERT-FOUND-SW            PIC X VALUE 'N'.
+           88  WS-CERT-FOUND                 VALUE 'Y'.
+           88  WS-CERT-NOT-FOUND             VALUE 'N'.
+       77  WS-ADD-ARCT                 PIC  X    VALUE 'N'.    
+       77  WS-COMMENT-INDEX            PIC S9(4) COMP.
+091012 77  A1                          PIC S9(5) COMP-3 VALUE +0.
+110612****MAX-FIELDS IS THE NUMBER OF FIELDS ON THE SQL TABLE MINUS 3. THIS IS
+110612****USED TO ADD ADDITIONAL EMPTY FIELDS WHEN OLDER RECORDS ARE RESENT
+121213*77  MAX-FIELDS                  PIC S9(5) COMP-3 VALUE +296.
+121015*77  MAX-FIELDS                  PIC S9(5) COMP-3 VALUE +297.
+070622 77  MAX-FIELDS                  PIC S9(5) COMP-3 VALUE +305.
+110612 77  CNTR                        PIC S9(5) COMP-3 VALUE +0.
+110612 77  DIFF                        PIC S9(5) COMP-3 VALUE +0.
+      
+       01  MISC.
+           05  WRK-RUN-DTE             PIC 9(11) COMP-3.
+           05  WRK-COMPANY             PIC 99 COMP.
+           05  FILLER REDEFINES WRK-COMPANY   COMP.
+               10  FILLER              PIC 9.
+               10  WRK-COMPANY-CD      PIC 9.
+           05  WRK-EXT-END.
+               10  EXT-BATCH-ARCHIVE       PIC 9(9).
+               10  FILLER                  PIC X(1) VALUE '~'.
+               10  EXT-BATCH-DATE          PIC X(8).
+               10  FILLER                  PIC X(2) VALUE '~E'.
+091713     05  WRK-ARCHIVE-NO          PIC 9(9).
+091713
+091713 01  STOP-QWS-REC                PIC X(50).
+091713           
+
+       01  EXT-REC.
+           05  EXT-LETTER-VARIABLES    PIC X(4350).
+
+                                       COPY ELCDTECX.
+
+                                       COPY ELCDTEVR.
+
+                                       COPY ELCDATE.
+
+       LINKAGE SECTION.
+       
+       01  PARM.
+           05  PARM-LENGTH        COMP     PIC S9(04)    VALUE ZEROS.
+           05  PARM-CYCLE-DATE             PIC X(08)     VALUE SPACES.
+091713     05  PARM-TEST                   PIC X(04)     VALUE SPACES.           
+
+       PROCEDURE DIVISION USING PARM.
+
+           IF PARM-CYCLE-DATE = SPACES
+               DISPLAY 'MISSING CYCLE DATE PARM'
+               PERFORM ABEND-PGM
+           END-IF.
+            
+           MOVE PARM-CYCLE-DATE      TO EXT-BATCH-DATE.
+
+       0000-DATE-CARD-READ. COPY ELCDTERX.
+
+           PERFORM 0040-OPEN-FILES     THRU 0040-EXIT.
+           PERFORM 0050-INIT           THRU 0050-EXIT.
+           PERFORM 0090-START-ERARCH   THRU 0090-EXIT.
+
+           PERFORM 0020-PROCESS        THRU 0020-EXIT UNTIL
+              (END-OF-ARCH).
+           PERFORM 0060-CLOSE-FILES    THRU 0060-EXIT.
+
+           DISPLAY ' ARCH RECS READ    ' ARCH-RECS-IN.
+           DISPLAY ' LETTER RECS WRITE ' NSAS-RECS-OUT.
+091713     DISPLAY ' QWS LETTERS STOPPED ' QWS-RECS-STOPPED
+
+           GOBACK.
+
+       0020-PROCESS.
+           
+           PERFORM 0024-READ-ERARCH      THRU 0024-EXIT.
+           IF END-OF-ARCH
+               GO TO 0020-EXIT
+           END-IF.
+           
+           IF LA-INITIAL-PRINT-DATE NOT EQUAL LOW-VALUES AND SPACES 
+               GO TO 0020-EXIT
+           END-IF.
+
+091713     IF (LA-VOIDED-DATE NOT EQUAL LOW-VALUES AND SPACES)  OR
+091713        (LA-PURGED-DATE NOT EQUAL LOW-VALUES AND SPACES)  OR
+091713        (LA-REPLY-DATE NOT EQUAL LOW-VALUES AND SPACES) 
+091713         IF LA-QWS
+091713             MOVE SPACES TO STOP-QWS-REC
+091713             MOVE LA-ARCHIVE-NO TO WRK-ARCHIVE-NO
+091713             IF LA-CERT-NO-A2 EQUAL LOW-VALUES OR SPACES
+091713                 MOVE '0000000000' TO LA-CERT-NO-A2
+091713             END-IF
+091713             STRING LA-CERT-NO-A2 DELIMITED BY ' '
+091713                    ' ' DELIMITED BY SIZE
+091713                    LA-FORM-A3 DELIMITED BY ' '
+091713                    ' ........ ........ ' DELIMITED BY SIZE
+091713                    WRK-ARCHIVE-NO DELIMITED BY SIZE
+091713                    ' Q' DELIMITED BY SIZE
+091713             INTO STOP-QWS-REC
+091713             WRITE STOP-QWS-RECORD FROM STOP-QWS-REC
+091713             ADD +1  TO QWS-RECS-STOPPED
+091713***ALSO NEED TO STOP THE ACCOUNT AND BENE LETTERS
+091713             MOVE SPACES TO STOP-QWS-REC
+091713             STRING LA-CERT-NO-A2 DELIMITED BY ' '
+091713                    ' ' DELIMITED BY SIZE
+091713                    LA-FORM-A3 DELIMITED BY ' '
+091713                    '\S ........ ........ ' DELIMITED BY SIZE
+091713                    WRK-ARCHIVE-NO DELIMITED BY SIZE
+091713                    ' Q' DELIMITED BY SIZE
+091713             INTO STOP-QWS-REC
+091713             WRITE STOP-QWS-RECORD FROM STOP-QWS-REC
+091713         END-IF
+091713     END-IF
+091713
+           IF (LA-VOIDED-DATE NOT EQUAL LOW-VALUES AND SPACES)  OR
+              (LA-PURGED-DATE NOT EQUAL LOW-VALUES AND SPACES)  OR
+              (LA-REPLY-DATE NOT EQUAL LOW-VALUES AND SPACES) 
+                  GO TO 0020-EXIT
+           END-IF.
+
+           IF NOT LA-STATUS-ACTIVE
+               GO TO 0020-EXIT
+           END-IF.
+
+           IF LA-TEMP
+               GO TO 0020-EXIT
+           END-IF.
+
+           IF LA-DATA-SOURCE = '1' OR '3'
+               CONTINUE
+           ELSE
+               MOVE 'N' TO WS-CERT-FOUND-SW
+               PERFORM 0250-READ-CERT THRU 0250-EXIT
+               IF WS-CERT-NOT-FOUND
+                  DISPLAY 'CERT NOT FOUND - '
+                     LA-CERT-NO-A2 ' ' LA-ARCHIVE-NO ' ' LA-FORM-A3
+                  MOVE 'C'                 TO LA-STATUS
+                  MOVE WS-CURRENT-BIN-DT   TO LA-VOIDED-DATE
+                  MOVE 'SYST'              TO LA-LAST-UPDATED-BY
+                  MOVE WS-CURRENT-BIN-DT   TO LA-LAST-MAINT-DATE
+                  MOVE WS-CURRENT-TIME     TO LA-LAST-MAINT-TIME
+091713
+091713            IF PARM-TEST NOT EQUAL 'TEST'
+                     REWRITE LETTER-ARCHIVE
+                     IF ERARCH-FILE-STATUS NOT = '00'
+                        DISPLAY ' ERROR ON ERARCH - REWRITE - CANCEL '
+                           ERARCH-FILE-STATUS  '  CERT '  LA-CERT-NO-A2
+                     END-IF
+091713            END-IF
+
+                  PERFORM 0300-READ-ERARCT THRU 0300-EXIT
+                  IF WS-COMMENT-INDEX = +20
+                      DISPLAY ' MAX COMMENTS ON CERT ' LA-CERT-NO-A2
+                      GO TO 0020-EXIT
+                  END-IF
+                  SET WS-COMMENT-INDEX UP BY +1
+                  SET LC-NDX TO WS-COMMENT-INDEX
+                  MOVE 'CERT NOT FOUND' TO LT-COMMENT-LINE (LC-NDX)
+                  MOVE WS-CURRENT-BIN-DT TO LT-COMMENT-CHG-DT (LC-NDX)
+                  MOVE 'SYST' TO LT-COMMENT-CHG-BY (LC-NDX)
+                  ADD +1      TO LT-NUM-LINES-ON-RECORD
+091713
+091713            IF PARM-TEST NOT EQUAL 'TEST'
+                     IF WS-ADD-ARCT = 'N'
+                        REWRITE LETTER-ARCHIVE-TEXT
+                     ELSE
+                        WRITE LETTER-ARCHIVE-TEXT
+                     END-IF
+091713            END-IF
+
+                  GO TO 0020-EXIT
+               END-IF
+           END-IF.
+               
+
+
+           PERFORM 0030-PROCESS-ARCHIVE  THRU 0030-EXIT.
+           
+       0020-EXIT.
+            EXIT.
+
+
+       0024-READ-ERARCH.
+
+           READ ERARCH NEXT RECORD.
+
+           IF (ERARCH-FILE-STATUS = '23' OR '10') OR
+             (LA-COMPANY-CD NOT = DTE-CLASIC-COMPANY-CD)           
+               SET END-OF-ARCH     TO TRUE
+           ELSE 
+              IF ERARCH-FILE-STATUS NOT = '00'
+                DISPLAY 'BAD READ ERARCH ' LA-CONTROL-PRIMARY '-'
+                    ERARCH-FILE-STATUS
+                 PERFORM ABEND-PGM
+              END-IF
+           END-IF.
+           
+           IF NOT END-OF-ARCH 
+              ADD 1                TO ARCH-RECS-IN
+           END-IF.
+
+           
+       0024-EXIT.
+           EXIT.
+
+
+       0030-PROCESS-ARCHIVE.
+                  
+           MOVE 'N'              TO WS-DONE-SW.
+           MOVE LA-COMPANY-CD    TO NSAS-COMPANY-CD.
+           MOVE LA-ARCHIVE-NO    TO NSAS-ARCHIVE-NO.
+           MOVE ZEROS            TO NSAS-SEQ-NO.
+           PERFORM 0100-START-NSASEXTR   THRU 0100-EXIT
+           IF NSAS-FILE-STATUS NOT = '00'
+               DISPLAY 'NO LETTER FOUND FOR ARCHIVE ' LA-ARCHIVE-NO
+               GO TO 0030-EXIT
+           END-IF.
+
+           MOVE WS-CURRENT-BIN-DT   TO LA-INITIAL-PRINT-DATE.
+           IF (LA-RESEND-DATE EQUAL LOW-VALUES OR SPACES) AND
+              (LA-FOLLOW-UP-DATE EQUAL LOW-VALUES OR SPACES)
+               MOVE 'C'             TO LA-STATUS
+           END-IF.
+
+091713     IF PARM-TEST NOT EQUAL 'TEST'
+              REWRITE LETTER-ARCHIVE
+                INVALID KEY
+                    DISPLAY ' CIDNSASX REWRITE ERROR - ERARCH'
+                    SET END-OF-ARCH TO TRUE
+                    PERFORM ABEND-PGM
+091713     END-IF.
+      
+           IF LA-QWS
+               display ' cert no - QWS - ' LA-CERT-NO-A2
+               display ' archive no : ' LA-ARCHIVE-NO-A2
+               GO TO 0030-EXIT
+           END-IF.
+072312
+072312     IF LA-FORM-A3 (3:1) = 'X'
+072312         GO TO 0030-EXIT
+072312     END-IF.           
+
+           PERFORM 0035-WRITE-EXT THRU 0035-EXIT
+               UNTIL DONE-WITH-ARCH.
+
+       0030-EXIT.
+            EXIT.
+
+              
+       0035-WRITE-EXT.
+
+           PERFORM 0125-READ-NSASEXTR    THRU 0125-EXIT.
+           IF NSAS-FILE-STATUS NOT EQUAL '00'
+               SET DONE-WITH-ARCH TO TRUE
+               GO TO 0035-EXIT
+           END-IF.
+           
+           IF NSAS-COMPANY-CD NOT EQUAL LA-COMPANY-CD  OR
+              NSAS-ARCHIVE-NO NOT EQUAL LA-ARCHIVE-NO
+                  SET DONE-WITH-ARCH TO TRUE
+                  GO TO 0035-EXIT
+           END-IF.
+
+
+           MOVE SPACES           TO EXT-LETTER-VARIABLES.
+110612     MOVE +0               TO CNTR.
+           MOVE LA-ARCHIVE-NO    TO EXT-BATCH-ARCHIVE.
+           INSPECT NSAS-LETTER-VARIABLES REPLACING ALL X'00' BY SPACES.
+110612     INSPECT NSAS-LETTER-VARIABLES TALLYING CNTR FOR ALL '~'
+091012     PERFORM VARYING A1 FROM 4350 BY -1
+091012         UNTIL NSAS-LETTER-VARIABLES (A1:1) <> ' '
+091012         OR A1 = 1
+091012     END-PERFORM
+110612     SUBTRACT CNTR FROM MAX-FIELDS GIVING DIFF
+110612     IF LA-VA-DISCLOSURE-IND = 'Y'
+110612         MOVE +0 TO DIFF
+110612     END-IF
+110612     PERFORM DIFF TIMES
+110612         ADD +1 TO A1
+110612         MOVE '~' TO NSAS-LETTER-VARIABLES (A1:1)
+110612     END-PERFORM
+091012     STRING NSAS-LETTER-VARIABLES (1:A1)
+                  WRK-EXT-END INTO EXT-LETTER-VARIABLES.
+
+           IF LA-VA-DISCLOSURE-IND = 'Y'
+               WRITE EXT-VA-RECORD     FROM EXT-REC
+           ELSE
+               WRITE EXT-RECORD        FROM EXT-REC
+           END-IF.
+           ADD 1                    TO NSAS-RECS-OUT.
+           
+       0035-EXIT.
+            EXIT.
+
+              
+       0040-OPEN-FILES.
+       
+           OPEN I-O ERARCH.
+           OPEN INPUT NSASEXTR.
+           OPEN INPUT ELCERT.
+           OPEN I-O ERARCT.
+
+           IF ERARCH-FILE-STATUS = '00' OR '97'
+              CONTINUE
+           ELSE
+              DISPLAY 'ERARCH OPEN ERR  ' ERARCH-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF.
+
+           IF NSAS-FILE-STATUS = '00' OR '97'
+              CONTINUE
+           ELSE
+              DISPLAY ' NSASEXTR OPEN ' NSAS-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF.
+
+           IF ELCERT-FILE-STATUS NOT = '00' AND '97'
+              DISPLAY 'ELCERT OPEN ERR  ' ELCERT-FILE-STATUS
+              MOVE ' ELCERT OPEN ERROR ' TO WS-ABEND-MESSAGE
+              MOVE ELCERT-FILE-STATUS    TO WS-ABEND-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF.
+
+           IF ERARCT-FILE-STATUS NOT = '00' AND '97'
+              DISPLAY 'ERARCT OPEN ERR  ' ERARCT-FILE-STATUS
+              MOVE ' ERARCT OPEN ERROR ' TO WS-ABEND-MESSAGE
+              MOVE ERARCT-FILE-STATUS    TO WS-ABEND-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF.
+
+           OPEN OUTPUT EXT-OUT EXT-VA-OUT.
+091713     OPEN OUTPUT STOP-QWS.
+
+       0040-EXIT.
+           EXIT.
+
+       0050-INIT.
+
+           ACCEPT WS-TIME-OF-DAY       FROM  TIME
+           MOVE WS-TIME                TO  WS-CURRENT-TIME
+           MOVE WS-CURRENT-DATE        TO  DC-GREG-DATE-1-EDIT.
+           MOVE '2'                    TO  DC-OPTION-CODE.
+           DISPLAY '* * * * * * * * * * * * * * * * * * * * * '.
+           DISPLAY 'CURRENT DATE USED FOR RUN IS - - ' WS-CURRENT-DATE.
+           DISPLAY '* * * * * * * * * * * * * * * * * * * * * '.
+
+           PERFORM 8510-DATE-CONVERSION.
+           IF NO-CONVERSION-ERROR
+               MOVE DC-BIN-DATE-1      TO  WS-CURRENT-BIN-DT
+           END-IF.
+
+       0050-EXIT.
+           EXIT.
+
+
+       0060-CLOSE-FILES.
+       
+           CLOSE ERARCH NSASEXTR.
+           CLOSE ELCERT ERARCT.
+
+           IF ERARCH-FILE-STATUS NOT = '00'
+              DISPLAY ' ERARCH CLOSE ' ERARCH-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF.
+
+           IF NSAS-FILE-STATUS NOT = '00'
+              DISPLAY ' NSASEXTR CLOSE ' NSAS-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF.
+
+           IF ELCERT-FILE-STATUS NOT = '00' 
+              MOVE ' ELCERT CLOSE ERROR ' TO WS-ABEND-MESSAGE
+              MOVE ELCERT-FILE-STATUS    TO WS-ABEND-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF.
+
+           IF ERARCT-FILE-STATUS NOT = '00'
+              DISPLAY ' ERARCT CLOSE ' ERARCT-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF.
+
+           CLOSE EXT-OUT EXT-VA-OUT.
+091713     CLOSE STOP-QWS.
+           
+       0060-EXIT.
+           EXIT.
+
+       0090-START-ERARCH.
+
+           MOVE LOW-VALUES             TO LA-CONTROL-PRIMARY.
+           MOVE DTE-CLASIC-COMPANY-CD  TO LA-COMPANY-CD.
+           MOVE ZEROS                  TO LA-ARCHIVE-NO.
+
+           START ERARCH KEY IS NOT < LA-CONTROL-PRIMARY.
+
+           IF ERARCH-FILE-STATUS = '10' OR '23'
+              SET END-OF-ARCH        TO TRUE
+           ELSE
+              IF ERARCH-FILE-STATUS NOT = '00'
+                 DISPLAY 'ERARCH START     ' ERARCH-FILE-STATUS
+                 SET END-OF-ARCH     TO TRUE
+              END-IF
+           END-IF.
+
+       0090-EXIT.
+           EXIT.
+
+       0100-START-NSASEXTR.
+
+           START NSASEXTR KEY IS NOT < NSAS-CONTROL-PRIMARY.
+
+110912     IF NSAS-FILE-STATUS NOT = '00' AND '10'
+110912        DISPLAY 'BAD START NSASEXTR ' nsas-archive-no ' '
+110912           nsas-seq-no  ' ' NSAS-FILE-STATUS
+           END-IF.
+
+       0100-EXIT.
+           EXIT.
+
+       0125-READ-NSASEXTR.
+
+           READ NSASEXTR NEXT RECORD.
+
+110912     IF NSAS-FILE-STATUS NOT = '00' AND '10'
+110912        DISPLAY 'BAD READ NSASEXTR ' nsas-archive-no ' '
+110912           nsas-seq-no  ' ' NSAS-FILE-STATUS
+           END-IF.
+
+       0125-EXIT.
+           EXIT.
+
+       0250-READ-CERT.
+
+           MOVE LA-COMPANY-CD          TO CM-COMPANY-CD
+           MOVE LA-CARRIER-A2          TO CM-CARRIER
+           MOVE LA-GROUPING-A2         TO CM-GROUPING
+           MOVE LA-STATE-A2            TO CM-STATE
+           MOVE LA-ACCOUNT-A2          TO CM-ACCOUNT
+           MOVE LA-EFFECT-DATE-A2      TO CM-CERT-EFF-DT
+           MOVE LA-CERT-NO-A2          TO CM-CERT-NO
+
+           READ ELCERT
+           IF ELCERT-FILE-STATUS = '00'
+              MOVE 'Y'                 TO WS-CERT-FOUND-SW
+           ELSE
+              DISPLAY ' ERROR ON ELCERT - READ - 0250 '
+                 ELCERT-FILE-STATUS
+           END-IF.
+
+       0250-EXIT.
+           EXIT.
+           
+           
+       0300-READ-ERARCT.
+       
+           MOVE LA-COMPANY-CD    TO LT-COMPANY-CD
+           MOVE LA-ARCHIVE-NO    TO LT-ARCHIVE-NO
+           MOVE '3'              TO LT-RECORD-TYPE
+           MOVE +0               TO LT-LINE-SEQ-NO
+           
+           READ ERARCT
+           IF ERARCT-FILE-STATUS = '00'
+               MOVE 'N' TO WS-ADD-ARCT
+               SET LC-NDX TO WS-ZEROS
+               PERFORM 20 TIMES
+                  SET LC-NDX UP BY +1
+                  IF LT-COMMENT-LINE (LC-NDX) > SPACES
+                     SET WS-COMMENT-INDEX TO LC-NDX
+                  END-IF
+               END-PERFORM
+               GO TO 0300-EXIT
+           END-IF
+           
+           MOVE 'Y'              TO WS-ADD-ARCT.
+           MOVE LOW-VALUES       TO LETTER-ARCHIVE-TEXT.
+           MOVE 'LT'             TO LT-RECORD-ID.
+           MOVE LA-COMPANY-CD    TO LT-COMPANY-CD.
+           MOVE LA-ARCHIVE-NO    TO LT-ARCHIVE-NO.
+           MOVE '3'              TO LT-RECORD-TYPE.
+           MOVE +0               TO LT-LINE-SEQ-NO.
+           MOVE +0               TO LT-NUM-LINES-ON-RECORD.
+           SET WS-COMMENT-INDEX  TO WS-ZEROS.
+
+       0300-EXIT.
+           EXIT.
+           
+
+       8510-DATE-CONVERSION.
+
+           CALL 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+       8590-EXIT.
+           EXIT.
+
+
+       ABEND-PGM.   COPY ELCABEND.
+

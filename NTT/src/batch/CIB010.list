@@ -1,0 +1,2302 @@
+*>Copyright (c) 2016-2021 NTT DATA, Inc. All rights reserved.
+*>compiler version:  6.0.28692
+*>source file name:  CIB010.cbl
+*>date generated  :  Mon Oct 03 09:52:18 CDT 2022
+*>compiler options:  -cv -apost -dcmi -cscs=preserve -dz -ld -sp=/apps/test/mdoff/copy:/apps/prod/cid1p/copy -dv=32 -od=/apps/test/mdoff/exe/bat -cirp1 -cmcd -csqq -pt2 -cax -sl2 -rw=FILE-ID
+*>source encoding :  UTF-8
+*>target encoding :  ISO-8859-1
+IDENTIFICATION DIVISION.                                         
+PROGRAM-ID.  CIB010.                                             
+                                                                 
+*>*****************************************************************
+*>                     PROGRAM DESCRIPTION                        *
+*>*****************************************************************
+*>                                                                 
+*> THIS PROGRAM READS THE MICR DRAFT FILE.                         
+*>                                                                 
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> DANA  NEW CR#1998020500005                                      
+*> 090803    2002100700001  SMVA  ADD DCC PROCESSING/DISK-DATE FILE
+*> 090803    2002100700001  SMVA  ADD ACCT STATE AND CLM TYPE TO MI
+*>                                FILES FOR PRINTING STATE SPEC PRO
+*>                                SPLIT PARTIAL PAYS FROM FINAL PAY
+*> 010904                   SMVA  FIX DRAFT ORDER # ON DRAFT COPIES
+*>                                ADD TO TOP OF COVER LETTERS      
+*> 020604                   SMVA  ADD DRAFT ORDER # TO FORMREQ FILE
+*> 022004                   SMVA  INCREMENT BC-SEQ SEPARATELY FOR P
+*>                                AND FINAL PAYMENTS FOR GUNTHER MA
+*> 081004  CR2004072100002  SMVA  LPAC /DCC & SECPAY CHANGES       
+*> 011305    2004072100002  PEMA  INCREASE COMMENT LINES TO 6      
+*> 032106  IR2006030600002  AJRA  ADD DCC2                         
+*> 052406  CR2006031600001  AJRA  ADD DCC SURVEY                   
+*> 062006  CR2006050100003  PEMA  ADD DCC3                         
+*> 042607  CR2006082200001  PEMA  FORCE LENGTH OF 28 TO BARCODE    
+*> 031308  CR2008010900001  AJRA  ADD NJ APPEAL NOTICE FILE        
+*> 090108  CR2007041300006  AJRA  SKIP CONTINUING FORM ON AUTO PAYM
+*> 091808    2008022800002  AJRA  ADD ALASKA CHECK FORM (AKCK)     
+*> 101708    2008050500001  AJRA  ADD DCC4                         
+*> 011110    2007101100001  AJRA  REMOVE PERIOD FROM LETTER MEMBER 
+*> 030612  CR2011120900003  AJRA  ADD AHL COMPANY CODE             
+*> 052614  CR2014022100001  AJRA  ADD FAMILY LEAVE CLAIM TYPE      
+*> 022122  CR2021100800003  PEMA  Add B and H claim types          
+*>*****************************************************************
+                                                                 
+                                                                 
+ENVIRONMENT DIVISION.                                            
+INPUT-OUTPUT SECTION.                                            
+FILE-CONTROL.                                                    
+                                                                 
+    SELECT MICR-DRAFT-FILE                                       
+        ASSIGN TO MICRDRFT                                       
+        ORGANIZATION IS INDEXED                                  
+        ACCESS IS SEQUENTIAL                                     
+        RECORD KEY IS FMICR-KEY                                  
+        FILE STATUS IS MICR-STATUS.                              
+                                                                 
+    SELECT DRAFT-COPIES-PART-PAY  ASSIGN TO SYS006.              
+    SELECT DRAFT-COPIES-FINAL-PAY ASSIGN TO SYS007.              
+    SELECT COVER-LETTERS          ASSIGN TO SYS008.              
+    SELECT COMMENT-CARDS          ASSIGN TO SYS009               
+                                  ORGANIZATION LINE SEQUENTIAL.  
+    SELECT FORM-REQUESTS          ASSIGN TO SYS010.              
+    SELECT DISK-DATE              ASSIGN TO SYS019.              
+    SELECT NJ-NOTICE              ASSIGN TO SYS011               
+                                  ORGANIZATION LINE SEQUENTIAL.  
+                                                                 
+                                                                 
+DATA DIVISION.                                                   
+FILE SECTION.                                                    
+                                                                 
+FD  MICR-DRAFT-FILE                                              
+    RECORD IS VARYING FROM 363 TO 3000 CHARACTERS.               
+01  FILLER.                                                      
+    05  FMICR-KEY      PIC X(0019).                              
+    05  FILLER        PIC X(2981).                               
+01  MICR-RECORD.                                                 
+*>    COPY MICR420C.                                               
+*>vvv-> file: /apps/prod/cid1p/copy/MICR420C
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 120803    2002100700001  SMVA  ADD ACCT STATE & CLM TYPE FOR    
+*>                                PRINTING STATE SPEC PROGRESS RPTS
+*> 011105    2004072100002  PEMA  ADD ONE COMMENT LINE             
+*> 013017  CR2016053100001  PEMA  ACH PROCESSING                   
+*>*****************************************************************
+*>                                                                 
+*> CURRENT LENGTH OF LAYOUT IS 1254                                
+*>                                                                 
+*>*****************************************************************
+      10 MICR-KEY.                                               
+          15 M420C-FORM         PIC X(4).                        
+          15 M420C-DRAFT-ORDER  PIC 9(5).                        
+          15 M420C-DRAFT        PIC X(10).                       
+      10 M420C-PRINT-COUNT      PIC S9(4) COMP.                  
+      10 M420C-SEQ-NUMBER       PIC S9(4) COMP.                  
+      10 M420C-AMOUNT-PAID      PIC S9(9)V9(2) COMP-3.           
+      10 M420C-COMPANY-NAME     PIC X(43).                       
+      10 M420C-CSO-ADDRESS      PIC X(33).                       
+      10 M420C-CLAIM-NO         PIC X(7).                        
+      10 M420C-CERT-NO          PIC X(11).                       
+      10 M420C-ACCT-NO          PIC X(10).                       
+      10 M420C-PLAN-CODE        PIC X(4).                        
+      10 M420C-PAID-FROM-DATE   PIC X(8).                        
+      10 M420C-PAID-THRU-DATE   PIC X(8).                        
+      10 M420C-PAYMENT-TYPE     PIC X.                           
+      10 M420C-CC-ACCT          PIC X(7).                        
+      10 M420C-CC-ACCT-NUMBER   PIC X(18).                       
+      10 M420C-TYPE-MESSAGE     PIC X(15).                       
+      10 M420C-FINAL-MESS9      PIC X(17).                       
+      10 M420C-FINAL-MESS10     PIC X(17).                       
+      10 M420C-FINAL-MESS11     PIC X(17).                       
+      10 M420C-MEMBER-NAME      PIC X(30).                       
+      10 M420C-MEMBER-ADDRESS1  PIC X(30).                       
+      10 M420C-MEMBER-ADDRESS2  PIC X(30).                       
+      10 M420C-MEMBER-ADDRESS3  PIC X(30).                       
+      10 M420C-MEMBER-ADDRESS4  PIC X(30).                       
+      10 M420C-MEMBER-ZIP-CODE  PIC X(9).                        
+      10 M420C-3RDADD-NAME      PIC X(30).                       
+      10 M420C-3RDADD-LINE1     PIC X(30).                       
+      10 M420C-3RDADD-LINE2     PIC X(40).                       
+      10 M420C-3RDADD-LINE3     PIC X(40).                       
+      10 M420C-3RDADD-ZIP       PIC X(9).                        
+      10 M420C-CHECK-DATE       PIC X(8).                        
+      10 M420C-DFT-NOTES1       PIC X(40).                       
+      10 M420C-DFT-NOTES2       PIC X(39).                       
+      10 M420C-ACH-PAYMENT      PIC X.                           
+      10 M420C-PAYEE-NAME       PIC X(30).                       
+      10 M420C-PAYEE-ADDRESS1   PIC X(30).                       
+      10 M420C-PAYEE-ADDRESS2   PIC X(30).                       
+      10 M420C-PAYEE-ADDRESS3   PIC X(30).                       
+      10 M420C-PAYEE-ADDRESS4   PIC X(30).                       
+      10 M420C-PAYEE-ZIP-CODE   PIC X(9).                        
+      10 M420C-REPLY-DATE       PIC X(5).                        
+      10 M420C-SIGNATURE        PIC X.                           
+      10 M420C-LOAN-NUMBER      PIC X(25).                       
+      10 M420C-DRAFT-MESSAGES.                                   
+         15 M420C-DRAFT-MESSAGE OCCURS 6 TIMES  PIC X(70).       
+      10 M420C-ACCT-STATE       PIC X(02).                       
+      10 M420C-CLAIM-TYPE       PIC X(01).                       
+*>^^^-> file: /apps/prod/cid1p/copy/MICR420C
+                                                                 
+FD  DRAFT-COPIES-PART-PAY                                        
+    LABEL RECORDS ARE STANDARD                                   
+    RECORDING MODE IS F                                          
+    BLOCK CONTAINS 0 RECORDS.                                    
+*>01  DRAFT-COPY-PART-PAY       PIC X(1345).                       
+01  DRAFT-COPY-PART-PAY       PIC X(1415).                       
+                                                                 
+FD  DRAFT-COPIES-FINAL-PAY                                       
+    LABEL RECORDS ARE STANDARD                                   
+    RECORDING MODE IS F                                          
+    BLOCK CONTAINS 0 RECORDS.                                    
+*>01  DRAFT-COPY-FINAL-PAY      PIC X(1345).                       
+01  DRAFT-COPY-FINAL-PAY      PIC X(1415).                       
+                                                                 
+FD  COVER-LETTERS                                                
+    LABEL RECORDS ARE STANDARD                                   
+    RECORDING MODE IS F                                          
+    BLOCK CONTAINS 0 RECORDS.                                    
+01  COVER-LETTER              PIC X(390).                        
+*>01  COVER-LETTER              PIC X(389).                        
+                                                                 
+FD  COMMENT-CARDS                                                
+    LABEL RECORDS ARE STANDARD                                   
+    RECORDING MODE IS F                                          
+    BLOCK CONTAINS 0 RECORDS.                                    
+*>01  COMMENT-CARD-REC          PIC X(44).                         
+01  COMMENT-CARD-REC          PIC X(57).                         
+                                                                 
+FD  FORM-REQUESTS                                                
+    LABEL RECORDS ARE STANDARD                                   
+    RECORDING MODE IS F                                          
+    BLOCK CONTAINS 0 RECORDS.                                    
+01  FORM-REQUEST              PIC X(136).                        
+                                                                 
+                                                                 
+FD  DISK-DATE                                                    
+*>    COPY ELCDTEFD.                                               
+*>vvv-> file: /apps/prod/cid1p/copy/ELCDTEFD
+*>*****************************************************************
+*>                                                                *
+*>                                                                *
+*>                            ELCDTEFD.                           *
+*>           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+*>                            VMOD=2.007                          *
+*>                                                                *
+*>*****************************************************************
+    BLOCK CONTAINS 0 RECORDS                                     
+    RECORDING MODE F.                                            
+                                                                 
+01  DATE-DISK.                                                   
+    12  DD-ID                       PIC  X(4).                   
+    12  FILLER                      PIC  X(14).                  
+    12  DD-CR1                      PIC  9.                      
+    12  DD-CR1N                     PIC  X(30).                  
+    12  DD-CR2                      PIC  9.                      
+    12  DD-CR2N                     PIC  X(30).                  
+    12  FILLER                      PIC  X(20).                  
+                                                                 
+01  DATE-DISK-R.                                                 
+    12  FILLER                      PIC  X(4).                   
+    12  DD-ST           OCCURS 3 TIMES                           
+                                    PIC  X(32).                  
+                                                                 
+01  DATE-DISK-T.                                                 
+    12  FILLER                      PIC  X(4).                   
+    12  DD-TYPE         OCCURS 2 TIMES                           
+                                    PIC  X(48).                  
+                                                                 
+01  DATE-DISK-M.                                                 
+    12  FILLER                      PIC  X(4).                   
+    12  DD-MORT         OCCURS 2 TIMES                           
+                                    PIC  X(48).                  
+                                                                 
+01  DATE-DISK-P.                                                 
+    12  DD-IDA                      PIC  XX.                     
+    12  DD-IDX                      PIC  99.                     
+    12  DD-DATA                     PIC  X(96).                  
+    12  FILLER  REDEFINES DD-DATA.                               
+        16  DD-PS-PIC   OCCURS 50 TIMES                          
+                                    PIC  X.                      
+        16  FILLER                  PIC  X(46).                  
+    12  FILLER  REDEFINES DD-DATA.                               
+        16  DD-PS-PICO  OCCURS 20 TIMES.                         
+            20  DD-PS-PRT           PIC  X.                      
+            20  DD-PS-FMT           PIC  X.                      
+            20  DD-PS-PRC           PIC  X.                      
+            20  DD-PS-TOT           PIC  X.                      
+        16  FILLER                  PIC  X(16).                  
+                                                                 
+01  DATE-DISK-E.                                                 
+    12  FILLER                      PIC  X(4).                   
+    12  DD-EDIT         OCCURS 24 TIMES                          
+                                    PIC  X(4).                   
+                                                                 
+01  DATE-DISK-C.                                                 
+    12  FILLER                      PIC  X(7).                   
+    12  DD-CARR1-SECPAY-SW          PIC  X.                      
+    12  DD-CARR1-UEP-PCT            PIC  S9V9(4) COMP-3.         
+    12  DD-CARR1-R78-PCT            PIC  S9V9(4) COMP-3.         
+    12  DD-CARR1-PRO-PCT            PIC  S9V9(4) COMP-3.         
+    12  DD-CARR1                    PIC  X.                      
+    12  DD-CARR1S                   PIC  XX.                     
+    12  DD-CARR1N                   PIC  X(30).                  
+    12  DD-CARR2                    PIC  X.                      
+    12  DD-CARR2S                   PIC  XX.                     
+    12  DD-CARR2N                   PIC  X(30).                  
+    12  DD-CARR2-UEP-PCT            PIC  S9V9(4) COMP-3.         
+    12  DD-CARR2-R78-PCT            PIC  S9V9(4) COMP-3.         
+    12  DD-CARR2-PRO-PCT            PIC  S9V9(4) COMP-3.         
+    12  DD-CARR2-SECPAY-SW          PIC  X.                      
+    12  FILLER                      PIC  X(7).                   
+                                                                 
+01  DATE-DISK-OPT.                                               
+    12  FILLER                      PIC  X(04).                  
+    12  DD-TLR-DATA.                                             
+        16  DD-TLR                  OCCURS 32 TIMES              
+                                    PIC  X(03).                  
+    12  DD-STATE-DATA REDEFINES DD-TLR-DATA.                     
+        16  DD-STATE-FLDS           OCCURS 16 TIMES              
+                                    PIC  X(06).                  
+    12  DD-CARR-DATA REDEFINES DD-TLR-DATA.                      
+        16  DD-CARR-FLDS            OCCURS 13 TIMES              
+                                    PIC  X(07).                  
+        16  FILLER                  PIC  X(05).                  
+    12  DD-MISC-DATA REDEFINES DD-TLR-DATA                       
+                                    PIC  X(96).                  
+*>*****************************************************************
+*>^^^-> file: /apps/prod/cid1p/copy/ELCDTEFD
+                                                                 
+FD  NJ-NOTICE                                                    
+    LABEL RECORDS ARE STANDARD                                   
+    RECORDING MODE IS F                                          
+    BLOCK CONTAINS 0 RECORDS.                                    
+01  NJ-NOTICE-REC             PIC X(47).                         
+                                                                 
+EJECT                                                            
+                                                                 
+WORKING-STORAGE SECTION.                                         
+*>copy "ctypes.cpy".                                               
+*>vvv-> file: /apps/prod/cid1p/copy/ctypes.cpy
+*>The below lines are commented out.                               
+*> 77  char                   pic s9(2)  comp-5 is typedef.        
+*> 77  uns-char               pic  9(2)  comp-5 is typedef.        
+*> 77  short                  pic s9(4)  comp-5 is typedef.        
+*> 77  uns-short              pic  9(4)  comp-5 is typedef.        
+*> 77  int                    pic s9(9)  comp-5 is typedef.        
+*> 77  uns-int                pic  9(9)  comp-5 is typedef.        
+*>$IF P64 set                                                      
+*> 77  long                   pic s9(18) comp-5 is typedef.        
+*> 77  uns-long               pic  9(18) comp-5 is typedef.        
+*>$ELSE                                                            
+*> 77  long                   pic s9(9)  comp-5 is typedef.        
+*> 77  uns-long               pic  9(9)  comp-5 is typedef.        
+*>$END                                                             
+*> 77  l-long                 pic s9(18) comp-5 is typedef.        
+*> 77  uns-l-long             pic  9(18) comp-5 is typedef.        
+*> 77  d-l-float                         comp-2 is typedef.        
+*> 77  d-float                           comp-2 is typedef.        
+*> 77  float                             comp-1 is typedef.        
+*> 77  proc-pointer           procedure-pointer is typedef.        
+*> 77  data-pointer                     pointer is typedef.        
+*> 77  void                   pic  9(2)  comp-5 is typedef.        
+*>NTT DATA modification of variables starts.                       
+*>The below lines are added by NTT DATA to remove the typedef      
+*>definitions, modify the compiler directives IF-ELSE-END as per   
+*> NTT DATA format, and rename reserved word float to float-1.     
+77  char                   pic s9(2)  comp-5.                    
+77  uns-char               pic  9(2)  comp-5.                    
+77  short                  pic s9(4)  comp-5.                    
+77  uns-short              pic  9(4)  comp-5.                    
+77  int                    pic s9(9)  comp-5.                    
+77  uns-int                pic  9(9)  comp-5.                    
+*>- >>IF P64 IS DEFINED                                               
+*>- 77  long                   pic s9(18) comp-5.                    
+*>- 77  uns-long               pic  9(18) comp-5.                    
+*>- >>ELSE                                                            
+77  long                   pic s9(9)  comp-5.                    
+77  uns-long               pic  9(9)  comp-5.                    
+*>- >>END-IF                                                          
+77  l-long                 pic s9(18) comp-5.                    
+77  uns-l-long             pic  9(18) comp-5.                    
+77  d-l-float                         comp-2.                    
+77  d-float                           comp-2.                    
+77  float-1                           comp-1.                    
+77  proc-pointer           procedure-pointer.                    
+77  data-pointer                     pointer.                    
+77  void                   pic  9(2)  comp-5.                    
+*>NTT Data modification of variables ends.                         
+78  default-convention-val value   0.                            
+78  cdecl-convention-val   value   0.                            
+78  pascal-convention-val  value  11.                            
+78  fast-convention-val    value   2.                            
+78  std-convention-val     value  74.                            
+78  sys-convention-val     value  16.                            
+78  opt-convention-val     value   0.                            
+78  pasc16-convention-val  value  35.                            
+78  cdec16-convention-val  value  32.                            
+*>^^^-> file: /apps/prod/cid1p/copy/ctypes.cpy
+                                                                 
+*>**** WS FIELDS USED FOR DISK-DATE PROCESSING VIA ELCDTERX        
+01  FILLER.                                                      
+    05  PGM-SUB              PIC S9(03) COMP   VALUE +521.       
+    05  WS-ABEND-MESSAGE     PIC X(80)         VALUE SPACES.     
+    05  WS-RETURN-CODE       PIC S9(04) COMP   VALUE +0.         
+                                                                 
+*>**** WS FIELDS USED FOR ABEND PROCESSING VIA ELCABEND            
+01  FILLER.                                                      
+    05  WS-ABEND-FILE-STATUS PIC X(02)         VALUE ZEROS.      
+    05  WS-ZERO              PIC S9(01)        VALUE +0.         
+                                                                 
+01  FILLER.                                                      
+    05  SUB                  PIC S9(4) BINARY.                   
+    05  S0C7                 PIC X(01)         VALUE SPACE.      
+    05  FORCE-DUMP   REDEFINES S0C7 PIC S9 COMP-3.               
+    05  MICR-STATUS          PIC XX            VALUE '00'.       
+        88  EOF                                VALUE '10'.       
+    05  WS-WORK              PIC X(30)         VALUE SPACES.     
+    05  SET-PERIOD-SW        PIC XXX  VALUE SPACES.              
+        88  PERIOD-IS-SET    VALUE IS 'YES'.                     
+    05  WORK-TABLE.                                              
+        10  WORK-ADDR OCCURS 5 TIMES PIC X(50).                  
+    05  WS-PARTIAL-SEQ       PIC 9(4)          VALUE ZERO.       
+    05  WS-FINAL-SEQ         PIC 9(4)          VALUE ZERO.       
+                                                                 
+01  DRAFT-RECORD.                                                
+    05  DR-SEQ              PIC 9(5).                            
+    05  DR-AMT1             PIC ZZZ,ZZZ,ZZZ.99.                  
+    05  DR-AMT2             PIC ***,***,***.99.                  
+    05  DR-MICR-REC         PIC X(1254).                         
+    05  DR-BARCODE          PIC X(128).                          
+                                                                 
+01  COMMENT-RECORD.                                              
+    05  CR-FILE-NAME        PIC X(10) VALUE 'SURVEY.DOC'.        
+    05  CR-TAB1             PIC X.                               
+    05  CR-CLAIM-NO         PIC X(7).                            
+    05  CR-TAB2             PIC X.                               
+    05  CR-BARCODE          PIC X(25).                           
+                                                                 
+01  DCC-COMMENT-RECORD.                                          
+    05  DCC-CR-FILE-NAME    PIC X(10) VALUE 'DCSRVY.DOC'.        
+    05  DCC-CR-TAB1         PIC X.                               
+    05  DCC-CR-CLAIM-NO     PIC X(7).                            
+    05  DCC-CR-TAB2         PIC X.                               
+    05  DCC-CR-BARCODE      PIC X(25).                           
+    05  DCC-CR-TAB3         PIC X.                               
+    05  DCC-CR-EVENT        PIC X(12).                           
+                                                                 
+01  FORM-REQUEST-RECORD.                                         
+    05  FR-ACCT-STATE       PIC X(02).                           
+    05  FR-CLAIM-TYPE       PIC X(01).                           
+    05  FR-BARCODE          PIC X(128).                          
+    05  FR-DRAFT-ORDER      PIC X(05).                           
+                                                                 
+01  NJ-NOTICE-RECORD.                                            
+    05  NJ-NOTICE-STATE       PIC X(2).                          
+    05  NJ-NOTICE-DRAFT-SEQ   PIC X(5).                          
+    05  NJ-NOTICE-DRAFT-NO    PIC X(10).                         
+    05  NJ-NOTICE-MEMBER-NAME PIC X(30).                         
+                                                                 
+01  LETTER-RECORD.                                               
+    05  LR-CARRIER          PIC X.                               
+    05  LR-LETTER-ID        PIC X(4).                            
+    05  LR-DRAFT-ORDER      PIC X(5).                            
+    05  LR-PAYEE-NAME       PIC X(30).                           
+    05  LR-PAYEE-ADDR1      PIC X(40).                           
+    05  LR-PAYEE-ADDR2      PIC X(40).                           
+    05  LR-PAYEE-ADDR3      PIC X(40).                           
+    05  LR-PAYEE-ADDR4      PIC X(40).                           
+    05  LR-MEMBER-NAME      PIC X(30).                           
+    05  LR-LOAN-NO          PIC X(25).                           
+    05  LR-CLAIM-NO         PIC X(7).                            
+    05  LR-BARCODE          PIC X(128).                          
+                                                                 
+01  CID-BARCODE.                                                 
+    05  BC-ENCL-CODE        PIC XX       VALUE ZERO.             
+    05  BC-MAIL-CODE        PIC X        VALUE '1'.              
+    05  BC-DIV-CODE         PIC X        VALUE '1'.              
+    05  BC-CLAIM-NO         PIC X(7)     VALUE SPACE.            
+    05  BC-CERT-NO          PIC X(10)    VALUE SPACE.            
+    05  BC-SEQ              PIC 9(4)     VALUE ZERO.             
+                                                                 
+01  CID-BARCODE-2.                                               
+    05  BC2-ENCL-CODE       PIC XX       VALUE ZERO.             
+    05  BC2-MAIL-CODE       PIC X        VALUE '1'.              
+    05  BC2-DIV-CODE        PIC X        VALUE '1'.              
+    05  BC2-CLAIM-NO        PIC X(7)     VALUE SPACE.            
+    05  BC2-CERT-NO         PIC X(10)    VALUE SPACE.            
+    05  BC2-SEQ             PIC 9(4)     VALUE ZERO.             
+                                                                 
+*>**  AGEB16 IS USED TO BUILD THE BARCODE.  IT CALLS EANSRC ***    
+01  AGEB16-PARMS.                                                
+*>     05  AGEB16-BC-LEN       PIC 9(4).                           
+*>    05  AGEB16-BC-LEN       SHORT.                               
+    05  AGEB16-BC-LEN       PIC S9(4) COMP.                      
+    05  AGEB16-BC-IN        PIC X(28).                           
+    05  AGEB16-BC-OUT       PIC X(128).                          
+                                                                 
+                                                                 
+    EJECT                                                        
+*>COPY ELCDATE.                                                    
+                                                                 
+*>COPY ELCDTECX.                                                   
+*>vvv-> file: /apps/prod/cid1p/copy/ELCDTECX
+*>*****************************************************************
+*>                                                                *
+*>                            ELCDTECX.                           *
+*>           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+*>                            VMOD=2.015                          *
+*>                                                                *
+*>      WORKING STORAGE COPY CODE FOR APPLICATIONS CALLING        *
+*>      THE DATE CARD DISK FILE. ( READ ROUTINE = ELCDTERX,       *
+*>      AND DISK FILE FD = ELCDTEFX)                              *
+*>                                                                *
+*>*****************************************************************
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 092602    2002091900008  PEMA  INCREASE NUMBER OF MAXIMUM       
+*>                                  BENEFIT CODES FROM 300 TO 900  
+*> 090803    2003080800002  PEMA  ADD CATEGORY FOR SUPER GAP       
+*> 051304    2003080800002  SMVA  ADD REFUND METHOD                
+*> 071714    2013100100002  PEMA  FIX CRIT PERIOD EDITS            
+*> 052218  CR2014061700002  PEMA  INCREASE MORT TABLES TABLE       
+*>*****************************************************************
+01  DATE-CARD.                                                   
+    12  DATX-COD                    PIC  X(4).                   
+    12  RUN-DATE                    PIC  9(11)  COMP-3.          
+    12  ALPH-DATE                   PIC  X(18).                  
+    12  EP-DT                       PIC  9(11)  COMP-3.          
+    12  PEND-ACT-FILE               PIC  XX.                     
+    12  EP-SW                       PIC  X.                      
+        88  NO-EP-EXTRACTS          VALUE SPACE.                 
+    12  TAPE-BATCHES                PIC  X.                      
+        88  TP-PREL-BAL             VALUE '1'.                   
+    12  BIN-RUN-DATE                PIC  XX.                     
+    12  RUN-CENTURY.                                             
+        16 RUN-CENTURY-N            PIC  99.                     
+    12  FILLER                      PIC  X.                      
+    12  CLAS-MORT-OVRD              PIC  X(4).                   
+    12  FILLER                      PIC  XXX.                    
+    12  COMPANY-NAME                PIC  X(30).                  
+                                                                 
+01  FILLER                          PIC  X(7)                    
+                                         VALUE 'OPTIONS'.        
+01  DATE-CARD-OPTIONS.                                           
+    12  DATE-OPTIONS-ID             PIC  X(4).                   
+    12  DTE-MIN-PREM                PIC  99V99.                  
+    12  DTE-LANGUAGE-IND            PIC  X.                      
+        88  DTE-LANGUAGE-IS-FR           VALUE 'F'.              
+        88  DTE-LANGUAGE-IS-ENG          VALUE 'E'.              
+    12  DTE-MIN-AGE                 PIC  99.                     
+    12  DTE-DEFAULT-AGE             PIC  99.                     
+    12  FILLER                      PIC  X.                      
+    12  DTE-MAX-TERM                PIC  999.                    
+    12  DTE-COMP-VG                 PIC  X.                      
+    12  DTE-REM-TRM                 PIC  X.                      
+    12  DTE-PRM-CK                  PIC S99V99.                  
+    12  DTE-PRORATA                 PIC  X.                      
+    12  DTE-CLM-REJ                 PIC  X.                      
+    12  DTE-REF-REJ                 PIC  X.                      
+    12  DTE-COM-TBL-USED            PIC  X.                      
+    12  FILLER                      PIC  X.                      
+    12  DTE-QTR-CO                  PIC  X.                      
+    12  DTE-REF-CK                  PIC S99V99.                  
+    12  DTE-CLM-CK                  PIC S99V99.                  
+    12  DTE-CONV-DT                 PIC 9(11) COMP-3.            
+    12  DTE-DEFAULT-SEX             PIC  X.                      
+    12  DTE-EPL-FORMAT              PIC  X.                      
+    12  FILLER                      PIC  X.                      
+    12  DTE-JT-AGE                  PIC  X.                      
+    12  DTE-KEY-BIRTH               PIC  X.                      
+    12  DTE-REINSURANCE             PIC  X.                      
+    12  DTE-CLAIM-SORT              PIC  X.                      
+    12  DTE-WRT-OFF                 PIC  S99V99.                 
+    12  DTE-R78                     PIC  X.                      
+    12  DTE-DLY-BILL                PIC  X.                      
+    12  DTE-ALT-MORT-CODE           PIC  X(4).                   
+    12  DTE-CLAIM-PAID-THRU-TO      PIC  X.                      
+    12  DTE-COMPENSATION-ACCESS     PIC  X.                      
+    12  DTE-MORTG-ACCESS-CNTL       PIC  X.                      
+    12  DTE-MP-ALT-MORT-CODE        PIC  X(4).                   
+    12  DTE-MORTALITY-AGE-CALC-METHOD                            
+                                    PIC  X.                      
+        88  DTE-USE-TABLE-ASSIGNED-METHOD VALUE '1'              
+                                                ' '.             
+        88  DTE-USE-ALL-AGE-LAST          VALUE '2'.             
+        88  DTE-USE-ALL-AGE-NEAR          VALUE '3'.             
+    12  DTE-RESERVE-OPTION-SWITCH   PIC  X.                      
+        88  DTE-OPT-RESERVE-METHOD-AUTH       VALUE 'Y'.         
+        88  DTE-OPT-RESERVE-METHOD-UNAUTH     VALUE 'N' ' '.     
+    12  DTE-REM-TRM-CALC-OPTION     PIC  X.                      
+    12  DTE-EXPERIENCE-RETENTION-AGE                             
+                                    PIC  9.                      
+    12  DTE-SYSTEM.                                              
+        16  DTE-SYS-A-CREDIT        PIC  X.                      
+        16  DTE-SYS-B-PEND-CLAIM    PIC  X.                      
+        16  DTE-SYS-C-CONFIRMATIONS PIC  X.                      
+        16  DTE-SYS-D-DEMAND-BILL   PIC  X.                      
+        16  DTE-SYS-E-CLASIC-CLAIMS PIC  X.                      
+        16  DTE-SYS-F-CLASIC-CREDIT PIC  X.                      
+        16  DTE-SYS-G-AR-USED       PIC  X.                      
+        16  DTE-SYS-H               PIC  X.                      
+        16  DTE-SYS-I               PIC  X.                      
+        16  DTE-SYS-J               PIC  X.                      
+        16  DTE-SYS-K               PIC  X.                      
+        16  DTE-SYS-L               PIC  X.                      
+        16  DTE-SYS-M               PIC  X.                      
+        16  DTE-SYS-N               PIC  X.                      
+        16  DTE-SYS-O               PIC  X.                      
+        16  DTE-SYS-P               PIC  X.                      
+        16  DTE-SYS-Q               PIC  X.                      
+        16  DTE-SYS-R               PIC  X.                      
+        16  DTE-SYS-S               PIC  X.                      
+        16  DTE-SYS-T               PIC  X.                      
+        16  DTE-SYS-U               PIC  X.                      
+        16  DTE-SYS-V               PIC  X.                      
+        16  DTE-SYS-W               PIC  X.                      
+        16  DTE-SYS-X               PIC  X.                      
+        16  DTE-SYS-Y               PIC  X.                      
+        16  DTE-SYS-Z               PIC  X.                      
+    12  FILLER                      REDEFINES DTE-SYSTEM.        
+        16  DTE-SYS-CODE            OCCURS 26 TIMES              
+                                    PIC  X.                      
+    12  DTE-CLIENT                  PIC  XXX.                    
+                                                                 
+01  CLASIC-SYSTEM-CODES.                                         
+    12  DTE-COLC-ID                 PIC  X(4).                   
+    12  DTE-CLASIC-COMPANY-CD       PIC  X.                      
+    12  DTE-CLASIC-COMPANY-NUMBER   PIC  999.                    
+*>    12  DTE-CLASIC-CLAIM-ACCESS     PIC  X.                      
+    12  FILLER                      PIC  X.                      
+    12  CLASIC-REIN-MAINT           PIC  XX.                     
+    12  CLASIC-COMP-MAINT           PIC  XX.                     
+    12  CLASIC-ACCT-MAINT           PIC  XX.                     
+    12  CLASIC-CTBL-MAINT           PIC  XX.                     
+    12  CLASIC-RATE-MAINT           PIC  XX.                     
+    12  CLASIC-CREDIT-EOM-DT        PIC  XX.                     
+    12  CLASIC-CLAIMS-EOM-DT        PIC  XX.                     
+                                                                 
+    12  LIFE-OVERRIDE-L1            PIC  X.                      
+    12  LIFE-OVERRIDE-L2            PIC  XX.                     
+    12  LIFE-OVERRIDE-L6            PIC  X(6).                   
+    12  LIFE-OVERRIDE-L12           PIC  X(12).                  
+                                                                 
+    12  AH-OVERRIDE-L1              PIC  X.                      
+    12  AH-OVERRIDE-L2              PIC  XX.                     
+    12  AH-OVERRIDE-L6              PIC  X(6).                   
+    12  AH-OVERRIDE-L12             PIC  X(12).                  
+                                                                 
+    12  CLAS-REPORT-CD1-CAPTION     PIC  X(10).                  
+    12  CLAS-REPORT-CD2-CAPTION     PIC  X(10).                  
+                                                                 
+    12  CLASIC-MORTG-EOM-DT         PIC  XX.                     
+    12  CLASIC-AR-EOM-DT            PIC  XX.                     
+                                                                 
+    12  FILLER                      PIC  X(11)      VALUE SPACE. 
+                                                                 
+01  DATE-CARD-FACTORS.                                           
+    12  DATE-FACTOR-ID              PIC  X(4).                   
+    12  FAC-1                       PIC S999V9(5).               
+    12  FAC-2                       PIC S999V9(5).               
+    12  FAC-3                       PIC S999V9(5).               
+    12  FAC-4                       PIC S999V9(5).               
+    12  FAC-5                       PIC S999V9(5).               
+    12  FAC-6                       PIC S999V9(5).               
+                                                                 
+01  FILLER                          PIC  X(12)                   
+                                         VALUE 'COMPANY NAME'.   
+01  COMPANY-NAME-TABLE.                                          
+    12  C-N-TBL                     OCCURS 6 TIMES.              
+        16  CNT-ID                  PIC  X.                      
+        16  CNT-NAME                PIC  X(30).                  
+                                                                 
+01  FILLER                          PIC  X(11)                   
+                                         VALUE 'STATE NAMES'.    
+01  STATE-NAMES.                                                 
+    12  STATE-NAME-FLD              OCCURS 75 TIMES.             
+        16  STATE-SUB               PIC  XX.                     
+        16  STATE-PIC1.                                          
+            20  STATE-ABBR          PIC  XX.                     
+            20  FILLER              PIC  XXX.                    
+            20  STATE-PIC           PIC  X(20).                  
+            20  STATE-CALL-EARN     PIC  X.                      
+            20  STATE-CALL-BREAK    PIC  X.                      
+            20  STATE-PRIM-FAC-DEV  PIC  XXX.                    
+                                                                 
+01  FILLER                          PIC  X(13)                   
+                                         VALUE 'CARRIER NAMES'.  
+01  CARRIER-NAMES.                                               
+    12  CARRIER-NAME-FLD            OCCURS 25 TIMES.             
+        16  CARRIER-SUB             PIC  X.                      
+        16  CARRIER-DOM-ST          PIC  XX.                     
+        16  CARRIER-PIC             PIC  X(30).                  
+        16  CARRIER-UEP-PCT         PIC  S9V9(4) COMP-3.         
+        16  CARRIER-R78-PCT         PIC  S9V9(4) COMP-3.         
+        16  CARRIER-PRO-PCT         PIC  S9V9(4) COMP-3.         
+*>        16  FILLER                  PIC  X.                      
+        16  CARRIER-SEC-PAY         PIC  X.                      
+            88  SEC-PAY-CARRIER          VALUE 'Y'.              
+                                                                 
+01  FILLER                          PIC  X(9)                    
+                                         VALUE 'INS TYPES'.      
+01  CLAS-INS-TYPES.                                              
+*>    12 CLAS-ALL-TYPES               OCCURS 300 TIMES.            
+    12 CLAS-ALL-TYPES               OCCURS 900 TIMES.            
+        16  CLAS-I-BEN              PIC  XX.                     
+        16  CLAS-I-AB3.                                          
+            20  FILLER              PIC  X.                      
+            20  CLAS-I-AB2.                                      
+                24  FILLER          PIC  X.                      
+                24  CLAS-I-AB1      PIC  X.                      
+        16  CLAS-I-AB3-AH REDEFINES CLAS-I-AB3.                  
+            20  CLAS-EXCLUSION      PIC  XX.                     
+            20  FILLER              PIC  X.                      
+        16  CLAS-I-AB10.                                         
+            20  FILLER              PIC  X(9).                   
+            20  CLAS-I-REIN-YN      PIC  X.                      
+        16  CLAS-I-COMMENT          PIC  X(10).                  
+        16  CLAS-I-JOINT            PIC  X.                      
+        16  CLAS-I-RL-AH            PIC  X.                      
+        16  CLAS-I-CALC-TYPE.                                    
+            20  CLAS-I-BAL          PIC  X.                      
+        16  CLAS-I-EP               PIC  X.                      
+        16  CLAS-CO-BEN-I-G-CD      PIC  X.                      
+        16  CLAS-CO-REM-TERM-CALC   PIC  X.                      
+        16  CLAS-I-BEN-CATEGORY     PIC  X.                      
+        16  CLAS-I-REFUND-METHOD    PIC  X.                      
+        16  CLAS-I-MAX-BENEFITS     PIC 99.                      
+        16  FILLER                  PIC  XXX.                    
+                                                                 
+01  FILLER                          PIC  X(16)                   
+                                    VALUE 'MORTALITY TABLES'.    
+01  CLAS-MORTALITY-CODES.                                        
+    12  CLAS-MORT-FLD               OCCURS 130 TIMES             
+                                    INDEXED BY CLAS-MORT-NDX.    
+        16  CLAS-MORT-CODE          PIC  X(4).                   
+        16  CLAS-MORT-J-CODE        PIC  X.                      
+        16  CLAS-MORT-J-FACT        PIC S9V9(4).                 
+        16  CLAS-MORT-DESC.                                      
+            20  CLAS-RESERVE-ADJ    PIC  999.                    
+            20  FILLER              PIC  XX.                     
+            20  CLAS-YEAR           PIC  X(4).                   
+            20  FILLER              PIC  X.                      
+            20  CLAS-TABLE-TYPE     PIC  XXX.                    
+            20  FILLER              PIC  X.                      
+            20  CLAS-AGE-METHOD     PIC  XX.                     
+            20  FILLER              PIC  X.                      
+            20  CLAS-INTEREST       PIC  99.99.                  
+            20  FILLER              PIC  X(5).                   
+                                                                 
+01  FILLER                          PIC  X(15)                   
+                                    VALUE 'BUSINESS TABLES'.     
+01  CLAS-BUSINESS-CLASSES.                                       
+    12  CLAS-BUSC-FLD               OCCURS 50 TIMES.             
+        16  CLAS-BUSC-CODE          PIC  99.                     
+        16  CLAS-BUSC-GROUP         PIC  X.                      
+        16  CLAS-BUSC-DESC          PIC  X(19).                  
+        16  CLAS-BUSC-EXCL          PIC  X.                      
+        16  FILLER                  PIC  X(4).                   
+                                                                 
+01  FILLER                          PIC  X(7)                    
+                                    VALUE 'INDEXES'.             
+01  CLAS-INDEX-TBL.                                              
+    12  CLAX-ID                     PIC  X(4).                   
+    12  CLAS-STARTC                 PIC S9(4) COMP.              
+    12  CLAS-MAXC                   PIC S9(4) COMP.              
+    12  CLAS-STARTL                 PIC S9(4) COMP.              
+    12  CLAS-MAXL                   PIC S9(4) COMP.              
+    12  CLAS-STARTA                 PIC S9(4) COMP.              
+    12  CLAS-MAXA                   PIC S9(4) COMP.              
+    12  CLAS-STARTM                 PIC S9(4) COMP.              
+    12  CLAS-MAXM                   PIC S9(4) COMP.              
+    12  CLAS-STARTB                 PIC S9(4) COMP.              
+    12  CLAS-MAXB                   PIC S9(4) COMP.              
+    12  CLAS-STARTS                 PIC S9(4) COMP.              
+    12  CLAS-MAXS                   PIC S9(4) COMP.              
+    12  CLAS-STARTE                 PIC S9(4) COMP.              
+    12  CLAS-MAXE                   PIC S9(4) COMP.              
+    12  CLAS-STARTCN                PIC S9(4) COMP.              
+    12  CLAS-MAXCN                  PIC S9(4) COMP.              
+                                                                 
+01  CLAS-TYPE-MISC.                                              
+    12  CLAS-INDEXC                 PIC S9(4) COMP.              
+    12  CLAS-INDEXL                 PIC S9(4) COMP.              
+    12  CLAS-INDEXA                 PIC S9(4) COMP.              
+    12  CLAS-INDEXM                 PIC S9(4) COMP.              
+    12  CLAS-INDEXB                 PIC S9(4) COMP.              
+    12  CLAS-INDEXS                 PIC S9(4) COMP.              
+    12  CLAS-INDEXE                 PIC S9(4) COMP.              
+    12  CLAS-INDEX                  PIC S9(4) COMP.              
+    12  CLAS-INDEXEN                PIC S9(4) COMP.              
+    12  CLAS-INDEXCN                PIC S9(4) COMP.              
+    12  CLAS-INDEXON                PIC S9(4) COMP.              
+                                                                 
+01  FILLER                          PIC  X(13)                   
+                                    VALUE 'MISCELLANEOUS'.       
+01  CLAS-MISC.                                                   
+    12  DTE-FICH                    PIC  X.                      
+        88  FICH-NO                 VALUE SPACE.                 
+        88  FICH-ONLY               VALUE '1'.                   
+        88  FICH-BOTH               VALUE '2'.                   
+    12  FICH-OPEN                   PIC  X.                      
+    12  REPT-OPEN                   PIC  X.                      
+    12  DTE-PGM-OPT                 PIC  9.                      
+    12  DTE-PRT-OPT                 PIC  X.                      
+    12  DTE-FMT-OPT                 PIC  9.                      
+    12  DTE-PRC-OPT                 PIC  9.                      
+    12  DTE-TOT-OPT                 PIC  9.                      
+    12  CLAS-LOOK                   PIC  XX.                     
+    12  DTE-TOT-LINES               PIC S9(8)      COMP.         
+    12  STATE-L                     PIC  XX.                     
+    12  CLAS-CN                     PIC  99.                     
+    12  CLAS-CO                     PIC  99.                     
+    12  DTE-VSAM-FLAGS                              VALUE ZERO.  
+        16  DTE-F-1                 PIC  X.                      
+        16  DTE-F-2                 PIC  X.                      
+    12  DTE-ABEND-WORK.                                          
+        16  DTE-ABEND-CD-1          PIC  XX         VALUE SPACES.
+        16  DTE-ABEND-CD-2          PIC  XX         VALUE SPACES.
+                                                                 
+01  FILLER                          PIC  X(12)                   
+                                    VALUE 'WORKING DATE'.        
+01  WS-DATE-AND-TIME.                                            
+    12  WS-ACCEPT-DATE.                                          
+        16  WS-AD-YY                PIC  99.                     
+        16  WS-AD-MM                PIC  99.                     
+        16  WS-AD-DD                PIC  99.                     
+    12  WS-CURRENT-DATE.                                         
+        16  WS-CD-MM                PIC  99.                     
+        16  FILLER                  PIC  X          VALUE '/'.   
+        16  WS-CD-DD                PIC  99.                     
+        16  FILLER                  PIC  X          VALUE '/'.   
+        16  WS-CD-YY                PIC  99.                     
+    12  WS-TIME-OF-DAY.                                          
+        16  WS-TIME                 PIC  9(6).                   
+        16  WS-HUN-SEC              PIC  99.                     
+                                                                 
+01  FILLER                          PIC  X(12)                   
+                                    VALUE 'CARRIER CLMS'.        
+01  CARRIER-OPT-CLAIM-DATA.                                      
+    12  CARRIER-FLDS                OCCURS 25 TIMES.             
+        16  CARRIER-IBNR-SWITCH     PIC  X.                      
+        16  CARRIER-IBNR-PERCENT    PIC S9V9(4) COMP-3.          
+        16  CARRIER-CIDA-DISCOUNT   PIC S9V9(4) COMP-3.          
+                                                                 
+01  FILLER                          PIC  X(10)                   
+                                    VALUE 'STATE TLRS'.          
+01  STATE-TARGET-LOSS-RATIOS.                                    
+    12  STATE-TLR-FLD               OCCURS 75 TIMES.             
+        16  STATE-TARGET-LOSS-RATIO PIC S9V9(4) COMP-3.          
+        16  STATE-CALC-INTEREST     PIC S9V9(4) COMP-3.          
+                                                                 
+01  FILLER                          PIC  X(13)                   
+                                    VALUE 'BUSINESS TLRS'.       
+01  BUSINESS-TRGT-LOSS-RATIO-MODS.                               
+    12  BUS-TLRM-FLD                OCCURS 99 TIMES.             
+        16  BUS-TRGT-LOSS-RATIO-MOD PIC S9V9(4) COMP-3.          
+                                                                 
+01  FILLER                          PIC  X(13)                   
+                                    VALUE 'MISC CLM DATA'.       
+01  MISC-OPT-CLM-RSV-DATA.                                       
+    12  COMPANY-CALC-INTEREST       PIC S9V9(4) COMP-3.          
+    12  COMPANY-CIDA-DISCOUNT       PIC S9V9(4) COMP-3.          
+    12  COMPANY-CRDB-TABLE-SELECTION                             
+                                    PIC  X.                      
+    12  COMPANY-IBNR-AH-FACTOR      PIC S9V9(4) COMP-3.          
+    12  COMPANY-IBNR-LAG-MONTH      PIC S999    COMP-3.          
+    12  COMPANY-IBNR-LIFE-FACTOR    PIC S9V9(4) COMP-3.          
+    12  COMPANY-OPTION-START-DATE   PIC  XX.                     
+    12  INDEXBS                     PIC S9(4)   COMP.            
+    12  INDEXCA                     PIC S9(4)   COMP.            
+    12  INDEXST                     PIC S9(4)   COMP.            
+    12  FILLER                      PIC  X(75).                  
+*>*****************************************************************
+*>01  MISC-CARR-PCT-DATA.                                          
+*>    12  DD-CARR1-UEP-PCT            PIC S9V9(4) COMP-3.          
+*>    12  DD-CARR1-R78-PCT            PIC S9V9(4) COMP-3.          
+*>    12  DD-CARR1-PRO-PCT            PIC S9V9(4) COMP-3.          
+*>    12  DD-CARR2-UEP-PCT            PIC S9V9(4) COMP-3.          
+*>    12  DD-CARR2-R78-PCT            PIC S9V9(4) COMP-3.          
+*>    12  DD-CARR2-PRO-PCT            PIC S9V9(4) COMP-3.          
+*>*****************************************************************
+*>^^^-> file: /apps/prod/cid1p/copy/ELCDTECX
+                                                                 
+*>COPY ELCDTEVR.                                                   
+*>vvv-> file: /apps/prod/cid1p/copy/ELCDTEVR
+*>**************************************************************** 
+*>                                                                *
+*>                                                                *
+*>                            ELCDTEVR.                           *
+*>           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+*>                            VMOD=2.001                          *
+*>                                                                *
+*>   WORKING STORAGE FOR DATE VARIABLES CREATED                   *
+*>   FOR THE YEAR 2000 DATE MODIFICATION                          *
+*>                                                                *
+*>*****************************************************************
+01  WS-DATE-CARD-DATE.                                           
+    05  WS-RUN-DATE.                                             
+        10  FILLER                  PIC  9(03).                  
+        10  RUN-CCYY                PIC  9(04).                  
+        10  RUN-CCYR  REDEFINES  RUN-CCYY.                       
+            15  RUN-CC              PIC  99.                     
+            15  RUN-YR              PIC  99.                     
+        10  RUN-MO                  PIC  99.                     
+        10  RUN-DA                  PIC  99.                     
+    05  WS-RUN-DATE-N REDEFINES                                  
+           WS-RUN-DATE              PIC 9(11).                   
+    05  WS-EP-DT.                                                
+        10  FILLER                  PIC  9(03).                  
+        10  EP-CCYY                 PIC  9(04).                  
+        10  EP-CCYR  REDEFINES  EP-CCYY.                         
+            15  EP-CC               PIC  99.                     
+            15  EP-YR               PIC  99.                     
+        10  EP-MO                   PIC  99.                     
+        10  EP-DA                   PIC  99.                     
+    05  WS-EP-DT-N REDEFINES                                     
+           WS-EP-DT                 PIC 9(11).                   
+    05  WS-DTE-CONV-DT.                                          
+        10  FILLER                  PIC  9(03).                  
+        10  DTE-CONV-CCYY           PIC  9(04).                  
+        10  DTE-CONV-CCYR  REDEFINES  DTE-CONV-CCYY.             
+            15  DTE-CONV-CC         PIC  99.                     
+            15  DTE-CONV-YR         PIC  99.                     
+        10  DTE-CONV-MO             PIC  99.                     
+        10  DTE-CONV-DA             PIC  99.                     
+    05  WS-DTE-CONV-DT-N REDEFINES                               
+           WS-DTE-CONV-DT           PIC  9(11).                  
+01  WS-BALANCE-FORWARD-DATE.                                     
+    05  WS-BF-LAST-ACTIVITY-DATE.                                
+        10  FILLER                            PIC 999.           
+        10  BF-ACT-CCYY                       PIC 9(04).         
+        10  BF-ACT-CCYR  REDEFINES  BF-ACT-CCYY.                 
+            15  BF-ACT-CC                     PIC 99.            
+            15  BF-ACT-YEAR                   PIC 99.            
+        10  BF-ACT-MONTH                      PIC 99.            
+        10  BF-ACT-DAY                        PIC 99.            
+    05  WS-BF-LAST-ACTIVITY-DATE-N REDEFINES                     
+           WS-BF-LAST-ACTIVITY-DATE           PIC 9(11).         
+    05  WS-BF-CURRENT-LAST-STMT-DT.                              
+        10  FILLER                            PIC 999.           
+        10  BF-CURRENT-LAST-STMT-CEN          PIC 99.            
+        10  BF-CURRENT-LAST-STMT-YEAR         PIC 99.            
+        10  BF-CURRENT-LAST-STMT-MONTH        PIC 99.            
+        10  BF-CURRENT-LAST-STMT-DAY          PIC 99.            
+    05  WS-BF-CURRENT-LAST-STMT-DT-N REDEFINES                   
+           WS-BF-CURRENT-LAST-STMT-DT        PIC 9(11).          
+01  WS-ADD-CONF-TRANSACTIONS-DTE.                                
+    05  WS-AC-CERT-EFF-DATE.                                     
+        10  FILLER                            PIC 999.           
+        10  AC-CERT-CCYY                      PIC 9(04).         
+        10  AC-CERT-CCYR  REDEFINES  AC-CERT-CCYY.               
+            15  AC-CERT-CC                    PIC 99.            
+            15  AC-CERT-YR                    PIC 99.            
+        10  AC-CERT-MO                        PIC 99.            
+        10  AC-CERT-DA                        PIC 99.            
+    05  WS-AC-CERT-EFF-DATE-N REDEFINES                          
+           WS-AC-CERT-EFF-DATE                PIC 9(11).         
+    05  WS-AC-LIFE-CANCEL-DATE.                                  
+        10  FILLER                            PIC 999.           
+        10  AC-LIFE-CANCEL-CCYY               PIC 9(04).         
+        10  AC-LIFE-CANCEL-CCYR REDEFINES AC-LIFE-CANCEL-CCYY.   
+            15  AC-LIFE-CANCEL-CC             PIC 99.            
+            15  AC-LIFE-CANCEL-YR             PIC 99.            
+        10  AC-LIFE-CANCEL-MO                 PIC 99.            
+        10  AC-LIFE-CANCEL-DA                 PIC 99.            
+    05  WS-AC-LIFE-CANCEL-DATE-N REDEFINES                       
+           WS-AC-LIFE-CANCEL-DATE             PIC 9(11).         
+    05  WS-AC-AH-CANCEL-DATE.                                    
+        10  FILLER                            PIC 999.           
+        10  AC-AH-CANCEL-CCYY                 PIC 9(04).         
+        10  AC-AH-CANCEL-CCYR  REDEFINES  AC-AH-CANCEL-CCYY.     
+            15  AC-AH-CANCEL-CC               PIC 99.            
+            15  AC-AH-CANCEL-YR               PIC 99.            
+        10  AC-AH-CANCEL-MO                   PIC 99.            
+        10  AC-AH-CANCEL-DA                   PIC 99.            
+    05  WS-AC-AH-CANCEL-DATE-N REDEFINES                         
+           WS-AC-AH-CANCEL-DATE               PIC 9(11).         
+01  WS-RATE-RECORD.                                              
+        05  WS-RT-EXPIRY-DATE.                                   
+            10  FILLER                        PIC 999.           
+            10  RT-EXP-CCYY                   PIC 9(04).         
+            10  RT-EXP-CCYR  REDEFINES  RT-EXP-CCYY.             
+                15  RT-EXP-CC                 PIC 99.            
+                15  RT-EXP-YR                 PIC 99.            
+            10  RT-EXP-MO                     PIC 99.            
+            10  RT-EXP-DA                     PIC 99.            
+        05  WS-RT-EXPIRY-DATE-N REDEFINES                        
+               WS-RT-EXPIRY-DATE              PIC 9(11).         
+*>^^^-> file: /apps/prod/cid1p/copy/ELCDTEVR
+*>                                                                 
+PROCEDURE DIVISION.                                              
+*>                                                                 
+*>    COPY ELCDTERX.                                               
+*>vvv-> file: /apps/prod/cid1p/copy/ELCDTERX
+*>*****************************************************************
+*>                                                                *
+*>                                                                *
+*>                            ELCDTERX.                           *
+*>           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+*>                            VMOD=2.007                          *
+*>                                                                *
+*>      LOAD DATE CARD DISK FILE INTO WORKING STORAGE AREA        *
+*>      (COPY CODE FOR W/S = ELCDTECX AND COPY CODE FOR FD        *
+*>      = ELCDTEFD)                                               *
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 112917    2017111600001  TANA  FIXED TABLE OVERFLOW             
+*>                                                                *
+*>*****************************************************************
+                                                                 
+    ACCEPT WS-ACCEPT-DATE       FROM  DATE.                      
+                                                                 
+    MOVE WS-AD-YY               TO  WS-CD-YY.                    
+    MOVE WS-AD-MM               TO  WS-CD-MM.                    
+    MOVE WS-AD-DD               TO  WS-CD-DD.                    
+                                                                 
+    ACCEPT WS-TIME-OF-DAY       FROM  TIME.                      
+                                                                 
+*>*****************************************************************
+*>    NOTE: THE FOLLOWING STATEMENT IS USED TO ELIMINATE COB II    
+*>          WARNING MESSAGES.                                      
+*>*****************************************************************
+    IF WS-CD-YY = LOW-VALUES                                     
+        COMPUTE PGM-SUB = PGM-SUB + 1.                           
+                                                                 
+    OPEN INPUT DISK-DATE.                                        
+                                                                 
+    MOVE SPACE TO DATE-CARD         CLAS-BUSINESS-CLASSES        
+                  STATE-NAMES       CLAS-MORTALITY-CODES         
+                  CLAS-INS-TYPES    COMPANY-NAME-TABLE           
+                  DATE-CARD-OPTIONS DATE-CARD-FACTORS            
+                  CLAX-ID           CLAS-MISC                    
+                  CARRIER-NAMES     CLASIC-SYSTEM-CODES          
+                  CARRIER-OPT-CLAIM-DATA                         
+                  STATE-TARGET-LOSS-RATIOS                       
+                  BUSINESS-TRGT-LOSS-RATIO-MODS                  
+                  MISC-OPT-CLM-RSV-DATA.                         
+                                                                 
+    MOVE LOW-VALUES TO CLAS-INDEX-TBL CLAS-TYPE-MISC.            
+                                                                 
+    MOVE ZERO TO CLAS-CN DTE-TOT-LINES CLAS-CO                   
+                 INDEXCA INDEXBS INDEXST.                        
+                                                                 
+    COMPUTE CLAS-CN = PGM-SUB / +50.                             
+    COMPUTE CLAS-CO = PGM-SUB / +20.                             
+    COMPUTE CLAS-INDEXEN = PGM-SUB - (CLAS-CN * +50).            
+    COMPUTE CLAS-INDEXON = PGM-SUB - (CLAS-CO * +20).            
+                                                                 
+    IF CLAS-INDEXEN = ZERO                                       
+        MOVE +50               TO CLAS-INDEXEN                   
+    ELSE                                                         
+        ADD +1                 TO CLAS-CN.                       
+                                                                 
+    IF CLAS-INDEXON = ZERO                                       
+        MOVE +20               TO CLAS-INDEXON                   
+    ELSE                                                         
+        ADD +1                 TO CLAS-CO.                       
+                                                                 
+0005-READ--CARD.                                                 
+    READ DISK-DATE                                               
+        AT END CLOSE DISK-DATE                                   
+            GO TO 0060-READ--TEST.                               
+                                                                 
+    MOVE ZERO                   TO CLAS-INDEX.                   
+                                                                 
+    IF DD-ID = 'CLAS' OR 'LIFE' OR 'GLED'                        
+        MOVE DATE-DISK          TO DATE-CARD                     
+        MOVE RUN-DATE           TO WS-RUN-DATE-N                 
+        MOVE EP-DT              TO WS-EP-DT-N                    
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    IF DD-ID = 'CLAD'                                            
+        MOVE DATE-DISK          TO DATE-CARD-OPTIONS             
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    IF DD-ID = 'CLAX'                                            
+        MOVE DATE-DISK          TO CLAS-INDEX-TBL                
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    IF DD-ID = 'CLAF'                                            
+        MOVE DATE-DISK          TO DATE-CARD-FACTORS             
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    IF DD-ID = 'CLAC'                                            
+        GO TO 0010-READ--CLAC.                                   
+                                                                 
+    IF DD-ID = 'CARR'                                            
+        GO TO 0015-READ--CARR.                                   
+                                                                 
+    IF DD-ID = 'STAT'                                            
+        GO TO 0020-READ--STAT.                                   
+                                                                 
+    IF DD-ID = 'BUSC'                                            
+        GO TO 0025-READ--BUSC.                                   
+                                                                 
+    IF DD-ID = 'MORT'                                            
+        GO TO 0030-READ--MORT.                                   
+                                                                 
+    IF DD-ID = 'CLAI'                                            
+        GO TO 0040-READ--CLAI.                                   
+                                                                 
+    IF DD-ID = 'COLC'                                            
+        GO TO 0065-READ--COLC.                                   
+                                                                 
+    IF DD-IDX NUMERIC AND                                        
+       DD-IDA = 'CL'                                             
+        GO TO 0035-READ--CLXX.                                   
+                                                                 
+    IF DD-IDX NUMERIC AND                                        
+       DD-IDA = 'PO'                                             
+        GO TO 0050-READ--POXX.                                   
+                                                                 
+    IF DD-ID = 'OPCA'                                            
+        GO TO 0070-READ--OPCA.                                   
+                                                                 
+    IF DD-ID = 'OPST'                                            
+        GO TO 0072-READ--OPST.                                   
+                                                                 
+    IF DD-ID = 'OPBS'                                            
+        GO TO 0074-READ--OPBS.                                   
+                                                                 
+    IF DD-ID = 'OPMS'                                            
+        MOVE DD-MISC-DATA       TO MISC-OPT-CLM-RSV-DATA.        
+                                                                 
+    GO TO 0005-READ--CARD.                                       
+                                                                 
+0010-READ--CLAC.                                                 
+    ADD 1                       TO CLAS-INDEXC.                  
+    IF CLAS-INDEXC > 6                                           
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    MOVE DD-CR1                 TO CNT-ID (CLAS-INDEXC).         
+    MOVE DD-CR1N                TO CNT-NAME (CLAS-INDEXC).       
+    ADD 1                       TO CLAS-INDEXC.                  
+    MOVE DD-CR2                 TO CNT-ID (CLAS-INDEXC).         
+    MOVE DD-CR2N                TO CNT-NAME (CLAS-INDEXC).       
+    GO TO 0005-READ--CARD.                                       
+                                                                 
+0015-READ--CARR.                                                 
+    ADD 1  TO  CLAS-INDEXCN.                                     
+    IF CLAS-INDEXCN LESS THAN +26                                
+       MOVE DD-CARR1         TO CARRIER-SUB (CLAS-INDEXCN)       
+       MOVE DD-CARR1S        TO CARRIER-DOM-ST (CLAS-INDEXCN)    
+       MOVE DD-CARR1N        TO CARRIER-PIC (CLAS-INDEXCN)       
+       MOVE DD-CARR1-UEP-PCT TO CARRIER-UEP-PCT (CLAS-INDEXCN)   
+       MOVE DD-CARR1-R78-PCT TO CARRIER-R78-PCT (CLAS-INDEXCN)   
+       MOVE DD-CARR1-PRO-PCT TO CARRIER-PRO-PCT (CLAS-INDEXCN)   
+       MOVE DD-CARR1-SECPAY-SW                                   
+                              TO CARRIER-SEC-PAY (CLAS-INDEXCN)  
+    END-IF                                                       
+                                                                 
+    ADD 1  TO  CLAS-INDEXCN.                                     
+    IF CLAS-INDEXCN LESS THAN +26                                
+       MOVE DD-CARR2         TO CARRIER-SUB (CLAS-INDEXCN)       
+       MOVE DD-CARR2S        TO CARRIER-DOM-ST (CLAS-INDEXCN)    
+       MOVE DD-CARR2N        TO CARRIER-PIC (CLAS-INDEXCN)       
+       MOVE DD-CARR2-UEP-PCT TO CARRIER-UEP-PCT (CLAS-INDEXCN)   
+       MOVE DD-CARR2-R78-PCT TO CARRIER-R78-PCT (CLAS-INDEXCN)   
+       MOVE DD-CARR2-PRO-PCT TO CARRIER-PRO-PCT (CLAS-INDEXCN)   
+       MOVE DD-CARR2-SECPAY-SW                                   
+                             TO CARRIER-SEC-PAY (CLAS-INDEXCN)   
+    END-IF                                                       
+                                                                 
+                                                                 
+    GO TO 0005-READ--CARD.                                       
+                                                                 
+0020-READ--STAT.                                                 
+    ADD 1                       TO CLAS-INDEX.                   
+    IF CLAS-INDEX GREATER 3  OR                                  
+       DD-ST (CLAS-INDEX) = SPACE                                
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    ADD 1                       TO CLAS-INDEXS.                  
+    MOVE DD-ST (CLAS-INDEX)     TO STATE-NAME-FLD (CLAS-INDEXS). 
+    GO TO 0020-READ--STAT.                                       
+                                                                 
+0025-READ--BUSC.                                                 
+    ADD 1                       TO CLAS-INDEX.                   
+    IF CLAS-INDEX GREATER 3  OR                                  
+       DD-ST (CLAS-INDEX) = SPACE                                
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    ADD 1                       TO CLAS-INDEXB.                  
+    MOVE DD-ST (CLAS-INDEX)     TO CLAS-BUSC-FLD (CLAS-INDEXB).  
+    GO TO 0025-READ--BUSC.                                       
+                                                                 
+0030-READ--MORT.                                                 
+    ADD 1                       TO CLAS-INDEX.                   
+    IF CLAS-INDEX GREATER 2  OR                                  
+       DD-MORT (CLAS-INDEX) = SPACE                              
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    ADD 1                       TO CLAS-INDEXM.                  
+    MOVE DD-MORT (CLAS-INDEX)   TO CLAS-MORT-FLD (CLAS-INDEXM).  
+    GO TO 0030-READ--MORT.                                       
+                                                                 
+0035-READ--CLXX.                                                 
+    IF DD-IDX NOT = CLAS-CN                                      
+         GO TO 0005-READ--CARD.                                  
+                                                                 
+    IF DD-PS-PIC (CLAS-INDEXEN) = 'X'                            
+        DISPLAY '***********************************************'
+        DISPLAY 'PROGRAM ECS-', PGM-SUB, ' NOT SCHEDULED TO RUN' 
+        DISPLAY '***********************************************'
+        GO TO 0055-READ--STOP.                                   
+                                                                 
+    IF DD-PS-PIC (CLAS-INDEXEN) NOT LESS 'A'  AND                
+       DD-PS-PIC (CLAS-INDEXEN) NOT GREATER 'I'                  
+        MOVE '1'                TO DTE-FICH.                     
+                                                                 
+    IF DD-PS-PIC (CLAS-INDEXEN) NOT LESS 'J'  AND                
+       DD-PS-PIC (CLAS-INDEXEN) NOT GREATER 'R'                  
+        MOVE '2'                TO DTE-FICH.                     
+                                                                 
+*>    MOVE DD-PS-PIC (CLAS-INDEXEN) TO DTE-PGM-OPT.                
+    GO TO 0005-READ--CARD.                                       
+                                                                 
+0040-READ--CLAI.                                                 
+    ADD 1                       TO CLAS-INDEX.                   
+    IF CLAS-INDEX GREATER 2  OR                                  
+       DD-TYPE (CLAS-INDEX) = SPACE                              
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    ADD 1                       TO CLAS-INDEXA.                  
+    MOVE DD-TYPE (CLAS-INDEX) TO CLAS-ALL-TYPES (CLAS-INDEXA).   
+    GO TO 0040-READ--CLAI.                                       
+                                                                 
+0045-READ--DUMP.                                                 
+    MOVE +999 TO WS-RETURN-CODE                                  
+    MOVE 'MISSING AND/OR INVALID CLAS DATE CARD'                 
+                                TO  WS-ABEND-MESSAGE             
+    PERFORM ABEND-PGM.                                           
+                                                                 
+0050-READ--POXX.                                                 
+    IF DD-IDX NOT = CLAS-CO                                      
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    IF DD-PS-PRC (CLAS-INDEXON) = 'X'                            
+        DISPLAY '***********************************************'
+        DISPLAY 'ECS - ', PGM-SUB, ' IS NOT SCHEDULED TO RUN'    
+        DISPLAY '***********************************************'
+        GO TO 0055-READ--STOP.                                   
+                                                                 
+    MOVE DD-PS-PRT (CLAS-INDEXON) TO DTE-PRT-OPT.                
+    MOVE DD-PS-FMT (CLAS-INDEXON) TO DTE-FMT-OPT.                
+    MOVE DD-PS-PRC (CLAS-INDEXON) TO DTE-PRC-OPT DTE-PGM-OPT.    
+    MOVE DD-PS-TOT (CLAS-INDEXON) TO DTE-TOT-OPT.                
+                                                                 
+    IF DTE-PRT-OPT = 'B'                                         
+        MOVE '2'                  TO DTE-FICH.                   
+    IF DTE-PRT-OPT = 'F'                                         
+        MOVE '1'                  TO DTE-FICH.                   
+                                                                 
+    GO TO 0005-READ--CARD.                                       
+                                                                 
+0055-READ--STOP.                                                 
+    GOBACK.                                                      
+                                                                 
+0060-READ--TEST.                                                 
+    IF DATX-COD        = SPACE  OR                               
+       CLAX-ID         = SPACE  OR                               
+       DATE-OPTIONS-ID = SPACE                                   
+        GO TO 0045-READ--DUMP.                                   
+                                                                 
+    MOVE LOW-VALUE TO CLAS-TYPE-MISC.                            
+    GO TO 0079-READ--EXIT.                                       
+                                                                 
+0065-READ--COLC.                                                 
+    MOVE DATE-DISK              TO CLASIC-SYSTEM-CODES.          
+    GO TO 0005-READ--CARD.                                       
+                                                                 
+0070-READ--OPCA.                                                 
+                                                                 
+    ADD 1                       TO CLAS-INDEX.                   
+                                                                 
+    IF  CLAS-INDEX GREATER 13                                    
+            OR                                                   
+        DD-CARR-FLDS (CLAS-INDEX) = SPACE                        
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    ADD 1                       TO INDEXCA.                      
+    MOVE DD-CARR-FLDS (CLAS-INDEX)                               
+                                TO CARRIER-FLDS (INDEXCA).       
+    GO TO 0070-READ--OPCA.                                       
+                                                                 
+0072-READ--OPST.                                                 
+                                                                 
+    ADD 1                       TO CLAS-INDEX.                   
+                                                                 
+    IF  CLAS-INDEX GREATER 16                                    
+            OR                                                   
+        DD-TLR (CLAS-INDEX) = SPACE                              
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    ADD 1                       TO INDEXST.                      
+    MOVE DD-STATE-FLDS (CLAS-INDEX)                              
+                                TO STATE-TLR-FLD (INDEXST).      
+    GO TO 0072-READ--OPST.                                       
+                                                                 
+0074-READ--OPBS.                                                 
+                                                                 
+    ADD 1                       TO CLAS-INDEX.                   
+                                                                 
+    IF  CLAS-INDEX GREATER 32                                    
+            OR                                                   
+        DD-TLR (CLAS-INDEX) = SPACE                              
+        GO TO 0005-READ--CARD.                                   
+                                                                 
+    ADD 1                       TO INDEXBS.                      
+    MOVE DD-TLR (CLAS-INDEX)    TO BUS-TLRM-FLD (INDEXBS).       
+    GO TO 0074-READ--OPBS.                                       
+                                                                 
+0079-READ--EXIT.                                                 
+*>    EXIT.                                                        
+*>*****************************************************************
+*>^^^-> file: /apps/prod/cid1p/copy/ELCDTERX
+                                                                 
+    OPEN INPUT MICR-DRAFT-FILE                                   
+    IF MICR-STATUS = '00' OR '97'                                
+       CONTINUE                                                  
+    ELSE                                                         
+       DISPLAY 'OPEN ERROR ' MICR-STATUS ' ON MICRDRFT FILE'     
+       ADD +1 TO FORCE-DUMP                                      
+    END-IF                                                       
+                                                                 
+    OPEN OUTPUT DRAFT-COPIES-PART-PAY                            
+                DRAFT-COPIES-FINAL-PAY                           
+                COMMENT-CARDS                                    
+                COVER-LETTERS                                    
+                FORM-REQUESTS                                    
+                NJ-NOTICE                                        
+                                                                 
+    MOVE X'09'              TO CR-TAB1                           
+                               CR-TAB2                           
+                                                                 
+    PERFORM UNTIL EOF                                            
+       READ MICR-DRAFT-FILE                                      
+       IF MICR-STATUS = '00'                                     
+           IF (M420C-FORM = '420C' AND DTE-CLIENT = 'CID')       
+              OR                                                 
+              (M420C-FORM = 'DCC1' AND DTE-CLIENT = 'DCC')       
+              OR (M420C-FORM = 'DCC2' AND DTE-CLIENT = 'DCC')    
+              OR (M420C-FORM = 'DCC3' AND DTE-CLIENT = 'DCC')    
+              OR (M420C-FORM = 'DCC4' AND DTE-CLIENT = 'DCC')    
+              OR (M420C-FORM = 'AKCK' AND DTE-CLIENT = 'CID')    
+              OR (M420C-FORM = '420A' AND DTE-CLIENT = 'AHL')    
+              OR (M420C-FORM = 'AKAH' AND DTE-CLIENT = 'AHL')    
+               MOVE SPACES TO LETTER-RECORD                      
+               PERFORM 100-GET-BARCODE  THRU 100-EXIT            
+               PERFORM 800-ADJ-ADDRESS  THRU 800-EXIT            
+               PERFORM 300-WRITE-LETTER THRU 300-EXIT            
+           ELSE                                                  
+               DISPLAY 'Check form and client id dont match?'    
+                     ' Form = ' M420C-FORM                       
+                     ' Client = ' DTE-CLIENT                     
+           END-IF                                                
+       END-IF                                                    
+    END-PERFORM                                                  
+                                                                 
+    CLOSE MICR-DRAFT-FILE                                        
+          DRAFT-COPIES-PART-PAY                                  
+          DRAFT-COPIES-FINAL-PAY                                 
+          COMMENT-CARDS                                          
+          COVER-LETTERS                                          
+          FORM-REQUESTS                                          
+          NJ-NOTICE                                              
+                                                                 
+                                                                 
+    STOP RUN.                                                    
+                                                                 
+                                                                 
+EJECT                                                            
+*>---------------------------------------------------------------  
+100-GET-BARCODE.                                                 
+*>---------------------------------------------------------------  
+    MOVE M420C-CLAIM-NO TO BC-CLAIM-NO                           
+    MOVE M420C-CERT-NO  TO BC-CERT-NO                            
+                                                                 
+    MOVE M420C-CLAIM-NO TO BC2-CLAIM-NO                          
+    MOVE M420C-CERT-NO  TO BC2-CERT-NO                           
+                                                                 
+    ADD +1 TO BC-SEQ                                             
+                                                                 
+    EVALUATE TRUE                                                
+    WHEN M420C-PAYMENT-TYPE = 'P' OR 'A'                         
+        ADD +1 TO WS-PARTIAL-SEQ                                 
+        MOVE WS-PARTIAL-SEQ   TO BC2-SEQ                         
+                                                                 
+    WHEN M420C-PAYMENT-TYPE = 'F'                                
+        ADD +1 TO WS-FINAL-SEQ                                   
+        MOVE WS-FINAL-SEQ TO BC2-SEQ                             
+                                                                 
+    WHEN OTHER                                                   
+        DISPLAY 'payment type ' M420C-PAYMENT-TYPE               
+    END-EVALUATE                                                 
+                                                                 
+    MOVE CID-BARCODE TO AGEB16-BC-IN                             
+*>    MOVE LENGTH OF CID-BARCODE TO AGEB16-BC-LEN                  
+    MOVE +28                    TO AGEB16-BC-LEN                 
+    CALL 'AGEB16' USING AGEB16-BC-LEN                            
+                        AGEB16-BC-IN                             
+                        AGEB16-BC-OUT                            
+                                                                 
+    IF AGEB16-BC-LEN = +128                                      
+       DISPLAY 'BARCODE ROUTINE ERROR: ' CID-BARCODE             
+    END-IF                                                       
+                                                                 
+    MOVE AGEB16-BC-OUT TO LR-BARCODE                             
+                                                                 
+    MOVE CID-BARCODE-2 TO AGEB16-BC-IN                           
+*>    MOVE LENGTH OF CID-BARCODE TO AGEB16-BC-LEN                  
+    MOVE +28                    TO AGEB16-BC-LEN                 
+    CALL 'AGEB16' USING AGEB16-BC-LEN                            
+                        AGEB16-BC-IN                             
+                        AGEB16-BC-OUT                            
+                                                                 
+    IF AGEB16-BC-LEN = +128                                      
+       DISPLAY 'BARCODE 2 ROUTINE ERROR: ' CID-BARCODE-2         
+    END-IF                                                       
+                                                                 
+    MOVE AGEB16-BC-OUT TO DR-BARCODE                             
+                                                                 
+    .                                                            
+100-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+*>---------------------------------------------------------------  
+300-WRITE-LETTER.                                                
+*>---------------------------------------------------------------  
+                                                                 
+    MOVE M420C-DRAFT(2:1)     TO LR-CARRIER                      
+    MOVE M420C-DRAFT-ORDER    TO LR-DRAFT-ORDER                  
+    MOVE M420C-PAYEE-NAME     TO LR-PAYEE-NAME                   
+    MOVE M420C-PAYEE-ADDRESS1 TO LR-PAYEE-ADDR1                  
+    MOVE M420C-PAYEE-ADDRESS2 TO LR-PAYEE-ADDR2                  
+    MOVE M420C-PAYEE-ADDRESS3 TO LR-PAYEE-ADDR3                  
+    MOVE M420C-PAYEE-ADDRESS4 TO LR-PAYEE-ADDR4                  
+                                                                 
+    MOVE M420C-MEMBER-NAME  TO WS-WORK                           
+*>    PERFORM 810-SET-PERIOD THRU 810-EXIT                         
+    MOVE WS-WORK TO LR-MEMBER-NAME                               
+                                                                 
+    MOVE M420C-LOAN-NUMBER  TO WS-WORK                           
+    PERFORM 810-SET-PERIOD THRU 810-EXIT                         
+    MOVE WS-WORK TO LR-LOAN-NO                                   
+                                                                 
+    MOVE M420C-CLAIM-NO  TO LR-CLAIM-NO                          
+                                                                 
+    IF M420C-PLAN-CODE = 'A&H ' OR 'IU  ' OR 'GAP ' OR 'FAM '    
+       or 'HOS ' or 'BRV '                                       
+       IF M420C-LOAN-NUMBER = SPACE                              
+          MOVE 'AH2 ' TO LR-LETTER-ID                            
+       ELSE                                                      
+          MOVE 'AH1 ' TO LR-LETTER-ID                            
+       END-IF                                                    
+    ELSE                                                         
+       MOVE 'LIFE' TO LR-LETTER-ID                               
+    END-IF                                                       
+                                                                 
+    IF DTE-CLIENT = 'CID' AND M420C-ACCT-STATE = 'NJ'            
+        MOVE M420C-ACCT-STATE TO NJ-NOTICE-STATE                 
+        MOVE M420C-DRAFT-ORDER TO NJ-NOTICE-DRAFT-SEQ            
+        MOVE M420C-DRAFT TO NJ-NOTICE-DRAFT-NO                   
+        MOVE M420C-MEMBER-NAME TO NJ-NOTICE-MEMBER-NAME          
+        WRITE NJ-NOTICE-REC FROM NJ-NOTICE-RECORD                
+    END-IF                                                       
+                                                                 
+    IF (M420C-PLAN-CODE = 'A&H ' OR 'IU  ' OR 'GAP ' OR 'FAM '   
+        OR 'HOS ' OR 'BRV ')                                     
+        IF (M420C-PAYMENT-TYPE = 'F')                            
+            IF DTE-CLIENT = 'CID'                                
+                PERFORM 350-WRITE-COMMENT THRU 350-EXIT          
+            ELSE                                                 
+                IF DTE-CLIENT = 'DCC'                            
+                   PERFORM 360-WRITE-DCC-COMMENT THRU 360-EXIT   
+                END-IF                                           
+            END-IF                                               
+        ELSE                                                     
+            IF (M420C-PAYMENT-TYPE = 'P')                        
+                PERFORM 370-WRITE-FORM-REQUEST THRU 370-EXIT     
+                WRITE COVER-LETTER FROM LETTER-RECORD            
+                PERFORM 320-CREATE-DRAFT-COPY THRU 320-EXIT      
+                WRITE DRAFT-COPY-PART-PAY FROM DRAFT-RECORD      
+                GO TO 300-EXIT                                   
+            ELSE                                                 
+                IF (M420C-PAYMENT-TYPE = 'A')                    
+                    WRITE COVER-LETTER FROM LETTER-RECORD        
+                    PERFORM 320-CREATE-DRAFT-COPY THRU 320-EXIT  
+                    WRITE DRAFT-COPY-PART-PAY FROM DRAFT-RECORD  
+                    GO TO 300-EXIT                               
+                END-IF                                           
+            END-IF                                               
+        END-IF                                                   
+    END-IF                                                       
+                                                                 
+    WRITE COVER-LETTER FROM LETTER-RECORD                        
+    PERFORM 320-CREATE-DRAFT-COPY THRU 320-EXIT                  
+    WRITE DRAFT-COPY-FINAL-PAY FROM DRAFT-RECORD                 
+                                                                 
+    .                                                            
+300-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+*>---------------------------------------------------------------  
+320-CREATE-DRAFT-COPY.                                           
+*>---------------------------------------------------------------  
+    MOVE M420C-DRAFT-ORDER  TO DR-SEQ                            
+    MOVE M420C-AMOUNT-PAID  TO DR-AMT1                           
+    MOVE M420C-AMOUNT-PAID  TO DR-AMT2                           
+    MOVE MICR-RECORD        TO DR-MICR-REC                       
+                                                                 
+    .                                                            
+320-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+                                                                 
+350-WRITE-COMMENT.                                               
+                                                                 
+    MOVE SPACES          TO COMMENT-RECORD                       
+    MOVE 'SURVEY.DOC'    TO CR-FILE-NAME                         
+    MOVE X'09'           TO CR-TAB1                              
+                            CR-TAB2                              
+    MOVE M420C-CLAIM-NO  TO CR-CLAIM-NO                          
+    MOVE CID-BARCODE     TO CR-BARCODE                           
+    WRITE COMMENT-CARD-REC FROM COMMENT-RECORD                   
+    .                                                            
+350-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+                                                                 
+360-WRITE-DCC-COMMENT.                                           
+                                                                 
+    MOVE SPACES          TO DCC-COMMENT-RECORD                   
+    MOVE 'DCSRVY.DOC'    TO DCC-CR-FILE-NAME                     
+    MOVE X'09'           TO DCC-CR-TAB1                          
+                            DCC-CR-TAB2                          
+                            DCC-CR-TAB3                          
+    MOVE M420C-CLAIM-NO  TO DCC-CR-CLAIM-NO                      
+    MOVE CID-BARCODE     TO DCC-CR-BARCODE                       
+    IF M420C-PLAN-CODE = 'IU'                                    
+        MOVE 'unemployment' TO DCC-CR-EVENT                      
+    ELSE                                                         
+        MOVE 'a disability' TO DCC-CR-EVENT                      
+    END-IF                                                       
+    WRITE COMMENT-CARD-REC FROM DCC-COMMENT-RECORD               
+    .                                                            
+360-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+370-WRITE-FORM-REQUEST.                                          
+                                                                 
+    MOVE SPACES TO FORM-REQUEST-RECORD                           
+    MOVE M420C-ACCT-STATE     TO FR-ACCT-STATE                   
+    MOVE M420C-CLAIM-TYPE     TO FR-CLAIM-TYPE                   
+    MOVE DR-BARCODE           TO FR-BARCODE                      
+    MOVE M420C-DRAFT-ORDER    TO FR-DRAFT-ORDER                  
+                                                                 
+    WRITE FORM-REQUEST FROM FORM-REQUEST-RECORD                  
+                                                                 
+                                                                 
+    .                                                            
+370-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+EJECT                                                            
+*>---------------------------------------------------------------  
+800-ADJ-ADDRESS.                                                 
+*>---------------------------------------------------------------  
+                                                                 
+    IF M420C-MEMBER-ADDRESS4 = SPACE                             
+       IF M420C-MEMBER-ADDRESS3 = SPACE                          
+          MOVE M420C-MEMBER-ZIP-CODE                             
+            TO M420C-MEMBER-ADDRESS2(26:5)                       
+       ELSE                                                      
+          MOVE M420C-MEMBER-ZIP-CODE                             
+            TO M420C-MEMBER-ADDRESS3(26:5)                       
+       END-IF                                                    
+    ELSE                                                         
+       MOVE M420C-MEMBER-ZIP-CODE                                
+         TO M420C-MEMBER-ADDRESS4(26:5)                          
+    END-IF                                                       
+                                                                 
+    MOVE M420C-MEMBER-ADDRESS1 TO WORK-ADDR(1)                   
+    MOVE M420C-MEMBER-ADDRESS2 TO WORK-ADDR(2)                   
+    MOVE M420C-MEMBER-ADDRESS3 TO WORK-ADDR(3)                   
+    MOVE M420C-MEMBER-ADDRESS4 TO WORK-ADDR(4)                   
+    MOVE SPACES                TO WORK-ADDR(5)                   
+    CALL 'ISD053' USING WORK-TABLE                               
+    MOVE WORK-ADDR(1) TO M420C-MEMBER-ADDRESS1                   
+    MOVE WORK-ADDR(2) TO M420C-MEMBER-ADDRESS2                   
+    MOVE WORK-ADDR(3) TO M420C-MEMBER-ADDRESS3                   
+    MOVE WORK-ADDR(4) TO M420C-MEMBER-ADDRESS4                   
+                                                                 
+    MOVE M420C-3RDADD-LINE1    TO WORK-ADDR(1)                   
+    MOVE M420C-3RDADD-LINE2    TO WORK-ADDR(2)                   
+    MOVE M420C-3RDADD-LINE3    TO WORK-ADDR(3)                   
+    MOVE SPACES                TO WORK-ADDR(4)                   
+    MOVE SPACES                TO WORK-ADDR(5)                   
+    CALL 'ISD053' USING WORK-TABLE                               
+    MOVE WORK-ADDR(1) TO M420C-3RDADD-LINE1                      
+    MOVE WORK-ADDR(2) TO M420C-3RDADD-LINE2                      
+    MOVE WORK-ADDR(3) TO M420C-3RDADD-LINE3                      
+                                                                 
+    IF M420C-PAYEE-ADDRESS4 = SPACE                              
+       IF M420C-PAYEE-ADDRESS3 = SPACE                           
+          MOVE M420C-PAYEE-ZIP-CODE                              
+            TO M420C-PAYEE-ADDRESS2(26:5)                        
+       ELSE                                                      
+          MOVE M420C-PAYEE-ZIP-CODE                              
+            TO M420C-PAYEE-ADDRESS3(26:5)                        
+       END-IF                                                    
+    ELSE                                                         
+       MOVE M420C-PAYEE-ZIP-CODE                                 
+         TO M420C-PAYEE-ADDRESS4(26:5)                           
+    END-IF                                                       
+                                                                 
+    MOVE M420C-PAYEE-ADDRESS1  TO WORK-ADDR(1)                   
+    MOVE M420C-PAYEE-ADDRESS2  TO WORK-ADDR(2)                   
+    MOVE M420C-PAYEE-ADDRESS3  TO WORK-ADDR(3)                   
+    MOVE M420C-PAYEE-ADDRESS4  TO WORK-ADDR(4)                   
+    MOVE SPACES                TO WORK-ADDR(5)                   
+    CALL 'ISD053' USING WORK-TABLE                               
+    MOVE WORK-ADDR(1) TO M420C-PAYEE-ADDRESS1                    
+    MOVE WORK-ADDR(2) TO M420C-PAYEE-ADDRESS2                    
+    MOVE WORK-ADDR(3) TO M420C-PAYEE-ADDRESS3                    
+    MOVE WORK-ADDR(4) TO M420C-PAYEE-ADDRESS4                    
+    .                                                            
+800-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+                                                                 
+EJECT                                                            
+*>---------------------------------------------------------------  
+810-SET-PERIOD.                                                  
+*>---------------------------------------------------------------  
+    IF WS-WORK = SPACES                                          
+       GO TO 810-EXIT                                            
+    END-IF                                                       
+                                                                 
+    MOVE 'NO ' TO SET-PERIOD-SW                                  
+                                                                 
+    PERFORM VARYING SUB FROM 1 BY 1                              
+              UNTIL SUB = 30 OR PERIOD-IS-SET                    
+        IF WS-WORK(SUB:2) = '  '                                 
+            MOVE '. ' TO WS-WORK(SUB:2)                          
+            SET PERIOD-IS-SET TO TRUE                            
+        END-IF                                                   
+    END-PERFORM                                                  
+    .                                                            
+810-EXIT.                                                        
+    EXIT.                                                        
+                                                                 
+ABEND-PGM SECTION.                                               
+*>    COPY ELCABEND.                                               
+*>vvv-> file: /apps/prod/cid1p/copy/ELCABEND
+*>**************************************************************** 
+*>                                                               * 
+*>                            ELCABEND.                          * 
+*>           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+*>                            VMOD 2.002                           
+*>                                                               * 
+*>                THIS SECTION DISPLAYS THE NECESSARY MESSAGES   * 
+*>            AND THEN ABENDS.                                   * 
+*>                                                               * 
+*>  NO  CID  MODS  IN  COPYBOOK  ELCABEND                        * 
+*>                                                               * 
+*>**************************************************************** 
+*>APS-010.                                                         
+    DISPLAY WS-ABEND-MESSAGE.                                    
+    DISPLAY WS-ABEND-MESSAGE UPON CONSOLE.                       
+                                                                 
+    IF WS-ABEND-FILE-STATUS NOT = ZERO                           
+        DISPLAY 'FILE STATUS = ' WS-ABEND-FILE-STATUS            
+        DISPLAY 'FILE STATUS = ' WS-ABEND-FILE-STATUS            
+                                UPON CONSOLE.                    
+                                                                 
+    IF WS-RETURN-CODE NOT = ZERO                                 
+        DISPLAY 'RETURN CODE = '  WS-RETURN-CODE                 
+        DISPLAY 'RETURN CODE = '  WS-RETURN-CODE                 
+                                UPON CONSOLE.                    
+                                                                 
+    DISPLAY 'PROGRAM WILL NOW ABEND **************'              
+    DISPLAY 'PROGRAM WILL NOW ABEND **************'              
+                                UPON CONSOLE.                    
+                                                                 
+    DIVIDE WS-ZERO BY WS-ZERO GIVING WS-ZERO.                    
+    CALL 'ABORTME'.                                              
+                                                                 
+APS-EXIT.                                                        
+    EXIT.                                                        
+*>^^^-> file: /apps/prod/cid1p/copy/ELCABEND
+*> ------------------------------------------------------------------------------------------------------------------
+*> The source line number references in the following sections are either of
+*> the form <line-number> or <file-number>:<line-number>. The first form is
+*> used as an abbreviation for 0:<line-number>.
+*> The following is a key allowing the determination of the file name from
+*> the <file-number>.
+*>  
+*>          0: CIB010.cbl
+*>          1: /apps/prod/cid1p/copy/MICR420C
+*>          2: /apps/prod/cid1p/copy/ELCDTEFD
+*>          3: /apps/prod/cid1p/copy/ctypes.cpy
+*>          4: /apps/prod/cid1p/copy/ELCDTECX
+*>          5: /apps/prod/cid1p/copy/ELCDTEVR
+*>          6: /apps/prod/cid1p/copy/ELCDTERX
+*>          7: /apps/prod/cid1p/copy/ELCABEND
+*>  
+*> ------------------------------------------------------------------------------------------------------------------
+*> DATA MAP KEY
+*>               Sec(Section) Fil = File Section                Type Flags: column O    ---> O = Occurs Item
+*>                            Wor = Working-Storage Section                 column R    ---> R = Redefines
+*>                            Loc = Local-Storage Section                   column X/G  ---> X = External
+*>                            Rep = Report Section                                           G = Global
+*>                            Lin = Linkage Section                         
+*> ------------------------------------------------------------------------------------------------------------------
+*> Data map for Program-Id: CIB010
+*> ------------------------------------------------------------------------------------------------------------------
+*>     Line    Name                                                  Size Offset      Sec Flags Data Type
+*>                                                                                        O R X
+*>                                                                                            G
+*> ------------------------------------------------------------------------------------------------------------------
+*>       72 01 FILLER                                                3000             Fil       Group
+*>       73   05 FMICR-KEY                                             19 (000000000)           Display
+*>       74   05 FILLER                                              2981 (000000019)           Display
+*>       75 01 MICR-RECORD                                           1254             Fil       Group
+*>     1:18   10 MICR-KEY                                              19 (000000000)           Group
+*>     1:19     15 M420C-FORM                                           4 (000000000)           Display
+*>     1:20     15 M420C-DRAFT-ORDER                                    5 (000000004)           Display Numeric
+*>     1:21     15 M420C-DRAFT                                         10 (000000009)           Display
+*>     1:22   10 M420C-PRINT-COUNT                                      2 (000000019)           Binary
+*>     1:23   10 M420C-SEQ-NUMBER                                       2 (000000021)           Binary
+*>     1:24   10 M420C-AMOUNT-PAID                                      6 (000000023)           Packed Decimal
+*>     1:25   10 M420C-COMPANY-NAME                                    43 (000000029)           Display
+*>     1:26   10 M420C-CSO-ADDRESS                                     33 (000000072)           Display
+*>     1:27   10 M420C-CLAIM-NO                                         7 (000000105)           Display
+*>     1:28   10 M420C-CERT-NO                                         11 (000000112)           Display
+*>     1:29   10 M420C-ACCT-NO                                         10 (000000123)           Display
+*>     1:30   10 M420C-PLAN-CODE                                        4 (000000133)           Display
+*>     1:31   10 M420C-PAID-FROM-DATE                                   8 (000000137)           Display
+*>     1:32   10 M420C-PAID-THRU-DATE                                   8 (000000145)           Display
+*>     1:33   10 M420C-PAYMENT-TYPE                                     1 (000000153)           Display
+*>     1:34   10 M420C-CC-ACCT                                          7 (000000154)           Display
+*>     1:35   10 M420C-CC-ACCT-NUMBER                                  18 (000000161)           Display
+*>     1:36   10 M420C-TYPE-MESSAGE                                    15 (000000179)           Display
+*>     1:37   10 M420C-FINAL-MESS9                                     17 (000000194)           Display
+*>     1:38   10 M420C-FINAL-MESS10                                    17 (000000211)           Display
+*>     1:39   10 M420C-FINAL-MESS11                                    17 (000000228)           Display
+*>     1:40   10 M420C-MEMBER-NAME                                     30 (000000245)           Display
+*>     1:41   10 M420C-MEMBER-ADDRESS1                                 30 (000000275)           Display
+*>     1:42   10 M420C-MEMBER-ADDRESS2                                 30 (000000305)           Display
+*>     1:43   10 M420C-MEMBER-ADDRESS3                                 30 (000000335)           Display
+*>     1:44   10 M420C-MEMBER-ADDRESS4                                 30 (000000365)           Display
+*>     1:45   10 M420C-MEMBER-ZIP-CODE                                  9 (000000395)           Display
+*>     1:46   10 M420C-3RDADD-NAME                                     30 (000000404)           Display
+*>     1:47   10 M420C-3RDADD-LINE1                                    30 (000000434)           Display
+*>     1:48   10 M420C-3RDADD-LINE2                                    40 (000000464)           Display
+*>     1:49   10 M420C-3RDADD-LINE3                                    40 (000000504)           Display
+*>     1:50   10 M420C-3RDADD-ZIP                                       9 (000000544)           Display
+*>     1:51   10 M420C-CHECK-DATE                                       8 (000000553)           Display
+*>     1:52   10 M420C-DFT-NOTES1                                      40 (000000561)           Display
+*>     1:53   10 M420C-DFT-NOTES2                                      39 (000000601)           Display
+*>     1:54   10 M420C-ACH-PAYMENT                                      1 (000000640)           Display
+*>     1:55   10 M420C-PAYEE-NAME                                      30 (000000641)           Display
+*>     1:56   10 M420C-PAYEE-ADDRESS1                                  30 (000000671)           Display
+*>     1:57   10 M420C-PAYEE-ADDRESS2                                  30 (000000701)           Display
+*>     1:58   10 M420C-PAYEE-ADDRESS3                                  30 (000000731)           Display
+*>     1:59   10 M420C-PAYEE-ADDRESS4                                  30 (000000761)           Display
+*>     1:60   10 M420C-PAYEE-ZIP-CODE                                   9 (000000791)           Display
+*>     1:61   10 M420C-REPLY-DATE                                       5 (000000800)           Display
+*>     1:62   10 M420C-SIGNATURE                                        1 (000000805)           Display
+*>     1:63   10 M420C-LOAN-NUMBER                                     25 (000000806)           Display
+*>     1:64   10 M420C-DRAFT-MESSAGES                                 420 (000000831)           Group
+*>     1:65     15 M420C-DRAFT-MESSAGE                                 70 (000000831)     O     Display
+*>     1:66   10 M420C-ACCT-STATE                                       2 (000001251)           Display
+*>     1:67   10 M420C-CLAIM-TYPE                                       1 (000001253)           Display
+*>       83 01 DRAFT-COPY-PART-PAY                                   1415             Fil       Display
+*>       90 01 DRAFT-COPY-FINAL-PAY                                  1415             Fil       Display
+*>       96 01 COVER-LETTER                                           390             Fil       Display
+*>      104 01 COMMENT-CARD-REC                                        57             Fil       Display
+*>      110 01 FORM-REQUEST                                           136             Fil       Display
+*>     2:12 01 DATE-DISK                                              100             Fil       Group
+*>     2:13   12 DD-ID                                                  4 (000000000)           Display
+*>     2:14   12 FILLER                                                14 (000000004)           Display
+*>     2:15   12 DD-CR1                                                 1 (000000018)           Display Numeric
+*>     2:16   12 DD-CR1N                                               30 (000000019)           Display
+*>     2:17   12 DD-CR2                                                 1 (000000049)           Display Numeric
+*>     2:18   12 DD-CR2N                                               30 (000000050)           Display
+*>     2:19   12 FILLER                                                20 (000000080)           Display
+*>     2:21 01 DATE-DISK-R                                            100             Fil       Group
+*>     2:22   12 FILLER                                                 4 (000000000)           Display
+*>     2:23   12 DD-ST                                                 32 (000000004)     O     Display
+*>     2:26 01 DATE-DISK-T                                            100             Fil       Group
+*>     2:27   12 FILLER                                                 4 (000000000)           Display
+*>     2:28   12 DD-TYPE                                               48 (000000004)     O     Display
+*>     2:31 01 DATE-DISK-M                                            100             Fil       Group
+*>     2:32   12 FILLER                                                 4 (000000000)           Display
+*>     2:33   12 DD-MORT                                               48 (000000004)     O     Display
+*>     2:36 01 DATE-DISK-P                                            100             Fil       Group
+*>     2:37   12 DD-IDA                                                 2 (000000000)           Display
+*>     2:38   12 DD-IDX                                                 2 (000000002)           Display Numeric
+*>     2:39   12 DD-DATA                                               96 (000000004)           Display
+*>     2:40   12 FILLER                                                96 (000000004)       R   Group
+*>     2:41     16 DD-PS-PIC                                            1 (000000004)     O R   Display
+*>     2:43     16 FILLER                                              46 (000000054)       R   Display
+*>     2:44   12 FILLER                                                96 (000000004)       R   Group
+*>     2:45     16 DD-PS-PICO                                           4 (000000004)     O R   Group
+*>     2:46       20 DD-PS-PRT                                          1 (000000004)       R   Display
+*>     2:47       20 DD-PS-FMT                                          1 (000000005)       R   Display
+*>     2:48       20 DD-PS-PRC                                          1 (000000006)       R   Display
+*>     2:49       20 DD-PS-TOT                                          1 (000000007)       R   Display
+*>     2:50     16 FILLER                                              16 (000000084)       R   Display
+*>     2:52 01 DATE-DISK-E                                            100             Fil       Group
+*>     2:53   12 FILLER                                                 4 (000000000)           Display
+*>     2:54   12 DD-EDIT                                                4 (000000004)     O     Display
+*>     2:57 01 DATE-DISK-C                                            100             Fil       Group
+*>     2:58   12 FILLER                                                 7 (000000000)           Display
+*>     2:59   12 DD-CARR1-SECPAY-SW                                     1 (000000007)           Display
+*>     2:60   12 DD-CARR1-UEP-PCT                                       3 (000000008)           Packed Decimal
+*>     2:61   12 DD-CARR1-R78-PCT                                       3 (000000011)           Packed Decimal
+*>     2:62   12 DD-CARR1-PRO-PCT                                       3 (000000014)           Packed Decimal
+*>     2:63   12 DD-CARR1                                               1 (000000017)           Display
+*>     2:64   12 DD-CARR1S                                              2 (000000018)           Display
+*>     2:65   12 DD-CARR1N                                             30 (000000020)           Display
+*>     2:66   12 DD-CARR2                                               1 (000000050)           Display
+*>     2:67   12 DD-CARR2S                                              2 (000000051)           Display
+*>     2:68   12 DD-CARR2N                                             30 (000000053)           Display
+*>     2:69   12 DD-CARR2-UEP-PCT                                       3 (000000083)           Packed Decimal
+*>     2:70   12 DD-CARR2-R78-PCT                                       3 (000000086)           Packed Decimal
+*>     2:71   12 DD-CARR2-PRO-PCT                                       3 (000000089)           Packed Decimal
+*>     2:72   12 DD-CARR2-SECPAY-SW                                     1 (000000092)           Display
+*>     2:73   12 FILLER                                                 7 (000000093)           Display
+*>     2:75 01 DATE-DISK-OPT                                          100             Fil       Group
+*>     2:76   12 FILLER                                                 4 (000000000)           Display
+*>     2:77   12 DD-TLR-DATA                                           96 (000000004)           Group
+*>     2:78     16 DD-TLR                                               3 (000000004)     O     Display
+*>     2:80   12 DD-STATE-DATA                                         96 (000000004)       R   Group
+*>     2:81     16 DD-STATE-FLDS                                        6 (000000004)     O R   Display
+*>     2:83   12 DD-CARR-DATA                                          96 (000000004)       R   Group
+*>     2:84     16 DD-CARR-FLDS                                         7 (000000004)     O R   Display
+*>     2:86     16 FILLER                                               5 (000000095)       R   Display
+*>     2:87   12 DD-MISC-DATA                                          96 (000000004)       R   Display
+*>      120 01 NJ-NOTICE-REC                                           47             Fil       Display
+*>     3:27 77 CHAR                                                     2             Wor       Native Binary
+*>     3:28 77 UNS-CHAR                                                 2             Wor       Native Binary
+*>     3:29 77 SHORT                                                    2             Wor       Native Binary
+*>     3:30 77 UNS-SHORT                                                2             Wor       Native Binary
+*>     3:31 77 INT                                                      4             Wor       Native Binary
+*>     3:32 77 UNS-INT                                                  4             Wor       Native Binary
+*>     3:37 77 LONG                                                     4             Wor       Native Binary
+*>     3:38 77 UNS-LONG                                                 4             Wor       Native Binary
+*>     3:40 77 L-LONG                                                   8             Wor       Native Binary
+*>     3:41 77 UNS-L-LONG                                               8             Wor       Native Binary
+*>     3:42 77 D-L-FLOAT                                                8             Wor       Comp-2
+*>     3:43 77 D-FLOAT                                                  8             Wor       Comp-2
+*>     3:44 77 FLOAT-1                                                  4             Wor       Comp-1
+*>     3:45 77 PROC-POINTER                                             4             Wor       Procedure Pointer
+*>     3:46 77 DATA-POINTER                                             4             Wor       Pointer
+*>     3:47 77 VOID                                                     2             Wor       Native Binary
+*>     3:49   78 DEFAULT-CONVENTION-VAL                                                         
+*>     3:50   78 CDECL-CONVENTION-VAL                                                           
+*>     3:51   78 PASCAL-CONVENTION-VAL                                                          
+*>     3:52   78 FAST-CONVENTION-VAL                                                            
+*>     3:53   78 STD-CONVENTION-VAL                                                             
+*>     3:54   78 SYS-CONVENTION-VAL                                                             
+*>     3:55   78 OPT-CONVENTION-VAL                                                             
+*>     3:56   78 PASC16-CONVENTION-VAL                                                          
+*>     3:57   78 CDEC16-CONVENTION-VAL                                                          
+*>      128 01 FILLER                                                  84             Wor       Group
+*>      129   05 PGM-SUB                                                2 (000000000)           Binary
+*>      130   05 WS-ABEND-MESSAGE                                      80 (000000002)           Display
+*>      131   05 WS-RETURN-CODE                                         2 (000000082)           Binary
+*>      134 01 FILLER                                                   3             Wor       Group
+*>      135   05 WS-ABEND-FILE-STATUS                                   2 (000000000)           Display
+*>      136   05 WS-ZERO                                                1 (000000002)           Display Numeric
+*>      138 01 FILLER                                                 296             Wor       Group
+*>      139   05 SUB                                                    2 (000000000)           Binary
+*>      140   05 S0C7                                                   1 (000000002)           Display
+*>      141   05 FORCE-DUMP                                             1 (000000002)       R   Packed Decimal
+*>      142   05 MICR-STATUS                                            2 (000000003)           Display
+*>      143     88 EOF                                                                          
+*>      144   05 WS-WORK                                               30 (000000005)           Display
+*>      145   05 SET-PERIOD-SW                                          3 (000000035)           Display
+*>      146     88 PERIOD-IS-SET                                                                
+*>      147   05 WORK-TABLE                                           250 (000000038)           Group
+*>      148     10 WORK-ADDR                                           50 (000000038)     O     Display
+*>      149   05 WS-PARTIAL-SEQ                                         4 (000000288)           Display Numeric
+*>      150   05 WS-FINAL-SEQ                                           4 (000000292)           Display Numeric
+*>      152 01 DRAFT-RECORD                                          1415             Wor       Group
+*>      153   05 DR-SEQ                                                 5 (000000000)           Display Numeric
+*>      154   05 DR-AMT1                                               14 (000000005)           Display Numeric Edit
+*>      155   05 DR-AMT2                                               14 (000000019)           Display Numeric Edit
+*>      156   05 DR-MICR-REC                                         1254 (000000033)           Display
+*>      157   05 DR-BARCODE                                           128 (000001287)           Display
+*>      159 01 COMMENT-RECORD                                          44             Wor       Group
+*>      160   05 CR-FILE-NAME                                          10 (000000000)           Display
+*>      161   05 CR-TAB1                                                1 (000000010)           Display
+*>      162   05 CR-CLAIM-NO                                            7 (000000011)           Display
+*>      163   05 CR-TAB2                                                1 (000000018)           Display
+*>      164   05 CR-BARCODE                                            25 (000000019)           Display
+*>      166 01 DCC-COMMENT-RECORD                                      57             Wor       Group
+*>      167   05 DCC-CR-FILE-NAME                                      10 (000000000)           Display
+*>      168   05 DCC-CR-TAB1                                            1 (000000010)           Display
+*>      169   05 DCC-CR-CLAIM-NO                                        7 (000000011)           Display
+*>      170   05 DCC-CR-TAB2                                            1 (000000018)           Display
+*>      171   05 DCC-CR-BARCODE                                        25 (000000019)           Display
+*>      172   05 DCC-CR-TAB3                                            1 (000000044)           Display
+*>      173   05 DCC-CR-EVENT                                          12 (000000045)           Display
+*>      175 01 FORM-REQUEST-RECORD                                    136             Wor       Group
+*>      176   05 FR-ACCT-STATE                                          2 (000000000)           Display
+*>      177   05 FR-CLAIM-TYPE                                          1 (000000002)           Display
+*>      178   05 FR-BARCODE                                           128 (000000003)           Display
+*>      179   05 FR-DRAFT-ORDER                                         5 (000000131)           Display
+*>      181 01 NJ-NOTICE-RECORD                                        47             Wor       Group
+*>      182   05 NJ-NOTICE-STATE                                        2 (000000000)           Display
+*>      183   05 NJ-NOTICE-DRAFT-SEQ                                    5 (000000002)           Display
+*>      184   05 NJ-NOTICE-DRAFT-NO                                    10 (000000007)           Display
+*>      185   05 NJ-NOTICE-MEMBER-NAME                                 30 (000000017)           Display
+*>      187 01 LETTER-RECORD                                          390             Wor       Group
+*>      188   05 LR-CARRIER                                             1 (000000000)           Display
+*>      189   05 LR-LETTER-ID                                           4 (000000001)           Display
+*>      190   05 LR-DRAFT-ORDER                                         5 (000000005)           Display
+*>      191   05 LR-PAYEE-NAME                                         30 (000000010)           Display
+*>      192   05 LR-PAYEE-ADDR1                                        40 (000000040)           Display
+*>      193   05 LR-PAYEE-ADDR2                                        40 (000000080)           Display
+*>      194   05 LR-PAYEE-ADDR3                                        40 (000000120)           Display
+*>      195   05 LR-PAYEE-ADDR4                                        40 (000000160)           Display
+*>      196   05 LR-MEMBER-NAME                                        30 (000000200)           Display
+*>      197   05 LR-LOAN-NO                                            25 (000000230)           Display
+*>      198   05 LR-CLAIM-NO                                            7 (000000255)           Display
+*>      199   05 LR-BARCODE                                           128 (000000262)           Display
+*>      201 01 CID-BARCODE                                             25             Wor       Group
+*>      202   05 BC-ENCL-CODE                                           2 (000000000)           Display
+*>      203   05 BC-MAIL-CODE                                           1 (000000002)           Display
+*>      204   05 BC-DIV-CODE                                            1 (000000003)           Display
+*>      205   05 BC-CLAIM-NO                                            7 (000000004)           Display
+*>      206   05 BC-CERT-NO                                            10 (000000011)           Display
+*>      207   05 BC-SEQ                                                 4 (000000021)           Display Numeric
+*>      209 01 CID-BARCODE-2                                           25             Wor       Group
+*>      210   05 BC2-ENCL-CODE                                          2 (000000000)           Display
+*>      211   05 BC2-MAIL-CODE                                          1 (000000002)           Display
+*>      212   05 BC2-DIV-CODE                                           1 (000000003)           Display
+*>      213   05 BC2-CLAIM-NO                                           7 (000000004)           Display
+*>      214   05 BC2-CERT-NO                                           10 (000000011)           Display
+*>      215   05 BC2-SEQ                                                4 (000000021)           Display Numeric
+*>      218 01 AGEB16-PARMS                                           158             Wor       Group
+*>      221   05 AGEB16-BC-LEN                                          2 (000000000)           Binary
+*>      222   05 AGEB16-BC-IN                                          28 (000000002)           Display
+*>      223   05 AGEB16-BC-OUT                                        128 (000000030)           Display
+*>     4:27 01 DATE-CARD                                               80             Wor       Group
+*>     4:28   12 DATX-COD                                               4 (000000000)           Display
+*>     4:29   12 RUN-DATE                                               6 (000000004)           Packed Decimal
+*>     4:30   12 ALPH-DATE                                             18 (000000010)           Display
+*>     4:31   12 EP-DT                                                  6 (000000028)           Packed Decimal
+*>     4:32   12 PEND-ACT-FILE                                          2 (000000034)           Display
+*>     4:33   12 EP-SW                                                  1 (000000036)           Display
+*>     4:34     88 NO-EP-EXTRACTS                                                               
+*>     4:35   12 TAPE-BATCHES                                           1 (000000037)           Display
+*>     4:36     88 TP-PREL-BAL                                                                  
+*>     4:37   12 BIN-RUN-DATE                                           2 (000000038)           Display
+*>     4:38   12 RUN-CENTURY                                            2 (000000040)           Group
+*>     4:39     16 RUN-CENTURY-N                                        2 (000000040)           Display Numeric
+*>     4:40   12 FILLER                                                 1 (000000042)           Display
+*>     4:41   12 CLAS-MORT-OVRD                                         4 (000000043)           Display
+*>     4:42   12 FILLER                                                 3 (000000047)           Display
+*>     4:43   12 COMPANY-NAME                                          30 (000000050)           Display
+*>     4:45 01 FILLER                                                   7             Wor       Display
+*>     4:47 01 DATE-CARD-OPTIONS                                      100             Wor       Group
+*>     4:48   12 DATE-OPTIONS-ID                                        4 (000000000)           Display
+*>     4:49   12 DTE-MIN-PREM                                           4 (000000004)           Display Numeric
+*>     4:50   12 DTE-LANGUAGE-IND                                       1 (000000008)           Display
+*>     4:51     88 DTE-LANGUAGE-IS-FR                                                           
+*>     4:52     88 DTE-LANGUAGE-IS-ENG                                                          
+*>     4:53   12 DTE-MIN-AGE                                            2 (000000009)           Display Numeric
+*>     4:54   12 DTE-DEFAULT-AGE                                        2 (000000011)           Display Numeric
+*>     4:55   12 FILLER                                                 1 (000000013)           Display
+*>     4:56   12 DTE-MAX-TERM                                           3 (000000014)           Display Numeric
+*>     4:57   12 DTE-COMP-VG                                            1 (000000017)           Display
+*>     4:58   12 DTE-REM-TRM                                            1 (000000018)           Display
+*>     4:59   12 DTE-PRM-CK                                             4 (000000019)           Display Numeric
+*>     4:60   12 DTE-PRORATA                                            1 (000000023)           Display
+*>     4:61   12 DTE-CLM-REJ                                            1 (000000024)           Display
+*>     4:62   12 DTE-REF-REJ                                            1 (000000025)           Display
+*>     4:63   12 DTE-COM-TBL-USED                                       1 (000000026)           Display
+*>     4:64   12 FILLER                                                 1 (000000027)           Display
+*>     4:65   12 DTE-QTR-CO                                             1 (000000028)           Display
+*>     4:66   12 DTE-REF-CK                                             4 (000000029)           Display Numeric
+*>     4:67   12 DTE-CLM-CK                                             4 (000000033)           Display Numeric
+*>     4:68   12 DTE-CONV-DT                                            6 (000000037)           Packed Decimal
+*>     4:69   12 DTE-DEFAULT-SEX                                        1 (000000043)           Display
+*>     4:70   12 DTE-EPL-FORMAT                                         1 (000000044)           Display
+*>     4:71   12 FILLER                                                 1 (000000045)           Display
+*>     4:72   12 DTE-JT-AGE                                             1 (000000046)           Display
+*>     4:73   12 DTE-KEY-BIRTH                                          1 (000000047)           Display
+*>     4:74   12 DTE-REINSURANCE                                        1 (000000048)           Display
+*>     4:75   12 DTE-CLAIM-SORT                                         1 (000000049)           Display
+*>     4:76   12 DTE-WRT-OFF                                            4 (000000050)           Display Numeric
+*>     4:77   12 DTE-R78                                                1 (000000054)           Display
+*>     4:78   12 DTE-DLY-BILL                                           1 (000000055)           Display
+*>     4:79   12 DTE-ALT-MORT-CODE                                      4 (000000056)           Display
+*>     4:80   12 DTE-CLAIM-PAID-THRU-TO                                 1 (000000060)           Display
+*>     4:81   12 DTE-COMPENSATION-ACCESS                                1 (000000061)           Display
+*>     4:82   12 DTE-MORTG-ACCESS-CNTL                                  1 (000000062)           Display
+*>     4:83   12 DTE-MP-ALT-MORT-CODE                                   4 (000000063)           Display
+*>     4:84   12 DTE-MORTALITY-AGE-CALC-METHOD                          1 (000000067)           Display
+*>     4:86     88 DTE-USE-TABLE-ASSIGNED-METHOD                                                
+*>     4:88     88 DTE-USE-ALL-AGE-LAST                                                         
+*>     4:89     88 DTE-USE-ALL-AGE-NEAR                                                         
+*>     4:90   12 DTE-RESERVE-OPTION-SWITCH                              1 (000000068)           Display
+*>     4:91     88 DTE-OPT-RESERVE-METHOD-AUTH                                                  
+*>     4:92     88 DTE-OPT-RESERVE-METHOD-UNAUTH                                                
+*>     4:93   12 DTE-REM-TRM-CALC-OPTION                                1 (000000069)           Display
+*>     4:94   12 DTE-EXPERIENCE-RETENTION-AGE                           1 (000000070)           Display Numeric
+*>     4:96   12 DTE-SYSTEM                                            26 (000000071)           Group
+*>     4:97     16 DTE-SYS-A-CREDIT                                     1 (000000071)           Display
+*>     4:98     16 DTE-SYS-B-PEND-CLAIM                                 1 (000000072)           Display
+*>     4:99     16 DTE-SYS-C-CONFIRMATIONS                              1 (000000073)           Display
+*>    4:100     16 DTE-SYS-D-DEMAND-BILL                                1 (000000074)           Display
+*>    4:101     16 DTE-SYS-E-CLASIC-CLAIMS                              1 (000000075)           Display
+*>    4:102     16 DTE-SYS-F-CLASIC-CREDIT                              1 (000000076)           Display
+*>    4:103     16 DTE-SYS-G-AR-USED                                    1 (000000077)           Display
+*>    4:104     16 DTE-SYS-H                                            1 (000000078)           Display
+*>    4:105     16 DTE-SYS-I                                            1 (000000079)           Display
+*>    4:106     16 DTE-SYS-J                                            1 (000000080)           Display
+*>    4:107     16 DTE-SYS-K                                            1 (000000081)           Display
+*>    4:108     16 DTE-SYS-L                                            1 (000000082)           Display
+*>    4:109     16 DTE-SYS-M                                            1 (000000083)           Display
+*>    4:110     16 DTE-SYS-N                                            1 (000000084)           Display
+*>    4:111     16 DTE-SYS-O                                            1 (000000085)           Display
+*>    4:112     16 DTE-SYS-P                                            1 (000000086)           Display
+*>    4:113     16 DTE-SYS-Q                                            1 (000000087)           Display
+*>    4:114     16 DTE-SYS-R                                            1 (000000088)           Display
+*>    4:115     16 DTE-SYS-S                                            1 (000000089)           Display
+*>    4:116     16 DTE-SYS-T                                            1 (000000090)           Display
+*>    4:117     16 DTE-SYS-U                                            1 (000000091)           Display
+*>    4:118     16 DTE-SYS-V                                            1 (000000092)           Display
+*>    4:119     16 DTE-SYS-W                                            1 (000000093)           Display
+*>    4:120     16 DTE-SYS-X                                            1 (000000094)           Display
+*>    4:121     16 DTE-SYS-Y                                            1 (000000095)           Display
+*>    4:122     16 DTE-SYS-Z                                            1 (000000096)           Display
+*>    4:123   12 FILLER                                                26 (000000071)       R   Group
+*>    4:124     16 DTE-SYS-CODE                                         1 (000000071)     O R   Display
+*>    4:126   12 DTE-CLIENT                                             3 (000000097)           Display
+*>    4:128 01 CLASIC-SYSTEM-CODES                                    100             Wor       Group
+*>    4:129   12 DTE-COLC-ID                                            4 (000000000)           Display
+*>    4:130   12 DTE-CLASIC-COMPANY-CD                                  1 (000000004)           Display
+*>    4:131   12 DTE-CLASIC-COMPANY-NUMBER                              3 (000000005)           Display Numeric
+*>    4:133   12 FILLER                                                 1 (000000008)           Display
+*>    4:134   12 CLASIC-REIN-MAINT                                      2 (000000009)           Display
+*>    4:135   12 CLASIC-COMP-MAINT                                      2 (000000011)           Display
+*>    4:136   12 CLASIC-ACCT-MAINT                                      2 (000000013)           Display
+*>    4:137   12 CLASIC-CTBL-MAINT                                      2 (000000015)           Display
+*>    4:138   12 CLASIC-RATE-MAINT                                      2 (000000017)           Display
+*>    4:139   12 CLASIC-CREDIT-EOM-DT                                   2 (000000019)           Display
+*>    4:140   12 CLASIC-CLAIMS-EOM-DT                                   2 (000000021)           Display
+*>    4:142   12 LIFE-OVERRIDE-L1                                       1 (000000023)           Display
+*>    4:143   12 LIFE-OVERRIDE-L2                                       2 (000000024)           Display
+*>    4:144   12 LIFE-OVERRIDE-L6                                       6 (000000026)           Display
+*>    4:145   12 LIFE-OVERRIDE-L12                                     12 (000000032)           Display
+*>    4:147   12 AH-OVERRIDE-L1                                         1 (000000044)           Display
+*>    4:148   12 AH-OVERRIDE-L2                                         2 (000000045)           Display
+*>    4:149   12 AH-OVERRIDE-L6                                         6 (000000047)           Display
+*>    4:150   12 AH-OVERRIDE-L12                                       12 (000000053)           Display
+*>    4:152   12 CLAS-REPORT-CD1-CAPTION                               10 (000000065)           Display
+*>    4:153   12 CLAS-REPORT-CD2-CAPTION                               10 (000000075)           Display
+*>    4:155   12 CLASIC-MORTG-EOM-DT                                    2 (000000085)           Display
+*>    4:156   12 CLASIC-AR-EOM-DT                                       2 (000000087)           Display
+*>    4:158   12 FILLER                                                11 (000000089)           Display
+*>    4:160 01 DATE-CARD-FACTORS                                       52             Wor       Group
+*>    4:161   12 DATE-FACTOR-ID                                         4 (000000000)           Display
+*>    4:162   12 FAC-1                                                  8 (000000004)           Display Numeric
+*>    4:163   12 FAC-2                                                  8 (000000012)           Display Numeric
+*>    4:164   12 FAC-3                                                  8 (000000020)           Display Numeric
+*>    4:165   12 FAC-4                                                  8 (000000028)           Display Numeric
+*>    4:166   12 FAC-5                                                  8 (000000036)           Display Numeric
+*>    4:167   12 FAC-6                                                  8 (000000044)           Display Numeric
+*>    4:169 01 FILLER                                                  12             Wor       Display
+*>    4:171 01 COMPANY-NAME-TABLE                                     186             Wor       Group
+*>    4:172   12 C-N-TBL                                               31 (000000000)     O     Group
+*>    4:173     16 CNT-ID                                               1 (000000000)           Display
+*>    4:174     16 CNT-NAME                                            30 (000000001)           Display
+*>    4:176 01 FILLER                                                  11             Wor       Display
+*>    4:178 01 STATE-NAMES                                           2400             Wor       Group
+*>    4:179   12 STATE-NAME-FLD                                        32 (000000000)     O     Group
+*>    4:180     16 STATE-SUB                                            2 (000000000)           Display
+*>    4:181     16 STATE-PIC1                                          30 (000000002)           Group
+*>    4:182       20 STATE-ABBR                                         2 (000000002)           Display
+*>    4:183       20 FILLER                                             3 (000000004)           Display
+*>    4:184       20 STATE-PIC                                         20 (000000007)           Display
+*>    4:185       20 STATE-CALL-EARN                                    1 (000000027)           Display
+*>    4:186       20 STATE-CALL-BREAK                                   1 (000000028)           Display
+*>    4:187       20 STATE-PRIM-FAC-DEV                                 3 (000000029)           Display
+*>    4:189 01 FILLER                                                  13             Wor       Display
+*>    4:191 01 CARRIER-NAMES                                         1075             Wor       Group
+*>    4:192   12 CARRIER-NAME-FLD                                      43 (000000000)     O     Group
+*>    4:193     16 CARRIER-SUB                                          1 (000000000)           Display
+*>    4:194     16 CARRIER-DOM-ST                                       2 (000000001)           Display
+*>    4:195     16 CARRIER-PIC                                         30 (000000003)           Display
+*>    4:196     16 CARRIER-UEP-PCT                                      3 (000000033)           Packed Decimal
+*>    4:197     16 CARRIER-R78-PCT                                      3 (000000036)           Packed Decimal
+*>    4:198     16 CARRIER-PRO-PCT                                      3 (000000039)           Packed Decimal
+*>    4:200     16 CARRIER-SEC-PAY                                      1 (000000042)           Display
+*>    4:201       88 SEC-PAY-CARRIER                                                            
+*>    4:203 01 FILLER                                                   9             Wor       Display
+*>    4:205 01 CLAS-INS-TYPES                                       34200             Wor       Group
+*>    4:207   12 CLAS-ALL-TYPES                                        38 (000000000)     O     Group
+*>    4:208     16 CLAS-I-BEN                                           2 (000000000)           Display
+*>    4:209     16 CLAS-I-AB3                                           3 (000000002)           Group
+*>    4:210       20 FILLER                                             1 (000000002)           Display
+*>    4:211       20 CLAS-I-AB2                                         2 (000000003)           Group
+*>    4:212         24 FILLER                                           1 (000000003)           Display
+*>    4:213         24 CLAS-I-AB1                                       1 (000000004)           Display
+*>    4:214     16 CLAS-I-AB3-AH                                        3 (000000002)       R   Group
+*>    4:215       20 CLAS-EXCLUSION                                     2 (000000002)       R   Display
+*>    4:216       20 FILLER                                             1 (000000004)       R   Display
+*>    4:217     16 CLAS-I-AB10                                         10 (000000005)           Group
+*>    4:218       20 FILLER                                             9 (000000005)           Display
+*>    4:219       20 CLAS-I-REIN-YN                                     1 (000000014)           Display
+*>    4:220     16 CLAS-I-COMMENT                                      10 (000000015)           Display
+*>    4:221     16 CLAS-I-JOINT                                         1 (000000025)           Display
+*>    4:222     16 CLAS-I-RL-AH                                         1 (000000026)           Display
+*>    4:223     16 CLAS-I-CALC-TYPE                                     1 (000000027)           Group
+*>    4:224       20 CLAS-I-BAL                                         1 (000000027)           Display
+*>    4:225     16 CLAS-I-EP                                            1 (000000028)           Display
+*>    4:226     16 CLAS-CO-BEN-I-G-CD                                   1 (000000029)           Display
+*>    4:227     16 CLAS-CO-REM-TERM-CALC                                1 (000000030)           Display
+*>    4:228     16 CLAS-I-BEN-CATEGORY                                  1 (000000031)           Display
+*>    4:229     16 CLAS-I-REFUND-METHOD                                 1 (000000032)           Display
+*>    4:230     16 CLAS-I-MAX-BENEFITS                                  2 (000000033)           Display Numeric
+*>    4:231     16 FILLER                                               3 (000000035)           Display
+*>    4:233 01 FILLER                                                  16             Wor       Display
+*>    4:235 01 CLAS-MORTALITY-CODES                                  4810             Wor       Group
+*>    4:236   12 CLAS-MORT-FLD                                         37 (000000000)     O     Group
+*>    4:238     16 CLAS-MORT-CODE                                       4 (000000000)           Display
+*>    4:239     16 CLAS-MORT-J-CODE                                     1 (000000004)           Display
+*>    4:240     16 CLAS-MORT-J-FACT                                     5 (000000005)           Display Numeric
+*>    4:241     16 CLAS-MORT-DESC                                      27 (000000010)           Group
+*>    4:242       20 CLAS-RESERVE-ADJ                                   3 (000000010)           Display Numeric
+*>    4:243       20 FILLER                                             2 (000000013)           Display
+*>    4:244       20 CLAS-YEAR                                          4 (000000015)           Display
+*>    4:245       20 FILLER                                             1 (000000019)           Display
+*>    4:246       20 CLAS-TABLE-TYPE                                    3 (000000020)           Display
+*>    4:247       20 FILLER                                             1 (000000023)           Display
+*>    4:248       20 CLAS-AGE-METHOD                                    2 (000000024)           Display
+*>    4:249       20 FILLER                                             1 (000000026)           Display
+*>    4:250       20 CLAS-INTEREST                                      5 (000000027)           Display Numeric Edit
+*>    4:251       20 FILLER                                             5 (000000032)           Display
+*>    4:253 01 FILLER                                                  15             Wor       Display
+*>    4:255 01 CLAS-BUSINESS-CLASSES                                 1350             Wor       Group
+*>    4:256   12 CLAS-BUSC-FLD                                         27 (000000000)     O     Group
+*>    4:257     16 CLAS-BUSC-CODE                                       2 (000000000)           Display Numeric
+*>    4:258     16 CLAS-BUSC-GROUP                                      1 (000000002)           Display
+*>    4:259     16 CLAS-BUSC-DESC                                      19 (000000003)           Display
+*>    4:260     16 CLAS-BUSC-EXCL                                       1 (000000022)           Display
+*>    4:261     16 FILLER                                               4 (000000023)           Display
+*>    4:263 01 FILLER                                                   7             Wor       Display
+*>    4:265 01 CLAS-INDEX-TBL                                          36             Wor       Group
+*>    4:266   12 CLAX-ID                                                4 (000000000)           Display
+*>    4:267   12 CLAS-STARTC                                            2 (000000004)           Binary
+*>    4:268   12 CLAS-MAXC                                              2 (000000006)           Binary
+*>    4:269   12 CLAS-STARTL                                            2 (000000008)           Binary
+*>    4:270   12 CLAS-MAXL                                              2 (000000010)           Binary
+*>    4:271   12 CLAS-STARTA                                            2 (000000012)           Binary
+*>    4:272   12 CLAS-MAXA                                              2 (000000014)           Binary
+*>    4:273   12 CLAS-STARTM                                            2 (000000016)           Binary
+*>    4:274   12 CLAS-MAXM                                              2 (000000018)           Binary
+*>    4:275   12 CLAS-STARTB                                            2 (000000020)           Binary
+*>    4:276   12 CLAS-MAXB                                              2 (000000022)           Binary
+*>    4:277   12 CLAS-STARTS                                            2 (000000024)           Binary
+*>    4:278   12 CLAS-MAXS                                              2 (000000026)           Binary
+*>    4:279   12 CLAS-STARTE                                            2 (000000028)           Binary
+*>    4:280   12 CLAS-MAXE                                              2 (000000030)           Binary
+*>    4:281   12 CLAS-STARTCN                                           2 (000000032)           Binary
+*>    4:282   12 CLAS-MAXCN                                             2 (000000034)           Binary
+*>    4:284 01 CLAS-TYPE-MISC                                          22             Wor       Group
+*>    4:285   12 CLAS-INDEXC                                            2 (000000000)           Binary
+*>    4:286   12 CLAS-INDEXL                                            2 (000000002)           Binary
+*>    4:287   12 CLAS-INDEXA                                            2 (000000004)           Binary
+*>    4:288   12 CLAS-INDEXM                                            2 (000000006)           Binary
+*>    4:289   12 CLAS-INDEXB                                            2 (000000008)           Binary
+*>    4:290   12 CLAS-INDEXS                                            2 (000000010)           Binary
+*>    4:291   12 CLAS-INDEXE                                            2 (000000012)           Binary
+*>    4:292   12 CLAS-INDEX                                             2 (000000014)           Binary
+*>    4:293   12 CLAS-INDEXEN                                           2 (000000016)           Binary
+*>    4:294   12 CLAS-INDEXCN                                           2 (000000018)           Binary
+*>    4:295   12 CLAS-INDEXON                                           2 (000000020)           Binary
+*>    4:297 01 FILLER                                                  13             Wor       Display
+*>    4:299 01 CLAS-MISC                                               26             Wor       Group
+*>    4:300   12 DTE-FICH                                               1 (000000000)           Display
+*>    4:301     88 FICH-NO                                                                      
+*>    4:302     88 FICH-ONLY                                                                    
+*>    4:303     88 FICH-BOTH                                                                    
+*>    4:304   12 FICH-OPEN                                              1 (000000001)           Display
+*>    4:305   12 REPT-OPEN                                              1 (000000002)           Display
+*>    4:306   12 DTE-PGM-OPT                                            1 (000000003)           Display Numeric
+*>    4:307   12 DTE-PRT-OPT                                            1 (000000004)           Display
+*>    4:308   12 DTE-FMT-OPT                                            1 (000000005)           Display Numeric
+*>    4:309   12 DTE-PRC-OPT                                            1 (000000006)           Display Numeric
+*>    4:310   12 DTE-TOT-OPT                                            1 (000000007)           Display Numeric
+*>    4:311   12 CLAS-LOOK                                              2 (000000008)           Display
+*>    4:312   12 DTE-TOT-LINES                                          4 (000000010)           Binary
+*>    4:313   12 STATE-L                                                2 (000000014)           Display
+*>    4:314   12 CLAS-CN                                                2 (000000016)           Display Numeric
+*>    4:315   12 CLAS-CO                                                2 (000000018)           Display Numeric
+*>    4:316   12 DTE-VSAM-FLAGS                                         2 (000000020)           Group
+*>    4:317     16 DTE-F-1                                              1 (000000020)           Display
+*>    4:318     16 DTE-F-2                                              1 (000000021)           Display
+*>    4:319   12 DTE-ABEND-WORK                                         4 (000000022)           Group
+*>    4:320     16 DTE-ABEND-CD-1                                       2 (000000022)           Display
+*>    4:321     16 DTE-ABEND-CD-2                                       2 (000000024)           Display
+*>    4:323 01 FILLER                                                  12             Wor       Display
+*>    4:325 01 WS-DATE-AND-TIME                                        22             Wor       Group
+*>    4:326   12 WS-ACCEPT-DATE                                         6 (000000000)           Group
+*>    4:327     16 WS-AD-YY                                             2 (000000000)           Display Numeric
+*>    4:328     16 WS-AD-MM                                             2 (000000002)           Display Numeric
+*>    4:329     16 WS-AD-DD                                             2 (000000004)           Display Numeric
+*>    4:330   12 WS-CURRENT-DATE                                        8 (000000006)           Group
+*>    4:331     16 WS-CD-MM                                             2 (000000006)           Display Numeric
+*>    4:332     16 FILLER                                               1 (000000008)           Display
+*>    4:333     16 WS-CD-DD                                             2 (000000009)           Display Numeric
+*>    4:334     16 FILLER                                               1 (000000011)           Display
+*>    4:335     16 WS-CD-YY                                             2 (000000012)           Display Numeric
+*>    4:336   12 WS-TIME-OF-DAY                                         8 (000000014)           Group
+*>    4:337     16 WS-TIME                                              6 (000000014)           Display Numeric
+*>    4:338     16 WS-HUN-SEC                                           2 (000000020)           Display Numeric
+*>    4:340 01 FILLER                                                  12             Wor       Display
+*>    4:342 01 CARRIER-OPT-CLAIM-DATA                                 175             Wor       Group
+*>    4:343   12 CARRIER-FLDS                                           7 (000000000)     O     Group
+*>    4:344     16 CARRIER-IBNR-SWITCH                                  1 (000000000)           Display
+*>    4:345     16 CARRIER-IBNR-PERCENT                                 3 (000000001)           Packed Decimal
+*>    4:346     16 CARRIER-CIDA-DISCOUNT                                3 (000000004)           Packed Decimal
+*>    4:348 01 FILLER                                                  10             Wor       Display
+*>    4:350 01 STATE-TARGET-LOSS-RATIOS                               450             Wor       Group
+*>    4:351   12 STATE-TLR-FLD                                          6 (000000000)     O     Group
+*>    4:352     16 STATE-TARGET-LOSS-RATIO                              3 (000000000)           Packed Decimal
+*>    4:353     16 STATE-CALC-INTEREST                                  3 (000000003)           Packed Decimal
+*>    4:355 01 FILLER                                                  13             Wor       Display
+*>    4:357 01 BUSINESS-TRGT-LOSS-RATIO-MODS                          297             Wor       Group
+*>    4:358   12 BUS-TLRM-FLD                                           3 (000000000)     O     Group
+*>    4:359     16 BUS-TRGT-LOSS-RATIO-MOD                              3 (000000000)           Packed Decimal
+*>    4:361 01 FILLER                                                  13             Wor       Display
+*>    4:363 01 MISC-OPT-CLM-RSV-DATA                                   98             Wor       Group
+*>    4:364   12 COMPANY-CALC-INTEREST                                  3 (000000000)           Packed Decimal
+*>    4:365   12 COMPANY-CIDA-DISCOUNT                                  3 (000000003)           Packed Decimal
+*>    4:366   12 COMPANY-CRDB-TABLE-SELECTION                           1 (000000006)           Display
+*>    4:368   12 COMPANY-IBNR-AH-FACTOR                                 3 (000000007)           Packed Decimal
+*>    4:369   12 COMPANY-IBNR-LAG-MONTH                                 2 (000000010)           Packed Decimal
+*>    4:370   12 COMPANY-IBNR-LIFE-FACTOR                               3 (000000012)           Packed Decimal
+*>    4:371   12 COMPANY-OPTION-START-DATE                              2 (000000015)           Display
+*>    4:372   12 INDEXBS                                                2 (000000017)           Binary
+*>    4:373   12 INDEXCA                                                2 (000000019)           Binary
+*>    4:374   12 INDEXST                                                2 (000000021)           Binary
+*>    4:375   12 FILLER                                                75 (000000023)           Display
+*>     5:12 01 WS-DATE-CARD-DATE                                       33             Wor       Group
+*>     5:13   05 WS-RUN-DATE                                           11 (000000000)           Group
+*>     5:14     10 FILLER                                               3 (000000000)           Display Numeric
+*>     5:15     10 RUN-CCYY                                             4 (000000003)           Display Numeric
+*>     5:16     10 RUN-CCYR                                             4 (000000003)       R   Group
+*>     5:17       15 RUN-CC                                             2 (000000003)       R   Display Numeric
+*>     5:18       15 RUN-YR                                             2 (000000005)       R   Display Numeric
+*>     5:19     10 RUN-MO                                               2 (000000007)           Display Numeric
+*>     5:20     10 RUN-DA                                               2 (000000009)           Display Numeric
+*>     5:21   05 WS-RUN-DATE-N                                         11 (000000000)       R   Display Numeric
+*>     5:23   05 WS-EP-DT                                              11 (000000011)           Group
+*>     5:24     10 FILLER                                               3 (000000011)           Display Numeric
+*>     5:25     10 EP-CCYY                                              4 (000000014)           Display Numeric
+*>     5:26     10 EP-CCYR                                              4 (000000014)       R   Group
+*>     5:27       15 EP-CC                                              2 (000000014)       R   Display Numeric
+*>     5:28       15 EP-YR                                              2 (000000016)       R   Display Numeric
+*>     5:29     10 EP-MO                                                2 (000000018)           Display Numeric
+*>     5:30     10 EP-DA                                                2 (000000020)           Display Numeric
+*>     5:31   05 WS-EP-DT-N                                            11 (000000011)       R   Display Numeric
+*>     5:33   05 WS-DTE-CONV-DT                                        11 (000000022)           Group
+*>     5:34     10 FILLER                                               3 (000000022)           Display Numeric
+*>     5:35     10 DTE-CONV-CCYY                                        4 (000000025)           Display Numeric
+*>     5:36     10 DTE-CONV-CCYR                                        4 (000000025)       R   Group
+*>     5:37       15 DTE-CONV-CC                                        2 (000000025)       R   Display Numeric
+*>     5:38       15 DTE-CONV-YR                                        2 (000000027)       R   Display Numeric
+*>     5:39     10 DTE-CONV-MO                                          2 (000000029)           Display Numeric
+*>     5:40     10 DTE-CONV-DA                                          2 (000000031)           Display Numeric
+*>     5:41   05 WS-DTE-CONV-DT-N                                      11 (000000022)       R   Display Numeric
+*>     5:43 01 WS-BALANCE-FORWARD-DATE                                 22             Wor       Group
+*>     5:44   05 WS-BF-LAST-ACTIVITY-DATE                              11 (000000000)           Group
+*>     5:45     10 FILLER                                               3 (000000000)           Display Numeric
+*>     5:46     10 BF-ACT-CCYY                                          4 (000000003)           Display Numeric
+*>     5:47     10 BF-ACT-CCYR                                          4 (000000003)       R   Group
+*>     5:48       15 BF-ACT-CC                                          2 (000000003)       R   Display Numeric
+*>     5:49       15 BF-ACT-YEAR                                        2 (000000005)       R   Display Numeric
+*>     5:50     10 BF-ACT-MONTH                                         2 (000000007)           Display Numeric
+*>     5:51     10 BF-ACT-DAY                                           2 (000000009)           Display Numeric
+*>     5:52   05 WS-BF-LAST-ACTIVITY-DATE-N                            11 (000000000)       R   Display Numeric
+*>     5:54   05 WS-BF-CURRENT-LAST-STMT-DT                            11 (000000011)           Group
+*>     5:55     10 FILLER                                               3 (000000011)           Display Numeric
+*>     5:56     10 BF-CURRENT-LAST-STMT-CEN                             2 (000000014)           Display Numeric
+*>     5:57     10 BF-CURRENT-LAST-STMT-YEAR                            2 (000000016)           Display Numeric
+*>     5:58     10 BF-CURRENT-LAST-STMT-MONTH                           2 (000000018)           Display Numeric
+*>     5:59     10 BF-CURRENT-LAST-STMT-DAY                             2 (000000020)           Display Numeric
+*>     5:60   05 WS-BF-CURRENT-LAST-STMT-DT-N                          11 (000000011)       R   Display Numeric
+*>     5:62 01 WS-ADD-CONF-TRANSACTIONS-DTE                            33             Wor       Group
+*>     5:63   05 WS-AC-CERT-EFF-DATE                                   11 (000000000)           Group
+*>     5:64     10 FILLER                                               3 (000000000)           Display Numeric
+*>     5:65     10 AC-CERT-CCYY                                         4 (000000003)           Display Numeric
+*>     5:66     10 AC-CERT-CCYR                                         4 (000000003)       R   Group
+*>     5:67       15 AC-CERT-CC                                         2 (000000003)       R   Display Numeric
+*>     5:68       15 AC-CERT-YR                                         2 (000000005)       R   Display Numeric
+*>     5:69     10 AC-CERT-MO                                           2 (000000007)           Display Numeric
+*>     5:70     10 AC-CERT-DA                                           2 (000000009)           Display Numeric
+*>     5:71   05 WS-AC-CERT-EFF-DATE-N                                 11 (000000000)       R   Display Numeric
+*>     5:73   05 WS-AC-LIFE-CANCEL-DATE                                11 (000000011)           Group
+*>     5:74     10 FILLER                                               3 (000000011)           Display Numeric
+*>     5:75     10 AC-LIFE-CANCEL-CCYY                                  4 (000000014)           Display Numeric
+*>     5:76     10 AC-LIFE-CANCEL-CCYR                                  4 (000000014)       R   Group
+*>     5:77       15 AC-LIFE-CANCEL-CC                                  2 (000000014)       R   Display Numeric
+*>     5:78       15 AC-LIFE-CANCEL-YR                                  2 (000000016)       R   Display Numeric
+*>     5:79     10 AC-LIFE-CANCEL-MO                                    2 (000000018)           Display Numeric
+*>     5:80     10 AC-LIFE-CANCEL-DA                                    2 (000000020)           Display Numeric
+*>     5:81   05 WS-AC-LIFE-CANCEL-DATE-N                              11 (000000011)       R   Display Numeric
+*>     5:83   05 WS-AC-AH-CANCEL-DATE                                  11 (000000022)           Group
+*>     5:84     10 FILLER                                               3 (000000022)           Display Numeric
+*>     5:85     10 AC-AH-CANCEL-CCYY                                    4 (000000025)           Display Numeric
+*>     5:86     10 AC-AH-CANCEL-CCYR                                    4 (000000025)       R   Group
+*>     5:87       15 AC-AH-CANCEL-CC                                    2 (000000025)       R   Display Numeric
+*>     5:88       15 AC-AH-CANCEL-YR                                    2 (000000027)       R   Display Numeric
+*>     5:89     10 AC-AH-CANCEL-MO                                      2 (000000029)           Display Numeric
+*>     5:90     10 AC-AH-CANCEL-DA                                      2 (000000031)           Display Numeric
+*>     5:91   05 WS-AC-AH-CANCEL-DATE-N                                11 (000000022)       R   Display Numeric
+*>     5:93 01 WS-RATE-RECORD                                          11             Wor       Group
+*>     5:94   05 WS-RT-EXPIRY-DATE                                     11 (000000000)           Group
+*>     5:95     10 FILLER                                               3 (000000000)           Display Numeric
+*>     5:96     10 RT-EXP-CCYY                                          4 (000000003)           Display Numeric
+*>     5:97     10 RT-EXP-CCYR                                          4 (000000003)       R   Group
+*>     5:98       15 RT-EXP-CC                                          2 (000000003)       R   Display Numeric
+*>     5:99       15 RT-EXP-YR                                          2 (000000005)       R   Display Numeric
+*>    5:100     10 RT-EXP-MO                                            2 (000000007)           Display Numeric
+*>    5:101     10 RT-EXP-DA                                            2 (000000009)           Display Numeric
+*>    5:102   05 WS-RT-EXPIRY-DATE-N                                   11 (000000000)       R   Display Numeric
+*> ------------------------------------------------------------------------------------------------------------------
+*> --I: #14 Compiling CIB010.cbl

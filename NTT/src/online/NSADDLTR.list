@@ -1,0 +1,1072 @@
+*>Copyright (c) 2016-2021 NTT DATA, Inc. All rights reserved.
+*>compiler version:  6.0.28692
+*>source file name:  NSADDLTR.cbl
+*>date generated  :  Mon Oct 03 10:09:31 CDT 2022
+*>compiler options:  -cv -apost -dcmi -dz -ld -sp=/apps/test/mdoff/copy:/apps/prod/cid1p/copy:/apps/test/mdoff/maps:/apps/prod/cid1p/maps:/apps/mtp/mtp/copy -dv=0 -od=/apps/test/mdoff/exe/onl -cirp2 -pt2 -cax -sl2 -rw=FILE-ID
+*>source encoding :  ISO-8859-1
+*>target encoding :  ISO-8859-1
+*>((program: NSADDLTR.cl2))                                        
+IDENTIFICATION DIVISION.                                         
+                                                                 
+PROGRAM-ID. NSADDLTR.                                            
+                                                                 
+*>AUTHOR.     PABLO                                                
+*>            COLLEYVILLE, TEXAS.                                  
+                                                                 
+*>REMARKS.    EXECUTED FROM addarch.html                           
+                                                                 
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 121802    2009122800001  PEMA  NEW PROGRAM                      
+*> 061421  CR2017031500001  PEMA  Update to CCM8                   
+*>*****************************************************************
+ENVIRONMENT DIVISION.                                            
+                                                                 
+DATA DIVISION.                                                   
+working-storage section.                                         
+01  DFH-START PIC X(04).                                         
+                                                                 
+*>***********************************************                  
+*> commarea passed to the business logic                           
+*>***********************************************                  
+                                                                 
+01 srch-commarea.                                                
+*>                                copy ELCLTRSPI.                  
+*>>>((file: ELCLTRSPI))                                            
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 121802    2009122800001  PEMA  NEW COPYBOOK                     
+*>*****************************************************************
+*>***************************************                          
+*>  commarea for NaperSoft On Demand Claim letters                 
+*>  (business logic input & output)                                
+*>***************************************                          
+                                                                 
+    03  BL-INPUT.                                                
+        05  BL-CARRIER          PIC X.                           
+        05  BL-CLAIM-NO         PIC X(7).                        
+        05  BL-CERT-NO          PIC X(11).                       
+        05  BL-LETTER-ID        PIC XXXX.                        
+        05  BL-FOLLOW-UP-DT     PIC X(10).                       
+        05  BL-RESEND-DT        PIC X(10).                       
+        05  BL-NO-OF-COPIES     PIC 99.                          
+        05  BL-PROC-ID          PIC XXXX.                        
+        05  BL-COMP-ID          PIC XXX.                         
+        05  BL-PRINT-NOW-SW     PIC X.                           
+        05  BL-ENC-CD           PIC XXX.                         
+        05  BL-ARCHIVE-NO       PIC 9(8).                        
+        05  BL-REGARDING        PIC X(70).                       
+                                                                 
+    03  BL-OUTPUT.                                               
+        05  BL-STATUS                   PIC X.                   
+            88  BL-OK                      VALUE "P".            
+            88  BL-FAIL                  VALUE "F".              
+        05  BL-MESSAGE          PIC X(50).                       
+    03  BL-RECORD-PASSED-DATA   PIC X(2500).                     
+*><<((file: ELCLTRSPI))                                            
+                                                                 
+01  input-string                pic x(200).                      
+01  INPUT-FROM-FORM.                                             
+    05  IFF-CARRIER             PIC X.                           
+    05  IFF-CLAIM-NO            PIC X(7).                        
+    05  IFF-CERT-NO             PIC X(11).                       
+    05  IFF-LETTER-ID           PIC XXXX.                        
+    05  IFF-FOLLOW-UP-DT        PIC X(10).                       
+    05  IFF-RESEND-DT           PIC X(10).                       
+    05  IFF-NO-OF-COPIES        PIC 99.                          
+    05  IFF-PROC-ID             PIC XXXX.                        
+    05  IFF-COMP-ID             PIC XXX.                         
+    05  IFF-PRINT-NOW-SW        PIC X.                           
+    05  IFF-ENC-CD              PIC XXX.                         
+    05  IFF-ARCHIVE-NO          PIC 9(8).                        
+    05  IFF-REGARDING           PIC X(70).                       
+                                                                 
+*>***********************************                              
+*> fields used to read web data                                    
+*>***********************************                              
+                                                                 
+01  w-form-name       pic x(80).                                 
+01  w-form-value      pic x(160).                                
+01  w-form-name-len   pic s9(8) comp.                            
+01  w-form-value-len  pic s9(8) comp.                            
+01  w-resp            pic s9(8) comp.                            
+01  w-doctoken        pic x(16).                                 
+                                                                 
+01  WS-ELMSTR-KEY.                                               
+    05  WS-ELMSTR-COMPANY-CD    PIC X.                           
+    05  WS-ELMSTR-CARRIER       PIC X.                           
+    05  WS-ELMSTR-CLAIM-NO      PIC X(7).                        
+    05  WS-ELMSTR-CERT-NO       PIC X(11).                       
+                                                                 
+*>                                COPY ELCMSTR.                    
+*>>>((file: ELCMSTR))                                              
+*>*****************************************************************
+*>                                                                *
+*>                            ELCMSTR.                            *
+*>           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+*>                            VMOD=2.012                          *
+*>                                                                *
+*>   FILE DESCRIPTION = CLAIM MASTER FILE                         *
+*>                                                                *
+*>   FILE TYPE = VSAM,KSDS                                        *
+*>   RECORD SIZE = 350  RECFORM = FIXED                           *
+*>                                                                *
+*>   BASE CLUSTER = ELMSTR                         RKP=2,LEN=20   *
+*>       ALTERNATE PATH1 = ELMSTR2 (BY NAME)       RKP=22,LEN=29  *
+*>       ALTERNATE PATH2 = ELMSTR3 (BY SOC SEC NO) RKP=51,LEN=12  *
+*>       ALTERNATE PATH3 = ELMSTR5 (BY CERT NO)    RKP=63,LEN=12  *
+*>       ALTERNATE PATH4 = ELMSTR6 (BY CREDIT CARD NO)            *
+*>                                                 RKP=75,LEN=21  *
+*>                                                                *
+*>   **** NOTE ****                                               *
+*>             ANY CHANGES TO THIS COPYBOOK MUST ALSO BE          *
+*>             IMPLEMENTED IN COPYBOOK ELCRETR (RETRIEVE MASTER)  *
+*>                                                                *
+*>   LOG = YES                                                    *
+*>   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 120503    2003080800002  SMVA  INITIAL SECURE PAY CHANGES       
+*> 080307    2007032100001  PEMA  ADD TOTAL INTEREST PAID FIELD    
+*> 031213    2012113000002  PEMA  ADD ACCIDENT INDICATOR           
+*> 051414  CR2013021100002  PEMA  RECURRENT CLAIM CHANGES          
+*> 052614    2014022100001  AJRA  ADD FAMILY LEAVE CLAIM TYPE      
+*> 081817    2016100700001  TANA  ADD NBR OF EXTENSIONS            
+*> 100518  CR2017061500001  TANA  ADD OTHER CLAIM TYPE             
+*>*****************************************************************
+01  CLAIM-MASTER.                                                
+    12  CL-RECORD-ID                PIC XX.                      
+        88  VALID-CL-ID         VALUE 'CL'.                      
+                                                                 
+    12  CL-CONTROL-PRIMARY.                                      
+        16  CL-COMPANY-CD           PIC X.                       
+        16  CL-CARRIER              PIC X.                       
+        16  CL-CLAIM-NO             PIC X(7).                    
+        16  CL-CERT-NO.                                          
+            20  CL-CERT-PRIME       PIC X(10).                   
+            20  CL-CERT-SFX         PIC X.                       
+                                                                 
+    12  CL-CONTROL-BY-NAME.                                      
+        16  CL-COMPANY-CD-A1        PIC X.                       
+        16  CL-INSURED-LAST-NAME    PIC X(15).                   
+        16  CL-INSURED-NAME.                                     
+            20  CL-INSURED-1ST-NAME PIC X(12).                   
+            20  CL-INSURED-MID-INIT PIC X.                       
+                                                                 
+    12  CL-CONTROL-BY-SSN.                                       
+        16  CL-COMPANY-CD-A2        PIC X.                       
+        16  CL-SOC-SEC-NO.                                       
+            20  CL-SSN-STATE        PIC XX.                      
+            20  CL-SSN-ACCOUNT      PIC X(6).                    
+            20  CL-SSN-LN3          PIC X(3).                    
+                                                                 
+    12  CL-CONTROL-BY-CERT-NO.                                   
+        16  CL-COMPANY-CD-A4        PIC X.                       
+        16  CL-CERT-NO-A4.                                       
+            20  CL-CERT-A4-PRIME    PIC X(10).                   
+            20  CL-CERT-A4-SFX      PIC X.                       
+                                                                 
+    12  CL-CONTROL-BY-CCN.                                       
+        16  CL-COMPANY-CD-A5        PIC X.                       
+        16  CL-CCN-A5.                                           
+            20  CL-CCN.                                          
+                24  CL-CCN-PREFIX-A5 PIC X(4).                   
+                24  CL-CCN-PRIME-A5 PIC X(12).                   
+            20  CL-CCN-FILLER-A5    PIC X(4).                    
+                                                                 
+    12  CL-INSURED-PROFILE-DATA.                                 
+        16  CL-INSURED-BIRTH-DT     PIC XX.                      
+        16  CL-INSURED-SEX-CD       PIC X.                       
+            88  INSURED-IS-MALE        VALUE 'M'.                
+            88  INSURED-IS-FEMALE      VALUE 'F'.                
+            88  INSURED-SEX-UNKNOWN    VALUE ' '.                
+        16  CL-INSURED-OCC-CD       PIC X(6).                    
+        16  FILLER                  PIC X(5).                    
+                                                                 
+    12  CL-PROCESSING-INFO.                                      
+        16  CL-PROCESSOR-ID         PIC X(4).                    
+        16  CL-CLAIM-STATUS         PIC X.                       
+            88  CLAIM-IS-OPEN          VALUE 'O'.                
+            88  CLAIM-IS-CLOSED        VALUE 'C'.                
+        16  CL-CLAIM-TYPE           PIC X.                       
+*>            88  AH-CLAIM               VALUE 'A'.                
+*>            88  LIFE-CLAIM             VALUE 'L'.                
+*>            88  PROPERTY-CLAIM         VALUE 'P'.                
+*>            88  IUI-CLAIM              VALUE 'I'.                
+*>            88  GAP-CLAIM              VALUE 'G'.                
+*>            88  FAMILY-LEAVE-CLAIM     VALUE 'F'.                
+*>            88  OTHER-CLAIM            VALUE 'O'.                
+        16  CL-CLAIM-PREM-TYPE      PIC X.                       
+            88  SINGLE-PREMIUM         VALUE '1'.                
+            88  O-B-COVERAGE           VALUE '2'.                
+            88  OPEN-END-COVERAGE      VALUE '3'.                
+        16  CL-INCURRED-DT          PIC XX.                      
+        16  CL-REPORTED-DT          PIC XX.                      
+        16  CL-FILE-ESTABLISH-DT    PIC XX.                      
+        16  CL-EST-END-OF-DISAB-DT  PIC XX.                      
+        16  CL-LAST-PMT-DT          PIC XX.                      
+        16  CL-LAST-PMT-AMT         PIC S9(7)V99  COMP-3.        
+        16  CL-PAID-THRU-DT         PIC XX.                      
+        16  CL-TOTAL-PAID-AMT       PIC S9(7)V99  COMP-3.        
+        16  CL-NO-OF-PMTS-MADE      PIC S9(3)     COMP-3.        
+        16  CL-NO-OF-DAYS-PAID      PIC S9(4)     COMP.          
+        16  CL-PMT-CALC-METHOD      PIC X.                       
+            88  CL-360-DAY-YR          VALUE '1'.                
+            88  CL-365-DAY-YR          VALUE '2'.                
+            88  CL-FULL-MONTHS         VALUE '3'.                
+        16  CL-CAUSE-CD             PIC X(6).                    
+                                                                 
+        16  CL-PRIME-CERT-NO.                                    
+            20  CL-PRIME-CERT-PRIME PIC X(10).                   
+            20  CL-PRIME-CERT-SFX   PIC X.                       
+                                                                 
+        16  CL-SYSTEM-IDENTIFIER    PIC XX.                      
+            88  CL-CREDIT-CLAIM        VALUE 'CR'.               
+            88  CL-CONVENIENCE-CLAIM   VALUE 'CV'.               
+                                                                 
+        16  CL-MICROFILM-NO         PIC X(10).                   
+        16  FILLER REDEFINES CL-MICROFILM-NO.                    
+            20  CL-BENEFIT-PERIOD   PIC 99.                      
+            20  FILLER              PIC X(8).                    
+        16  CL-PROG-FORM-TYPE       PIC X.                       
+        16  CL-LAST-ADD-ON-DT       PIC XX.                      
+                                                                 
+        16  CL-LAST-REOPEN-DT       PIC XX.                      
+        16  CL-LAST-CLOSE-DT        PIC XX.                      
+        16  CL-LAST-CLOSE-REASON    PIC X(01).                   
+            88  FINAL-PAID             VALUE '1'.                
+            88  CLAIM-DENIED           VALUE '2'.                
+            88  AUTO-CLOSE             VALUE '3'.                
+            88  MANUAL-CLOSE           VALUE '4'.                
+            88  BENEFITS-CHANGED       VALUE 'C'.                
+            88  SETUP-ERRORS           VALUE 'E'.                
+        16  CL-ASSOC-CERT-SEQU      PIC S99.                     
+        16  CL-ASSOC-CERT-TOTAL     PIC S99.                     
+        16  CL-CLAIM-PAYMENT-STATUS PIC 9.                       
+            88  PAYMENT-IN-PREP        VALUE 1 THRU 9.           
+        16  CL-TOTAL-INT-PAID       PIC S9(5)V99 COMP-3.         
+        16  FILLER                  PIC X.                       
+                                                                 
+    12  CL-CERTIFICATE-DATA.                                     
+        16  CL-CERT-ORIGIN          PIC X.                       
+            88  CERT-WAS-ONLINE        VALUE '1'.                
+            88  CERT-WAS-CREATED       VALUE '2'.                
+            88  COVERAGE-WAS-ADDED     VALUE '3'.                
+        16  CL-CERT-KEY-DATA.                                    
+            20  CL-CERT-CARRIER     PIC X.                       
+            20  CL-CERT-GROUPING    PIC X(6).                    
+            20  CL-CERT-STATE       PIC XX.                      
+            20  CL-CERT-ACCOUNT.                                 
+                24  CL-CERT-ACCOUNT-PREFIX PIC X(4).             
+                24  CL-CERT-ACCOUNT-PRIME  PIC X(6).             
+            20  CL-CERT-EFF-DT      PIC XX.                      
+                                                                 
+    12  CL-STATUS-CONTROLS.                                      
+        16  CL-PRIORITY-CD          PIC X.                       
+            88  CONFIDENTIAL-DATA      VALUE '8'.                
+            88  HIGHEST-PRIORITY       VALUE '9'.                
+        16  CL-SUPV-ATTN-CD         PIC X.                       
+            88  SUPV-NOT-REQUIRED      VALUE ' ' 'N'.            
+            88  SUPV-IS-REQUIRED       VALUE 'Y'.                
+        16  CL-PURGED-DT            PIC XX.                      
+        16  CL-RESTORED-DT          PIC XX.                      
+        16  CL-NEXT-AUTO-PAY-DT     PIC XX.                      
+        16  CL-NEXT-RESEND-DT       PIC XX.                      
+        16  CL-NEXT-FOLLOWUP-DT     PIC XX.                      
+        16  CL-CRITICAL-PERIOD      PIC 99.                      
+*>        16  FILLER                  PIC XX.                      
+        16  CL-LAST-MAINT-DT        PIC XX.                      
+        16  CL-LAST-MAINT-USER      PIC X(4).                    
+        16  CL-LAST-MAINT-HHMMSS    PIC S9(6)     COMP-3.        
+        16  CL-LAST-MAINT-TYPE      PIC X.                       
+            88  CLAIM-SET-UP           VALUE ' '.                
+            88  PAYMENT-MADE           VALUE '1'.                
+            88  LETTER-SENT            VALUE '2'.                
+            88  MASTER-WAS-ALTERED     VALUE '3'.                
+            88  MASTER-WAS-RESTORED    VALUE '4'.                
+            88  INCURRED-DATE-CHANGED  VALUE '5'.                
+            88  FILE-CONVERTED         VALUE '6'.                
+            88  CHANGE-OF-BENEFITS     VALUE 'C'.                
+            88  ERROR-CORRECTION       VALUE 'E'.                
+        16  CL-RELATED-CLAIM-NO     PIC X(7).                    
+        16  CL-HISTORY-ARCHIVE-DT   PIC XX.                      
+        16  CL-BENEFICIARY          PIC X(10).                   
+        16  CL-FILE-ESTABLISHED-BY  PIC X(4).                    
+        16  CL-DENIAL-TYPE          PIC X.                       
+            88  CL-TYPE-DENIAL          VALUE '1'.               
+            88  CL-TYPE-RESCISSION      VALUE '2'.               
+            88  CL-TYPE-REFORMATION     VALUE '3'.               
+            88  CL-TYPE-REF-TO-RES      VALUE '4'.               
+            88  CL-TYPE-RECONSIDERED    VALUE '5'.               
+        16  CL-NO-OF-EXTENSIONS     PIC 99.                      
+                                                                 
+        16  filler                  pic x(3).                    
+*>        16  CL-CRIT-PER-RECURRENT   PIC X.                       
+*>        16  CL-CRIT-PER-RTW-MOS     PIC 99.                      
+*>        16  CL-RTW-DT               PIC XX.                      
+                                                                 
+    12  CL-TRAILER-CONTROLS.                                     
+        16  CL-TRAILER-SEQ-CNT      PIC S9(4)     COMP.          
+            88  CL-1ST-TRL-AVAIL       VALUE +4095.              
+            88  CL-LAST-TRL-AVAIL      VALUE +100.               
+            88  CL-RESV-EXP-HIST-TRLR  VALUE +0.                 
+        16  CL-LAST-INC-DT-CHANGE   PIC S9(4)     COMP.          
+        16  FILLER                  PIC XX.                      
+        16  CL-AUTO-PAY-SEQ         PIC S9(4)     COMP.          
+        16  CL-ADDRESS-TRAILER-CNT.                              
+            20  CL-INSURED-ADDR-CNT  PIC S9(1).                  
+                88  NO-INSURED-AVAILABLE    VALUE ZERO.          
+            20  CL-ACCOUNT-ADDR-CNT  PIC S9(1).                  
+                88  ACCOUNT-IS-ONLINE       VALUE ZERO.          
+            20  CL-BENIF-ADDR-CNT    PIC S9(1).                  
+                88  BENEFICIARY-IS-ONLINE   VALUE ZERO.          
+            20  CL-EMPLOYER-ADDR-CNT PIC S9(1).                  
+                88  NO-EMPLOY-AVAILABLE     VALUE ZERO.          
+            20  CL-DOCTOR-ADDR-CNT   PIC S9(1).                  
+                88  NO-DOCTOR-AVAILABLE     VALUE ZERO.          
+            20  CL-OTHER-1-ADDR-CNT  PIC S9(1).                  
+                88  NO-OTHER-1-ADDRESSES    VALUE ZERO.          
+            20  CL-OTHER-2-ADDR-CNT  PIC S9(1).                  
+                88  NO-OTHER-2-ADDRESSES    VALUE ZERO.          
+                                                                 
+    12  CL-CV-REFERENCE-NO.                                      
+        16  CL-CV-REFNO-PRIME       PIC X(18).                   
+        16  CL-CV-REFNO-SFX         PIC XX.                      
+                                                                 
+    12  CL-FILE-LOCATION            PIC X(4).                    
+                                                                 
+    12  CL-PROCESS-ERRORS.                                       
+        16  CL-FATAL-ERROR-CNT      PIC S9(4)     COMP.          
+            88  NO-FATAL-ERRORS        VALUE ZERO.               
+        16  CL-FORCEABLE-ERROR-CNT  PIC S9(4)     COMP.          
+            88  NO-FORCABLE-ERRORS     VALUE ZERO.               
+                                                                 
+    12  CL-PRODUCT-CD               PIC X.                       
+                                                                 
+    12  CL-CURRENT-KEY-DATA.                                     
+        16  CL-CURRENT-CARRIER      PIC X.                       
+        16  CL-CURRENT-GROUPING     PIC X(6).                    
+        16  CL-CURRENT-STATE        PIC XX.                      
+        16  CL-CURRENT-ACCOUNT      PIC X(10).                   
+                                                                 
+    12  CL-ASSOCIATES               PIC X.                       
+        88  CL-ASSOC-NO-INTERFACE      VALUE 'A'.                
+        88  CL-ASSOC-INTERFACE         VALUE 'I'.                
+        88  CL-NON-ASSOC-NO-INTERFACE  VALUE 'N'.                
+        88  CL-NON-ASSOC-INTERFACE     VALUE 'M'.                
+                                                                 
+    12  CL-ACTIVITY-CODE            PIC 99.                      
+    12  CL-ACTIVITY-MAINT-DT        PIC XX.                      
+    12  CL-ACTIVITY-MAINT-TYPE      PIC X(4).                    
+                                                                 
+    12  CL-LAPSE-REPORT-CODE        PIC 9.                       
+    12  CL-LAG-REPORT-CODE          PIC 9.                       
+    12  CL-LOAN-TYPE                PIC XX.                      
+    12  CL-LEGAL-STATE              PIC XX.                      
+                                                                 
+    12  CL-YESNOSW                  PIC X.                       
+    12  CL-ACCIDENT-CLAIM-SW        PIC X.                       
+        88  CL-ACCIDENT-NOT-SET           VALUE ' '.             
+        88  CL-CLAIM-DUE-TO-ACCIDENT      VALUE 'Y'.             
+        88  CL-CLAIM-NOT-DUE-TO-ACCIDENT  VALUE 'N'.             
+    12  cl-insured-type             pic x.                       
+        88  cl-claim-on-primary         value 'P'.               
+        88  cl-claim-on-co-borrower     value 'C'.               
+    12  cl-benefit-expiration-dt    PIC XX.                      
+*><<((file: ELCMSTR))                                              
+                                                                 
+01 output-msg.                                                   
+   05 filler              pic x(4) value "MSG=".                 
+   05 out-msg-text        pic x(50).                             
+                                                                 
+01  MISC.                                                        
+    12  WS-RESPONSE             PIC S9(8)   COMP.                
+        88  RESP-NORMAL                  VALUE +00.              
+        88  RESP-NOTFND                  VALUE +13.              
+        88  RESP-DUPREC                  VALUE +14.              
+        88  RESP-DUPKEY                  VALUE +15.              
+        88  RESP-NOTOPEN                 VALUE +19.              
+        88  RESP-ENDFILE                 VALUE +20.              
+                                                                 
+*>****************************************                         
+*> symbol list for the SRCHROW template                            
+*>****************************************                         
+                                                                 
+*>***************************************************************  
+*>                                                                 
+*> Copyright (c) 2016-2020 NTT DATA, Inc.                          
+*> All rights reserved.                                            
+*>                                                                 
+*>***************************************************************  
+01  DFHEIV.                                                      
+  02  DFHEIV0               PIC X(35).                           
+  02  DFHEIV1               PIC X(08).                           
+  02  DFHEIV2               PIC X(08).                           
+  02  DFHEIV3               PIC X(08).                           
+  02  DFHEIV4               PIC X(06).                           
+  02  DFHEIV5               PIC X(04).                           
+  02  DFHEIV6               PIC X(04).                           
+  02  DFHEIV7               PIC X(02).                           
+  02  DFHEIV8               PIC X(02).                           
+  02  DFHEIV9               PIC X(01).                           
+  02  DFHEIV10              PIC S9(7) COMP-3.                    
+  02  DFHEIV11              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV12              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV13              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV14              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV15              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV16              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV17              PIC X(04).                           
+  02  DFHEIV18              PIC X(04).                           
+  02  DFHEIV19              PIC X(04).                           
+  02  DFHEIV20              USAGE IS POINTER.                    
+  02  DFHEIV21              USAGE IS POINTER.                    
+  02  DFHEIV22              USAGE IS POINTER.                    
+  02  DFHEIV23              USAGE IS POINTER.                    
+  02  DFHEIV24              USAGE IS POINTER.                    
+  02  DFHEIV25              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV26              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV27              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV28              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV29              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV30              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV31              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV32              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV33              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV34              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV35              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV97              PIC S9(7) COMP-3 VALUE ZERO.         
+  02  DFHEIV98              PIC S9(4) COMP SYNC VALUE ZERO.      
+  02  FILLER                PIC X(02).                           
+  02  DFHEIV99              PIC X(08) VALUE SPACE.               
+  02  DFHEIVL0              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL1              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL2              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL3              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL4              PIC X(255) VALUE SPACE.              
+  02  DFHEIVL5              PIC X(255) VALUE SPACE.              
+LINKAGE  SECTION.                                                
+*>**************************************************************** 
+*>                                                               * 
+*> Copyright (c) 2016-2020 NTT DATA, Inc.                        * 
+*> All rights reserved.                                          * 
+*>                                                               * 
+*>**************************************************************** 
+01  dfheiblk.                                                    
+    02  eibtime          pic s9(7) comp-3.                       
+    02  eibdate          pic s9(7) comp-3.                       
+    02  eibtrnid         pic x(4).                               
+    02  eibtaskn         pic s9(7) comp-3.                       
+    02  eibtrmid         pic x(4).                               
+    02  dfheigdi         pic s9(4) comp.                         
+    02  eibcposn         pic s9(4) comp.                         
+    02  eibcalen         pic s9(4) comp.                         
+    02  eibaid           pic x(1).                               
+    02  eibfiller1       pic x(1).                               
+    02  eibfn            pic x(2).                               
+    02  eibfiller2       pic x(2).                               
+    02  eibrcode         pic x(6).                               
+    02  eibfiller3       pic x(2).                               
+    02  eibds            pic x(8).                               
+    02  eibreqid         pic x(8).                               
+    02  eibrsrce         pic x(8).                               
+    02  eibsync          pic x(1).                               
+    02  eibfree          pic x(1).                               
+    02  eibrecv          pic x(1).                               
+    02  eibsend          pic x(1).                               
+    02  eibatt           pic x(1).                               
+    02  eibeoc           pic x(1).                               
+    02  eibfmh           pic x(1).                               
+    02  eibcompl         pic x(1).                               
+    02  eibsig           pic x(1).                               
+    02  eibconf          pic x(1).                               
+    02  eiberr           pic x(1).                               
+    02  eibrldbk         pic x(1).                               
+    02  eiberrcd         pic x(4).                               
+    02  eibsynrb         pic x(1).                               
+    02  eibnodat         pic x(1).                               
+    02  eibfiller5       pic x(2).                               
+    02  eibresp          pic s9(8) comp.                         
+    02  eibresp2         pic s9(8) comp.                         
+    02  dfheigdj         pic s9(4) comp.                         
+    02  dfheigdk         pic s9(4) comp.                         
+01  DFHCOMMAREA       PIC X(01).                                 
+PROCEDURE DIVISION USING DFHEIBLK DFHCOMMAREA.                   
+0000-DFHEXIT SECTION.                                            
+    MOVE FUNCTION WHEN-COMPILED TO DFHEIVL0(1:21).               
+    MOVE '9#                    %   ' TO DFHEIV0.                
+    MOVE 'NSADDLTR' TO DFHEIV1.                                  
+    CALL 'kxdfhei1' USING DFHEIV0 DFH-START DFHEIV DFHEIV1       
+         DFHEIVL0.                                               
+VCOBOL-DUMMY-PROCEDURE.                                          
+                                                                 
+*>********************                                             
+*> Receive web input                                               
+*>********************                                             
+                                                                 
+                                                                 
+*> exec cics web                                                   
+*>       startbr formfield resp(w-resp)                            
+*>     end-exec.                                                   
+*>    MOVE 'X(f                   &  N#00000512' TO DFHEIV0        
+    MOVE X'582866202020202020202020' &                           
+         X'202020202020202020202620' &                           
+         X'204E233030303030353132' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO w-resp                                      
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+     perform read-form thru read-form-exit                       
+        until w-resp not = 0 .                                   
+*>   dfhresp(normal)                                               
+                                                                 
+                                                                 
+*> exec cics web                                                   
+*>       endbr formfield                                           
+*>     end-exec.                                                   
+*>    MOVE 'X,f                   #   #00000519' TO DFHEIV0        
+    MOVE X'582C66202020202020202020' &                           
+         X'202020202020202020202320' &                           
+         X'2020233030303030353139' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+    unstring                                                     
+       input-string(6:192) delimited by '~~'                     
+       into                                                      
+         IFF-CARRIER                                             
+         IFF-CLAIM-NO                                            
+         IFF-CERT-NO                                             
+         IFF-LETTER-ID                                           
+         IFF-FOLLOW-UP-DT                                        
+         IFF-RESEND-DT                                           
+         IFF-NO-OF-COPIES                                        
+         IFF-PROC-ID                                             
+         IFF-COMP-ID                                             
+         IFF-PRINT-NOW-SW                                        
+         IFF-ENC-CD                                              
+         IFF-ARCHIVE-NO                                          
+         IFF-REGARDING                                           
+    end-unstring                                                 
+    INSPECT iff-regarding REPLACING ALL '~' BY ' '               
+                                                                 
+    MOVE INPUT-FROM-FORM        TO BL-INPUT                      
+                                                                 
+*>    DISPLAY ' I F F ' INPUT-FROM-FORM                            
+*>****************************************                         
+*> Invoke the SEARCH business logic                                
+*>****************************************                         
+                                                                 
+                                                                 
+*> exec cics link                                                  
+*>       program('NSALTRBL')                                       
+*>       commarea(srch-commarea)                                   
+*>    end-exec.                                                    
+    MOVE LENGTH OF                                               
+     srch-commarea                                               
+      TO DFHEIV11                                                
+    MOVE 'NSALTRBL' TO DFHEIV1                                   
+*>    MOVE '."C                   (   #00000549' TO DFHEIV0        
+    MOVE X'2E2243202020202020202020' &                           
+         X'202020202020202020202820' &                           
+         X'2020233030303030353439' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV1,                                               
+          srch-commarea,                                         
+          DFHEIV11,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+                                                                 
+*> exec cics                                                       
+*>       return                                                    
+*>    end-exec.                                                    
+*>    MOVE '.(                    ''   #00000554' TO DFHEIV0       
+    MOVE X'2E2820202020202020202020' &                           
+         X'202020202020202020202720' &                           
+         X'2020233030303030353534' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+*>*****************************************************            
+*> Read all fields of the incoming form, moving                    
+*> each to the corresponding field of the commarea                 
+*> (business logic input fields).  For a search,                   
+*> both form fields, last_name and first_initial,                  
+*> may be null.  In that case, set the business                    
+*> logic input fields to spaces.                                   
+*>*****************************************************            
+                                                                 
+read-form.                                                       
+    move spaces to w-form-name.                                  
+    move length of w-form-name to w-form-name-len.               
+          move spaces to w-form-value.                           
+    move length of w-form-value to w-form-value-len.             
+                                                                 
+*> exec cics web readnext                                          
+*>                  formfield(w-form-name)                         
+*>                  namelength(w-form-name-len)                    
+*>                  value(w-form-value)                            
+*>                  valuelength(w-form-value-len)                  
+*>                  resp(w-resp)                                   
+*>    end-exec.                                                    
+*>    MOVE 'X*FLVL                &  N#00000572' TO DFHEIV0        
+    MOVE X'582A464C564C202020202020' &                           
+         X'202020202020202020202620' &                           
+         X'204E233030303030353732' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-form-name,                                           
+          w-form-name-len,                                       
+          w-form-value,                                          
+          w-form-value-len,                                      
+          DFHEIV99                                               
+    MOVE EIBRESP  TO w-resp                                      
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+    evaluate w-resp                                              
+       when 0                                                    
+*>   dfhresp(normal)                                               
+          evaluate w-form-name(1:w-form-name-len)                
+             when 'clmkey'                                       
+                if w-form-value-len not = 0                      
+                   move w-form-value(1:w-form-value-len)         
+                          to INPUT-string                        
+*>                          to INPUT-FROM-FORM                     
+                else                                             
+                   move spaces to input-string                   
+                end-if                                           
+          end-evaluate                                           
+       when other                                                
+          continue                                               
+    end-evaluate.                                                
+*>    display ' input string ' input-string                        
+    .                                                            
+read-form-exit.                                                  
+                                                                 
+9999-DFHBACK SECTION.                                            
+    MOVE '9%                    "   ' TO DFHEIV0                 
+    MOVE 'NSADDLTR' TO DFHEIV1                                   
+    CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1                        
+    GOBACK.                                                      
+9999-DFHEXIT.                                                    
+    IF DFHEIGDJ EQUAL 0001                                       
+        NEXT SENTENCE.                                           
+    MOVE '9%                    "   ' TO DFHEIV0                 
+    MOVE 'NSADDLTR' TO DFHEIV1                                   
+    CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1                        
+    GOBACK.                                                      
+*> ------------------------------------------------------------------------------------------------------------------
+*> The source line number references in the following sections are either of
+*> the form <line-number> or <file-number>:<line-number>. The first form is
+*> used as an abbreviation for 0:<line-number>.
+*> The following is a key allowing the determination of the file name from
+*> the <file-number>.
+*>  
+*>          0: NSADDLTR.cl2
+*>          1: ELCLTRSPI
+*>          2: ELCMSTR
+*>  
+*> ------------------------------------------------------------------------------------------------------------------
+*> DATA MAP KEY
+*>               Sec(Section) Fil = File Section                Type Flags: column O    ---> O = Occurs Item
+*>                            Wor = Working-Storage Section                 column R    ---> R = Redefines
+*>                            Loc = Local-Storage Section                   column X/G  ---> X = External
+*>                            Rep = Report Section                                           G = Global
+*>                            Lin = Linkage Section                         
+*> ------------------------------------------------------------------------------------------------------------------
+*> Data map for Program-Id: NSADDLTR
+*> ------------------------------------------------------------------------------------------------------------------
+*>     Line    Name                                                  Size Offset      Sec Flags Data Type
+*>                                                                                        O R X
+*>                                                                                            G
+*> ------------------------------------------------------------------------------------------------------------------
+*>       24 01 DFH-START                                                4             Wor       Display
+*>       30 01 SRCH-COMMAREA                                         2685             Wor       Group
+*>     1:16   03 BL-INPUT                                             134 (000000000)           Group
+*>     1:17     05 BL-CARRIER                                           1 (000000000)           Display
+*>     1:18     05 BL-CLAIM-NO                                          7 (000000001)           Display
+*>     1:19     05 BL-CERT-NO                                          11 (000000008)           Display
+*>     1:20     05 BL-LETTER-ID                                         4 (000000019)           Display
+*>     1:21     05 BL-FOLLOW-UP-DT                                     10 (000000023)           Display
+*>     1:22     05 BL-RESEND-DT                                        10 (000000033)           Display
+*>     1:23     05 BL-NO-OF-COPIES                                      2 (000000043)           Display Numeric
+*>     1:24     05 BL-PROC-ID                                           4 (000000045)           Display
+*>     1:25     05 BL-COMP-ID                                           3 (000000049)           Display
+*>     1:26     05 BL-PRINT-NOW-SW                                      1 (000000052)           Display
+*>     1:27     05 BL-ENC-CD                                            3 (000000053)           Display
+*>     1:28     05 BL-ARCHIVE-NO                                        8 (000000056)           Display Numeric
+*>     1:29     05 BL-REGARDING                                        70 (000000064)           Display
+*>     1:31   03 BL-OUTPUT                                             51 (000000134)           Group
+*>     1:32     05 BL-STATUS                                            1 (000000134)           Display
+*>     1:33       88 BL-OK                                                                      
+*>     1:34       88 BL-FAIL                                                                    
+*>     1:35     05 BL-MESSAGE                                          50 (000000135)           Display
+*>     1:36   03 BL-RECORD-PASSED-DATA                               2500 (000000185)           Display
+*>       33 01 INPUT-STRING                                           200             Wor       Display
+*>       34 01 INPUT-FROM-FORM                                        134             Wor       Group
+*>       35   05 IFF-CARRIER                                            1 (000000000)           Display
+*>       36   05 IFF-CLAIM-NO                                           7 (000000001)           Display
+*>       37   05 IFF-CERT-NO                                           11 (000000008)           Display
+*>       38   05 IFF-LETTER-ID                                          4 (000000019)           Display
+*>       39   05 IFF-FOLLOW-UP-DT                                      10 (000000023)           Display
+*>       40   05 IFF-RESEND-DT                                         10 (000000033)           Display
+*>       41   05 IFF-NO-OF-COPIES                                       2 (000000043)           Display Numeric
+*>       42   05 IFF-PROC-ID                                            4 (000000045)           Display
+*>       43   05 IFF-COMP-ID                                            3 (000000049)           Display
+*>       44   05 IFF-PRINT-NOW-SW                                       1 (000000052)           Display
+*>       45   05 IFF-ENC-CD                                             3 (000000053)           Display
+*>       46   05 IFF-ARCHIVE-NO                                         8 (000000056)           Display Numeric
+*>       47   05 IFF-REGARDING                                         70 (000000064)           Display
+*>       53 01 W-FORM-NAME                                             80             Wor       Display
+*>       54 01 W-FORM-VALUE                                           160             Wor       Display
+*>       55 01 W-FORM-NAME-LEN                                          4             Wor       Binary
+*>       56 01 W-FORM-VALUE-LEN                                         4             Wor       Binary
+*>       57 01 W-RESP                                                   4             Wor       Binary
+*>       58 01 W-DOCTOKEN                                              16             Wor       Display
+*>       60 01 WS-ELMSTR-KEY                                           20             Wor       Group
+*>       61   05 WS-ELMSTR-COMPANY-CD                                   1 (000000000)           Display
+*>       62   05 WS-ELMSTR-CARRIER                                      1 (000000001)           Display
+*>       63   05 WS-ELMSTR-CLAIM-NO                                     7 (000000002)           Display
+*>       64   05 WS-ELMSTR-CERT-NO                                     11 (000000009)           Display
+*>     2:41 01 CLAIM-MASTER                                           350             Wor       Group
+*>     2:42   12 CL-RECORD-ID                                           2 (000000000)           Display
+*>     2:43     88 VALID-CL-ID                                                                  
+*>     2:45   12 CL-CONTROL-PRIMARY                                    20 (000000002)           Group
+*>     2:46     16 CL-COMPANY-CD                                        1 (000000002)           Display
+*>     2:47     16 CL-CARRIER                                           1 (000000003)           Display
+*>     2:48     16 CL-CLAIM-NO                                          7 (000000004)           Display
+*>     2:49     16 CL-CERT-NO                                          11 (000000011)           Group
+*>     2:50       20 CL-CERT-PRIME                                     10 (000000011)           Display
+*>     2:51       20 CL-CERT-SFX                                        1 (000000021)           Display
+*>     2:53   12 CL-CONTROL-BY-NAME                                    29 (000000022)           Group
+*>     2:54     16 CL-COMPANY-CD-A1                                     1 (000000022)           Display
+*>     2:55     16 CL-INSURED-LAST-NAME                                15 (000000023)           Display
+*>     2:56     16 CL-INSURED-NAME                                     13 (000000038)           Group
+*>     2:57       20 CL-INSURED-1ST-NAME                               12 (000000038)           Display
+*>     2:58       20 CL-INSURED-MID-INIT                                1 (000000050)           Display
+*>     2:60   12 CL-CONTROL-BY-SSN                                     12 (000000051)           Group
+*>     2:61     16 CL-COMPANY-CD-A2                                     1 (000000051)           Display
+*>     2:62     16 CL-SOC-SEC-NO                                       11 (000000052)           Group
+*>     2:63       20 CL-SSN-STATE                                       2 (000000052)           Display
+*>     2:64       20 CL-SSN-ACCOUNT                                     6 (000000054)           Display
+*>     2:65       20 CL-SSN-LN3                                         3 (000000060)           Display
+*>     2:67   12 CL-CONTROL-BY-CERT-NO                                 12 (000000063)           Group
+*>     2:68     16 CL-COMPANY-CD-A4                                     1 (000000063)           Display
+*>     2:69     16 CL-CERT-NO-A4                                       11 (000000064)           Group
+*>     2:70       20 CL-CERT-A4-PRIME                                  10 (000000064)           Display
+*>     2:71       20 CL-CERT-A4-SFX                                     1 (000000074)           Display
+*>     2:73   12 CL-CONTROL-BY-CCN                                     21 (000000075)           Group
+*>     2:74     16 CL-COMPANY-CD-A5                                     1 (000000075)           Display
+*>     2:75     16 CL-CCN-A5                                           20 (000000076)           Group
+*>     2:76       20 CL-CCN                                            16 (000000076)           Group
+*>     2:77         24 CL-CCN-PREFIX-A5                                 4 (000000076)           Display
+*>     2:78         24 CL-CCN-PRIME-A5                                 12 (000000080)           Display
+*>     2:79       20 CL-CCN-FILLER-A5                                   4 (000000092)           Display
+*>     2:81   12 CL-INSURED-PROFILE-DATA                               14 (000000096)           Group
+*>     2:82     16 CL-INSURED-BIRTH-DT                                  2 (000000096)           Display
+*>     2:83     16 CL-INSURED-SEX-CD                                    1 (000000098)           Display
+*>     2:84       88 INSURED-IS-MALE                                                            
+*>     2:85       88 INSURED-IS-FEMALE                                                          
+*>     2:86       88 INSURED-SEX-UNKNOWN                                                        
+*>     2:87     16 CL-INSURED-OCC-CD                                    6 (000000099)           Display
+*>     2:88     16 FILLER                                               5 (000000105)           Display
+*>     2:90   12 CL-PROCESSING-INFO                                    81 (000000110)           Group
+*>     2:91     16 CL-PROCESSOR-ID                                      4 (000000110)           Display
+*>     2:92     16 CL-CLAIM-STATUS                                      1 (000000114)           Display
+*>     2:93       88 CLAIM-IS-OPEN                                                              
+*>     2:94       88 CLAIM-IS-CLOSED                                                            
+*>     2:95     16 CL-CLAIM-TYPE                                        1 (000000115)           Display
+*>    2:103     16 CL-CLAIM-PREM-TYPE                                   1 (000000116)           Display
+*>    2:104       88 SINGLE-PREMIUM                                                             
+*>    2:105       88 O-B-COVERAGE                                                               
+*>    2:106       88 OPEN-END-COVERAGE                                                          
+*>    2:107     16 CL-INCURRED-DT                                       2 (000000117)           Display
+*>    2:108     16 CL-REPORTED-DT                                       2 (000000119)           Display
+*>    2:109     16 CL-FILE-ESTABLISH-DT                                 2 (000000121)           Display
+*>    2:110     16 CL-EST-END-OF-DISAB-DT                               2 (000000123)           Display
+*>    2:111     16 CL-LAST-PMT-DT                                       2 (000000125)           Display
+*>    2:112     16 CL-LAST-PMT-AMT                                      5 (000000127)           Packed Decimal
+*>    2:113     16 CL-PAID-THRU-DT                                      2 (000000132)           Display
+*>    2:114     16 CL-TOTAL-PAID-AMT                                    5 (000000134)           Packed Decimal
+*>    2:115     16 CL-NO-OF-PMTS-MADE                                   2 (000000139)           Packed Decimal
+*>    2:116     16 CL-NO-OF-DAYS-PAID                                   2 (000000141)           Binary
+*>    2:117     16 CL-PMT-CALC-METHOD                                   1 (000000143)           Display
+*>    2:118       88 CL-360-DAY-YR                                                              
+*>    2:119       88 CL-365-DAY-YR                                                              
+*>    2:120       88 CL-FULL-MONTHS                                                             
+*>    2:121     16 CL-CAUSE-CD                                          6 (000000144)           Display
+*>    2:123     16 CL-PRIME-CERT-NO                                    11 (000000150)           Group
+*>    2:124       20 CL-PRIME-CERT-PRIME                               10 (000000150)           Display
+*>    2:125       20 CL-PRIME-CERT-SFX                                  1 (000000160)           Display
+*>    2:127     16 CL-SYSTEM-IDENTIFIER                                 2 (000000161)           Display
+*>    2:128       88 CL-CREDIT-CLAIM                                                            
+*>    2:129       88 CL-CONVENIENCE-CLAIM                                                       
+*>    2:131     16 CL-MICROFILM-NO                                     10 (000000163)           Display
+*>    2:132     16 FILLER                                              10 (000000163)       R   Group
+*>    2:133       20 CL-BENEFIT-PERIOD                                  2 (000000163)       R   Display Numeric
+*>    2:134       20 FILLER                                             8 (000000165)       R   Display
+*>    2:135     16 CL-PROG-FORM-TYPE                                    1 (000000173)           Display
+*>    2:136     16 CL-LAST-ADD-ON-DT                                    2 (000000174)           Display
+*>    2:138     16 CL-LAST-REOPEN-DT                                    2 (000000176)           Display
+*>    2:139     16 CL-LAST-CLOSE-DT                                     2 (000000178)           Display
+*>    2:140     16 CL-LAST-CLOSE-REASON                                 1 (000000180)           Display
+*>    2:141       88 FINAL-PAID                                                                 
+*>    2:142       88 CLAIM-DENIED                                                               
+*>    2:143       88 AUTO-CLOSE                                                                 
+*>    2:144       88 MANUAL-CLOSE                                                               
+*>    2:145       88 BENEFITS-CHANGED                                                           
+*>    2:146       88 SETUP-ERRORS                                                               
+*>    2:147     16 CL-ASSOC-CERT-SEQU                                   2 (000000181)           Display Numeric
+*>    2:148     16 CL-ASSOC-CERT-TOTAL                                  2 (000000183)           Display Numeric
+*>    2:149     16 CL-CLAIM-PAYMENT-STATUS                              1 (000000185)           Display Numeric
+*>    2:150       88 PAYMENT-IN-PREP                                                            
+*>    2:151     16 CL-TOTAL-INT-PAID                                    4 (000000186)           Packed Decimal
+*>    2:152     16 FILLER                                               1 (000000190)           Display
+*>    2:154   12 CL-CERTIFICATE-DATA                                   22 (000000191)           Group
+*>    2:155     16 CL-CERT-ORIGIN                                       1 (000000191)           Display
+*>    2:156       88 CERT-WAS-ONLINE                                                            
+*>    2:157       88 CERT-WAS-CREATED                                                           
+*>    2:158       88 COVERAGE-WAS-ADDED                                                         
+*>    2:159     16 CL-CERT-KEY-DATA                                    21 (000000192)           Group
+*>    2:160       20 CL-CERT-CARRIER                                    1 (000000192)           Display
+*>    2:161       20 CL-CERT-GROUPING                                   6 (000000193)           Display
+*>    2:162       20 CL-CERT-STATE                                      2 (000000199)           Display
+*>    2:163       20 CL-CERT-ACCOUNT                                   10 (000000201)           Group
+*>    2:164         24 CL-CERT-ACCOUNT-PREFIX                           4 (000000201)           Display
+*>    2:165         24 CL-CERT-ACCOUNT-PRIME                            6 (000000205)           Display
+*>    2:166       20 CL-CERT-EFF-DT                                     2 (000000211)           Display
+*>    2:168   12 CL-STATUS-CONTROLS                                    54 (000000213)           Group
+*>    2:169     16 CL-PRIORITY-CD                                       1 (000000213)           Display
+*>    2:170       88 CONFIDENTIAL-DATA                                                          
+*>    2:171       88 HIGHEST-PRIORITY                                                           
+*>    2:172     16 CL-SUPV-ATTN-CD                                      1 (000000214)           Display
+*>    2:173       88 SUPV-NOT-REQUIRED                                                          
+*>    2:174       88 SUPV-IS-REQUIRED                                                           
+*>    2:175     16 CL-PURGED-DT                                         2 (000000215)           Display
+*>    2:176     16 CL-RESTORED-DT                                       2 (000000217)           Display
+*>    2:177     16 CL-NEXT-AUTO-PAY-DT                                  2 (000000219)           Display
+*>    2:178     16 CL-NEXT-RESEND-DT                                    2 (000000221)           Display
+*>    2:179     16 CL-NEXT-FOLLOWUP-DT                                  2 (000000223)           Display
+*>    2:180     16 CL-CRITICAL-PERIOD                                   2 (000000225)           Display Numeric
+*>    2:182     16 CL-LAST-MAINT-DT                                     2 (000000227)           Display
+*>    2:183     16 CL-LAST-MAINT-USER                                   4 (000000229)           Display
+*>    2:184     16 CL-LAST-MAINT-HHMMSS                                 4 (000000233)           Packed Decimal
+*>    2:185     16 CL-LAST-MAINT-TYPE                                   1 (000000237)           Display
+*>    2:186       88 CLAIM-SET-UP                                                               
+*>    2:187       88 PAYMENT-MADE                                                               
+*>    2:188       88 LETTER-SENT                                                                
+*>    2:189       88 MASTER-WAS-ALTERED                                                         
+*>    2:190       88 MASTER-WAS-RESTORED                                                        
+*>    2:191       88 INCURRED-DATE-CHANGED                                                      
+*>    2:192       88 FILE-CONVERTED                                                             
+*>    2:193       88 CHANGE-OF-BENEFITS                                                         
+*>    2:194       88 ERROR-CORRECTION                                                           
+*>    2:195     16 CL-RELATED-CLAIM-NO                                  7 (000000238)           Display
+*>    2:196     16 CL-HISTORY-ARCHIVE-DT                                2 (000000245)           Display
+*>    2:197     16 CL-BENEFICIARY                                      10 (000000247)           Display
+*>    2:198     16 CL-FILE-ESTABLISHED-BY                               4 (000000257)           Display
+*>    2:199     16 CL-DENIAL-TYPE                                       1 (000000261)           Display
+*>    2:200       88 CL-TYPE-DENIAL                                                             
+*>    2:201       88 CL-TYPE-RESCISSION                                                         
+*>    2:202       88 CL-TYPE-REFORMATION                                                        
+*>    2:203       88 CL-TYPE-REF-TO-RES                                                         
+*>    2:204       88 CL-TYPE-RECONSIDERED                                                       
+*>    2:205     16 CL-NO-OF-EXTENSIONS                                  2 (000000262)           Display Numeric
+*>    2:207     16 FILLER                                               3 (000000264)           Display
+*>    2:212   12 CL-TRAILER-CONTROLS                                   15 (000000267)           Group
+*>    2:213     16 CL-TRAILER-SEQ-CNT                                   2 (000000267)           Binary
+*>    2:214       88 CL-1ST-TRL-AVAIL                                                           
+*>    2:215       88 CL-LAST-TRL-AVAIL                                                          
+*>    2:216       88 CL-RESV-EXP-HIST-TRLR                                                      
+*>    2:217     16 CL-LAST-INC-DT-CHANGE                                2 (000000269)           Binary
+*>    2:218     16 FILLER                                               2 (000000271)           Display
+*>    2:219     16 CL-AUTO-PAY-SEQ                                      2 (000000273)           Binary
+*>    2:220     16 CL-ADDRESS-TRAILER-CNT                               7 (000000275)           Group
+*>    2:221       20 CL-INSURED-ADDR-CNT                                1 (000000275)           Display Numeric
+*>    2:222         88 NO-INSURED-AVAILABLE                                                     
+*>    2:223       20 CL-ACCOUNT-ADDR-CNT                                1 (000000276)           Display Numeric
+*>    2:224         88 ACCOUNT-IS-ONLINE                                                        
+*>    2:225       20 CL-BENIF-ADDR-CNT                                  1 (000000277)           Display Numeric
+*>    2:226         88 BENEFICIARY-IS-ONLINE                                                    
+*>    2:227       20 CL-EMPLOYER-ADDR-CNT                               1 (000000278)           Display Numeric
+*>    2:228         88 NO-EMPLOY-AVAILABLE                                                      
+*>    2:229       20 CL-DOCTOR-ADDR-CNT                                 1 (000000279)           Display Numeric
+*>    2:230         88 NO-DOCTOR-AVAILABLE                                                      
+*>    2:231       20 CL-OTHER-1-ADDR-CNT                                1 (000000280)           Display Numeric
+*>    2:232         88 NO-OTHER-1-ADDRESSES                                                     
+*>    2:233       20 CL-OTHER-2-ADDR-CNT                                1 (000000281)           Display Numeric
+*>    2:234         88 NO-OTHER-2-ADDRESSES                                                     
+*>    2:236   12 CL-CV-REFERENCE-NO                                    20 (000000282)           Group
+*>    2:237     16 CL-CV-REFNO-PRIME                                   18 (000000282)           Display
+*>    2:238     16 CL-CV-REFNO-SFX                                      2 (000000300)           Display
+*>    2:240   12 CL-FILE-LOCATION                                       4 (000000302)           Display
+*>    2:242   12 CL-PROCESS-ERRORS                                      4 (000000306)           Group
+*>    2:243     16 CL-FATAL-ERROR-CNT                                   2 (000000306)           Binary
+*>    2:244       88 NO-FATAL-ERRORS                                                            
+*>    2:245     16 CL-FORCEABLE-ERROR-CNT                               2 (000000308)           Binary
+*>    2:246       88 NO-FORCABLE-ERRORS                                                         
+*>    2:248   12 CL-PRODUCT-CD                                          1 (000000310)           Display
+*>    2:250   12 CL-CURRENT-KEY-DATA                                   19 (000000311)           Group
+*>    2:251     16 CL-CURRENT-CARRIER                                   1 (000000311)           Display
+*>    2:252     16 CL-CURRENT-GROUPING                                  6 (000000312)           Display
+*>    2:253     16 CL-CURRENT-STATE                                     2 (000000318)           Display
+*>    2:254     16 CL-CURRENT-ACCOUNT                                  10 (000000320)           Display
+*>    2:256   12 CL-ASSOCIATES                                          1 (000000330)           Display
+*>    2:257     88 CL-ASSOC-NO-INTERFACE                                                        
+*>    2:258     88 CL-ASSOC-INTERFACE                                                           
+*>    2:259     88 CL-NON-ASSOC-NO-INTERFACE                                                    
+*>    2:260     88 CL-NON-ASSOC-INTERFACE                                                       
+*>    2:262   12 CL-ACTIVITY-CODE                                       2 (000000331)           Display Numeric
+*>    2:263   12 CL-ACTIVITY-MAINT-DT                                   2 (000000333)           Display
+*>    2:264   12 CL-ACTIVITY-MAINT-TYPE                                 4 (000000335)           Display
+*>    2:266   12 CL-LAPSE-REPORT-CODE                                   1 (000000339)           Display Numeric
+*>    2:267   12 CL-LAG-REPORT-CODE                                     1 (000000340)           Display Numeric
+*>    2:268   12 CL-LOAN-TYPE                                           2 (000000341)           Display
+*>    2:269   12 CL-LEGAL-STATE                                         2 (000000343)           Display
+*>    2:271   12 CL-YESNOSW                                             1 (000000345)           Display
+*>    2:272   12 CL-ACCIDENT-CLAIM-SW                                   1 (000000346)           Display
+*>    2:273     88 CL-ACCIDENT-NOT-SET                                                          
+*>    2:274     88 CL-CLAIM-DUE-TO-ACCIDENT                                                     
+*>    2:275     88 CL-CLAIM-NOT-DUE-TO-ACCIDENT                                                 
+*>    2:276   12 CL-INSURED-TYPE                                        1 (000000347)           Display
+*>    2:277     88 CL-CLAIM-ON-PRIMARY                                                          
+*>    2:278     88 CL-CLAIM-ON-CO-BORROWER                                                      
+*>    2:279   12 CL-BENEFIT-EXPIRATION-DT                               2 (000000348)           Display
+*>       68 01 OUTPUT-MSG                                              54             Wor       Group
+*>       69   05 FILLER                                                 4 (000000000)           Display
+*>       70   05 OUT-MSG-TEXT                                          50 (000000004)           Display
+*>       72 01 MISC                                                     4             Wor       Group
+*>       73   12 WS-RESPONSE                                            4 (000000000)           Binary
+*>       74     88 RESP-NORMAL                                                                  
+*>       75     88 RESP-NOTFND                                                                  
+*>       76     88 RESP-DUPREC                                                                  
+*>       77     88 RESP-DUPKEY                                                                  
+*>       78     88 RESP-NOTOPEN                                                                 
+*>       79     88 RESP-ENDFILE                                                                 
+*>       84 01 DFHEIV                                                 882             Wor       Group
+*>       84   02 DFHEIV0                                               35 (000000000)           Display
+*>       84   02 DFHEIV1                                                8 (000000035)           Display
+*>       84   02 DFHEIV2                                                8 (000000043)           Display
+*>       84   02 DFHEIV3                                                8 (000000051)           Display
+*>       84   02 DFHEIV4                                                6 (000000059)           Display
+*>       84   02 DFHEIV5                                                4 (000000065)           Display
+*>       84   02 DFHEIV6                                                4 (000000069)           Display
+*>       84   02 DFHEIV7                                                2 (000000073)           Display
+*>       84   02 DFHEIV8                                                2 (000000075)           Display
+*>       84   02 DFHEIV9                                                1 (000000077)           Display
+*>       84   02 DFHEIV10                                               4 (000000078)           Packed Decimal
+*>       84   02 DFHEIV11                                               2 (000000082)           Binary
+*>       84   02 DFHEIV12                                               2 (000000084)           Binary
+*>       84   02 DFHEIV13                                               2 (000000086)           Binary
+*>       84   02 DFHEIV14                                               2 (000000088)           Binary
+*>       84   02 DFHEIV15                                               2 (000000090)           Binary
+*>       84   02 DFHEIV16                                               4 (000000092)           Binary
+*>       84   02 DFHEIV17                                               4 (000000096)           Display
+*>       84   02 DFHEIV18                                               4 (000000100)           Display
+*>       84   02 DFHEIV19                                               4 (000000104)           Display
+*>       84   02 DFHEIV20                                               4 (000000108)           Pointer
+*>       84   02 DFHEIV21                                               4 (000000112)           Pointer
+*>       84   02 DFHEIV22                                               4 (000000116)           Pointer
+*>       84   02 DFHEIV23                                               4 (000000120)           Pointer
+*>       84   02 DFHEIV24                                               4 (000000124)           Pointer
+*>       84   02 DFHEIV25                                               4 (000000128)           Binary
+*>       84   02 DFHEIV26                                               4 (000000132)           Binary
+*>       84   02 DFHEIV27                                               4 (000000136)           Binary
+*>       84   02 DFHEIV28                                               4 (000000140)           Binary
+*>       84   02 DFHEIV29                                               4 (000000144)           Binary
+*>       84   02 DFHEIV30                                               4 (000000148)           Binary
+*>       84   02 DFHEIV31                                               4 (000000152)           Binary
+*>       84   02 DFHEIV32                                               2 (000000156)           Binary
+*>       84   02 DFHEIV33                                               2 (000000158)           Binary
+*>       84   02 DFHEIV34                                               2 (000000160)           Binary
+*>       84   02 DFHEIV35                                               2 (000000162)           Binary
+*>       84   02 DFHEIV97                                               4 (000000164)           Packed Decimal
+*>       84   02 DFHEIV98                                               2 (000000168)           Binary
+*>       84   02 FILLER                                                 2 (000000170)           Display
+*>       84   02 DFHEIV99                                               8 (000000172)           Display
+*>       84   02 DFHEIVL0                                              48 (000000180)           Display
+*>       84   02 DFHEIVL1                                              48 (000000228)           Display
+*>       84   02 DFHEIVL2                                              48 (000000276)           Display
+*>       84   02 DFHEIVL3                                              48 (000000324)           Display
+*>       84   02 DFHEIVL4                                             255 (000000372)           Display
+*>       84   02 DFHEIVL5                                             255 (000000627)           Display
+*>       84 01 DFHEIBLK                                                96             Lin       Group
+*>       84   02 EIBTIME                                                4 (000000000)           Packed Decimal
+*>       84   02 EIBDATE                                                4 (000000004)           Packed Decimal
+*>       84   02 EIBTRNID                                               4 (000000008)           Display
+*>       84   02 EIBTASKN                                               4 (000000012)           Packed Decimal
+*>       84   02 EIBTRMID                                               4 (000000016)           Display
+*>       84   02 DFHEIGDI                                               2 (000000020)           Binary
+*>       84   02 EIBCPOSN                                               2 (000000022)           Binary
+*>       84   02 EIBCALEN                                               2 (000000024)           Binary
+*>       84   02 EIBAID                                                 1 (000000026)           Display
+*>       84   02 EIBFILLER1                                             1 (000000027)           Display
+*>       84   02 EIBFN                                                  2 (000000028)           Display
+*>       84   02 EIBFILLER2                                             2 (000000030)           Display
+*>       84   02 EIBRCODE                                               6 (000000032)           Display
+*>       84   02 EIBFILLER3                                             2 (000000038)           Display
+*>       84   02 EIBDS                                                  8 (000000040)           Display
+*>       84   02 EIBREQID                                               8 (000000048)           Display
+*>       84   02 EIBRSRCE                                               8 (000000056)           Display
+*>       84   02 EIBSYNC                                                1 (000000064)           Display
+*>       84   02 EIBFREE                                                1 (000000065)           Display
+*>       84   02 EIBRECV                                                1 (000000066)           Display
+*>       84   02 EIBSEND                                                1 (000000067)           Display
+*>       84   02 EIBATT                                                 1 (000000068)           Display
+*>       84   02 EIBEOC                                                 1 (000000069)           Display
+*>       84   02 EIBFMH                                                 1 (000000070)           Display
+*>       84   02 EIBCOMPL                                               1 (000000071)           Display
+*>       84   02 EIBSIG                                                 1 (000000072)           Display
+*>       84   02 EIBCONF                                                1 (000000073)           Display
+*>       84   02 EIBERR                                                 1 (000000074)           Display
+*>       84   02 EIBRLDBK                                               1 (000000075)           Display
+*>       84   02 EIBERRCD                                               4 (000000076)           Display
+*>       84   02 EIBSYNRB                                               1 (000000080)           Display
+*>       84   02 EIBNODAT                                               1 (000000081)           Display
+*>       84   02 EIBFILLER5                                             2 (000000082)           Display
+*>       84   02 EIBRESP                                                4 (000000084)           Binary
+*>       84   02 EIBRESP2                                               4 (000000088)           Binary
+*>       84   02 DFHEIGDJ                                               2 (000000092)           Binary
+*>       84   02 DFHEIGDK                                               2 (000000094)           Binary
+*>       84 01 DFHCOMMAREA                                              1             Lin       Display
+*> ------------------------------------------------------------------------------------------------------------------
+*> --I: #14 Compiling NSADDLTR.cbl

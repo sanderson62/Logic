@@ -1,0 +1,387 @@
+       TITLE 'CID RETRO ADJUSTMENTS INTERFACE'                          
+                                                                        
+       IDENTIFICATION DIVISION.                                         
+       PROGRAM-ID.    FNB184.                                           
+       AUTHOR.        DAN DRYDEN.                                       
+       DATE-WRITTEN.  NOVEMBER, 1998.                                   
+                                                                        
+      ***************************************************************** 
+      *                                                               * 
+      *               CID RETRO/REINSURANCE ADJUSTMENTS               * 
+      *                                                               * 
+      *****************************************************************
+031102******************************************************************
+031102*                   C H A N G E   L O G
+031102*
+031102* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+031102*-----------------------------------------------------------------
+031102*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+031102* EFFECTIVE    NUMBER
+031102*-----------------------------------------------------------------
+      * 021299                   DANA  TO PRODUCTION
+031102* 031102    2002021300008  SMVA  REMOVE PLAN CODE TABLE DEPENDENCY
+103002* 103002                   PEMA  ADD PROCESSING FOR DCC
+022103* 022103                   SMVA  ADD REC TYP 5 FOR AH BEN CD SRCH
+112906* 112906  CR2006111300003  PEMA  ADD PROCESSING FOR KY
+051810* 051810 CR2010042900001   PEMA  SPEARATE CITY AND STATE
+032212* 032212  CR2011110200001  AJRA  AHL CHANGES
+042512* 042512  IR2012042400001  AJRA  FORCE CYCLE DATE INTO FX DATES
+010716* 010716  CR2015082500001  PEMA  VPP CHANGES
+031102******************************************************************
+                                                                        
+       ENVIRONMENT DIVISION.                                            
+       INPUT-OUTPUT SECTION.                                            
+       FILE-CONTROL.                                                    
+      *                                                                 
+           SELECT CID-RETRO                                             
+               ASSIGN TO SYS010                                         
+               FILE STATUS IS SYS010-STATUS.                            
+                                                                        
+           SELECT CID-CONTROL-FILE                                      
+               ASSIGN TO ELCNTL                                         
+               ORGANIZATION IS INDEXED                                  
+               ACCESS IS SEQUENTIAL                                     
+               RECORD KEY IS CF-CONTROL-PRIMARY                         
+               FILE STATUS IS ELCNTL-STATUS.                            
+                                                                        
+           SELECT CID-ACCOUNT-MASTER                                    
+               ASSIGN TO ERACCT                                         
+               ORGANIZATION IS INDEXED                                  
+               ACCESS IS DYNAMIC                                        
+               RECORD KEY IS AM-CONTROL-PRIMARY                         
+               FILE STATUS IS ERACCT-STATUS.                            
+                                                                        
+           SELECT FREEDOM-EXTRACT                                       
+               ASSIGN TO SYS011
+pemuni         organization is line sequential.
+
+103002     SELECT DISK-DATE        ASSIGN TO SYS019.
+                                                                        
+       DATA DIVISION.                                                   
+       FILE SECTION.                                                    
+                                                                        
+       FD  CID-RETRO                                                    
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+           COPY ERCREPY.                                                
+                                                                        
+       FD  CID-CONTROL-FILE.                                            
+           COPY ELCCNTL.                                                
+                                                                        
+       FD  CID-ACCOUNT-MASTER.                                          
+           COPY ERCACCT.                                                
+                                                                        
+       FD  FREEDOM-EXTRACT                                              
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  FREEDOM-RECORD.                                              
+           COPY FNC022184.                                              
+                                                                        
+103002 FD  DISK-DATE                                                    
+103002     COPY ELCDTEFD.                                               
+103002                                                                  
+                                                                        
+       EJECT                                                            
+                                                                        
+       WORKING-STORAGE SECTION.                                         
+                                                                        
+       01  FILLER                  BINARY.                              
+           05  SUB                 PIC S9(4)    VALUE +0.               
+                                                                        
+       01  FILLER.                                                      
+103002     05  WS-ZERO                 PIC S9(3)  COMP-3  VALUE +0.
+103002     05  WS-ABEND-MESSAGE        PIC X(80)  VALUE SPACES.    
+103002     05  PGM-SUB                 PIC S9(4) COMP VALUE +310.
+103002     05  WS-RETURN-CODE          PIC S999  COMP-3 VALUE +0.
+           05  S0C7                PIC X        VALUE ' '.              
+           05  FORCE-DUMP REDEFINES S0C7 PIC S9 COMP-3.                 
+           05  DATE-RETURN-CODE    PIC X        VALUE ' '.              
+               88  VALID-DATE                   VALUE 'V'.              
+           05  BEN-TABLE-SW        PIC 9        VALUE 0.                
+               88  RECORD-FOUND    VALUE 1.                             
+               88  END-OF-TABLE    VALUE 2.                             
+           05  ELCNTL-STATUS       PIC XX       VALUE '00'.             
+           05  ERACCT-STATUS       PIC XX       VALUE '00'.             
+           05  ERREPY-STATUS       PIC XX       VALUE '00'.             
+           05  SYS010-STATUS       PIC XX       VALUE '00'.             
+               88  EOF                          VALUE '10'.             
+022103     05  WS-SAVE-CF-REC-TYPE PIC X        VALUE SPACE.
+           05  WS-IG               PIC X        VALUE SPACE.            
+           05  WS-PLAN.                                                 
+               10  WS-PLAN1        PIC X        VALUE SPACE.            
+               10  WS-PLAN2        PIC XXX      VALUE SPACE.
+
+
+                                       copy elcfundt.
+
+
+pemuni 01  SYSTEM-DATE.
+pemuni     05  SYS-MO         PIC 9(2).
+pemuni     05  SYS-DA         PIC 9(2).
+pemuni     05  SYS-CCYY       PIC 9(4).
+
+       01  FNX001-PARMS.                                                
+           05  FNX001-DATA         PIC X(50).                           
+           05  FNX001-CITY         PIC X(30).                           
+           05  FNX001-STATE        PIC X(02).                           
+           05  FNX001-ZIP          PIC X(09).                           
+                                                                        
+031102* STATE EDIT TABLE
+031102 COPY FNC018.
+
+103002     COPY ELCDTECX.                                               
+103002     COPY ELCDTEVR.                                               
+                                                                        
+       LINKAGE SECTION.                                                 
+                                                                        
+       01  PARMS.                                                       
+           05  PARM-LENGTH         PIC S9(4)     COMP.                  
+           05  PARM-DATE           PIC X(8).                            
+                                                                        
+                                                                        
+                                                                        
+                                                                        
+           EJECT                                                        
+      *                                                                 
+       PROCEDURE DIVISION USING PARMS.                                  
+      *                                                                 
+103002*************************************************************     
+103002                                 COPY ELCDTERX.                   
+103002*************************************************************     
+           PERFORM 0000-HOUSEKEEPING THRU 0000-EXIT                     
+                                                                        
+           PERFORM 1000-PROCESS THRU 1000-EXIT UNTIL EOF
+
+090402     CLOSE CID-RETRO
+090402           CID-CONTROL-FILE
+090402           CID-ACCOUNT-MASTER
+090402           FREEDOM-EXTRACT
+
+                                                                        
+031102     GOBACK.
+                                                                        
+                                                                        
+           EJECT                                                        
+      *                                                                 
+       1000-PROCESS.                                                    
+      *                                                                 
+           READ CID-RETRO                                               
+              AT END GO TO 1000-EXIT
+031102     END-READ
+                                                                        
+           IF RP-RECORD-ID NOT = 'RP'                                   
+              GO TO 1000-EXIT
+031102     END-IF
+                                                                        
+           IF RP-COMPANY-CD = DTE-CLASIC-COMPANY-CD
+              CONTINUE
+           ELSE
+              GO TO 1000-EXIT
+           END-IF
+           MOVE SPACES      TO FREEDOM-RECORD                           
+
+032212     EVALUATE TRUE
+032212        WHEN DTE-CLIENT = 'AHL'
+032212           MOVE 'AHL RETRO'      TO FX-SYSTEM
+032212           MOVE 'CRLOGC'         TO FX-SOURCE-CODE
+032212           MOVE '02'             TO FX-DIVISION
+032212           MOVE 'S'              TO FX-FY-REN
+032212        WHEN DTE-CLIENT = 'CID'
+032212           MOVE 'CID RETRO'      TO FX-SYSTEM
+032212           MOVE 'CRLOGC'         TO FX-SOURCE-CODE
+032212           MOVE '02'             TO FX-DIVISION
+032212           MOVE 'S'              TO FX-FY-REN
+032212        WHEN DTE-CLIENT = 'DCC'
+032212           MOVE 'LPAC RETRO'     TO FX-SYSTEM
+032212           MOVE 'CRLOGC'         TO FX-SOURCE-CODE
+032212           MOVE '02'             TO FX-DIVISION
+032212           MOVE ' '              TO FX-FY-REN
+032212        WHEN DTE-CLIENT = 'VPP'
+032212           MOVE 'VPA RETRO'      TO FX-SYSTEM
+032212           MOVE 'CRLOGC'         TO FX-SOURCE-CODE
+032212           MOVE '5V'             TO FX-DIVISION
+032212           MOVE ' '              TO FX-FY-REN
+032212     END-EVALUATE
+
+           MOVE '50'        TO FX-TRAN-TYPE                             
+           MOVE '05'        TO FX-SUB-TYPE                              
+
+112906     IF RP-CARRIER = '8'
+112906        MOVE '04'     TO FX-SUB-TYPE
+112906     END-IF
+
+           MOVE PARM-DATE   TO FX-POSTING-DATE
+042512     IF DTE-CLIENT = 'AHL'
+042512         MOVE PARM-DATE TO FX-JOURNAL-DATE
+042512     ELSE
+pemuni     MOVE SYSTEM-DATE TO FX-JOURNAL-DATE
+042512     END-IF
+           PERFORM 1100-READ-ACCOUNT  THRU 1100-EXIT                    
+                                                                        
+032212     IF DTE-CLIENT = 'CID' OR 'AHL'
+103002        PERFORM 1200-GET-PLAN-CODE THRU 1200-EXIT
+103002     ELSE
+103002        MOVE RP-BENEFIT-CD       TO WS-PLAN
+103002     END-IF                    
+           MOVE WS-PLAN     TO FX-PLAN-CODE                             
+           MOVE WS-PLAN     TO FX-FORM                                  
+                                                                        
+           MOVE RP-STATE    TO FX-STATE                                 
+           MOVE RP-PAYMENTS TO FX-AMOUNT                                
+           MOVE RP-CARRIER  TO FX-DESCRIPTION(27:1)                     
+           MOVE RP-GROUPING-PRIME TO FX-DESCRIPTION(28:3)               
+103002*    MOVE 'S'         TO FX-FY-REN                                
+           MOVE 'Y'         TO FX-LOC-CODE                              
+                                                                        
+031102*    CALL 'FNB160' USING FREEDOM-RECORD
+
+031102**** SEARCH PULLED FROM FNB160
+031102     IF FX-STATE NOT= SPACES
+031102         SEARCH ALL STATE-TABLE
+031102             AT END DISPLAY 'INVALID STATE CODE: ' FX-STATE
+031102             WHEN ST-STATE (ST-INDEX) = FX-STATE
+031102             MOVE ST-ALT-STATE (ST-INDEX) TO FX-STATE
+031102         END-SEARCH
+031102     END-IF
+
+
+031102**** THE '*' IN POSITION 255 ENSURES A 255 BYTE RECORD IS PASSED
+031102**** TO FREEDOM - PREVENTS TRUNCATION OF BLANK FIELDS
+031102     MOVE '*'                      TO FREEDOM-RECORD(255:1)
+           WRITE FREEDOM-RECORD.                                        
+                                                                        
+       1000-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+           EJECT                                                        
+      *                                                                 
+       1100-READ-ACCOUNT.                                               
+      *                                                                 
+           MOVE SPACE TO WS-IG                                          
+           MOVE RP-CONTROL-PRIMARY TO AM-CONTROL-PRIMARY                
+           MOVE LOW-VALUES TO AM-CNTRL-2                                
+           START CID-ACCOUNT-MASTER                                     
+             KEY >= AM-CONTROL-PRIMARY                                  
+           .                                                            
+       1100-LOOP.                                                       
+           READ CID-ACCOUNT-MASTER NEXT                                 
+           IF (ERACCT-STATUS = '00')                                    
+              AND (AM-COMPANY-CD = RP-COMPANY-CD)                       
+              AND (AM-CARRIER  = RP-CARRIER)                            
+              AND (AM-GROUPING = RP-GROUPING)                           
+              AND (AM-STATE    = RP-STATE)                              
+              AND (AM-ACCOUNT  = RP-ACCOUNT)                            
+              AND (AM-EXPIRATION-DT >= RP-INPUT-DT)                     
+                   MOVE AM-IG   TO WS-IG                                
+051810             MOVE SPACES  TO FX-CITY                              
+051810             STRING AM-ADDR-CITY ' ' AM-ADDR-STATE
+051810                DELIMITED BY '  ' INTO FX-CITY
+051810             END-STRING
+                   MOVE AM-ZIP  TO FX-ZIP-CODE                          
+                   GO TO 1100-LOOP
+031102     END-IF
+                                                                        
+           MOVE FX-CITY TO FNX001-DATA                                  
+           CALL 'FNX001' USING FNX001-DATA                              
+           MOVE FNX001-CITY TO FX-CITY
+
+           .                                                            
+       1100-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+           EJECT                                                        
+      *                                                                 
+       1200-GET-PLAN-CODE.                                              
+      *                                                                 
+022103     MOVE SPACES TO WS-SAVE-CF-REC-TYPE
+           MOVE SPACES TO WS-PLAN                                       
+           IF WS-IG = '2'                                               
+              MOVE 'G' TO WS-PLAN1                                      
+           ELSE                                                         
+              MOVE 'I' TO WS-PLAN1                                      
+           END-IF                                                       
+                                                                        
+           MOVE 0     TO BEN-TABLE-SW                                   
+           MOVE SPACE TO CF-CONTROL-PRIMARY                             
+032212     MOVE DTE-CLIENT TO CF-COMPANY-ID                                  
+022103     IF RP-BENEFIT-TYPE = 'L'
+               MOVE '4'   TO CF-RECORD-TYPE                                 
+022103         MOVE '4'   TO WS-SAVE-CF-REC-TYPE
+022103     ELSE
+022103         MOVE '5'   TO CF-RECORD-TYPE
+022103         MOVE '5'   TO WS-SAVE-CF-REC-TYPE
+022103     END-IF
+           MOVE RP-BENEFIT-CD TO CF-HI-BEN-IN-REC                       
+           MOVE +0    TO CF-SEQUENCE-NO                                 
+           START CID-CONTROL-FILE                                       
+             KEY >= CF-CONTROL-PRIMARY                                  
+                                                                        
+           READ CID-CONTROL-FILE NEXT                                   
+           IF ELCNTL-STATUS = '00'                                      
+              PERFORM VARYING SUB FROM 1 BY 1                           
+                UNTIL RECORD-FOUND OR END-OF-TABLE                      
+022103             IF (SUB > 8) OR 
+022103                (CF-RECORD-TYPE NOT = WS-SAVE-CF-REC-TYPE)           
+                      DISPLAY RP-BENEFIT-CD ' NOT IN BENEFIT TABLE'     
+                      SET END-OF-TABLE TO TRUE                          
+                   ELSE                                                 
+                      IF CF-BENEFIT-NUMERIC (SUB) = RP-BENEFIT-CD       
+                         MOVE CF-BENEFIT-ALPHA (SUB) TO WS-PLAN2        
+                         SET RECORD-FOUND TO TRUE                       
+                      END-IF                                            
+                   END-IF                                               
+              END-PERFORM                                               
+            END-IF
+
+            .                                                           
+       1200-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+           EJECT                                                        
+      *                                                                 
+       0000-HOUSEKEEPING.                                               
+      *                                                                 
+pemuni     MOVE FUNCTION CURRENT-DATE
+pemuni                                 TO FUNCTION-DATE
+pemuni     move ws-fn-mo               to sys-mo
+pemuni     move ws-fn-da               to sys-da
+pemuni     move ws-fn-ccyr             to sys-ccyy
+
+           CALL 'DATEEDIT' USING PARM-DATE DATE-RETURN-CODE             
+           IF NOT VALID-DATE                                            
+              DISPLAY 'INVALID DATE IN PARM: ' PARM-DATE                
+              ADD +1 TO FORCE-DUMP
+031102     END-IF
+                                                                        
+           OPEN INPUT CID-RETRO                                         
+           IF SYS010-STATUS NOT = '00'                                  
+              DISPLAY 'OPEN ERROR ' SYS010-STATUS ' ON SYS010'          
+              ADD +1 TO FORCE-DUMP
+031102     END-IF
+                                                                        
+           OPEN INPUT CID-CONTROL-FILE                                  
+           IF ELCNTL-STATUS NOT = ('00' AND '97')                       
+              DISPLAY 'OPEN ERROR ' ELCNTL-STATUS ' ON ELCNTL'          
+              ADD +1 TO FORCE-DUMP
+031102     END-IF
+                                                                        
+           OPEN INPUT CID-ACCOUNT-MASTER                                
+           IF ERACCT-STATUS NOT = ('00' AND '97')                       
+              DISPLAY 'OPEN ERROR ' ERACCT-STATUS ' ON ERACCT'          
+              ADD +1 TO FORCE-DUMP
+031102     END-IF
+                                                                        
+           OPEN OUTPUT FREEDOM-EXTRACT
+
+           .                                                            
+       0000-EXIT.                                                       
+           EXIT.                                                        
+103002 ABEND-PGM SECTION.                                               00026280
+103002     DIVIDE WS-ZERO BY WS-ZERO GIVING WS-ZERO.                    00026290
+103002 ABEND-EXIT.                                                      00026300
+                                                                        

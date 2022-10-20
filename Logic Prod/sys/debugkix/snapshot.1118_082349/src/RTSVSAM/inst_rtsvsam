@@ -1,0 +1,444 @@
+#!/bin/ksh
+#**********************************************************************#
+#*                                                                    *#
+#* Copyright (c) 2007-2013 Dell Inc.                                  *#
+#* All rights reserved.                                               *#
+#*                                                                    *#
+#**********************************************************************#
+
+
+# ***********************************************
+#* $Date:   17 Apr 2013 18:46:16  $ $Modtime:   17 Apr 2013 18:46:02  $
+# ***********************************************
+
+# ***********************************************
+# $Workfile:   inst_rtsvsam  $ $Revision:   1.20  $
+# ***********************************************
+
+#
+# This command should be used to generate the UniKix TPE-BPE RUNB command.
+#
+if [ $# -ge 5 ]
+then
+  MACHINE=$1;export MACHINE
+  EBM_MF_REL=$2;export EBM_MF_REL
+  EBM_MF_INX=$3;export EBM_MF_INX
+  RUNBDIR="$4";export RUNBDIR
+  EBMRTSOBJECTS="$5";export EBMRTSOBJECTS
+  DBLINKS="$6";export DBLINKS
+  LINKLIBDIR="$7";export LINKLIBDIR   
+  EXCILINKS="$8";export EXCILINKS
+  COBOPTS="$9";export COBOPTS
+fi
+
+#
+# Program Restart System (PRS): begin settings
+#
+if [ ! -z "$BAM_PRS_MODE" ]
+then
+  # invoked by BAM
+  if [ $BAM_PRS_MODE -eq 1 ]
+  then
+    # specified PRS
+    # PRS_LINKS should come from bam.AaS_Vs
+    export DBLINKS="$PRS_LINKS $DBLINKS"
+  fi
+else
+  if [ -z "$BAMSHELL" ]
+  then
+    # not invoked by BAM, this is a command line rebuild
+    if [ ! -z "$BPE_PRS_MODE" ]
+    then
+      # subsystem as PRS on
+      if [ "$BPE_PRS_MODE" = "DB2" -o "$BPE_PRS_MODE" = "ORACLE" ]
+      then
+        export DBLINKS="-L $PACK/lib -lbpeprt -lprtdb2 -lprtora -lcobrsp $DBLINKS"
+      fi
+    fi
+  fi
+fi
+# The end of Program Restart System (PRS) settings
+
+hoststr=`uname`
+E=
+CC=cc
+if [ "$hoststr" = "Interix" ]
+then
+  E=.exe
+  CC=gcc
+fi
+
+if [ -z "$EBMMFDATE" ]
+then
+  EBMMFDATE=" "; export EBMMFDATE
+  ELDATE="el_date.o"; export ELDATE
+else
+  ELDATE="el_date_ebmmfdate.o"; export ELDATE
+fi
+#
+# UNIKIXSRC must be set to the $UNIKIX/src directory of the UniKix product.
+#
+UNIKIXSRC="."
+RTSVSAM_DIR="./RTSVSAM"
+
+if [ "${EBM_MF_REL}+" = "+" ]
+then
+#
+# UNIKIXSRC must be set to the $UNIKIX/src directory of the UniKix product.
+#
+UNIKIXSRC=".."
+RTSVSAM_DIR="."
+# Begin statements when not called via kixinstall {
+#
+# Declare variable for the Oracle archives and objects.
+# Note that ORACLELIB must be set prior to executing this command.
+#
+
+# ORACLEOBJ="\
+#       $ORACLELIB/cobol/lib/invstr.o \
+#       $ORACLELIB/cobol/lib/osnttcmf.o \
+#       $ORACLELIB/cobol/lib/ttcx2ymf.o \
+#       $ORACLELIB/cobol/lib/cobsqlintf.o \
+#       $ORACLELIB/rdbms/lib/libsql.a \
+#       $ORACLELIB/rdbms/lib/osntab.o \
+#       $ORACLELIB/rdbms/lib/libsqlnet.a \
+#       $ORACLELIB/rdbms/lib/libora.a \
+#       $ORACLELIB/rdbms/lib/libocic.a \
+#       `cat $ORACLELIB/rdbms/lib/sysliblist` \
+#       "
+#or
+#ORACLEOBJ="\
+#        $ORACLELIB/cobol/lib/cobsqlintf.o \
+#        $ORACLELIB/rdbms/lib/libsql.a \
+#        $ORACLELIB/rdbms/lib/osntab.o \
+#        $ORACLELIB/rdbms/lib/libsqlnet.a \
+#        $ORACLELIB/rdbms/lib/libora.a \
+#        $ORACLELIB/rdbms/lib/libocic.a \
+#        "
+
+#
+# Declare variable for the Sybase archives and objects.
+# Note that SYBASELIB must be set prior to executing this command.
+#
+
+#SYBASEOBJ="\
+#       $SYBASELIB/libblk.a \
+#       $SYBASELIB/libcobct.a \
+#       $SYBASELIB/libcomn.a \
+#       $SYBASELIB/libcs.a \
+#       $SYBASELIB/libct.a \
+#       $SYBASELIB/libintl.a \
+#       $SYBASELIB/libsybdb.a \
+#       $SYBASELIB/libtcl.a \
+#       $SYBASELIB/libtli.a \
+#	-lm \
+#       "
+
+#
+# Declare the system modified modules plus user modules
+# Note that these modules must be generated prior to execute this command.
+#
+#	$UNIKIXSRC/KXORACLE.o \
+#	$UNIKIXSRC/KXSYBASE.o \
+#
+
+
+KXUSEROBJ="\
+	$UNIKIXSRC/trans/kxusrexit.o \
+	$UNIKIXSRC/convert/cvlwrupr.o \
+	$UNIKIXSRC/convert/kxusrxlt.o \
+	$UNIKIXSRC/convert/kxcvtxlt.o \
+	$UNIKIXSRC/convert/kxcnvtbl.o \
+	"
+#
+# Declare variable for external security archives
+#
+# Security default value : no external security
+#
+
+SECURITYOBJECTS=
+
+  echo "By default UniKix will handle both Relative and Indexed Files"
+  echo "Do you access any Micro Focus Relative Files? <y/n>"
+  read resp1
+  case ${resp1-"n"} in
+  y )
+	EBM_MF_REL="y"
+	;;
+  n )
+	EBM_MF_REL="n"
+	;;
+  * )
+	echo "Invalid option, command aborted."
+	exit 4
+	;;
+  esac
+
+  echo "Do you access any Micro Focus Indexed Files? <y/n>"
+  read resp2
+  case ${resp2-"n"} in
+  y )
+	EBM_MF_INX="y"
+	;;
+  n )
+	EBM_MF_INX="n"
+	;;
+  * )
+	echo "Invalid option, command aborted."
+	exit 5
+	;;
+  esac
+# End statements when not called via kixinstall }
+fi
+
+
+if [ $EBM_MF_REL = "y" ]
+then
+	if [ $EBM_MF_INX = "y" ]
+	then
+		FILE=""
+		EBMLSFILE="$RTSVSAM_DIR/ebmlsfile.o"
+	else
+		FILE="-m ixfile=kxvsam -m ixfilev=kxvsam"
+		EBMLSFILE="$RTSVSAM_DIR/ebmlsfileNR.o"
+	fi
+else
+	if [ $EBM_MF_INX = "y" ]
+	then
+		FILE="-m rlfile=kxvsam -m rlfilev=kxvsam"
+		EBMLSFILE="$RTSVSAM_DIR/ebmlsfileNI.o"
+	else
+		FILE="-m ixfile=kxvsam -m ixfilev=kxvsam -m rlfile=kxvsam -m rlfilev=kxvsam"
+		EBMLSFILE=$RTSVSAM_DIR/ebmlsfile.o
+	fi
+fi
+
+#
+# RUNBDIR must point to the RUNB executable.
+#
+if [ ${RUNBDIR}a = "a" ]
+then
+	echo "RUNBDIR: ?"
+	read risp
+	RUNBDIR=`eval echo $risp`
+fi
+if [ ! -d $RUNBDIR ]
+then
+	echo RUNBDIR=$RUNBDIR invalid directory 
+	exit 1
+fi
+if [ -f $RUNBDIR/RUNB ]
+then
+	echo RUNB=$RUNBDIR/RUNB already exists, removed
+        rm -f $RUNBDIR/RUNB
+fi
+
+RTSVSAM=$RUNBDIR/rtsvsam_${EBM_MF_REL}${EBM_MF_INX}
+
+set -x
+rm -f $RTSVSAM
+
+if [ "$MBM_COBOL" = "MFCOBOL" ]
+then
+rm -f cobwrap.o $RTSVSAM_DIR/cobwrap.o
+$BPE_MFCOB_CMD -xc $RTSVSAM_DIR/cobwrap.cbl
+mv cobwrap.o $RTSVSAM_DIR/cobwrap.o
+rm -f cobwrap.int cobwrap.idy
+
+rm -f coberror.o $RTSVSAM_DIR/coberror.o
+$BPE_MFCOB_CMD -xc $RTSVSAM_DIR/coberror.cbl
+mv coberror.o $RTSVSAM_DIR/coberror.o
+rm -f coberror.int coberror.idy
+
+rm -f CCFextfh.o $RTSVSAM_DIR/CCFextfh.o
+$BPE_MFCOB_CMD -xc $RTSVSAM_DIR/CCFextfh.cbl
+mv CCFextfh.o $RTSVSAM_DIR/CCFextfh.o
+rm -f CCFextfh.int CCFextfh.idy
+
+rm -f CCFinit.o $RTSVSAM_DIR/CCFinit.o
+$BPE_MFCOB_CMD -xc $RTSVSAM_DIR/CCFinit.cbl
+mv CCFinit.o $RTSVSAM_DIR/CCFinit.o
+rm -f CCFinit.int CCFinit.idy
+
+COBOPTIONS=$COBOPT
+COBOPT="" ;export COBOPT
+
+$BPE_MFCOB_CMD -xD $COBOPTS -C "$COBOPTIONS" $LINKLIBDIR -o $RTSVSAM $FILE \
+  $EBMMFDATE \
+		$RTSVSAM_DIR/CPR.o $RTSVSAM_DIR/COB.o $RTSVSAM_DIR/CCFinit.o \
+		$RTSVSAM_DIR/$ELDATE  $RTSVSAM_DIR/lppfserv.o \
+		$RTSVSAM_DIR/CCFextfh.o $RTSVSAM_DIR/cobwrap.o \
+		$RTSVSAM_DIR/coberror.o \
+		$RTSVSAM_DIR/kxpassrem.o $RTSVSAM_DIR/kxpassubs.o \
+		$EBMLSFILE $RTSVSAM_DIR/kxcat.o \
+		$RTSVSAM_DIR/runb.o \
+		$KXUSEROBJ \
+		$ORACLEOBJ  \
+		$SYBASEOBJ  \
+		$SECURITYOBJECTS \
+		$EBMRTSOBJECTS \
+		$DBLINKS \
+		$EXCILINKS \
+		$EBMHOME/pack/RTSFS/nonJVM.o \
+		-L$PACK/lib/lang -llang_mf
+elif [ "$MBM_COBOL" = "VCOBOL" ]
+then
+# now compile all the VCOBOL runtime files
+ if [ "$MACHINE" = "WINTEL" ]
+ then
+   VCC="kxvcc"
+ else
+   VCC=$BPE_VCOB_CMD
+ fi
+ VCOBOPT="-csl -cv -ef -dv=32"
+ CURDIR=`pwd`
+ cd $RTSVSAM_DIR
+ mv cobwrap.cbl cobwrap.cbl.mf
+ cp acuwrap.cbl cobwrap.cbl
+ for cblpgm in CCFinit CCFextfh cobwrap CBLERROR CBLEXIT CDBRST32
+ do
+    ucblpgm=`echo $cblpgm | tr '[a-z]' '[A-Z]'`
+    rm -f ${ucblpgm}.class 
+    ${VCC} ${VCOBOPT} ${cblpgm}.cbl
+    if [ -f ${ucblpgm}.class ]
+    then
+       mv ${ucblpgm}*.class $RUNBDIR
+    else
+       mv cobwrap.cbl.mf cobwrap.cbl
+       exit 1
+    fi
+ done
+ mv cobwrap.cbl.mf cobwrap.cbl
+ cd $CURDIR
+ JVMLIB=""
+ myosname=`uname -s`
+ procname=`uname -p`
+ if [ $? -ne 0 ]
+ then
+   procname=`uname -m 2>/dev/null`
+ fi
+ case $myosname in
+   Linux)
+     if [ "$procname" = "s390" -o "$procname" = "s390x" ]
+     then
+        if [ "$BPE_MAKE_BITS" = "64" ]
+        then
+           MBM_CFLAGS="-m64 -Wl,-E"
+           JVMLIB="-L$JAVA_HOME/jre/lib/s390x/j9vm -L$JAVA_HOME/jre/lib/s390x -ljsig -ljvm -ldl"
+        else
+           MBM_CFLAGS="-m31 -Wl,-E"
+           JVMLIB="-L$JAVA_HOME/jre/lib/s390/j9vm -L$JAVA_HOME/jre/lib/s390 -ljsig -ljvm"
+        fi
+     else
+        if [ "$BPE_MAKE_BITS" = "64" ]
+        then
+           MBM_CFLAGS="-m64 -Wl,-E"
+           JVMLIB="-L$JAVA_HOME/jre/lib/amd64/server -ljsig -ljvm"
+        else
+           MBM_CFLAGS="-m32 -Wl,-E"
+           JVMLIB="-L$JAVA_HOME/jre/lib/i386/server -ljsig -ljvm"
+        fi
+     fi
+  ;;
+   AIX)
+     if [ "$BPE_MAKE_BITS" = "64" ]
+     then
+        MBM_CFLAGS="-q64 -brtl -bexpall"
+        JVMLIB="-L$JAVA_HOME/jre/lib/ppc64/j9vm -L$JAVA_HOME/jre/lib/ppc64 -ljsig -ljvm"
+     else
+        MBM_CFLAGS="-brtl -bexpall"
+        JVMLIB="-L$JAVA_HOME/jre/lib/ppc/j9vm -L$JAVA_HOME/jre/lib/ppc -ljsig -ljvm"
+     fi
+   ;;
+   SunOS)
+     if [ "$BPE_MAKE_BITS" = "64" ]
+     then
+        MBM_CFLAGS="-xtarget=ultra -xarch=v9 -xcode=pic32"
+        JVMLIB="-L$JAVA_HOME/jre/lib/sparcv9/server -ljsig -ljvm"
+     else
+        MBM_CFLAGS=""
+        JVMLIB="-L$JAVA_HOME/jre/lib/sparc/server -ljsig -ljvm"
+     fi
+   ;;
+   HP-UX)
+     if [ "$BPE_MAKE_BITS" = "64" ]
+     then
+        MBM_CFLAGS="-z +DD64"
+        JVMLIB="-L$JAVA_HOME/jre/lib/IA64W/server -ljsig -ljvm"
+     else
+        MBM_CFLAGS="-z"
+        JVMLIB="-L$JAVA_HOME/jre/lib/IA64N/server -ljsig -ljvm"
+     fi
+   ;;
+   Interix)
+     MBM_CFLAGS="-R -m32"
+     JVMLIB="$JAVA_HOME/lib/jvm.lib"
+   ;;
+ esac
+
+ if [ "$MACHINE" = "WINTEL" ]
+ then
+   $CC $MBM_CFLAGS $LINKLIBDIR -o $RTSVSAM \
+		"$JVMLIB" \
+                $EBMMFDATE \
+                $RTSVSAM_DIR/CPR.o $RTSVSAM_DIR/COB.o \
+                $RTSVSAM_DIR/$ELDATE  $RTSVSAM_DIR/lppfserv.o \
+                $RTSVSAM_DIR/kxpassrem.o $RTSVSAM_DIR/kxpassubs.o \
+                $EBMLSFILE $RTSVSAM_DIR/kxcat.o \
+                $RTSVSAM_DIR/runb.o \
+                $KXUSEROBJ \
+                $ORACLEOBJ  \
+                $SYBASEOBJ  \
+                $SECURITYOBJECTS \
+                $EBMRTSOBJECTS \
+                $DBLINKS \
+                $EXCILINKS \
+                $EBMHOME/pack/RTSFS/acustub.o \
+                $EBMHOME/pack/RTSFS/vJVM.o \
+		$EBMHOME/pack/RTSFS/bpefork.o \
+                -L$PACK/lib/lang -llang_vcobol \
+                -L$VCOBOL/native/lib -lvcobol \
+		"$JVMLIB" $PACK/lib/ebmbridge.lib
+  else
+   $CC $MBM_CFLAGS $LINKLIBDIR -o $RTSVSAM \
+                $JVMLIB \
+                $EBMMFDATE \
+                $RTSVSAM_DIR/CPR.o $RTSVSAM_DIR/COB.o \
+                $RTSVSAM_DIR/$ELDATE  $RTSVSAM_DIR/lppfserv.o \
+                $RTSVSAM_DIR/kxpassrem.o $RTSVSAM_DIR/kxpassubs.o \
+                $EBMLSFILE $RTSVSAM_DIR/kxcat.o \
+                $RTSVSAM_DIR/runb.o \
+                $KXUSEROBJ \
+                $ORACLEOBJ  \
+                $SYBASEOBJ  \
+                $SECURITYOBJECTS \
+                $EBMRTSOBJECTS \
+                $DBLINKS \
+                $EXCILINKS \
+                $EBMHOME/pack/RTSFS/acustub.o \
+                $EBMHOME/pack/RTSFS/vJVM.o \
+                -L$PACK/lib/lang -llang_vcobol \
+                -L$VCOBOL/native/lib -lvcobol
+  fi
+fi
+
+set +x
+if [ "$MBM_COBOL" = "MFCOBOL" ] || \
+   [ "$MBM_COBOL" = "VCOBOL" ]
+then
+	if [ ! -f $RTSVSAM ]
+	then
+		echo fatal error creating the $RTSVSAM command
+		exit 1
+	fi
+	chmod 755 $RTSVSAM
+	ln -s $RTSVSAM $RUNBDIR/RUNB
+	ln -s $RTSVSAM $RUNBDIR/rtsvsam
+	if [ ! -f $RUNBDIR/RUNB ]
+	then
+		echo fatal error creating the $RUNBDIR/RUNB command
+		exit 1
+	fi
+fi
+
+exit 0

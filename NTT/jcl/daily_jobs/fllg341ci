@@ -1,0 +1,74 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+
+setenv dtetme `date +%m%d%H%M%S`
+
+################################################################################
+LABEL name=BEGSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/INTPYMTS.fnl.csv
+rm -f $SEQFILES/*intpymts.fnl.csv
+ftp -n ntcso1 < $JCLLIB/ftp-fllg341ci
+cat $SEQFILES/*intpymts.fnl.csv > $SEQFILES/INTPYMTS.fnl.csv
+cp $SEQFILES/INTPYMTS.fnl.csv $SEQFILES/INTPYMTS.fnl.csv.$dtetme
+!
+EXECPGM pgmname='BPXBATCH' stepname='BEGSTEP' parm='SH'
+
+################################################################################
+LABEL name=PERL1 
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/clmint_conv.pl $SEQFILES/INTPYMTS.fnl.csv $SEQFILES/FL.WW.CLMINT.WORK
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=TRLRBKP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+unikixbld -t s -d ELTRLR -s $SEQFILES/fnl.eltrlr_el341ci.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='TRLRBKP' parm='SH'
+
+################################################################################
+LABEL name=EL341CI
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/FL.WW.CLMINT.WORK' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/FL.EX.FICH341CI' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/FL.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='B' 
+
+EXECPGM pgmname='EL341CI' stepname='EL341CI' 
+
+################################################################################
+LABEL name=CPY341
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/FL.EX.FICH341CI' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/FL.DL.CIADM.FICH341CI' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY341' parm='ALL' 
+
+################################################################################
+
+################################################################################
+LABEL name=ENDSTEP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cat $SEQFILES/FL.DL.CIADM.FICH341CI | mutt -s '$JOBNAME is complete' dsysclmdlyrpts
+!
+EXECPGM pgmname='BPXBATCH' stepname='ENDSTEP' parm='SH'
+
+ENDJOB 
+
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################

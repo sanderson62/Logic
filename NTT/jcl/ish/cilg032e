@@ -1,0 +1,63 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+
+################################################################################
+LABEL name=ECS032E
+################################################################################
+#  ********************************************************************  
+#  ******--                                                    --******  
+#  ***--                 CLAIM RESERVES REPORT FOR EMERALD        --***  
+#  ******--                                                    --******  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+#  (TEMP COPY OF CI.XX.DET010 CART)00000029
+ASSGNDD ddname='SYS018' filename='$SEQFILES/CI.DD.DET010.TEMP' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/CI.EX.FICH032.EMERALD' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='ERMEBL' type='DUMMY'
+#  ****************************************************  WORK FILES      
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+
+EXECPGM pgmname='ECS032E' stepname='ECS032E'
+
+################################################################################
+LABEL name=CPY032E
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.EX.FICH032.EMERALD' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH032R.EMERALD' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009LT' stepname='CPY032E' parm='ECS032R'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/rpt2pdf $SEQFILES/CI.DL.CIADM.FICH032R.EMERALD $SEQFILES/CI.ECS032R.EMERALD.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+    "ftp -n ntis1.cso.local < $JCLLIB/ftp-cilg032e"
+#    "uuencode $SEQFILES/CI.ECS032R.EMERALD.pdf CI.ECS032R.EMERALD.pdf|mailx -s 'Emerald Special ECS032R Attached' -r 'slunikix@cso.com' pema@cso.com"
+    echo " There are no hardcopy reports in this job "
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOBS
+# 052914 2014042300003   TANA   CHANGE MAILX TO MUTT EMAIL

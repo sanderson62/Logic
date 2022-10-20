@@ -1,0 +1,45 @@
+################################################################################
+#                       
+#     JOB: cilgm360    
+#                      
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=CPY360
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cp $SEQFILES/CI.DD.MTD.AUDIT.ELBENE $SEQFILES/CI.DL.CIADM.AUDIT.ELBENE
+rm -f $SEQFILES/CI.DD.MTD.AUDIT.ELBENE
+!
+EXECPGM pgmname='BPXBATCH' stepname='CPY360' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/el3602pdf $SEQFILES/CI.DL.CIADM.AUDIT.ELBENE $SEQFILES/CID.BENE.AUDIT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+    "ftp -n ntcso1 < $JCLLIB/ftp-cilgm360"
+    "smtp -f slunikix -t dcpsbeneaudit -s 'Beneficiary Master Audit is ready' -mf /apps/prod/cid1p/emails/cilgm360.txt"
+   "mutt -s 'CID BENE Audit Report Attached' -a $SEQFILES/CID.BENE.AUDIT.pdf dcpsbeneaudit@cso.com  -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"
+else
+   echo "Job aborted "
+endif
+
+################################################################################
+ENDJOB 
+
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 021804   2002123000003 SMVA   NEW MONTHLY JOB
+# 071113                 PEMA   add mutt

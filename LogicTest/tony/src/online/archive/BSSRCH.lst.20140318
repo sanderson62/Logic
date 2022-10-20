@@ -1,0 +1,1656 @@
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page   1
+* BSSRCH.cbl
+* Options: int("BSSRCH.int") anim csi verbose NOBOUND LINKCHECK
+*          PARAMCOUNTCHECK directives(cobopt.bth) endp list("BSSRCH.lst")
+* Setting: NOACCEPTREFRESH NOADV ALIGN"8" ALPHASTART"1" NOALTER NOAMODE ANIM
+*          NOANIMPREP ANS85 APOST NOAREACHECK ARITHMETIC"OSVS" ASSIGN
+*          "EXTERNAL" NOASSIGN-PRINTER NOAUTOLOCK NOBELL NOBOUND NOBRIEF
+*          NOBS2000 BWZSTAR NOBYTEMODEMOVE CALLFH"EXTFH" NOCALLMCS
+*          NOCALLRECOVERY CALLSORT"EXTSM" CANCEL CANCELLBR NOCHANGEMESSAGE
+*          CHARSET"ASCII" CHECKDIV"ANSI" NOCHECKREFMOD NOCICS CICS-CPY
+*          NOCICSOPTIMIZE NOCMPR2 NOCOBFSTATCONV NOCOBIDY NOCOBOL370 COBOLDIR
+*          NOCOMP COMP-5"2" COMP-6"2" NOCOMS85 CONFIRM NOCONVERTRET CONVSPACE
+*          COPYEXT",cbl,cpy" NOCOPYLBR COPYLIST COPYLISTCOMMENT"1" CSI
+*          CURRENCY-SIGN"36" CURRENT-DATE"MMDDYY" NODATA DATACOMPRESS"0"
+*          NODATA-CONTEXT DATE DBCHECK DBCS"2" NODBCSSOSI DBSPACE DE-EDIT"2"
+*          DEFAULTBYTE"0" NODEFAULTCALLS DETECTLOCK NODG DIALECT"MF"
+*          NODIRECTIVES-IN-COMMENTS NODOSVS NODPCINSUBSCRIPT DYNAM
+*          NOEARLY-RELEASE ECHO NOECHOALL NOEDITOR ENSUITE"0" NOENTCOBOL
+*          ERRFORMAT"1" ERRLIST"EMBED" NOERRQ FASTSORT NOFCD3 NOFCDREG
+*          NOFDCLEAR NOFILESHARE FILETYPE"0" NOFLAG NOFLAGAS NOFLAGCD
+*          NOFLAGEUC NOFLAGMIG NOFLAGQ FLAGSINEDIT NOFLAGSTD NOFOLDCALLNAME
+*          NOFOLDCOPYNAME FORM"60" NOFP-ROUNDING NOHOSTARITHMETIC
+*          NOHOSTCONTZERO NOHOST-NUMCOMPARE NOHOST-NUMMOVE NOHOSTFD NOHOSTRW
+*          NOIBM-MS IBMCOMP IDXFORMAT"0" NOILGEN IMPLICITSCOPE NOINDD
+*          INFORETURN"0" NOINITCALL INITPTR INT"BSSRCH.int" INTDATE"ANSI"
+*          INTLEVEL"2" IOCONV NOISO2002 NOIXNLSKEY NOIXNUMKEY KEEP-INT
+*          KEYCHECK KEYCOMPRESS"0" LIBRARIAN"2" NOLINE-COUNT LIST"BSSRCH.lst"
+*          LISTPATH"" LISTWIDTH"80" LITVAL-SIZE"4" LOCKTYPE"0" NOMAPNAME
+*          NOMAXERROR METHODDEFAULT"REFERENCE" MF"15" MFCOMMENT NOMOVELENCHECK
+*          NOMS NOMVS NATIVE"ASCII" NONATIVEFLOATINGPOINT NONCHAR
+*          NONEWBASENAME NONLS NSYMBOL"DBCS" NOODOOSVS NOODOSLIDE
+*          NOOLDBLANKLINE NOOLDCOPY NOOLDINDEX NOOLDNEXTSENTENCE NOOLDREADINTO
+*          NOOLDSTRMIX OOCTRL"-C-E-G-P+Q+R-S+W" OPTIONAL-FILE NOOS390 OSEXT""
+*          NOOSVS NOOUTDD NOP64 NOPANVALET PERFORM-TYPE"OSVS" NOPREPLIST
+*          NOPREPROCESS NOPRINT-EXT NOPROFILE NOPROGID-COMMENT
+*          NOPROGID-INT-NAME NOPROTECT-LINKAGE PROTOTYPE"RELAXED" QUAL
+*          QUALPROC NOQUERY NOQUOTE NORAWLIST NORDW RECMODE"F" NOREENTRANT
+*          NOREF NOREFNO REMAINDER"1" REPORT-LINE"256" RESEQ NORETRYLOCK
+*          REWRITE-LS NORM RTNCODE-SIZE"4" NORWHARDPAGE NOSAA SEG NOSEQCHK
+*          SEQUENTIAL"RECORD" NOSERIAL SETTING"LINE" NOSHAREOUTDD NOSHOW-DIR
+*          SIGN"ASCII" NOSIGNDISCARD NOSIGNFIXUP SORTTYPE"DFSORT" SOURCEFORMAT
+*          "FIXED" SOURCETABSTOP"8" NOSPZERO NOSSRANGE STDERR STICKY-LINKAGE
+*          "2" NOSTICKY-PERFORM SUPFF SWITCHTYPE"1" SYMBSTART"1" SYSPUNCH"132"
+*          TERMPAGE TIME NOTRACE NOTRUNC NOTRUNCCALLNAME NOTRUNCCOPY TRUNCINC
+*          "10" UNICODE"NATIVE" VERBOSE VSC2"4" WARNING"1" NOWB NOWB2 NOWB3
+*          WEBSERVER"CGI" NOWRITELOCK NOWRITETHRU NOXOPEN NOXREF
+*          NOZEROLENGTHFALSE NOZEROSEQ NOZWB
+     1*****************************************************************
+     2*                                                               *
+     3* Copyright (c) 2013 by Central States Health and Life          *
+     4* All rights reserved.                                          *
+     5*                                                               *
+     6*****************************************************************
+     7 identification division.
+     8 program-id. BSSRCH.
+     9*
+    10*AUTHOR.    Pablo.
+    11*           Colleyville, TEXAS.
+    12********************************************
+    13*   Balance sheet for month end balancing
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page   2
+* BSSRCH.cbl
+    14********************************************
+    15******************************************************************
+    16*                   C H A N G E   L O G
+    17*
+    18* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+    19*-----------------------------------------------------------------
+    20*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+    21* EFFECTIVE    NUMBER
+    22*-----------------------------------------------------------------
+    23* 082013  CR2013060600001  PEMA  ADJ TOL TO 10% FOR NON-PROC
+    24* 100813  IR2013100100001  PEMA INCREASE NON-PROC REF TOL
+    25* 101713  CR2013060600001  PEMA AUTOMATE AHL MORT RESERVE CALC
+    26 environment division.
+    27 INPUT-OUTPUT SECTION.
+    28 FILE-CONTROL.
+    29 SELECT CID-ECS010-IN ASSIGN TO
+    30    '/data/seqfiles/cilgm15.ECS010.ME50.BAL.AMTS'
+    31    FILE STATUS IS ECS010-STATUS.
+    32 SELECT AHL-ECS080-IN ASSIGN TO
+    33    '/data/seqfiles/ahlgm17.ECS080.ME.BAL.AMTS'
+    34    FILE STATUS IS ECS080-STATUS.
+    35 SELECT AHL-ECS010-IN ASSIGN TO
+    36    '/data/seqfiles/ahlgm15.ECS010.ME50.BAL.AMTS'
+    37    FILE STATUS IS ECS010-STATUS.
+    38 SELECT DCC-ECS010-IN ASSIGN TO
+    39    '/data/seqfiles/cidclgm15.ECS010.ME50.BAL.AMTS'
+    40    FILE STATUS IS ECS010-STATUS.
+    41 SELECT CID-CHKPOINT-OUT ASSIGN TO
+    42    '/data/seqfiles/cidmechkpts.txt'
+    43    FILE STATUS IS CHKPNT-STATUS
+    44                            ORGANIZATION IS LINE SEQUENTIAL.
+    45 SELECT ahl-CHKPOINT-OUT ASSIGN TO
+    46   '/data/seqfiles/ahlmechkpts.txt'
+    47    FILE STATUS IS CHKPNT-STATUS
+    48                            ORGANIZATION IS LINE SEQUENTIAL.
+    49 SELECT dcc-CHKPOINT-OUT ASSIGN TO
+    50    '/data/seqfiles/dccmechkpts.txt'
+    51    FILE STATUS IS CHKPNT-STATUS
+    52                            ORGANIZATION IS LINE SEQUENTIAL.
+    53 data division.
+    54 FILE SECTION.
+    55 FD  CID-ECS010-IN
+    56     BLOCK CONTAINS 0
+    57     RECORDING MODE F.
+    58 01  CID-ECS010-IN-REC           pic x(94).
+    59 FD  AHL-ECS010-IN
+    60     BLOCK CONTAINS 0
+    61     RECORDING MODE F.
+    62 01  AHL-ECS010-IN-REC           pic x(94).
+    63 FD  AHL-ECS080-IN
+    64     BLOCK CONTAINS 0
+    65     RECORDING MODE F.
+    66 01  AHL-ECS080-IN-REC           pic x(46).
+    67 FD  DCC-ECS010-IN
+    68     BLOCK CONTAINS 0
+    69     RECORDING MODE F.
+    70 01  DCC-ECS010-IN-REC           pic x(94).
+    71 FD  cid-CHKPOINT-OUT
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page   3
+* BSSRCH.cbl
+    72     BLOCK CONTAINS 0
+    73     RECORDING MODE F.
+    74 01  cid-CHKPOINT-OUT-REC        pic x(94).
+    75 FD  ahl-CHKPOINT-OUT
+    76     BLOCK CONTAINS 0
+    77     RECORDING MODE F.
+    78 01  ahl-CHKPOINT-OUT-REC        pic x(94).
+    79 FD  dcc-CHKPOINT-OUT
+    80     BLOCK CONTAINS 0
+    81     RECORDING MODE F.
+    82 01  dcc-CHKPOINT-OUT-REC        pic x(94).
+    83 working-storage section.
+    84 01  DFH-START PIC X(04).
+    85 77  s1 pic s999 comp-3 value +0.
+    86 77  s2 pic s999 comp-3 value +0.
+    87 77  ws-pass-amount              pic s9(11) comp-3 value +0.
+    88 77  ws-low-amount               pic s9(11) value zeros.
+    89 77  ws-hi-amount                pic s9(11) value zeros.
+    90 77  ws-low-pct                  pic s9v9(4) value zeros comp-3.
+    91 77  ws-high-pct                 pic s9v9(4) value zeros comp-3.
+    92************************************************
+    93* commarea passed to the business logic
+    94************************************************
+    95 01  srch-commarea.
+    96*                                copy BSSRCH-COMMAREA.
+    97*****************************************************************
+    98*                                                               *
+    99* Copyright (c) 2013 by CSO.                                    *
+   100* All rights reserved.                                          *
+   101*                                                               *
+   102*****************************************************************
+   103****************************************
+   104*  commarea for QUERY by eom date and company id
+   105*  (business logic input & output)
+   106****************************************
+   107     03  bl-input.
+   108         05  bl-input-eom-date   pic x(10).
+   109         05  bl-input-comp-id    pic xxx.
+   110         05  bl-input-lo-resv    pic 9(9).
+   111         05  bl-input-hi-resv    pic 9(9).
+   112         05  bl-input-bld-file   pic xxx.
+   113     03  bl-output.
+   114         05  bl-status           pic x.
+   115             88  bl-ok                 value "p".
+   116             88  bl-fail               value "f".
+   117         05  bl-output-message   pic x(50).
+   118         05  bl-output-record.
+   119            07  bl-out-company-name
+   120                                 pic x(30).
+   121            07  bl-out-formated-date
+   122                                 pic x(20).
+   123            07  filler occurs 3.
+   124                09  bl-out-lf-prem  pic s9(9)v99 comp-3 value +0.
+   125                09  bl-out-ah-prem  pic s9(9)v99 comp-3 value +0.
+   126                09  bl-out-lf-ref   pic s9(9)v99 comp-3 value +0.
+   127                09  bl-out-ah-ref   pic s9(9)v99 comp-3 value +0.
+   128                09  bl-out-lf-net   pic s9(9)v99 comp-3 value +0.
+   129                09  bl-out-ah-net   pic s9(9)v99 comp-3 value +0.
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page   4
+* BSSRCH.cbl
+   130                09  bl-out-lf-iss-com
+   131                                    pic s9(9)v99 comp-3 value +0.
+   132                09  bl-out-ah-iss-com
+   133                                    pic s9(9)v99 comp-3 value +0.
+   134                09  bl-out-lf-ref-com
+   135                                    pic s9(9)v99 comp-3 value +0.
+   136                09  bl-out-ah-ref-com
+   137                                    pic s9(9)v99 comp-3 value +0.
+   138                09  bl-out-lf-net-com
+   139                                    pic s9(9)v99 comp-3 value +0.
+   140                09  bl-out-ah-net-com
+   141                                    pic s9(9)v99 comp-3 value +0.
+   142                09  bl-out-iss-com  pic s9(9)v99 comp-3 value +0.
+   143                09  bl-out-ref-com  pic s9(9)v99 comp-3 value +0.
+   144                09  bl-out-net-com  pic s9(9)v99 comp-3 value +0.
+   145                09  bl-out-iss-cnt  pic s9(9)    comp-3 value +0.
+   146                09  bl-out-can-cnt  pic s9(9)    comp-3 value +0.
+   147                09  bl-out-net-cnt  pic s9(9)    comp-3 value +0.
+   148                09  bl-out-tot-prm  pic s9(9)v99 comp-3 value +0.
+   149                09  bl-out-tot-ref  pic s9(9)v99 comp-3 value +0.
+   150                09  bl-out-net-tot  pic s9(9)v99 comp-3 value +0.
+   151            07  bl-out-cm-cnt    pic s9(9)     comp-3 value +0.
+   152            07  bl-out-lf-clms-pd
+   153                                 pic s9(9)v99  comp-3 value +0.
+   154            07  bl-out-lf-clms-void
+   155                                 pic s9(9)v99  comp-3 value +0.
+   156            07  bl-out-lf-tot-clms
+   157                                 pic s9(9)v99  comp-3 value +0.
+   158            07  bl-out-ah-clms-pd
+   159                                 pic s9(9)v99  comp-3 value +0.
+   160            07  bl-out-ah-clms-void
+   161                                 pic s9(9)v99  comp-3 value +0.
+   162            07  bl-out-ah-tot-clms
+   163                                 pic s9(9)v99  comp-3 value +0.
+   164            07  bl-out-clms-pd   pic s9(9)v99  comp-3 value +0.
+   165            07  bl-out-clms-void pic s9(9)v99  comp-3 value +0.
+   166            07  bl-out-tot-clms  pic s9(9)v99  comp-3 value +0.
+   167            07  bl-out-lf-clms-cur
+   168                                 pic s9(9)v99  comp-3 value +0.
+   169            07  bl-out-ah-clms-cur
+   170                                 pic s9(9)v99  comp-3 value +0.
+   171            07  bl-out-tot-clms-cur
+   172                                 pic s9(9)v99  comp-3 value +0.
+   173*                                copy ELCFUNDT.
+   174*****************************************************************
+   175*                                                               *
+   176*                            ELCFUNDT.                          *
+   177*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE *
+   178*                            VMOD=2.001                         *
+   179*                                                               *
+   180*           COPYBOOK FOR THE FUNCTION DATE FORMAT               *
+   181*                                                               *
+   182*****************************************************************
+   183
+   184
+   185 01  FUNCTION-DATE.
+   186     05  WS-FN-DATE                PIC 9(8)    VALUE ZEROS.
+   187     05  WS-FN-CYMD  REDEFINES  WS-FN-DATE.
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page   5
+* BSSRCH.cbl
+   188         10  WS-FN-CCYR            PIC 9(4).
+   189         10  WS-FN-CCYY  REDEFINES  WS-FN-CCYR.
+   190             15  WS-FN-CC          PIC 99.
+   191             15  WS-FN-YR          PIC 99.
+   192         10  WS-FN-MO              PIC 99.
+   193         10  WS-FN-DA              PIC 99.
+   194     05  WS-FN-HOURS               PIC 99      VALUE ZEROS.
+   195     05  WS-FN-MINUTES             PIC 99      VALUE ZEROS.
+   196     05  WS-FN-SECONDS             PIC 99      VALUE ZEROS.
+   197     05  WS-FN-HUNDSECS            PIC 99      VALUE ZEROS.
+   198     05  WS-FN-GMT-IND             PIC X       VALUE SPACES.
+   199         88  WS-BEHIND-GMT                     VALUE '-'.
+   200         88  WS-AFTER-GMT                      VALUE '+'.
+   201         88  WS-NO-GMT                         VALUE ZERO.
+   202     05  WS-FN-GMT-HOURS           PIC 99      VALUE ZEROS.
+   203     05  WS-FN-GMT-MINUTES         PIC 99      VALUE ZEROS.
+   204*                                COPY ELCDATE.
+   205******************************************************************
+   206*                                                                *
+   207*                                                                *
+   208*                            ELCDATE.                            *
+   209*           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE
+   210*                            VMOD=2.003
+   211*                                                                *
+   212*                                                                *
+   213*   DESCRIPTION:  DATA PASSED TO DATE CONVERSION ROUTINE.        *
+   214*                 LENGTH = 200                                   *
+   215******************************************************************
+   216
+   217 01  DATE-CONVERSION-DATA.
+   218     12  DC-COMM-LENGTH                PIC S9(4) COMP VALUE +200.
+   219     12  DC-OPTION-CODE                PIC X.
+   220         88  BIN-TO-GREG                VALUE ' '.
+   221         88  ELAPSED-BETWEEN-BIN        VALUE '1'.
+   222         88  EDIT-GREG-TO-BIN           VALUE '2'.
+   223         88  YMD-GREG-TO-BIN            VALUE '3'.
+   224         88  MDY-GREG-TO-BIN            VALUE '4'.
+   225         88  JULIAN-TO-BIN              VALUE '5'.
+   226         88  BIN-PLUS-ELAPSED           VALUE '6'.
+   227         88  FIND-CENTURY               VALUE '7'.
+   228         88  ELAPSED-BETWEEN-BIN-3      VALUE '8'.
+   229         88  EDIT-GREG-TO-BIN-3         VALUE '9'.
+   230         88  YMD-GREG-TO-BIN-3          VALUE 'A'.
+   231         88  MDY-GREG-TO-BIN-3          VALUE 'B'.
+   232         88  JULIAN-TO-BIN-3            VALUE 'C'.
+   233         88  BIN-PLUS-ELAPSED-3         VALUE 'D'.
+   234         88  JULIAN-EXPANDED-TO-BIN     VALUE 'E'.
+   235         88  JULIAN-EXPANDED-TO-BIN-3   VALUE 'F'.
+   236         88  BIN-TO-JULIAN-EXPANDED     VALUE 'G'.
+   237         88  JULIAN-EXPANDED            VALUE 'E', 'F', 'G'.
+   238         88  CHECK-LEAP-YEAR            VALUE 'H'.
+   239         88  BIN-3-TO-GREG              VALUE 'I'.
+   240         88  CYMD-GREG-TO-BIN-3         VALUE 'J'.
+   241         88  MDCY-GREG-TO-BIN-3         VALUE 'K'.
+   242         88  CYMD-GREG-TO-BIN           VALUE 'L'.
+   243         88  MDCY-GREG-TO-BIN           VALUE 'M'.
+   244         88  MDY-GREG-TO-JULIAN         VALUE 'N'.
+   245         88  MDCY-GREG-TO-JULIAN        VALUE 'O'.
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page   6
+* BSSRCH.cbl
+   246         88  YMD-GREG-TO-JULIAN         VALUE 'P'.
+   247         88  CYMD-GREG-TO-JULIAN        VALUE 'Q'.
+   248         88  THREE-CHARACTER-BIN
+   249                  VALUES  '8' '9' 'A' 'B' 'C' 'D' 'I' 'J' 'K'.
+   250         88  GREGORIAN-TO-BIN
+   251                  VALUES '2' '3' '4' '9' 'A' 'B' 'J' 'K' 'L' 'M'.
+   252         88  BIN-TO-GREGORIAN
+   253                  VALUES ' ' '1' 'I' '8' 'G'.
+   254         88  JULIAN-TO-BINARY
+   255                  VALUES '5' 'C' 'E' 'F'.
+   256     12  DC-ERROR-CODE                 PIC X.
+   257         88  NO-CONVERSION-ERROR        VALUE ' '.
+   258         88  DATE-CONVERSION-ERROR
+   259                  VALUES '1' '2' '3' '4' '5' '9' 'A' 'B' 'C'.
+   260         88  DATE-IS-ZERO               VALUE '1'.
+   261         88  DATE-IS-NON-NUMERIC        VALUE '2'.
+   262         88  DATE-IS-INVALID            VALUE '3'.
+   263         88  DATE1-GREATER-DATE2        VALUE '4'.
+   264         88  ELAPSED-PLUS-NEGATIVE      VALUE '5'.
+   265         88  DATE-INVALID-OPTION        VALUE '9'.
+   266         88  INVALID-CENTURY            VALUE 'A'.
+   267         88  ONLY-CENTURY               VALUE 'B'.
+   268         88  ONLY-LEAP-YEAR             VALUE 'C'.
+   269         88  VALID-CENTURY-LEAP-YEAR    VALUE 'B', 'C'.
+   270     12  DC-END-OF-MONTH               PIC X.
+   271         88  CALCULATE-END-OF-MONTH     VALUE '1'.
+   272     12  DC-CENTURY-ADJUSTMENT         PIC X   VALUE SPACES.
+   273         88  USE-NORMAL-PROCESS         VALUE ' '.
+   274         88  ADJUST-DOWN-100-YRS        VALUE '1'.
+   275         88  ADJUST-UP-100-YRS          VALUE '2'.
+   276     12  FILLER                        PIC X.
+   277     12  DC-CONVERSION-DATES.
+   278         16  DC-BIN-DATE-1             PIC XX.
+   279         16  DC-BIN-DATE-2             PIC XX.
+   280         16  DC-GREG-DATE-1-EDIT       PIC X(08).
+   281         16  DC-GREG-DATE-1-EDIT-R REDEFINES
+   282                       DC-GREG-DATE-1-EDIT.
+   283             20  DC-EDIT1-MONTH        PIC 99.
+   284             20  SLASH1-1              PIC X.
+   285             20  DC-EDIT1-DAY          PIC 99.
+   286             20  SLASH1-2              PIC X.
+   287             20  DC-EDIT1-YEAR         PIC 99.
+   288         16  DC-GREG-DATE-2-EDIT       PIC X(08).
+   289         16  DC-GREG-DATE-2-EDIT-R REDEFINES
+   290                     DC-GREG-DATE-2-EDIT.
+   291             20  DC-EDIT2-MONTH        PIC 99.
+   292             20  SLASH2-1              PIC X.
+   293             20  DC-EDIT2-DAY          PIC 99.
+   294             20  SLASH2-2              PIC X.
+   295             20  DC-EDIT2-YEAR         PIC 99.
+   296         16  DC-GREG-DATE-1-YMD        PIC 9(06).
+   297         16  DC-GREG-DATE-1-YMD-R  REDEFINES
+   298                     DC-GREG-DATE-1-YMD.
+   299             20  DC-YMD-YEAR           PIC 99.
+   300             20  DC-YMD-MONTH          PIC 99.
+   301             20  DC-YMD-DAY            PIC 99.
+   302         16  DC-GREG-DATE-1-MDY        PIC 9(06).
+   303         16  DC-GREG-DATE-1-MDY-R REDEFINES
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page   7
+* BSSRCH.cbl
+   304                      DC-GREG-DATE-1-MDY.
+   305             20  DC-MDY-MONTH          PIC 99.
+   306             20  DC-MDY-DAY            PIC 99.
+   307             20  DC-MDY-YEAR           PIC 99.
+   308         16  DC-GREG-DATE-1-ALPHA.
+   309             20  DC-ALPHA-MONTH        PIC X(10).
+   310             20  DC-ALPHA-DAY          PIC 99.
+   311             20  FILLER                PIC XX.
+   312             20  DC-ALPHA-CENTURY.
+   313                 24 DC-ALPHA-CEN-N     PIC 99.
+   314             20  DC-ALPHA-YEAR         PIC 99.
+   315         16  DC-ELAPSED-MONTHS         PIC S9(4)     COMP.
+   316         16  DC-ODD-DAYS-OVER          PIC S9(4)     COMP.
+   317         16  DC-ELAPSED-DAYS           PIC S9(4)     COMP.
+   318         16  DC-JULIAN-DATE            PIC 9(05).
+   319         16  DC-JULIAN-YYDDD REDEFINES DC-JULIAN-DATE
+   320                                       PIC 9(05).
+   321         16  DC-JULIAN-DT REDEFINES DC-JULIAN-DATE.
+   322             20  DC-JULIAN-YEAR        PIC 99.
+   323             20  DC-JULIAN-DAYS        PIC 999.
+   324         16  DC-DAYS-IN-MONTH          PIC S9(3)       COMP-3.
+   325         16  DC-DAY-OF-WEEK            PIC S9  VALUE ZERO COMP-3.
+   326         16  DC-DAY-OF-WEEK2           PIC S9  VALUE ZERO COMP-3.
+   327     12  DATE-CONVERSION-VARIBLES.
+   328         16  HOLD-CENTURY-1            PIC 9(11) VALUE 0.
+   329         16  HOLD-CENTURY-1-SPLIT REDEFINES HOLD-CENTURY-1.
+   330             20  FILLER                PIC 9(3).
+   331             20  HOLD-CEN-1-CCYY.
+   332                 24  HOLD-CEN-1-CC     PIC 99.
+   333                 24  HOLD-CEN-1-YY     PIC 99.
+   334             20  HOLD-CEN-1-MO         PIC 99.
+   335             20  HOLD-CEN-1-DA         PIC 99.
+   336         16  HOLD-CENTURY-1-R   REDEFINES HOLD-CENTURY-1.
+   337             20  HOLD-CEN-1-R-MO       PIC 99.
+   338             20  HOLD-CEN-1-R-DA       PIC 99.
+   339             20  HOLD-CEN-1-R-CCYY.
+   340                 24  HOLD-CEN-1-R-CC   PIC 99.
+   341                 24  HOLD-CEN-1-R-YY   PIC 99.
+   342             20  FILLER                PIC 9(3).
+   343         16  HOLD-CENTURY-1-X.
+   344             20  FILLER                PIC X(3)  VALUE SPACES.
+   345             20  HOLD-CEN-1-X-CCYY.
+   346                 24  HOLD-CEN-1-X-CC   PIC XX VALUE SPACES.
+   347                 24  HOLD-CEN-1-X-YY   PIC XX VALUE SPACES.
+   348             20  HOLD-CEN-1-X-MO       PIC XX VALUE SPACES.
+   349             20  HOLD-CEN-1-X-DA       PIC XX VALUE SPACES.
+   350         16  HOLD-CENTURY-1-R-X REDEFINES HOLD-CENTURY-1-X.
+   351             20  HOLD-CEN-1-R-X-MO     PIC XX.
+   352             20  HOLD-CEN-1-R-X-DA     PIC XX.
+   353             20  HOLD-CEN-1-R-X-CCYY.
+   354                 24  HOLD-CEN-1-R-X-CC PIC XX.
+   355                 24  HOLD-CEN-1-R-X-YY PIC XX.
+   356             20  FILLER                PIC XXX.
+   357         16  DC-BIN-DATE-EXPAND-1      PIC XXX.
+   358         16  DC-BIN-DATE-EXPAND-2      PIC XXX.
+   359         16  DC-JULIAN-DATE-1          PIC 9(07).
+   360         16  DC-JULIAN-DATE-1-R REDEFINES DC-JULIAN-DATE-1.
+   361             20  DC-JULIAN-1-CCYY.
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page   8
+* BSSRCH.cbl
+   362                 24  DC-JULIAN-1-CC    PIC 99.
+   363                 24  DC-JULIAN-1-YR    PIC 99.
+   364             20  DC-JULIAN-DA-1        PIC 999.
+   365         16  DC-JULIAN-DATE-2          PIC 9(07).
+   366         16  DC-JULIAN-DATE-2-R REDEFINES DC-JULIAN-DATE-2.
+   367             20  DC-JULIAN-2-CCYY.
+   368                 24  DC-JULIAN-2-CC    PIC 99.
+   369                 24  DC-JULIAN-2-YR    PIC 99.
+   370             20  DC-JULIAN-DA-2        PIC 999.
+   371         16  DC-GREG-DATE-A-EDIT.
+   372             20  DC-EDITA-MONTH        PIC 99.
+   373             20  SLASHA-1              PIC X VALUE '/'.
+   374             20  DC-EDITA-DAY          PIC 99.
+   375             20  SLASHA-2              PIC X VALUE '/'.
+   376             20  DC-EDITA-CCYY.
+   377                 24  DC-EDITA-CENT     PIC 99.
+   378                 24  DC-EDITA-YEAR     PIC 99.
+   379         16  DC-GREG-DATE-B-EDIT.
+   380             20  DC-EDITB-MONTH        PIC 99.
+   381             20  SLASHB-1              PIC X VALUE '/'.
+   382             20  DC-EDITB-DAY          PIC 99.
+   383             20  SLASHB-2              PIC X VALUE '/'.
+   384             20  DC-EDITB-CCYY.
+   385                 24  DC-EDITB-CENT     PIC 99.
+   386                 24  DC-EDITB-YEAR     PIC 99.
+   387         16  DC-GREG-DATE-CYMD         PIC 9(08).
+   388         16  DC-GREG-DATE-CYMD-R REDEFINES
+   389                              DC-GREG-DATE-CYMD.
+   390             20  DC-CYMD-CEN           PIC 99.
+   391             20  DC-CYMD-YEAR          PIC 99.
+   392             20  DC-CYMD-MONTH         PIC 99.
+   393             20  DC-CYMD-DAY           PIC 99.
+   394         16  DC-GREG-DATE-MDCY         PIC 9(08).
+   395         16  DC-GREG-DATE-MDCY-R REDEFINES
+   396                              DC-GREG-DATE-MDCY.
+   397             20  DC-MDCY-MONTH         PIC 99.
+   398             20  DC-MDCY-DAY           PIC 99.
+   399             20  DC-MDCY-CEN           PIC 99.
+   400             20  DC-MDCY-YEAR          PIC 99.
+   401    12  DC-FORCE-EL310-DATE-SW         PIC X    VALUE SPACE.
+   402        88  DC-FORCE-EL310-DATE                 VALUE 'Y'.
+   403    12  DC-EL310-DATE                  PIC X(21).
+   404    12  FILLER                         PIC X(28).
+   405* 01  TRAN-DATA-LINE1             PIC X(80)    VALUE
+   406*     'BEGINJOB mode=''MVS'''.
+   407* 01  TRAN-DATA-LINE2             PIC X(80)    VALUE
+   408*     'LABEL name=PERL1'.
+   409* 01  TRAN-DATA-LINE3             PIC X(80)    VALUE
+   410*     'ASSGNDD ddname=''SYSIN'' type=''INSTREAM''  << !'.
+   411* 01  TRAN-DATA-LINE4             PIC X(80)    VALUE
+   412*     'perl /export/home/pema/bin/bal_sheet_ss.pl $SEQFILES/a1.txt
+   413*-    '$SEQFILES/a2.xlsx'
+   414* 01  TRAN-DATA-LINE5             PIC X(80)    VALUE '!'.
+   415* 01  TRAN-DATA-LINE6             PIC X(80)    VALUE
+   416*    'EXECPGM pgmname=''BPXBATCH'' stepname=''PERL1'' parm=''SH'''
+   417* 01  TRAN-DATA-LINE7             PIC X(80)    VALUE
+   418*     'LABEL name=EMAIL'.
+   419* 01  TRAN-DATA-LINE8             PIC X(80)    VALUE
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page   9
+* BSSRCH.cbl
+   420*     'ASSGNDD ddname=''SYSIN'' type=''INSTREAM''  << !'.
+   421* 01  TRAN-DATA-LINE9             PIC X(80)    VALUE
+   422*     'mutt -s ''AHL chkpts'' -a $SEQFILES/ahlmechkpts.xlsx pema@c
+   423*-    'o.com < /dev/null'.
+   424* 01  TRAN-DATA-LINE10            PIC X(80)    VALUE '!'.
+   425* 01  TRAN-DATA-LINE11            PIC X(80)    VALUE
+   426*    'EXECPGM pgmname=''BPXBATCH'' stepname=''EMAIL'' parm=''SH'''
+   427* 01  TRAN-DATA-LINE12            PIC X(80)    VALUE
+   428*     'ENDJOB'.
+   429 01  TRAN-DATA-LINE1             PIC X(80)    VALUE
+   430     'cd /apps/prod/cid1p/jcl'.
+   431 01  TRAN-DATA-LINE2.
+   432     05  filler                  pic x(10) value 'unikixjob '.
+   433     05  tran-comp-id            pic xxx   value '   '.
+   434     05  filler                 pic x(15) value 'chkpts -k cid1p'.
+   435     05  filler                  pic x(52) value spaces.
+   436 01  ECS010-IN-REC.
+   437     05  filler                  pic x(21).
+   438     05  ecs010-cert-cnt         pic x(11).
+   439     05  filler                  pic x(62).
+   440 01  ECS080-IN-REC.
+   441     05  filler                  pic x(21).
+   442     05  ecs080-mort-resv        pic x(11).
+   443     05  filler                  pic x(14).
+   444 01  cpo-out-record.
+   445     05  cpo-jobname             pic x(10)  value spaces.
+   446     05  f                       pic x value ';'.
+   447     05  cpo-stepname            pic x(6)   value spaces.
+   448     05  f                       pic x value ';'.
+   449     05  cpo-low-amount          pic -9(9)  value zeros.
+   450     05  f                       pic x value ';'.
+   451     05  cpo-hi-amount           pic -9(9)  value zeros.
+   452     05  f                       pic x value ';'.
+   453     05  cpo-desc                pic x(50)  value spaces.
+   454 01  ahl-table.
+   455     05 f                        pic x(68) value
+   456         'AHLGM10   ;EL524 ;Total Claims Paid
+   457-        '            '.
+   458     05 f                        pic x(68) value
+   459         'AHLGM10   ;EL523 ;Processable Written & Outstanding Bala
+   460-        'nce         '.
+   461     05 f                        pic x(68) value
+   462         'AHLGM10   ;EL523 ;Non-Processable Written & Outstanding
+   463-        'Balance     '.
+   464     05 f                        pic x(68) value
+   465         'AHLGM10   ;EL523 ;Total Written & Outstanding Balance
+   466-        '            '.
+   467     05 f                        pic x(68) value
+   468         'AHLGM10   ;EL523 ;Processable Cancelled
+   469-        '            '.
+   470     05 f                        pic x(68) value
+   471         'AHLGM10   ;EL523 ;Non-Processable Cancelled
+   472-        '            '.
+   473     05 f                        pic x(68) value
+   474         'AHLGM10   ;EL523 ;Total Cancelled
+   475-        '            '.
+   476     05 f                        pic x(68) value
+   477         'AHLGM10   ;EL523 ;Processable Net Premium
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  10
+* BSSRCH.cbl
+   478-        '            '.
+   479     05 f                        pic x(68) value
+   480         'AHLGM10   ;EL523 ;Non-Processable Net Premium
+   481-        '            '.
+   482     05 f                        pic x(68) value
+   483         'AHLGM10   ;EL523 ;Total Net Premium
+   484-        '            '.
+   485     05 f                        pic x(68) value
+   486         'AHLGM10   ;EL523 ;Processable Net Commission
+   487-        '            '.
+   488     05 f                        pic x(68) value
+   489         'AHLGM10   ;EL523 ;Non-Processable Net Commission
+   490-        '            '.
+   491     05 f                        pic x(68) value
+   492         'AHLGM10   ;EL523 ;Total Net Commission
+   493-        '            '.
+   494     05 f                        pic x(68) value
+   495         'AHLGM15   ;ECS010;Life Claims Paid
+   496-        '            '.
+   497     05 f                        pic x(68) value
+   498         'AHLGM15   ;ECS010;A&H Claims Paid
+   499-        '            '.
+   500     05 f                        pic x(68) value
+   501         'AHLGM15   ;ECS010;Output Certificate Master Records Prio
+   502-        'r Month     '.
+   503     05 f                        pic x(68) value
+   504         'AHLGM17   ;ECS080;Gross Reserve
+   505-        '            '.
+   506 01  dcc-table.
+   507     05 f                        pic x(68) value
+   508         'CIDCLGM10 ;EL524 ;Total Claims Paid
+   509-        '            '.
+   510     05 f                        pic x(68) value
+   511         'CIDCLGM10 ;EL523 ;Processable Written & Outstanding Bala
+   512-        'nce         '.
+   513     05 f                        pic x(68) value
+   514         'CIDCLGM10 ;EL523 ;Non-Processable Written & Outstanding
+   515-        'Balance     '.
+   516     05 f                        pic x(68) value
+   517         'CIDCLGM10 ;EL523 ;Total Written & Outstanding Balance
+   518-        '            '.
+   519     05 f                        pic x(68) value
+   520         'CIDCLGM10 ;EL523 ;Processable Cancelled
+   521-        '            '.
+   522     05 f                        pic x(68) value
+   523         'CIDCLGM10 ;EL523 ;Non-Processable Cancelled
+   524-        '            '.
+   525     05 f                        pic x(68) value
+   526         'CIDCLGM10 ;EL523 ;Total Cancelled
+   527-        '            '.
+   528     05 f                        pic x(68) value
+   529         'CIDCLGM10 ;EL523 ;Processable Net Premium
+   530-        '            '.
+   531     05 f                        pic x(68) value
+   532         'CIDCLGM10 ;EL523 ;Non-Processable Net Premium
+   533-        '            '.
+   534     05 f                        pic x(68) value
+   535         'CIDCLGM10 ;EL523 ;Total Net Premium
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  11
+* BSSRCH.cbl
+   536-        '            '.
+   537     05 f                        pic x(68) value
+   538         'CIDCLGM10 ;EL523 ;Processable Net Commission
+   539-        '            '.
+   540     05 f                        pic x(68) value
+   541         'CIDCLGM10 ;EL523 ;Non-Processable Net Commission
+   542-        '            '.
+   543     05 f                        pic x(68) value
+   544         'CIDCLGM10 ;EL523 ;Total Net Commission
+   545-        '            '.
+   546     05 f                        pic x(68) value
+   547         'CIDCLGM15 ;ECS010;Life Claims Paid
+   548-        '            '.
+   549     05 f                        pic x(68) value
+   550         'CIDCLGM15 ;ECS010;A&H Claims Paid
+   551-        '            '.
+   552     05 f                        pic x(68) value
+   553         'CIDCLGM15 ;ECS010;Output Certificate Master Records Prio
+   554-        'r Month     '.
+   555     05 f                        pic x(68) value
+   556         'CIDCLGM17 ;ECS080;Gross Reserve
+   557-        '            '.
+   558 01  cid-table.
+   559     05 f                        pic x(68) value
+   560         'CILGM10   ;EL524 ;Total Claims Paid
+   561-        '            '.
+   562     05 f                        pic x(68) value
+   563         'CILGM10   ;EL523 ;Processable Written & Outstanding Bala
+   564-        'nce         '.
+   565     05 f                        pic x(68) value
+   566         'CILGM10   ;EL523 ;Non-Processable Written & Outstanding
+   567-        'Balance     '.
+   568     05 f                        pic x(68) value
+   569         'CILGM10   ;EL523 ;Total Written & Outstanding Balance
+   570-        '            '.
+   571     05 f                        pic x(68) value
+   572         'CILGM10   ;EL523 ;Processable Cancelled
+   573-        '            '.
+   574     05 f                        pic x(68) value
+   575         'CILGM10   ;EL523 ;Non-Processable Cancelled
+   576-        '            '.
+   577     05 f                        pic x(68) value
+   578         'CILGM10   ;EL523 ;Total Cancelled
+   579-        '            '.
+   580     05 f                        pic x(68) value
+   581         'CILGM10   ;EL523 ;Processable Net Premium
+   582-        '            '.
+   583     05 f                        pic x(68) value
+   584         'CILGM10   ;EL523 ;Non-Processable Net Premium
+   585-        '            '.
+   586     05 f                        pic x(68) value
+   587         'CILGM10   ;EL523 ;Total Net Premium
+   588-        '            '.
+   589     05 f                        pic x(68) value
+   590         'CILGM10   ;EL523 ;Processable Net Commission
+   591-        '            '.
+   592     05 f                        pic x(68) value
+   593         'CILGM10   ;EL523 ;Non-Processable Net Commission
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  12
+* BSSRCH.cbl
+   594-        '            '.
+   595     05 f                        pic x(68) value
+   596         'CILGM10   ;EL523 ;Total Net Commission
+   597-        '            '.
+   598     05 f                        pic x(68) value
+   599         'CILGM15   ;ECS010;Life Claims Paid
+   600-        '            '.
+   601     05 f                        pic x(68) value
+   602         'CILGM15   ;ECS010;A&H Claims Paid
+   603-        '            '.
+   604     05 f                        pic x(68) value
+   605         'CILGM15   ;ECS010;Output Certificate Master Records Prio
+   606-        'r Month     '.
+   607     05 f                        pic x(68) value
+   608         'CILGM17   ;ECS080;Gross Reserve
+   609-        '            '.
+   610 01  filler redefines cid-table.
+   611     05  filler occurs 17.
+   612         10  tbl-jobname             pic x(10).
+   613         10  f                       pic x.
+   614         10  tbl-stepname            pic x(6).
+   615         10  f                       pic x.
+   616         10  tbl-desc                pic x(50).
+   617 01  filler.
+   618     05  filler occurs 17.
+   619         10  tbl-low-amount      pic s9(9).
+   620         10  tbl-hi-amount       pic s9(9).
+   621************************************
+   622* fields used to read web data
+   623************************************
+   624 01  w-form-name       pic x(80).
+   625 01  w-form-value      pic x(80).
+   626 01  w-form-name-len   pic s9(8) comp.
+   627 01  w-form-value-len  pic s9(8) comp.
+   628 01  w-resp            pic s9(8) comp.
+   629 01  w-doctoken        pic x(16).
+   630 01  filler.
+   631     05  ECS010-STATUS           PIC XX VALUE ZEROS.
+   632     05  ECS080-STATUS           PIC XX VALUE ZEROS.
+   633     05  CHKPNT-STATUS           pic xx value zeros.
+   634     05  work-cert-cnt           pic x(11).
+   635     05  numeric-cert-cnt        pic 9(9).
+   636     05  work-mort-resv          pic x(11).
+   637     05  work-mort-resv-lo       pic x(11).
+   638     05  work-mort-resv-hi       pic x(11).
+   639     05  numeric-mort-resv       pic 9(9).
+   640*****************************************
+   641* symbol list for the BSDETAIL template
+   642*****************************************
+   643 01 output-data.
+   644    05  filler                   pic x(7) value"COMPID=".
+   645    05  out-comp-id              pic xxx.
+   646    05  filler                   pic x(8) value"&EOMDTE=".
+   647    05  out-eom-date             pic x(10).
+   648    05  filler                   pic x(9) value"&COMPNME=".
+   649    05  out-comp-name            pic x(30).
+   650    05  filler                   pic x(7) value"&FDATE=".
+   651    05  out-format-date          pic x(20).
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  13
+* BSSRCH.cbl
+   652    05  filler                   pic x(10) value"&LFISSPRM=".
+   653    05  out-lf-iss-prem          pic zz,z99,999.99.
+   654    05  filler                   pic x(10) value"&LFREFPRM=".
+   655    05  out-lf-ref-prem          pic zz,z99,999.99.
+   656    05  filler                   pic x(10) value"&LFNETPRM=".
+   657    05  out-lf-net-prem          pic -zz,zz9,999.99.
+   658    05  filler                   pic x(10) value"&AHISSPRM=".
+   659    05  out-ah-iss-prem          pic zz,zz9,999.99.
+   660    05  filler                   pic x(10) value"&AHREFPRM=".
+   661    05  out-ah-ref-prem          pic zz,z99,999.99.
+   662    05  filler                   pic x(10) value"&AHNETPRM=".
+   663    05  out-ah-net-prem          pic -zz,z99,999.99.
+   664    05  filler                   pic x(10) value"&LFISSCOM=".
+   665    05  out-lf-iss-comm          pic zz,zz9,999.99.
+   666    05  filler                   pic x(10) value"&LFREFCOM=".
+   667    05  out-lf-ref-comm          pic zz,zz9,999.99.
+   668    05  filler                   pic x(10) value"&LFNETCOM=".
+   669    05  out-lf-net-comm          pic -zz,zz9,999.99.
+   670    05  filler                   pic x(10) value"&AHISSCOM=".
+   671    05  out-ah-iss-comm          pic zz,zzz,999.99.
+   672    05  filler                   pic x(10) value"&AHREFCOM=".
+   673    05  out-ah-ref-comm          pic zz,z99,999.99.
+   674    05  filler                   pic x(10) value"&AHNETCOM=".
+   675    05  out-ah-net-comm          pic -zz,z99,999.99.
+   676    05  filler                   pic x(9) value "&TOTPREM=".
+   677    05  out-tot-prem             pic zz,z99,999.99.
+   678    05  filler                   pic x(9) value "&TOTREFS=".
+   679    05  out-tot-refs             pic zz,z99,999.99.
+   680    05  filler                   pic x(9) value"&TOTNETP=".
+   681    05  out-tot-netp             pic -zz,z99,999.99.
+   682    05  filler                   pic x(8) value"&ISSCOM=".
+   683    05  out-iss-comm             pic zz,zz9,999.99.
+   684    05  filler                   pic x(8) value"&REFCOM=".
+   685    05  out-ref-comm             pic zz,z99,999.99.
+   686    05  filler                   pic x(9) value"&TOTNCOM=".
+   687    05  out-net-comm             pic -zz,z99,999.99.
+   688    05  filler                   pic x(8) value "&ISSCNT=".
+   689    05  out-iss-cnt              pic zzzz,z99.
+   690    05  filler                   pic x(8) value "&REFCNT=".
+   691    05  out-ref-cnt              pic zzzz,999.
+   692    05  filler                   pic x(8) value "&NETCNT=".
+   693    05  out-net-cnt              pic -zzzz,999.
+   694    05  filler                   pic x(8) value"&LFCLMS=".
+   695    05  out-lf-clms-pd           pic zz,z99,999.99.
+   696    05  filler                   pic x(9) value"&LFVOIDS=".
+   697    05  out-lf-clms-void         pic zz,zz9,999.99.
+   698    05  filler                   pic x(11) value"&TOTLFCLMS=".
+   699    05  out-lf-tot-clms          pic -zz,z99,999.99.
+   700    05  filler                   pic x(8) value"&AHCLMS=".
+   701    05  out-ah-clms-pd           pic zz,z99,999.99.
+   702    05  filler                   pic x(9) value"&AHVOIDS=".
+   703    05  out-ah-clms-void         pic zz,zz9,999.99.
+   704    05  filler                   pic x(11) value"&TOTAHCLMS=".
+   705    05  out-ah-tot-clms          pic -zz,z99,999.99.
+   706    05  filler                   pic x(8) value"&PDCLMS=".
+   707    05  out-clms-pd              pic zz,z99,999.99.
+   708    05  filler                   pic x(8) value"&VDCLMS=".
+   709    05  out-clms-void            pic zz,z99,999.99.
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  14
+* BSSRCH.cbl
+   710    05  filler                   pic x(9) value"&TOTCLMS=".
+   711    05  out-tot-clms             pic -zz,z99,999.99.
+   712    05  filler                   pic x(8) value"&LORESV=".
+   713    05  out-lo-resv              pic zzz,z99,999.
+   714    05  filler                   pic x(8) value"&HIRESV=".
+   715    05  out-hi-resv              pic zzz,z99,999.
+   716    05  filler                   pic x(8) value"&CRTCNT=".
+   717    05  out-crt-cnt              pic z,zz9,999.
+   718    05  filler                   pic x(5) value "&MSG=".
+   719    05  output-msg               pic x(50).
+   720 01 bl-index               pic s9(8) comp.
+   721****************************************************************
+   722*
+   723* Copyright (c) 2007 by Clerity Solutions, Inc.
+   724* All rights reserved.
+   725*
+   726****************************************************************
+   727 01  DFHEIV.
+   728   02  DFHEIV0               PIC X(35).
+   729   02  DFHEIV1               PIC X(08).
+   730   02  DFHEIV2               PIC X(08).
+   731   02  DFHEIV3               PIC X(08).
+   732   02  DFHEIV4               PIC X(06).
+   733   02  DFHEIV5               PIC X(04).
+   734   02  DFHEIV6               PIC X(04).
+   735   02  DFHEIV7               PIC X(02).
+   736   02  DFHEIV8               PIC X(02).
+   737   02  DFHEIV9               PIC X(01).
+   738   02  DFHEIV10              PIC S9(7) COMP-3.
+   739   02  DFHEIV11              PIC S9(4) COMP SYNC.
+   740   02  DFHEIV12              PIC S9(4) COMP SYNC.
+   741   02  DFHEIV13              PIC S9(4) COMP SYNC.
+   742   02  DFHEIV14              PIC S9(4) COMP SYNC.
+   743   02  DFHEIV15              PIC S9(4) COMP SYNC.
+   744   02  DFHEIV16              PIC S9(9) COMP SYNC.
+   745   02  DFHEIV17              PIC X(04).
+   746   02  DFHEIV18              PIC X(04).
+   747   02  DFHEIV19              PIC X(04).
+   748   02  DFHEIV20              USAGE IS POINTER.
+   749   02  DFHEIV21              USAGE IS POINTER.
+   750   02  DFHEIV22              USAGE IS POINTER.
+   751   02  DFHEIV23              USAGE IS POINTER.
+   752   02  DFHEIV24              USAGE IS POINTER.
+   753   02  DFHEIV25              PIC S9(9) COMP SYNC.
+   754   02  DFHEIV26              PIC S9(9) COMP SYNC.
+   755   02  DFHEIV27              PIC S9(9) COMP SYNC.
+   756   02  DFHEIV28              PIC S9(9) COMP SYNC.
+   757   02  DFHEIV97              PIC S9(7) COMP-3 VALUE ZERO.
+   758   02  DFHEIV98              PIC S9(4) COMP SYNC VALUE ZERO.
+   759   02  FILLER                PIC X(02).
+   760   02  DFHEIV99              PIC X(08) VALUE SPACE.
+   761   02  DFHEIVL0              PIC X(48) VALUE SPACE.
+   762   02  DFHEIVL1              PIC X(48) VALUE SPACE.
+   763   02  DFHEIVL2              PIC X(48) VALUE SPACE.
+   764   02  DFHEIVL3              PIC X(48) VALUE SPACE.
+   765 LINKAGE  SECTION.
+   766*****************************************************************
+   767*                                                               *
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  15
+* BSSRCH.cbl
+   768* Copyright (c) 2007 by Clerity Solutions, Inc.                 *
+   769* All rights reserved.                                          *
+   770*                                                               *
+   771*****************************************************************
+   772 01  dfheiblk.
+   773     02  eibtime          pic s9(7) comp-3.
+   774     02  eibdate          pic s9(7) comp-3.
+   775     02  eibtrnid         pic x(4).
+   776     02  eibtaskn         pic s9(7) comp-3.
+   777     02  eibtrmid         pic x(4).
+   778     02  dfheigdi         pic s9(4) comp.
+   779     02  eibcposn         pic s9(4) comp.
+   780     02  eibcalen         pic s9(4) comp.
+   781     02  eibaid           pic x(1).
+   782     02  eibfiller1       pic x(1).
+   783     02  eibfn            pic x(2).
+   784     02  eibfiller2       pic x(2).
+   785     02  eibrcode         pic x(6).
+   786     02  eibfiller3       pic x(2).
+   787     02  eibds            pic x(8).
+   788     02  eibreqid         pic x(8).
+   789     02  eibrsrce         pic x(8).
+   790     02  eibsync          pic x(1).
+   791     02  eibfree          pic x(1).
+   792     02  eibrecv          pic x(1).
+   793     02  eibsend          pic x(1).
+   794     02  eibatt           pic x(1).
+   795     02  eibeoc           pic x(1).
+   796     02  eibfmh           pic x(1).
+   797     02  eibcompl         pic x(1).
+   798     02  eibsig           pic x(1).
+   799     02  eibconf          pic x(1).
+   800     02  eiberr           pic x(1).
+   801     02  eibrldbk         pic x(1).
+   802     02  eiberrcd         pic x(4).
+   803     02  eibsynrb         pic x(1).
+   804     02  eibnodat         pic x(1).
+   805     02  eibfiller5       pic x(2).
+   806     02  eibresp          pic 9(09) comp.
+   807     02  eibresp2         pic 9(09) comp.
+   808     02  dfheigdj         pic s9(4) comp.
+   809     02  dfheigdk         pic s9(4) comp.
+   810 01  DFHCOMMAREA       PIC X(01).
+   811 PROCEDURE DIVISION USING DFHEIBLK DFHCOMMAREA.
+   812 0000-DFHEXIT SECTION.
+   813     MOVE '9#                    $   ' TO DFHEIV0.
+   814     MOVE 'BSSRCH' TO DFHEIV1.
+   815     CALL 'kxdfhei1' USING DFHEIV0 DFH-START DFHEIV DFHEIV1.
+   816 0000-begin.
+   817     MOVE FUNCTION CURRENT-DATE  TO FUNCTION-DATE
+   818
+   819* exec cics web
+   820*       startbr formfield resp(w-resp)
+   821*    end-exec
+   822*    MOVE 'X(f                   &  N#00000814' TO DFHEIV0
+   823     MOVE X'582866202020202020202020' TO DFHEIV0(1:12)
+   824     MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+   825     MOVE X'204E233030303030383134' TO DFHEIV0(25:11)
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  16
+* BSSRCH.cbl
+   826     CALL 'kxdfhei1' USING DFHEIV0,
+   827           DFHEIV99,
+   828           DFHEIV99,
+   829           DFHEIV99,
+   830           DFHEIV99,
+   831           DFHEIV99
+   832     MOVE EIBRESP  TO w-resp
+   833     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+   834     perform 0200-read-form      thru 0200-exit until
+   835        w-resp not = 0
+   836*   dfhresp(normal)
+   837
+   838* exec cics web
+   839*       endbr formfield
+   840*    end-exec
+   841*    MOVE 'X,f                   #   #00000819' TO DFHEIV0
+   842     MOVE X'582C66202020202020202020' TO DFHEIV0(1:12)
+   843     MOVE X'202020202020202020202320' TO DFHEIV0(13:12)
+   844     MOVE X'2020233030303030383139' TO DFHEIV0(25:11)
+   845     CALL 'kxdfhei1' USING DFHEIV0,
+   846           DFHEIV99,
+   847           DFHEIV99
+   848     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+   849     display ' input date   ' bl-input-eom-date
+   850     display ' comp id      ' bl-input-comp-id
+   851     display ' mort resv lo ' work-mort-resv-lo
+   852     display ' mort resv hi ' work-mort-resv-hi
+   853     display ' build file   ' bl-input-bld-file
+   854     evaluate bl-input-comp-id
+   855        when 'AHL'
+   856           open input AHL-ECS010-IN
+   857           if ecs010-status not = '00'
+   858              move ' Cant open AHL ecs010 file '
+   859                                 to bl-output-message
+   860              go to 0100-send-document
+   861           end-if
+   862           READ AHL-ECS010-IN into ecs010-in-rec
+   863              display ' ecs010 cert cnt ' ecs010-cert-cnt
+   864              move ecs010-cert-cnt
+   865                                 to work-cert-cnt
+   866           close ahl-ecs010-in
+   867           open input AHL-ECS080-IN
+   868           if ecs080-status not = '00'
+   869              move ' Cant open AHL ecs080 file '
+   870                                 to bl-output-message
+   871              go to 0100-send-document
+   872           end-if
+   873           READ AHL-ECS080-IN into ecs080-in-rec
+   874              display ' ecs080 mort resv ' ecs080-in-rec
+   875              move ecs080-mort-resv
+   876                                 to work-mort-resv
+   877           close ahl-ecs080-in
+   878        when 'CID'
+   879           open input CID-ECS010-IN
+   880           if ecs010-status not = '00'
+   881              move ' Cant open AHL ecs010 file '
+   882                                 to bl-output-message
+   883              go to 0100-send-document
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  17
+* BSSRCH.cbl
+   884           end-if
+   885           READ CID-ECS010-IN into ecs010-in-rec
+   886              display ' ecs010 cert cnt ' ecs010-cert-cnt
+   887              move ecs010-cert-cnt
+   888                                 to work-cert-cnt
+   889           close cid-ecs010-in
+   890        when 'DCC'
+   891           open input DCC-ECS010-IN
+   892           if ecs010-status not = '00'
+   893              move ' Cant open AHL ecs010 file '
+   894                                 to bl-output-message
+   895              go to 0100-send-document
+   896           end-if
+   897           READ DCC-ECS010-IN into ecs010-in-rec
+   898              display ' ecs010 cert cnt ' ecs010-cert-cnt
+   899              move ecs010-cert-cnt
+   900                                 to work-cert-cnt
+   901           close dcc-ecs010-in
+   902     end-evaluate
+   903     move zeros                  to numeric-cert-cnt
+   904     inspect work-cert-cnt replacing all spaces by zeros
+   905     move +9 to s2
+   906     perform varying s1 from +11 by -1 until s1 < +1
+   907        if work-cert-cnt (s1:1) numeric
+   908           move work-cert-cnt (s1:1)
+   909                                 to numeric-cert-cnt (s2:1)
+   910           subtract +1 from s2
+   911        end-if
+   912     end-perform
+   913     move numeric-cert-cnt       to bl-out-cm-cnt
+   914     if bl-input-comp-id = 'AHL'
+   915        display ' work mort reserve  **' work-mort-resv '**'
+   916        move zeros               to numeric-mort-resv
+   917        inspect work-mort-resv replacing all spaces by zeros
+   918        display ' work mort reserve  **' work-mort-resv '**'
+   919        move +9 to s2
+   920        perform varying s1 from +11 by -1 until s1 < +1
+   921           if work-mort-resv (s1:1) numeric
+   922              move work-mort-resv (s1:1)
+   923                                 to numeric-mort-resv (s2:1)
+   924              subtract +1 from s2
+   925           end-if
+   926        end-perform
+   927        move numeric-mort-resv   to bl-input-hi-resv
+   928        display ' bl hi reserve ' bl-input-hi-resv
+   929        if bl-input-hi-resv < 1000000
+   930           move zeros            to bl-input-lo-resv
+   931        else
+   932           compute bl-input-lo-resv = bl-input-hi-resv - 1000000
+   933        end-if
+   934        display ' bl lo reserve ' bl-input-lo-resv
+   935     else
+   936        move zeros               to numeric-mort-resv
+   937****    inspect work-mort-resv replacing all spaces by zeros
+   938        move +9 to s2
+   939        perform varying s1 from +11 by -1 until s1 < +1
+   940           if work-mort-resv-lo (s1:1) numeric
+   941              move work-mort-resv-lo (s1:1)
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  18
+* BSSRCH.cbl
+   942                                 to numeric-mort-resv (s2:1)
+   943              subtract +1 from s2
+   944           end-if
+   945        end-perform
+   946        move numeric-mort-resv   to bl-input-lo-resv
+   947        display ' bl lo reserve ' bl-input-lo-resv
+   948        move zeros               to numeric-mort-resv
+   949****    inspect work-mort-resv replacing all spaces by zeros
+   950        move +9 to s2
+   951        perform varying s1 from +11 by -1 until s1 < +1
+   952           if work-mort-resv-hi (s1:1) numeric
+   953              move work-mort-resv-hi (s1:1)
+   954                                 to numeric-mort-resv (s2:1)
+   955              subtract +1 from s2
+   956           end-if
+   957        end-perform
+   958        move numeric-mort-resv   to bl-input-hi-resv
+   959        display ' bl hi reserve ' bl-input-hi-resv
+   960     end-if
+   961
+   962* exec cics link
+   963*       program  ('BSSRCHBL')
+   964*       commarea (srch-commarea)
+   965*    end-exec
+   966     MOVE LENGTH OF
+   967      srch-commarea
+   968       TO DFHEIV11
+   969     MOVE 'BSSRCHBL' TO DFHEIV1
+   970*    MOVE '."C                   (   #00000934' TO DFHEIV0
+   971     MOVE X'2E2243202020202020202020' TO DFHEIV0(1:12)
+   972     MOVE X'202020202020202020202820' TO DFHEIV0(13:12)
+   973     MOVE X'2020233030303030393334' TO DFHEIV0(25:11)
+   974     CALL 'kxdfhei1' USING DFHEIV0,
+   975           DFHEIV1,
+   976           srch-commarea,
+   977           DFHEIV11,
+   978           DFHEIV99,
+   979           DFHEIV99,
+   980           DFHEIV99,
+   981           DFHEIV99
+   982     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+   983     .
+   984 0100-send-document.
+   985***********************************************************
+   986* Build output document.
+   987***********************************************************
+   988     move bl-input-comp-id       to out-comp-id
+   989     move bl-input-eom-date      to out-eom-date
+   990     move bl-input-lo-resv       to out-lo-resv
+   991     move bl-input-hi-resv       to out-hi-resv
+   992     move bl-out-company-name    to out-comp-name
+   993     move bl-out-formated-date   to out-format-date
+   994     move bl-out-lf-prem (1)     to out-lf-iss-prem
+   995     move bl-out-ah-prem (1)     to out-ah-iss-prem
+   996     move bl-out-tot-prm (1)     to out-tot-prem
+   997     move bl-out-lf-ref  (1)     to out-lf-ref-prem
+   998     move bl-out-ah-ref  (1)     to out-ah-ref-prem
+   999     move bl-out-tot-ref (1)     to out-tot-refs
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  19
+* BSSRCH.cbl
+  1000     move bl-out-lf-net  (1)     to out-lf-net-prem
+  1001     move bl-out-ah-net  (1)     to out-ah-net-prem
+  1002     move bl-out-lf-iss-com (1)  to out-lf-iss-comm
+  1003     move bl-out-ah-iss-com (1)  to out-ah-iss-comm
+  1004     move bl-out-lf-ref-com (1)  to out-lf-ref-comm
+  1005     move bl-out-ah-ref-com (1)  to out-ah-ref-comm
+  1006     move bl-out-lf-net-com (1)  to out-lf-net-comm
+  1007     move bl-out-ah-net-com (1)  to out-ah-net-comm
+  1008     move bl-out-iss-com    (1)  to out-iss-comm
+  1009     move bl-out-ref-com    (1)  to out-ref-comm
+  1010     move bl-out-net-com    (1)  to out-net-comm
+  1011     move bl-out-iss-cnt    (1)  to out-iss-cnt
+  1012     move bl-out-can-cnt    (1)  to out-ref-cnt
+  1013     move bl-out-net-cnt    (1)  to out-net-cnt
+  1014     move bl-out-net-tot    (1)  to out-tot-netp
+  1015     move bl-out-cm-cnt          to out-crt-cnt
+  1016     move bl-out-lf-clms-pd      to out-lf-clms-pd
+  1017     move bl-out-lf-clms-void    to out-lf-clms-void
+  1018     move bl-out-lf-tot-clms     to out-lf-tot-clms
+  1019     move bl-out-ah-clms-pd      to out-ah-clms-pd
+  1020     move bl-out-ah-clms-void    to out-ah-clms-void
+  1021     move bl-out-ah-tot-clms     to out-ah-tot-clms
+  1022     move bl-out-clms-pd         to out-clms-pd
+  1023     move bl-out-clms-void       to out-clms-void
+  1024     move bl-out-tot-clms        to out-tot-clms
+  1025     move bl-output-message      to output-msg
+  1026     if bl-input-bld-file = 'YES'
+  1027        move 'Balance File Created'
+  1028                                 to output-msg
+  1029     end-if
+  1030
+  1031* exec cics document create
+  1032*       doctoken   (w-doctoken)
+  1033*       template   ('BSDETAIL')
+  1034*       symbollist (output-data)
+  1035*       listlength (length of output-data)
+  1036*    end-exec
+  1037     MOVE 'BSDETAIL'
+  1038      TO DFHEIVL0
+  1039     MOVE LENGTH OF
+  1040      output-data TO DFHEIV16
+  1041*    MOVE '\"D tSL               )   #00000985' TO DFHEIV0
+  1042     MOVE X'5C22442074534C2020202020' TO DFHEIV0(1:12)
+  1043     MOVE X'202020202020202020202920' TO DFHEIV0(13:12)
+  1044     MOVE X'2020233030303030393835' TO DFHEIV0(25:11)
+  1045     CALL 'kxdfhei1' USING DFHEIV0,
+  1046           w-doctoken,
+  1047           DFHEIV99,
+  1048           DFHEIVL0,
+  1049           output-data,
+  1050           DFHEIV16,
+  1051           DFHEIV99,
+  1052           DFHEIV99,
+  1053           DFHEIV99
+  1054     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+  1055     move 1                      to bl-index
+  1056*    exec cics document insert
+  1057*       doctoken (w-doctoken)
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  20
+* BSSRCH.cbl
+  1058*       template ('BSFTR')
+  1059*    end-exec
+  1060    if bl-fail
+  1061
+  1062* exec cics syncpoint rollback
+  1063*      end-exec
+  1064*    MOVE '6"R                   !   #00000997' TO DFHEIV0
+  1065     MOVE X'362252202020202020202020' TO DFHEIV0(1:12)
+  1066     MOVE X'202020202020202020202120' TO DFHEIV0(13:12)
+  1067     MOVE X'2020233030303030393937' TO DFHEIV0(25:11)
+  1068     CALL 'kxdfhei1' USING DFHEIV0
+  1069     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+  1070    end-if
+  1071****************************************
+  1072* Send the document and return.
+  1073****************************************
+  1074
+  1075* exec cics web send
+  1076*       doctoken(w-doctoken)
+  1077*    end-exec
+  1078*    MOVE 'X$D                   *   #00001003' TO DFHEIV0
+  1079     MOVE X'582444202020202020202020' TO DFHEIV0(1:12)
+  1080     MOVE X'202020202020202020202A20' TO DFHEIV0(13:12)
+  1081     MOVE X'2020233030303031303033' TO DFHEIV0(25:11)
+  1082     CALL 'kxdfhei1' USING DFHEIV0,
+  1083           w-doctoken,
+  1084           DFHEIV99,
+  1085           DFHEIV99,
+  1086           DFHEIV99,
+  1087           DFHEIV99,
+  1088           DFHEIV99,
+  1089           DFHEIV99,
+  1090           DFHEIV99,
+  1091           DFHEIV99
+  1092     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+  1093     if bl-input-bld-file = 'YES'
+  1094        evaluate bl-input-comp-id
+  1095           when 'AHL'
+  1096              move ahl-table     to cid-table
+  1097              perform 0300-build-cid
+  1098                                 thru 0300-exit
+  1099              perform 0400-write-ahl
+  1100                                 thru 0400-exit
+  1101           when 'CID'
+  1102              perform 0300-build-cid
+  1103                                 thru 0300-exit
+  1104              perform 0500-write-cid
+  1105                                 thru 0500-exit
+  1106           when 'DCC'
+  1107              move dcc-table     to cid-table
+  1108              perform 0300-build-cid
+  1109                                 thru 0300-exit
+  1110              perform 0600-write-dcc
+  1111                                 thru 0600-exit
+  1112        end-evaluate
+  1113     end-if
+  1114
+  1115* exec cics return
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  21
+* BSSRCH.cbl
+  1116*    end-exec
+  1117*    MOVE '.(                    ''   #00001027' TO DFHEIV0
+  1118     MOVE X'2E2820202020202020202020' TO DFHEIV0(1:12)
+  1119     MOVE X'202020202020202020202720' TO DFHEIV0(13:12)
+  1120     MOVE X'2020233030303031303237' TO DFHEIV0(25:11)
+  1121     CALL 'kxdfhei1' USING DFHEIV0,
+  1122           DFHEIV99,
+  1123           DFHEIV99,
+  1124           DFHEIV99,
+  1125           DFHEIV99,
+  1126           DFHEIV99,
+  1127           DFHEIV99
+  1128     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+  1129     .
+  1130 0200-read-form.
+  1131     move spaces                 to w-form-name
+  1132     move length of w-form-name  to w-form-name-len
+  1133     move spaces                 to w-form-value
+  1134     move length of w-form-value to w-form-value-len
+  1135
+  1136* exec cics web readnext
+  1137*       formfield   (w-form-name)
+  1138*       namelength  (w-form-name-len)
+  1139*       value       (w-form-value)
+  1140*       valuelength (w-form-value-len)
+  1141*       resp        (w-resp)
+  1142*    end-exec
+  1143*    MOVE 'X*FLVL                &  N#00001035' TO DFHEIV0
+  1144     MOVE X'582A464C564C202020202020' TO DFHEIV0(1:12)
+  1145     MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+  1146     MOVE X'204E233030303031303335' TO DFHEIV0(25:11)
+  1147     CALL 'kxdfhei1' USING DFHEIV0,
+  1148           w-form-name,
+  1149           w-form-name-len,
+  1150           w-form-value,
+  1151           w-form-value-len,
+  1152           DFHEIV99
+  1153     MOVE EIBRESP  TO w-resp
+  1154     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+  1155     evaluate w-resp
+  1156        when 0
+  1157*   dfhresp(normal)
+  1158           evaluate w-form-name(1:w-form-name-len)
+  1159              when 'eom_dte'
+  1160                 if w-form-value-len not = 0
+  1161                    move w-form-value(1:w-form-value-len)
+  1162                                 to bl-input-eom-date
+  1163                 else
+  1164                    move spaces  to bl-input-eom-date
+  1165                end-if
+  1166              when 'comp_id'
+  1167                 if w-form-value-len not = 0
+  1168                    move w-form-value(1:w-form-value-len)
+  1169                                 to bl-input-comp-id
+  1170                 else
+  1171                    move spaces  to bl-input-comp-id
+  1172                end-if
+  1173              when 'lo_resv'
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  22
+* BSSRCH.cbl
+  1174                 if w-form-value-len not = 0
+  1175                    move w-form-value(1:w-form-value-len)
+  1176                                 to work-mort-resv-lo
+  1177                 else
+  1178                    move zeros   to work-mort-resv-lo
+  1179                end-if
+  1180              when 'hi_resv'
+  1181                 if w-form-value-len not = 0
+  1182                    move w-form-value(1:w-form-value-len)
+  1183                                 to work-mort-resv-hi
+  1184                 else
+  1185                    move zeros   to work-mort-resv-hi
+  1186                end-if
+  1187              when 'bld_file'
+  1188                 if w-form-value-len not = 0
+  1189                    move w-form-value(1:w-form-value-len)
+  1190                                 to bl-input-bld-file
+  1191                 else
+  1192                    move spaces  to bl-input-bld-file
+  1193                end-if
+  1194           end-evaluate
+  1195        when other
+  1196           continue
+  1197     end-evaluate
+  1198     .
+  1199 0200-exit.
+  1200     exit.
+  1201 0300-build-cid.
+  1202     move +.98                   to ws-low-pct
+  1203     move +1.02                  to ws-high-pct
+  1204     perform varying s1 from +1 by +1 until s1 > +17
+  1205        move -999999999          to tbl-low-amount (s1)
+  1206        move +999999999          to tbl-hi-amount  (s1)
+  1207     end-perform
+  1208     move bl-out-tot-clms        to ws-pass-amount
+  1209     perform 0310-calc-tol       thru 0310-exit
+  1210     move ws-low-amount          to tbl-low-amount (1)
+  1211     move ws-hi-amount           to tbl-hi-amount (1)
+  1212*** processable gross premium
+  1213     move bl-out-tot-prm (1)     to ws-pass-amount
+  1214     perform 0310-calc-tol       thru 0310-exit
+  1215     move ws-low-amount          to tbl-low-amount (2)
+  1216     move ws-hi-amount           to tbl-hi-amount (2)
+  1217*** non-processable gross premium
+  1218     move +.90                   to ws-low-pct
+  1219     move +1.10                  to ws-high-pct
+  1220     move bl-out-tot-prm (2)     to ws-pass-amount
+  1221     perform 0310-calc-tol       thru 0310-exit
+  1222     move ws-low-amount          to tbl-low-amount (3)
+  1223     move ws-hi-amount           to tbl-hi-amount (3)
+  1224*** total gross premium
+  1225     move +.98                   to ws-low-pct
+  1226     move +1.02                  to ws-high-pct
+  1227     compute tbl-low-amount (4) =
+  1228        tbl-low-amount (2) + tbl-low-amount (3)
+  1229     compute tbl-hi-amount (4) =
+  1230        tbl-hi-amount (2) + tbl-hi-amount (3)
+  1231*** processable refunded premium
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  23
+* BSSRCH.cbl
+  1232     move bl-out-tot-ref (1)     to ws-pass-amount
+  1233     perform 0310-calc-tol       thru 0310-exit
+  1234     move ws-low-amount          to tbl-low-amount (5)
+  1235     move ws-hi-amount           to tbl-hi-amount (5)
+  1236*** non-processable refunded premium
+  1237     move +.70                   to ws-low-pct
+  1238     move +1.30                  to ws-high-pct
+  1239     move bl-out-tot-ref (2)     to ws-pass-amount
+  1240     perform 0310-calc-tol       thru 0310-exit
+  1241     move ws-low-amount          to tbl-low-amount (6)
+  1242     move ws-hi-amount           to tbl-hi-amount (6)
+  1243*** total refunded premium
+  1244     move +.98                   to ws-low-pct
+  1245     move +1.02                  to ws-high-pct
+  1246     compute tbl-low-amount (7) =
+  1247        tbl-low-amount (5) + tbl-low-amount (6)
+  1248     compute tbl-hi-amount (7) =
+  1249        tbl-hi-amount (5) + tbl-hi-amount (6)
+  1250*** processable net premium
+  1251     move bl-out-net-tot (1)     to ws-pass-amount
+  1252     perform 0310-calc-tol       thru 0310-exit
+  1253     move ws-low-amount          to tbl-low-amount (8)
+  1254     move ws-hi-amount           to tbl-hi-amount (8)
+  1255*** non-processable net premium
+  1256     move +.90                   to ws-low-pct
+  1257     move +1.10                  to ws-high-pct
+  1258     move bl-out-net-tot (2)     to ws-pass-amount
+  1259     perform 0310-calc-tol       thru 0310-exit
+  1260     move ws-low-amount          to tbl-low-amount (9)
+  1261     move ws-hi-amount           to tbl-hi-amount (9)
+  1262*** total net premium
+  1263     move +.98                   to ws-low-pct
+  1264     move +1.02                  to ws-high-pct
+  1265     compute tbl-low-amount (10) =
+  1266        tbl-low-amount (8) + tbl-low-amount (9)
+  1267     compute tbl-hi-amount (10) =
+  1268        tbl-hi-amount (8) + tbl-hi-amount (9)
+  1269*** processable commission
+  1270     move bl-out-net-com (1)     to ws-pass-amount
+  1271     perform 0310-calc-tol       thru 0310-exit
+  1272     move ws-low-amount          to tbl-low-amount (11)
+  1273     move ws-hi-amount           to tbl-hi-amount (11)
+  1274*** non-processable commission
+  1275     move +.90                   to ws-low-pct
+  1276     move +1.10                  to ws-high-pct
+  1277     move bl-out-net-com (2)     to ws-pass-amount
+  1278     perform 0310-calc-tol       thru 0310-exit
+  1279     move ws-low-amount          to tbl-low-amount (12)
+  1280     move ws-hi-amount           to tbl-hi-amount (12)
+  1281*** total commission
+  1282     move +.98                   to ws-low-pct
+  1283     move +1.02                  to ws-high-pct
+  1284     compute tbl-low-amount (13) =
+  1285        tbl-low-amount (11) + tbl-low-amount (12)
+  1286     compute tbl-hi-amount (13) =
+  1287        tbl-hi-amount (11) + tbl-hi-amount (12)
+  1288     move bl-out-lf-tot-clms     to ws-pass-amount
+  1289     perform 0310-calc-tol       thru 0310-exit
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  24
+* BSSRCH.cbl
+  1290     move ws-low-amount          to tbl-low-amount (14)
+  1291     move ws-hi-amount           to tbl-hi-amount (14)
+  1292     move bl-out-ah-tot-clms     to ws-pass-amount
+  1293     perform 0310-calc-tol       thru 0310-exit
+  1294     move ws-low-amount          to tbl-low-amount (15)
+  1295     move ws-hi-amount           to tbl-hi-amount (15)
+  1296     move bl-out-cm-cnt          to tbl-low-amount (16)
+  1297                                    tbl-hi-amount  (16)
+  1298     move bl-input-lo-resv       to tbl-low-amount (17)
+  1299     move bl-input-hi-resv       to tbl-hi-amount (17)
+  1300     .
+  1301 0300-exit.
+  1302     exit.
+  1303 0310-calc-tol.
+  1304     if ws-pass-amount > zeros
+  1305        compute ws-low-amount = ws-pass-amount * ws-low-pct
+  1306        compute ws-hi-amount  = ws-pass-amount * ws-high-pct
+  1307     else
+  1308        compute ws-low-amount = ws-pass-amount * ws-high-pct
+  1309        compute ws-hi-amount  = ws-pass-amount * ws-low-pct
+  1310     end-if
+  1311     .
+  1312 0310-exit.
+  1313     exit.
+  1314 0400-write-ahl.
+  1315     open output ahl-chkpoint-out
+  1316     if chkpnt-status not = '00'
+  1317        move ' Cant open AHL CHKPNT file '
+  1318           to bl-output-message
+  1319        go to 0100-send-document
+  1320     end-if
+  1321     move bl-input-eom-date      to cpo-jobname
+  1322     move 'AHL'                  to cpo-stepname
+  1323     string ws-fn-mo '/' ws-fn-da '/' ws-fn-ccyy ' - '
+  1324        ws-fn-hours ':' ws-fn-minutes ':' ws-fn-seconds
+  1325        delimited by size into cpo-desc
+  1326     end-string
+  1327     write ahl-chkpoint-out-rec  from cpo-out-record
+  1328     move spaces                 to cpo-jobname
+  1329                                    cpo-stepname
+  1330     move 'Proc Cnt'             to cpo-desc
+  1331     move bl-out-iss-cnt (1)     to cpo-low-amount
+  1332     move bl-out-can-cnt (1)     to cpo-hi-amount
+  1333     write ahl-chkpoint-out-rec  from cpo-out-record
+  1334     move 'NonProcCnt'           to cpo-desc
+  1335     move bl-out-iss-cnt (2)     to cpo-low-amount
+  1336     move bl-out-can-cnt (2)     to cpo-hi-amount
+  1337     write ahl-chkpoint-out-rec  from cpo-out-record
+  1338     move 'Total Cnt'            to cpo-desc
+  1339     move bl-out-iss-cnt (3)     to cpo-low-amount
+  1340     move bl-out-can-cnt (3)     to cpo-hi-amount
+  1341     write ahl-chkpoint-out-rec  from cpo-out-record
+  1342     move bl-out-lf-clms-cur     to ws-pass-amount
+  1343     perform 0310-calc-tol       thru 0310-exit
+  1344     move 'LF Claims Paid Curr'  to cpo-desc
+  1345     move ws-low-amount          to cpo-low-amount
+  1346     move ws-hi-amount           to cpo-hi-amount
+  1347     write ahl-chkpoint-out-rec  from cpo-out-record
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  25
+* BSSRCH.cbl
+  1348     move bl-out-ah-clms-cur     to ws-pass-amount
+  1349     perform 0310-calc-tol       thru 0310-exit
+  1350     move 'AH Claims Paid Curr'  to cpo-desc
+  1351     move ws-low-amount          to cpo-low-amount
+  1352     move ws-hi-amount           to cpo-hi-amount
+  1353     write ahl-chkpoint-out-rec  from cpo-out-record
+  1354     move bl-out-tot-clms-cur    to ws-pass-amount
+  1355     perform 0310-calc-tol       thru 0310-exit
+  1356     move 'TOT Claims Paid Curr' to cpo-desc
+  1357     move ws-low-amount          to cpo-low-amount
+  1358     move ws-hi-amount           to cpo-hi-amount
+  1359     write ahl-chkpoint-out-rec  from cpo-out-record
+  1360     perform varying s1 from 1 by 1 until s1 > 17
+  1361        move tbl-jobname    (s1) to cpo-jobname
+  1362        move tbl-stepname   (s1) to cpo-stepname
+  1363        move tbl-desc       (s1) to cpo-desc
+  1364        move tbl-low-amount (s1) to cpo-low-amount
+  1365        move tbl-hi-amount  (s1) to cpo-hi-amount
+  1366        write ahl-chkpoint-out-rec from cpo-out-record
+  1367     end-perform
+  1368     close ahl-chkpoint-out
+  1369     perform 0700-submit-job     thru 0700-exit
+  1370     .
+  1371 0400-exit.
+  1372     exit.
+  1373 0500-write-cid.
+  1374     open output cid-chkpoint-out
+  1375     if chkpnt-status not = '00'
+  1376        move ' Cant open CID CHKPNT file '
+  1377           to bl-output-message
+  1378        go to 0100-send-document
+  1379     end-if
+  1380     move bl-input-eom-date      to cpo-jobname
+  1381     move 'CID'                  to cpo-stepname
+  1382     string ws-fn-mo '/' ws-fn-da '/' ws-fn-ccyy ' - '
+  1383        ws-fn-hours ':' ws-fn-minutes ':' ws-fn-seconds
+  1384        delimited by size into cpo-desc
+  1385     end-string
+  1386     write cid-chkpoint-out-rec  from cpo-out-record
+  1387     move spaces                 to cpo-jobname
+  1388                                    cpo-stepname
+  1389     move 'Proc Cnt'             to cpo-desc
+  1390     move bl-out-iss-cnt (1)     to cpo-low-amount
+  1391     move bl-out-can-cnt (1)     to cpo-hi-amount
+  1392     write cid-chkpoint-out-rec  from cpo-out-record
+  1393     move 'NonProcCnt'           to cpo-desc
+  1394     move bl-out-iss-cnt (2)     to cpo-low-amount
+  1395     move bl-out-can-cnt (2)     to cpo-hi-amount
+  1396     write cid-chkpoint-out-rec  from cpo-out-record
+  1397     move 'Total Cnt'            to cpo-desc
+  1398     move bl-out-iss-cnt (3)     to cpo-low-amount
+  1399     move bl-out-can-cnt (3)     to cpo-hi-amount
+  1400     write cid-chkpoint-out-rec  from cpo-out-record
+  1401     move bl-out-lf-clms-cur     to ws-pass-amount
+  1402     perform 0310-calc-tol       thru 0310-exit
+  1403     move 'LF Claims Paid Curr'  to cpo-desc
+  1404     move ws-low-amount          to cpo-low-amount
+  1405     move ws-hi-amount           to cpo-hi-amount
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  26
+* BSSRCH.cbl
+  1406     write cid-chkpoint-out-rec  from cpo-out-record
+  1407     move bl-out-ah-clms-cur     to ws-pass-amount
+  1408     perform 0310-calc-tol       thru 0310-exit
+  1409     move 'AH Claims Paid Curr'  to cpo-desc
+  1410     move ws-low-amount          to cpo-low-amount
+  1411     move ws-hi-amount           to cpo-hi-amount
+  1412     write cid-chkpoint-out-rec  from cpo-out-record
+  1413     move bl-out-tot-clms-cur    to ws-pass-amount
+  1414     perform 0310-calc-tol       thru 0310-exit
+  1415     move 'TOT Claims Paid Curr' to cpo-desc
+  1416     move ws-low-amount          to cpo-low-amount
+  1417     move ws-hi-amount           to cpo-hi-amount
+  1418     write cid-chkpoint-out-rec  from cpo-out-record
+  1419     perform varying s1 from 1 by 1 until s1 > 17
+  1420        move tbl-jobname    (s1) to cpo-jobname
+  1421        move tbl-stepname   (s1) to cpo-stepname
+  1422        move tbl-desc       (s1) to cpo-desc
+  1423        move tbl-low-amount (s1) to cpo-low-amount
+  1424        move tbl-hi-amount  (s1) to cpo-hi-amount
+  1425        write cid-chkpoint-out-rec
+  1426                                 from cpo-out-record
+  1427     end-perform
+  1428     close cid-chkpoint-out
+  1429     perform 0700-submit-job     thru 0700-exit
+  1430     .
+  1431 0500-exit.
+  1432     exit.
+  1433 0600-write-dcc.
+  1434     open output dcc-chkpoint-out
+  1435     if chkpnt-status not = '00'
+  1436        move ' Cant open DCC CHKPNT file '
+  1437           to bl-output-message
+  1438        go to 0100-send-document
+  1439     end-if
+  1440     move bl-input-eom-date      to cpo-jobname
+  1441     move 'DCC'                  to cpo-stepname
+  1442     string ws-fn-mo '/' ws-fn-da '/' ws-fn-ccyy ' - '
+  1443        ws-fn-hours ':' ws-fn-minutes ':' ws-fn-seconds
+  1444        delimited by size into cpo-desc
+  1445     end-string
+  1446     write dcc-chkpoint-out-rec  from cpo-out-record
+  1447     move spaces                 to cpo-jobname
+  1448                                    cpo-stepname
+  1449     move 'Proc Cnt'             to cpo-desc
+  1450     move bl-out-iss-cnt (1)     to cpo-low-amount
+  1451     move bl-out-can-cnt (1)     to cpo-hi-amount
+  1452     write dcc-chkpoint-out-rec  from cpo-out-record
+  1453     move 'NonProcCnt'           to cpo-desc
+  1454     move bl-out-iss-cnt (2)     to cpo-low-amount
+  1455     move bl-out-can-cnt (2)     to cpo-hi-amount
+  1456     write dcc-chkpoint-out-rec  from cpo-out-record
+  1457     move 'Total Cnt'            to cpo-desc
+  1458     move bl-out-iss-cnt (3)     to cpo-low-amount
+  1459     move bl-out-can-cnt (3)     to cpo-hi-amount
+  1460     write dcc-chkpoint-out-rec  from cpo-out-record
+  1461     move bl-out-lf-clms-cur     to ws-pass-amount
+  1462     perform 0310-calc-tol       thru 0310-exit
+  1463     move 'LF Claims Paid Curr'  to cpo-desc
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  27
+* BSSRCH.cbl
+  1464     move ws-low-amount          to cpo-low-amount
+  1465     move ws-hi-amount           to cpo-hi-amount
+  1466     write dcc-chkpoint-out-rec  from cpo-out-record
+  1467     move bl-out-ah-clms-cur     to ws-pass-amount
+  1468     perform 0310-calc-tol       thru 0310-exit
+  1469     move 'AH Claims Paid Curr'  to cpo-desc
+  1470     move ws-low-amount          to cpo-low-amount
+  1471     move ws-hi-amount           to cpo-hi-amount
+  1472     write dcc-chkpoint-out-rec  from cpo-out-record
+  1473     move bl-out-tot-clms-cur    to ws-pass-amount
+  1474     perform 0310-calc-tol       thru 0310-exit
+  1475     move 'TOT Claims Paid Curr' to cpo-desc
+  1476     move ws-low-amount          to cpo-low-amount
+  1477     move ws-hi-amount           to cpo-hi-amount
+  1478     write dcc-chkpoint-out-rec  from cpo-out-record
+  1479     perform varying s1 from 1 by 1 until s1 > 16
+  1480        move tbl-jobname    (s1) to cpo-jobname
+  1481        move tbl-stepname   (s1) to cpo-stepname
+  1482        move tbl-desc       (s1) to cpo-desc
+  1483        move tbl-low-amount (s1) to cpo-low-amount
+  1484        move tbl-hi-amount  (s1) to cpo-hi-amount
+  1485        write dcc-chkpoint-out-rec from cpo-out-record
+  1486     end-perform
+  1487     close dcc-chkpoint-out
+  1488     perform 0700-submit-job     thru 0700-exit
+  1489     .
+  1490 0600-exit.
+  1491     exit.
+  1492 0700-submit-job.
+  1493     move function lower-case(bl-input-comp-id)
+  1494                                 to tran-comp-id
+  1495
+  1496* EXEC CICS WRITEQ TD
+  1497*       QUEUE ('BTCH')
+  1498*       FROM (TRAN-DATA-LINE1)
+  1499*       LENGTH (80)
+  1500*    END-EXEC
+  1501     MOVE 80
+  1502       TO DFHEIV11
+  1503     MOVE 'BTCH' TO DFHEIV5
+  1504*    MOVE '(" L                  &   #00001381' TO DFHEIV0
+  1505     MOVE X'2822204C2020202020202020' TO DFHEIV0(1:12)
+  1506     MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+  1507     MOVE X'2020233030303031333831' TO DFHEIV0(25:11)
+  1508     CALL 'kxdfhei1' USING DFHEIV0,
+  1509           DFHEIV5,
+  1510           TRAN-DATA-LINE1,
+  1511           DFHEIV11,
+  1512           DFHEIV99,
+  1513           DFHEIV99
+  1514     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+  1515
+  1516* EXEC CICS WRITEQ TD
+  1517*       QUEUE ('BTCH')
+  1518*       FROM (TRAN-DATA-LINE2)
+  1519*       LENGTH (80)
+  1520*    END-EXEC
+  1521     MOVE 80
+* Micro Focus Server Express         V5.1 revision 000 17-Oct-13 13:19 Page  28
+* BSSRCH.cbl
+  1522       TO DFHEIV11
+  1523     MOVE 'BTCH' TO DFHEIV5
+  1524*    MOVE '(" L                  &   #00001386' TO DFHEIV0
+  1525     MOVE X'2822204C2020202020202020' TO DFHEIV0(1:12)
+  1526     MOVE X'202020202020202020202620' TO DFHEIV0(13:12)
+  1527     MOVE X'2020233030303031333836' TO DFHEIV0(25:11)
+  1528     CALL 'kxdfhei1' USING DFHEIV0,
+  1529           DFHEIV5,
+  1530           TRAN-DATA-LINE2,
+  1531           DFHEIV11,
+  1532           DFHEIV99,
+  1533           DFHEIV99
+  1534     GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK
+  1535     .
+  1536 0700-exit.
+  1537     exit.
+  1538
+  1539 9999-DFHBACK SECTION.
+  1540     MOVE '9%                    "   ' TO DFHEIV0
+  1541     MOVE 'BSSRCH' TO DFHEIV1
+  1542     CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+  1543     GOBACK.
+  1544 9999-DFHEXIT.
+  1545     IF DFHEIGDJ EQUAL 0001
+  1546         NEXT SENTENCE.
+  1547     MOVE '9%                    "   ' TO DFHEIV0
+  1548     MOVE 'BSSRCH' TO DFHEIV1
+  1549     CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1
+  1550     GOBACK.
+* Micro Focus Server Express         V5.1 revision 000 Compiler
+* Copyright (C) Micro Focus IP Development Limited 1984-2012.
+*                                                        REF GNR-008065005AF
+* Total Messages:     0
+* Data:       10712     Code:        8204

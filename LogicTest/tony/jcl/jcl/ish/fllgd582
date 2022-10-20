@@ -1,0 +1,73 @@
+################################################################################
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=EL582 
+################################################################################
+#  ********************************************************************  
+#  ******--                                                    --******  
+#  ***--        BATCH PAYMENT AND ADJUSTMENT SUMMARY              --***  
+#  ***--        BATCH VERSION OF ONLINE PROGRAM EL682             --***  
+#  ******--                                                    --******  
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='ERPYAJ' dataset='CI.DD.LG.ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/FL.DD.ER.DATECARD' disp='i-o' 
+
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' filename='$SEQFILES/FL.DD.PRNT582' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SYS022' filename='$SEQFILES/EL682_FNL.TXT' disp='o' normal='k' abend='d' recfmt='F' recsize='101' 
+
+EXECPGM pgmname='EL582' stepname='EL582' parm='101722101822' 
+
+################################################################################
+LABEL name=FNLCPY 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/FL.DD.PRNT582' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYSIN' type='DUMMY'
+
+EXECPGM pgmname='IEBGENER' stepname='FNLCPY' 
+
+################################################################################
+LABEL name=CORPCPY 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/FL.DD.PRNT582' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYSIN' type='DUMMY'
+
+EXECPGM pgmname='IEBGENER' stepname='CORPCPY' 
+
+################################################################################
+LABEL name=CPY582
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/FL.DD.PRNT582' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/FL.DL.CIADM.FICH682.DLY' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY582' parm='ALL' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+      "ftp -n ntcso1 < $JCLLIB/ftp-fllgd582"
+      "ftp -n ntis2 < $JCLLIB/ftp-fllgd582-ntis2"
+      "ftp -n sdv-free02.cso.local < $JCLLIB/ftp-fllgd582-ntfree2"
+else
+        echo " Job aborted, print not released "
+endif
+
+################################################################################
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 05282021 2021021600001 PEMA   New script for FNL

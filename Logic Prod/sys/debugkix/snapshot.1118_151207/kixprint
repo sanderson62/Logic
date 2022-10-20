@@ -1,0 +1,189 @@
+: $Workfile:   kixprint.sh  $ $Revision:   1.0  $
+#**********************************************************************#
+#*                                                                    *#
+#* Copyright (c) 2007 by Clerity Solutions, Inc.                      *#
+#* All rights reserved.                                               *#
+#*                                                                    *#
+#**********************************************************************#
+
+
+# usage: kixprint [-p printer-id]	[file ...]
+# formats file and pipes it thru spooler; removes file
+
+#
+# Figure out if we are on NT or UNIX
+#
+OS_PLATFORM=`uname`
+#
+# Set up variables according to platform
+#
+if [ "$OS_PLATFORM" = "Windows_NT" ]
+then
+    NULL_DEVICE=NUL
+    NT_SYS_ROOT=`echo $SystemRoot | sed 's#\\\\#/#g' `
+    SPOOLER=${SPOOLER-"$NT_SYS_ROOT/system32/print.exe "}
+    FORMATTER=
+else
+    NULL_DEVICE=/dev/null
+    SPOOLER=${SPOOLER-'lp -s'}
+    FORMATTER=cat
+fi
+
+# file(s) to print (optional); default stdin
+FILE=
+# printer id (optional)
+PRINTID=
+
+
+# Spool	command
+SPOOLCMD="$SPOOLER"
+
+# collect arguments
+set -- `getopt p: $*`
+
+# while	options	to process
+while [ "$1"	!= "--" ]
+do
+    case $1 in
+    -p)
+	PRINTID=$2
+	shift
+	;;
+    *)
+	exit 1
+	# illegal option encountered
+	;;
+    esac
+    shift
+done
+
+# skip --
+shift
+
+# all arguments	are files to print
+FILE="$*"
+
+
+#
+# If on Windows NT, make sure that the file to be printed has both
+# Carriage Return and Line Feed symbols.  The MKS tool "flip" provides this.
+# If printing from Stdin, then create a temporary file called printfile.tmp.
+#
+if [ "$OS_PLATFORM" = "Windows_NT" ]
+then
+    if [ -z "$FILE" ] 
+    then
+        flip - > printfile.tmp
+        FILE=printfile.tmp
+    else
+        flip $FILE
+    fi
+fi
+
+# next 3 lines 7278 eliminate pipe
+echo $FILE > $FILE.dmp
+FILE_FOUR=`cut -c1-4 $FILE.dmp`
+rm $FILE.dmp
+if [ "DUMP" = "$FILE_FOUR" ]
+then
+    if [ "$KIXDUMPDIR" != "" ]
+    then
+       if [ -d $KIXDUMPDIR ]
+       then
+	  OUTDIRR=$KIXDUMPDIR
+       else
+	  OUTDIRR=$KIXSYS
+       fi
+    elif [ -d $KIXSYS/debugkix ]
+    then
+       OUTDIRR=$KIXSYS/debugkix
+    else
+       OUTDIRR=$KIXSYS
+    fi
+    mv $FILE $OUTDIRR/.
+    exit 0
+fi
+
+# if no	file given, assume stdin
+# must remove file after printing
+if [ "$OS_PLATFORM" = "Windows_NT" ]
+then
+# Case 2838, removed the semicolon from rm command
+    RMCMD="rm -f $FILE"
+else
+    if [ -z "$FILE" ]
+    then
+	FILE="-"
+	RMCMD=
+    else
+        RMCMD="; /bin/rm -f $FILE"
+    fi
+fi
+
+# special kix product handling
+if [ "$PRINTID" = "print1" ]
+then
+    FORMATTER="pr -l60 -o10"
+    PRINTID=
+fi
+
+# special handling if printer id given
+if [ -n "$PRINTID" ]
+then
+    # if UCB line printer spooler, add "-P" switch;
+    # if ATT line printer spooler, add "-d" switch;
+    # if NT print.exe command add a /d:PrinterName switch;
+    # all other	spoolers should	accept -p
+    case "$SPOOLER" in
+    lpr*)
+	SPOOLCMD="$SPOOLER -P $PRINTID"
+	;;
+    lp*)
+	: 'check for existence'
+	if test "`lpstat -v|fgrep ""$PRINTID""`"
+	then
+	    : 'printid OK'
+	    SPOOLCMD="$SPOOLER -d$PRINTID"
+	else
+	    : 'printid not OK'
+	    SPOOLCMD="$SPOOLER"
+	fi
+	;;
+    *print.exe*)
+	SPOOLCMD="$SPOOLER \/d:$PRINTID"
+	;;
+    *)
+	SPOOLCMD="$SPOOLER -p $PRINTID"
+	;;
+    esac
+fi
+
+#
+# Set up the CMD string depending on if we are using Windows NT and MKS
+# or if we are on UNIX
+#
+if [ "$OS_PLATFORM" = "Windows_NT" ]
+then
+    if [ -n "$FORMATTER" ]
+    then
+	for FILE1 in `echo $FILE`
+	do
+	    $FORMATTER $FILE1 > $FILE1.tmp
+	    $SPOOLCMD $FILE1.tmp > NUL
+	    rm -f $FILE1.tmp
+	    rm -f $FILE1
+	done
+    else
+# Case 2838
+# These two lines do not work for NT properly
+#	CMD="$SPOOLCMD $FILE > NUL $RMCMD"
+#	eval $CMD
+	$SPOOLCMD $FILE
+	$RMCMD
+    fi
+else
+    CMD="$FORMATTER $FILE | $SPOOLCMD $RMCMD"
+    eval $CMD
+fi
+
+exit $?

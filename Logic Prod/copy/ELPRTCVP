@@ -1,0 +1,189 @@
+00001 ******************************************************************06/26/96
+00002 ***                                                              *ELPRTCVP
+00003 ***                          ELPRTCVP.                           *   LV003
+00004 ***                          VMOD=2.003                          *   CL**3
+00005 ***                                                              *ELPRTCVP
+00006 ***     COPY MEMBER FOR TERMINAL ONLINE PRINT ROUTINE.           *ELPRTCVP
+00007 ***     THIS ROUTINE WILL ACCOMODATE PRINTING TO A 3270          *ELPRTCVP
+00008 ***     TERMINAL PRINTER. A BUFFER OF UP TO 1920 CHARACTERS      *ELPRTCVP
+00009 ***     IS ACCUMULATED AND PRINTED COLLECTIVELY.                 *ELPRTCVP
+00010 ***                                                              *ELPRTCVP
+00011 ***     THIS ROUTINE TO BE USED ONLY WITH ACCOMPANIMENT          *ELPRTCVP
+00012 ***      OF THE WORKING-STORAGE COPY MEMBER ( ELPRTCVD )         *ELPRTCVP
+00013 ***     THE HOST PROGRAM MUST INITIALIZE THE FOLLOWING 3 FIELDS  *ELPRTCVP
+00014 ***      FROM THE ABOVE COPY MEMBER FOR THIS PROCEDURE TO BE     *ELPRTCVP
+00015 ***      SUCCESSFUL.                                             *ELPRTCVP
+00016 ***      05  WS-LINE-LEN    PIC  S9(4)  COMP  VALUE +80.         *ELPRTCVP
+00017 ***                         LENGTH OF THE LINE TO BE PRINTED     *ELPRTCVP
+00018 ***                         DEFAULT IS 80, YOU CAN USE ANY NUMBER*ELPRTCVP
+00019 ***                         UP TO 132.  THIS FIELD IS ONLY ACCEP-*ELPRTCVP
+00020 ***                         TED THE FIRST TIME THRU THE ROUTINE. *ELPRTCVP
+00021 ***      05  WS-PROG-END    PIC  X  VALUE SPACES.                *ELPRTCVP
+00022 ***                         PROGRAM END SWITCH. INITIALIZED      *ELPRTCVP
+00023 ***                         TO SPACE-     MOVE IN ANY NONBLANK   *ELPRTCVP
+00024 ***                         TO IT WHEN PROGRAM IS FINISHED.      *ELPRTCVP
+00025 ***      05  WS-PRINT-AREA.                                      *ELPRTCVP
+00026 ***          10  WS-PASSED-CNTL-CHAR     PIC X.                  *ELPRTCVP
+00027 ***          10  WS-PASSED-DATA          PIC X(132).             *ELPRTCVP
+00028 ***                         USE THE DATA TO BE PRINTED IN THE    *ELPRTCVP
+00029 ***                         WS-PASSED-DATA.                      *ELPRTCVP
+00030 ***                         USE THE STANDARD CARRIAGE CONTROL    *ELPRTCVP
+00031 ***                         CHARACTER IN THE WS-PASSED-CNTL-CHAR *ELPRTCVP
+00032 ***                           SINGLE-SPACE            VALUE ' '  *ELPRTCVP
+00033 ***                           DOUBLE-SPACE            VALUE '0'  *ELPRTCVP
+00034 ***                           TRIPLE-SPACE            VALUE '-'  *ELPRTCVP
+00035 ***                           TOP-PAGE                VALUE '1'  *ELPRTCVP
+00036 ***      NOTE: A LINE COUNT IS PROVIDED IN FIELDNAME -WS-LINE-CNT*ELPRTCVP
+00037 ***            THE USE OF THIS FIELD IS OPTIONAL.                *ELPRTCVP
+00038 ***            THIS ROUTINE WILL ONLY ADD 1, 2, OR 3             *ELPRTCVP
+00039 ***            TO THIS COUNT DEPENDING ON THE WS-PASSED-CNTL-CHAR*ELPRTCVP
+00040 ***            AND RESET THE COUNT TO ZERO WHEN TOP-PAGE         *ELPRTCVP
+00041 ***            CONDITION.                                        *ELPRTCVP
+00042 ***                                                              *ELPRTCVP
+00043 ******************************************************************ELPRTCVP
+00044                                                                   ELPRTCVP
+00045  ELPRTCVP.                                                        ELPRTCVP
+00046                                                                      CL**3
+pemuni*    IF PI-COMPANY-ID IS EQUAL TO 'DMD' OR 'CID'                     CL**3
+pemuni     IF PI-COMPANY-ID IS EQUAL TO 'DMD' OR 'XXX'                     CL**3
+00048          MOVE 'P'                TO DL34-PROCESS-TYPE                CL**3
+00049          MOVE THIS-PGM           TO DL34-PRINT-PROGRAM-ID            CL**3
+00050          MOVE PI-PROCESSOR-ID    TO DL34-USERID                      CL**3
+00051          MOVE PI-COMPANY-ID      TO DL34-COMPANY-ID                  CL**3
+00052          MOVE WS-PRINT-AREA      TO DL34-PRINT-LINE                  CL**3
+00053          MOVE PI-ALT-DMD-PRT-ID  TO DL34-OVERRIDE-PRINTER-ID         CL**3
+00054                                                                      CL**3
+00055          EXEC CICS LINK                                              CL**3
+00056              PROGRAM    ('DLO034')                                   CL**3
+00057              COMMAREA   (DLO034-COMMUNICATION-AREA)                  CL**3
+00058              LENGTH     (DLO034-REC-LENGTH)                          CL**3
+00059          END-EXEC                                                    CL**3
+00060                                                                      CL**3
+00061             IF DL34-RETURN-CODE = 'OK'                               CL**3
+00062                 GO TO ELPRTCVP-EXIT                                  CL**3
+00063             ELSE                                                     CL**3
+00064 *               MOVE '8339'     TO EMI-ERROR ?????ERROR MESSAGE???   CL**3
+00065                 GO TO ELPRTCVP-EXIT.                                 CL**3
+00066                                                                      CL**3
+00067      IF NOT FIRST-TIME                                            ELPRTCVP
+00068          GO TO ELPRTCVP-020.                                      ELPRTCVP
+00069                                                                   ELPRTCVP
+00070      IF WS-LINE-LEN NOT GREATER ZERO                              ELPRTCVP
+00071          GO TO ELPRTCVP-EXIT.                                     ELPRTCVP
+00072                                                                   ELPRTCVP
+00073      MOVE '2'                    TO WS-FIRST-TIME-SW.             ELPRTCVP
+00074      MOVE LOW-VALUES             TO WS-BUFFER-AREA.               ELPRTCVP
+00075                                                                   ELPRTCVP
+00076      SET BUFFER-INDEX TO +1                                       ELPRTCVP
+00077                                                                   ELPRTCVP
+00078      IF EIBTRMID IS EQUAL TO 'AFLP'                                  CL**2
+00079          NEXT SENTENCE                                               CL**2
+00080      ELSE                                                            CL**2
+00081          IF NOT TOP-PAGE                                             CL**2
+00082              MOVE T-TP           TO WS-BUFFER-BYTE (BUFFER-INDEX)    CL**2
+00083              SET BUFFER-INDEX UP BY +1.                              CL**2
+00084                                                                   ELPRTCVP
+00085  ELPRTCVP-020.                                                    ELPRTCVP
+00086      IF WS-PROG-END = SPACES                                      ELPRTCVP
+00087          GO TO ELPRTCVP-030.                                      ELPRTCVP
+00088                                                                   ELPRTCVP
+00089      MOVE SPACES                 TO WS-PROG-END.                  ELPRTCVP
+00090                                                                   ELPRTCVP
+00091      IF BUFFER-INDEX GREATER +1                                   ELPRTCVP
+00092          PERFORM ELPRTCVP-PRINT-BUFFER THRU ELPRTCVP-PRINT-EXIT.  ELPRTCVP
+00093                                                                   ELPRTCVP
+00094      MOVE '1'                    TO WS-FIRST-TIME-SW.             ELPRTCVP
+00095                                                                   ELPRTCVP
+00096      GO TO ELPRTCVP-EXIT.                                         ELPRTCVP
+00097                                                                   ELPRTCVP
+00098  ELPRTCVP-030.                                                    ELPRTCVP
+00099      IF WS-PASSED-DATA = SPACES                                   ELPRTCVP
+00100          SET PRT-INDEX TO +1                                      ELPRTCVP
+00101          GO TO ELPRTCVP-050.                                      ELPRTCVP
+00102                                                                   ELPRTCVP
+00103      SET PRT-INDEX TO WS-LINE-LEN.                                ELPRTCVP
+00104                                                                   ELPRTCVP
+00105  ELPRTCVP-040.                                                    ELPRTCVP
+00106      IF WS-PRINT-BYTE (PRT-INDEX) NOT = SPACES                    ELPRTCVP
+00107          GO TO ELPRTCVP-050.                                      ELPRTCVP
+00108                                                                   ELPRTCVP
+00109      IF PRT-INDEX GREATER +1                                      ELPRTCVP
+00110          SET PRT-INDEX DOWN BY +1                                 ELPRTCVP
+00111          GO TO ELPRTCVP-040.                                      ELPRTCVP
+00112                                                                   ELPRTCVP
+00113  ELPRTCVP-050.                                                    ELPRTCVP
+00114      SET WS-LINE-LENGTH TO PRT-INDEX.                             ELPRTCVP
+00115      SET BUFFER-INDEX2 TO BUFFER-INDEX.                           ELPRTCVP
+00116      SET BUFFER-INDEX2 UP BY WS-LINE-LENGTH.                      ELPRTCVP
+00117                                                                   ELPRTCVP
+00118      IF BUFFER-INDEX2 NOT LESS WS-BUFFER-SIZE                     ELPRTCVP
+00119          PERFORM ELPRTCVP-PRINT-BUFFER THRU ELPRTCVP-PRINT-EXIT.  ELPRTCVP
+00120                                                                   ELPRTCVP
+00121      IF TRIPLE-SPACE                                              ELPRTCVP
+00122           ADD +2  TO  WS-LINE-CNT                                 ELPRTCVP
+00123           MOVE T-SS           TO WS-BUFFER-BYTE (BUFFER-INDEX)    ELPRTCVP
+00124                                  WS-BUFFER-BYTE (BUFFER-INDEX + 1)ELPRTCVP
+00125           SET BUFFER-INDEX UP BY +2.                              ELPRTCVP
+00126                                                                   ELPRTCVP
+00127      IF DOUBLE-SPACE                                              ELPRTCVP
+00128           ADD +1  TO  WS-LINE-CNT                                 ELPRTCVP
+00129           MOVE T-SS             TO WS-BUFFER-BYTE (BUFFER-INDEX)  ELPRTCVP
+00130           SET BUFFER-INDEX UP BY +1.                              ELPRTCVP
+00131                                                                   ELPRTCVP
+00132      ADD +1 TO WS-LINE-CNT                                        ELPRTCVP
+00133 ************************************************************      ELPRTCVP
+00134 *     BYPASS NEW LINE SYMBOL                               *      ELPRTCVP
+00135 *        IF FIRST BUFFER SENT AND TOP-OF-FORM SET.         *      ELPRTCVP
+00136 *     OR IF FIRST LINE OF SUBSEQUENT BUFFERS.              *      ELPRTCVP
+00137 ************************************************************      ELPRTCVP
+00138                                                                   ELPRTCVP
+00139      IF (BUFFER-INDEX GREATER +1 AND                              ELPRTCVP
+00140          WS-BUFFER-BYTE (BUFFER-INDEX - 1) = T-TP)  OR            ELPRTCVP
+00141          FIRST-LINE-NEXT-BUFFER                                   ELPRTCVP
+00142          MOVE ZERO               TO WS-FIRST-TIME-SW              ELPRTCVP
+00143      ELSE                                                         ELPRTCVP
+00144          MOVE T-SS               TO WS-BUFFER-BYTE (BUFFER-INDEX) ELPRTCVP
+00145          SET BUFFER-INDEX UP BY +1.                               ELPRTCVP
+00146                                                                   ELPRTCVP
+00147 **   NOTE, SINGLE SPACE IS REQUIRED BEFORE TOP PAGE CHAR          ELPRTCVP
+00148                                                                   ELPRTCVP
+00149      IF TOP-PAGE                                                  ELPRTCVP
+00150          MOVE +1                TO WS-LINE-CNT                    ELPRTCVP
+00151          MOVE T-TP              TO WS-BUFFER-BYTE (BUFFER-INDEX)  ELPRTCVP
+00152          SET BUFFER-INDEX UP BY +1.                               ELPRTCVP
+00153                                                                   ELPRTCVP
+00154      SET PRT-INDEX TO +1.                                         ELPRTCVP
+00155                                                                   ELPRTCVP
+00156  ELPRTCVP-060.                                                    ELPRTCVP
+00157      MOVE WS-PRINT-BYTE (PRT-INDEX)                               ELPRTCVP
+00158                                  TO WS-BUFFER-BYTE (BUFFER-INDEX).ELPRTCVP
+00159      SET BUFFER-INDEX UP BY +1.                                   ELPRTCVP
+00160                                                                   ELPRTCVP
+00161      IF PRT-INDEX LESS WS-LINE-LENGTH                             ELPRTCVP
+00162          SET PRT-INDEX UP BY +1                                   ELPRTCVP
+00163          GO TO ELPRTCVP-060.                                      ELPRTCVP
+00164                                                                   ELPRTCVP
+00165  ELPRTCVP-EXIT.                                                   ELPRTCVP
+00166      EXIT.                                                        ELPRTCVP
+00167                                                                   ELPRTCVP
+00168  ELPRTCVP-PRINT-BUFFER.                                           ELPRTCVP
+00169      IF WS-BUFFER-BYTE (BUFFER-INDEX - 1) = T-SS                  ELPRTCVP
+00170         MOVE SPACE               TO WS-BUFFER-BYTE (BUFFER-INDEX) ELPRTCVP
+00171         SET BUFFER-INDEX UP BY 1.                                 ELPRTCVP
+00172                                                                   ELPRTCVP
+00173      MOVE  T-EM                  TO  WS-BUFFER-BYTE (BUFFER-INDEX)ELPRTCVP
+00174      SET WS-BUFFER-LENGTH TO BUFFER-INDEX.                        ELPRTCVP
+00175                                                                   ELPRTCVP
+00176      EXEC CICS SEND                                               ELPRTCVP
+00177          FROM    (WS-BUFFER-AREA)                                 ELPRTCVP
+00178          LENGTH  (WS-BUFFER-LENGTH)                               ELPRTCVP
+00179          CTLCHAR (WS-WCC-CNTL)                                    ELPRTCVP
+00180          ERASE                                                    ELPRTCVP
+00181      END-EXEC.                                                    ELPRTCVP
+00182                                                                   ELPRTCVP
+00183      SET BUFFER-INDEX TO +1.                                      ELPRTCVP
+00184      MOVE '2'                    TO WS-FIRST-TIME-SW.             ELPRTCVP
+00185                                                                   ELPRTCVP
+00186  ELPRTCVP-PRINT-EXIT.                                             ELPRTCVP
+00187      EXIT.                                                        ELPRTCVP
+00188                                                                   ELPRTCVP

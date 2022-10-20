@@ -1,0 +1,89 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+if ($EBMSYS != "cid1t") then
+   echo "Job aborting, not TEST"
+   exit 1
+endif
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERRATE -s $SEQFILES/errate.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/cps_convert_rates.pl /export/home/cidftp/data/TIMBERLINE_UP.csv $SEQFILES/Logic_Rates1
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=PERL2
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/cps_convert_rates.pl /export/home/cidftp/data/PARKSTATE_UP.csv $SEQFILES/Logic_Rates2
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL2' parm='SH'
+
+################################################################################
+LABEL name=PERL3
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/cps_convert_rates.pl /export/home/cidftp/data/NATIONALPENN_UP.CSV $SEQFILES/Logic_Rates3
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL3' parm='SH'
+
+################################################################################
+LABEL name=PERL4
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/cps_convert_rates.pl /export/home/cidftp/data/prvb_up.csv $SEQFILES/Logic_Rates4
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL4' parm='SH'
+
+################################################################################
+LABEL name=PERL5
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/cps_convert_rates.pl /export/home/cidftp/data/FNBSS_up.CSV $SEQFILES/Logic_Rates5
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL5' parm='SH'
+
+################################################################################
+LABEL name=DCCRTU1 
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/Logic_Rates1' disp='i-o' 
+ASSGNDD                 filename='$SEQFILES/Logic_Rates2' disp='i-o' 
+ASSGNDD                 filename='$SEQFILES/Logic_Rates3' disp='i-o' 
+ASSGNDD                 filename='$SEQFILES/Logic_Rates4' disp='i-o' 
+ASSGNDD                 filename='$SEQFILES/Logic_Rates5' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'
+ASSGNDD ddname='ERRATE' type='VS' filename='ERRATE' disp='i-o'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o'
+
+EXECPGM pgmname='CPSRTU1' stepname='DCCRTU1' 
+
+################################################################################
+LABEL name=CPYFILE
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M'
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/DCCRTU1/SYS008_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.DL.CIADM.FICHRTU1' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+EXECPGM pgmname='CIB009L' stepname='CPYFILE' parm='ALL'
+
+#if ($JOBSTATUS == 0) then
+#   "exelpr.sh l133std.parms '-ode=DCCI' $SYSOUTDIR/$JOBNAME/DCCRTU1/SYS008_$JON"
+#   "smtp -f slunikix -t pema,jjva,prva -s 'Rate File Load Complete' -mf /apps/prod/cid1p/emails/$JOBNAME.txt"
+#else
+#  echo " Job aborted, print not released"
+#endif
+
+ENDJOB 

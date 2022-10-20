@@ -1,0 +1,589 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CIDMAX1.
+       AUTHOR.     PABLO.
+       DATE-COMPILED.
+092006******************************************************************
+092006*                   C H A N G E   L O G
+092006*
+092006* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+092006*-----------------------------------------------------------------
+092006*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+092006* EFFECTIVE    NUMBER
+092006*-----------------------------------------------------------------
+092006* 092006   2006051800002   PEMA  NEW PROGRAM.
+041608* 041608   2008030300004   PEMA  ADD CERT PROCESSING
+111114* 111114 IR2014111000002   PEMA  CORRECT EXTRACT PROCESS
+092006******************************************************************
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+041608     SELECT CERT-IN          ASSIGN TO SYS010.
+
+           SELECT ELCERT           ASSIGN TO ELCERT
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS DYNAMIC
+                                   RECORD KEY IS CM-CONTROL-PRIMARY
+                                   FILE STATUS IS ELCERT-FILE-STATUS.
+
+072403     SELECT ERMAIL           ASSIGN TO ERMAIL
+072403                             ORGANIZATION IS INDEXED
+072403                             ACCESS IS DYNAMIC
+072403                             RECORD KEY IS MA-CONTROL-PRIMARY
+072403                             FILE STATUS IS ERMAIL-FILE-STATUS.
+
+           SELECT DISK-DATE        ASSIGN TO SYS019.
+
+           SELECT EXTR-OUT         ASSIGN TO EXTROT
+               ORGANIZATION IS LINE SEQUENTIAL.
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  ELCERT.
+
+           COPY ELCCERT.
+
+072403 FD  ERMAIL.
+
+072403     COPY ERCMAIL.
+
+       FD  DISK-DATE
+                                       COPY ELCDTEFD.
+
+       FD  CERT-IN
+           RECORDING MODE F
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+           
+                                       COPY ECSCRT01.
+
+       FD  EXTR-OUT
+           RECORDING MODE F
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+
+072403 01  EXTR-OUT-REC                PIC X(800).
+
+       WORKING-STORAGE SECTION.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  FILLER  PIC X(32) VALUE '   CIDMAX1  WORKING STORAGE     '.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  WS-CERT-IN-CNT              PIC 9(7)  VALUE ZEROS.
+       77  WS-ELCERT-MATCH-CNT         PIC 9(7)  VALUE ZEROS.
+       77  WS-CERT-MATCH-CNT           PIC 9(7)  VALUE ZEROS.
+       77  WS-DIS-DATE                 PIC 9(8)  VALUE ZEROS.
+       01  WS-COMPARE-CERT-KEY.
+           05  WS-CCK-CARRIER          PIC X.
+           05  WS-CCK-GROUP            PIC X(6).
+           05  WS-CCK-STATE            PIC XX.
+           05  WS-CCK-ACCOUNT          PIC X(10).
+           05  WS-CCK-EFF-DT           PIC 9(11) COMP-3.
+           05  WS-CCK-CERT-NO          PIC X(11).
+
+030404 01  WS-MISC.
+           05  WS-DIS-REFUNDS          PIC 99999999999.99.
+           05  WS-TOT-REFUNDS          PIC S9(11)V99 COMP-3 VALUE +0.
+           05  WS-WORK-DT              PIC 9(8)  VALUE ZEROS.
+           05  WS-WORK-DTR REDEFINES WS-WORK-DT.
+               10  WS-WORK-DT-CCYY      PIC X(4).
+               10  WS-WORK-DT-MM        PIC XX.
+               10  WS-WORK-DT-DD        PIC XX.
+           05  PGM-SUB                 PIC S999 COMP  VALUE +158.
+           05  WS-POST-CARD-SW         PIC X      VALUE SPACES.
+               88  POST-CARD-SENT                 VALUE 'Y'.
+           05  WS-EOF-CERT             PIC X      VALUE SPACES.
+               88  END-OF-CERT                    VALUE 'Y'.
+           05  WS-FIND-SW              PIC X      VALUE SPACES.
+               88  FOUND-CERT                     VALUE 'Y'.
+           05  WS-EOF-SW               PIC X      VALUE SPACES.
+               88  END-OF-ERMAIL                  VALUE 'Y'.
+           05  ERMAIL-RECS-IN          PIC 9(9)   VALUE ZEROS.
+           05  EXTR-RECS-OUT           PIC 9(9)   VALUE ZEROS.
+           05  S1                      PIC S999   VALUE +0 COMP-3.
+
+072403     05  WS-SAVE-EXTR            PIC X(800) VALUE LOW-VALUES.
+           05  ELCERT-FILE-STATUS      PIC XX     VALUE ZEROS.
+072403     05  ERMAIL-FILE-STATUS      PIC XX     VALUE ZEROS.
+           05  WS-DATE                 PIC 9(11)  VALUE ZEROS.
+
+030404**** PROGRAM ABEND FIELDS
+030404     05  WS-RETURN-CODE          PIC S9(03) VALUE +0.
+030404     05  WS-ZERO                 PIC S9(01) VALUE +0.
+030404     05  WS-ABEND-MESSAGE        PIC X(80)  VALUE SPACES.
+030404     05  WS-ABEND-FILE-STATUS    PIC X(02)  VALUE ZERO.
+
+
+       01  EXTR-DETAIL-RECORD.
+           12  EX-CARRIER              PIC X.
+           12  EX-TAB1                 PIC X.
+           12  EX-GROUPING             PIC X(6).
+           12  EX-TAB2                 PIC X.
+           12  EX-STATE                PIC XX.
+           12  EX-TAB3                 PIC X.
+           12  EX-ACCOUNT              PIC X(10).
+           12  EX-TAB4                 PIC X.
+           12  EX-CERT-EFF-DT          PIC X(10).
+           12  EX-TAB5                 PIC X.
+           12  EX-CERT-NO              PIC X(11).
+           12  EX-TAB6                 PIC X.
+           12  EX-INSURED-FIRST-NAME   PIC X(10).
+           12  EX-TAB7                 PIC X.
+           12  EX-INSURED-LAST-NAME    PIC X(15).
+           12  EX-TAB8                 PIC X.
+           12  EX-INSURED-INITIAL1     PIC X.
+           12  EX-TAB9                 PIC X.
+           12  EX-INSURED-INITIAL2     PIC X.
+           12  EX-TAB10                PIC X.
+072403     12  EX-ADDR1                PIC X(30).
+072403     12  EX-TAB11                PIC X.
+072403     12  EX-ADDR2                PIC X(30).
+072403     12  EX-TAB12                PIC X.
+072403     12  EX-CITY-ST              PIC X(30).
+072403     12  EX-TAB13                PIC X.
+072403     12  EX-ZIP                  PIC X(9).
+           12  EX-TAB14                PIC X.
+           12  EX-PC-IND               PIC X(10).
+           12  EX-TAB15                PIC X.
+           12  EX-CANCEL-DT            PIC X(10).
+           12  EX-TAB16                PIC X.
+           12  EX-CANCEL-AMT           PIC -ZZ,ZZZ.99.
+           12  EX-TAB17                PIC X.
+           12  FILLER OCCURS 7.
+               16  EX-PC-MT                PIC X(10).
+               16  EX-TAB18                PIC X.
+               16  EX-PC-MS                PIC X(10).
+               16  EX-TAB19                PIC X.
+               16  EX-PC-DT                PIC X(10).
+               16  EX-TAB20                PIC X.
+           12  EX-TAB21                PIC X.
+           12  EX-EOR                  PIC X.
+
+                                       COPY ELCDATE.
+
+                                       COPY ELCDTECX.
+
+                                       COPY ELCDTEVR.
+
+030404 PROCEDURE DIVISION.
+
+                                       COPY ELCDTERX.
+
+           PERFORM 0400-OPEN-FILES     THRU 0400-EXIT
+
+           PERFORM 0600-INITIALIZE     THRU 0600-EXIT
+
+           PERFORM 0050-PROCESS-ERMAIL THRU 0050-EXIT UNTIL
+              (END-OF-ERMAIL)
+PEMTST*       OR (ERMAIL-RECS-IN > 1000)
+
+           PERFORM 0500-CLOSE-FILES    THRU 0500-EXIT
+
+           DISPLAY ' MAIL RECORDS READ    '  ERMAIL-RECS-IN
+           DISPLAY ' EXTR RECORDS WRITTEN '  EXTR-RECS-OUT
+           DISPLAY ' CERT RECORDS READ    '  WS-CERT-IN-CNT
+           DISPLAY ' ELCERT MATCHES       '  WS-ELCERT-MATCH-CNT
+           DISPLAY ' CERT MATCHES         '  WS-CERT-MATCH-CNT
+           MOVE WS-TOT-REFUNDS         TO WS-DIS-REFUNDS
+           DISPLAY ' TOTAL REFUNDS ' WS-DIS-REFUNDS
+
+           GOBACK
+
+           .
+       0050-PROCESS-ERMAIL.
+
+           MOVE ' '                    TO WS-POST-CARD-SW
+           PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+              (S1 > +7)
+              IF MA-MAIL-DATE (S1) NOT = SPACES AND LOW-VALUES
+                 SET POST-CARD-SENT    TO TRUE
+              END-IF
+           END-PERFORM
+
+           IF POST-CARD-SENT
+              PERFORM 0100-PROCESS-ERMAIL
+                                       THRU 0100-EXIT
+           END-IF
+
+           PERFORM 0200-READ-ERMAIL    THRU 0200-EXIT
+
+           .
+       0050-EXIT.
+           EXIT.
+
+       0100-PROCESS-ERMAIL.
+
+           PERFORM 0350-READ-ELCERT    THRU 0350-EXIT
+
+           MOVE WS-SAVE-EXTR           TO EXTR-DETAIL-RECORD
+           MOVE MA-CARRIER             TO EX-CARRIER
+           MOVE MA-GROUPING            TO EX-GROUPING
+           MOVE MA-STATE               TO EX-STATE
+           MOVE MA-ACCOUNT             TO EX-ACCOUNT
+           MOVE MA-CERT-EFF-DT         TO DC-BIN-DATE-1
+           MOVE ' '                    TO DC-OPTION-CODE
+           PERFORM 8510-DATE-CONVERSION
+                                       THRU 8590-EXIT
+           IF NO-CONVERSION-ERROR
+              MOVE DC-GREG-DATE-A-EDIT TO EX-CERT-EFF-DT
+           END-IF
+
+           MOVE MA-INSURED-LAST-NAME   TO EX-INSURED-LAST-NAME
+           MOVE MA-INSURED-FIRST-NAME  TO EX-INSURED-FIRST-NAME
+           MOVE MA-INSURED-MIDDLE-INIT TO EX-INSURED-INITIAL2
+           MOVE MA-CERT-NO             TO EX-CERT-NO
+           MOVE MA-ADDRESS-LINE-1      TO EX-ADDR1
+           MOVE MA-ADDRESS-LINE-2      TO EX-ADDR2
+           MOVE MA-CITY-STATE          TO EX-CITY-ST
+           MOVE MA-ZIP                 TO EX-ZIP
+
+           PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+              S1 > +7
+              EVALUATE MA-MAIL-TYPE (S1)
+                 WHEN '1'
+                    MOVE '12MO ANNIV'  TO EX-PC-MT (S1)
+                 WHEN '2'
+                    MOVE 'EXPIRED'     TO EX-PC-MT (S1)
+              END-EVALUATE
+              EVALUATE MA-MAIL-STATUS (S1)
+                 WHEN '1'
+                    MOVE 'MAILED'      TO EX-PC-MS (S1)
+                 WHEN '2'
+                    MOVE 'RETURNED'    TO EX-PC-MS (S1)
+                 WHEN '3'
+                    MOVE 'NOT MAILED'  TO EX-PC-MS (S1)
+              END-EVALUATE
+              IF MA-MAIL-DATE (S1) NOT = SPACES AND LOW-VALUES
+                 MOVE MA-MAIL-DATE (S1)
+                                       TO DC-BIN-DATE-1
+                 MOVE ' '              TO DC-OPTION-CODE
+                 PERFORM 8510-DATE-CONVERSION
+                                       THRU 8590-EXIT
+                 IF NO-CONVERSION-ERROR
+                    MOVE DC-GREG-DATE-A-EDIT
+                                       TO EX-PC-DT (S1)
+                 END-IF
+              END-IF
+           END-PERFORM
+
+           IF ELCERT-FILE-STATUS = '00'
+              ADD 1                    TO WS-ELCERT-MATCH-CNT
+              MOVE CM-INSURED-LAST-NAME
+                                       TO EX-INSURED-LAST-NAME
+              MOVE CM-INSURED-INITIAL1 TO EX-INSURED-INITIAL1
+              MOVE CM-INSURED-INITIAL2 TO EX-INSURED-INITIAL2
+              MOVE CM-INSURED-FIRST-NAME
+                                       TO EX-INSURED-FIRST-NAME
+              MOVE CM-POST-CARD-IND    TO EX-PC-IND
+              IF EX-PC-IND = 'Y'
+                 COMPUTE WS-TOT-REFUNDS = WS-TOT-REFUNDS +
+                    CM-LF-ITD-CANCEL-AMT + CM-AH-ITD-CANCEL-AMT
+              END-IF
+              COMPUTE EX-CANCEL-AMT = CM-LF-ITD-CANCEL-AMT
+                 + CM-AH-ITD-CANCEL-AMT
+              IF CM-LF-CANCEL-DT NOT = SPACES AND LOW-VALUES
+                 MOVE CM-LF-CANCEL-DT  TO DC-BIN-DATE-1
+                 MOVE ' '              TO DC-OPTION-CODE
+                 PERFORM 8510-DATE-CONVERSION
+                                       THRU 8590-EXIT
+                 IF NO-CONVERSION-ERROR
+                    MOVE DC-GREG-DATE-A-EDIT
+                                       TO EX-CANCEL-DT
+                 END-IF
+              END-IF
+              IF (CM-AH-CANCEL-DT NOT = SPACES AND LOW-VALUES)
+                 MOVE CM-AH-CANCEL-DT  TO DC-BIN-DATE-1
+                 MOVE ' '              TO DC-OPTION-CODE
+                 PERFORM 8510-DATE-CONVERSION
+                                       THRU 8590-EXIT
+                 IF NO-CONVERSION-ERROR
+                    MOVE DC-GREG-DATE-A-EDIT
+                                       TO EX-CANCEL-DT
+                 END-IF
+              END-IF
+           ELSE
+              DISPLAY ' NO ELCERT FOR ERMAIL ' MA-CERT-NO
+              MOVE SPACES              TO WS-FIND-SW
+              MOVE MA-CONTROL-PRIMARY (2:19)
+                                       TO WS-COMPARE-CERT-KEY
+
+              MOVE MA-CERT-EFF-DT      TO DC-BIN-DATE-1
+              MOVE ' '                 TO DC-OPTION-CODE
+              PERFORM 8510-DATE-CONVERSION
+                                       THRU 8590-EXIT
+              IF NO-CONVERSION-ERROR
+                 MOVE DC-GREG-DATE-CYMD TO WS-CCK-EFF-DT
+              ELSE
+                 DISPLAY ' ERROR - EFF DT CONVERT ' MA-CERT-NO
+                 MOVE ZEROS            TO WS-CCK-EFF-DT
+              END-IF
+
+              MOVE MA-CERT-NO          TO WS-CCK-CERT-NO
+
+              PERFORM 0360-PROCESS-CERT
+                                       THRU 0360-EXIT
+              IF FOUND-CERT
+                 ADD 1                 TO WS-CERT-MATCH-CNT
+      *       DISPLAY ' FOUND CERT ' WS-CCK-CARRIER ' '
+      *          WS-CCK-STATE ' ' WS-CCK-ACCOUNT ' ' WS-CCK-EFF-DT ' '
+      *          WS-CCK-CERT-NO
+      *          DISPLAY ' FULL CONTROL ' CR-ACCT-CONTROL ' '
+      *            CR-DT ' ' CR-CERT-NO
+                 MOVE CR-POST-CARD-IND TO EX-PC-IND
+                 IF EX-PC-IND = 'Y'
+                    COMPUTE WS-TOT-REFUNDS = WS-TOT-REFUNDS +
+                       CR-LFRFND + CR-AHRFND
+                 END-IF
+                 COMPUTE EX-CANCEL-AMT = CR-LFRFND + CR-AHRFND
+                 IF CR-LF-CANC-DT NOT = ZEROS
+                    MOVE CR-LF-CANC-DT TO WS-WORK-DT
+                    STRING WS-WORK-DT-MM '/' WS-WORK-DT-DD '/'
+                      WS-WORK-DT-CCYY DELIMITED BY SIZE
+                                       INTO EX-CANCEL-DT
+                    END-STRING
+                 END-IF
+                 IF CR-AH-CANC-DT NOT = ZEROS
+                    MOVE CR-AH-CANC-DT TO WS-WORK-DT
+                    STRING WS-WORK-DT-MM '/' WS-WORK-DT-DD '/'
+                      WS-WORK-DT-CCYY DELIMITED BY SIZE
+                                       INTO EX-CANCEL-DT
+                    END-STRING
+                 END-IF
+                 IF EX-INSURED-LAST-NAME = SPACES
+                    MOVE CR-LNAME      TO EX-INSURED-LAST-NAME
+                 END-IF
+                 IF EX-INSURED-FIRST-NAME = SPACES
+                    MOVE CR-FNAME      TO EX-INSURED-FIRST-NAME
+                 END-IF
+                 IF EX-INSURED-INITIAL2 = SPACES
+                    MOVE CR-INIT       TO EX-INSURED-INITIAL2
+                 END-IF
+                 PERFORM 0370-READ-CERT THRU 0370-EXIT
+              END-IF
+           END-IF
+
+111114     IF EX-PC-IND = 'S'
+111114        CONTINUE
+111114     ELSE
+              PERFORM 0300-WRITE-EXTR  THRU 0300-EXIT
+111114     END-IF
+
+           .
+       0100-EXIT.
+           EXIT.
+
+       0200-READ-ERMAIL.
+
+           READ ERMAIL NEXT RECORD
+
+           IF (ERMAIL-FILE-STATUS = '10' OR '23')
+              OR (MA-COMPANY-CD NOT = DTE-CLASIC-COMPANY-CD)
+              SET END-OF-ERMAIL        TO TRUE
+           ELSE
+              IF ERMAIL-FILE-STATUS NOT = '00'
+                 DISPLAY 'ERROR ON ERMAIL - READ NEXT '
+                    ERMAIL-FILE-STATUS
+                 SET END-OF-ERMAIL     TO TRUE
+              END-IF
+           END-IF
+
+           IF NOT END-OF-ERMAIL
+              ADD 1                    TO ERMAIL-RECS-IN
+           END-IF
+
+           .
+       0200-EXIT.
+           EXIT.
+
+       0300-WRITE-EXTR.
+
+           WRITE EXTR-OUT-REC          FROM EXTR-DETAIL-RECORD
+           ADD 1 TO EXTR-RECS-OUT
+
+           .
+       0300-EXIT.
+           EXIT.
+
+
+072403 0350-READ-ELCERT.
+
+           MOVE MA-CONTROL-PRIMARY     TO CM-CONTROL-PRIMARY
+
+072403     READ ELCERT
+
+072403     .
+072403 0350-EXIT.
+072403     EXIT.
+
+       0360-PROCESS-CERT.
+
+      *    MOVE MA-CONTROL-PRIMARY (2:19)
+      *                                TO WS-COMPARE-CERT-KEY
+
+      *    MOVE MA-CERT-EFF-DT         TO DC-BIN-DATE-1
+      *    MOVE ' '                    TO DC-OPTION-CODE
+      *    PERFORM 8510-DATE-CONVERSION
+      *                                THRU 8590-EXIT
+      *    IF NO-CONVERSION-ERROR
+      *       MOVE DC-GREG-DATE-CYMD   TO WS-CCK-EFF-DT
+      *    ELSE
+      *       DISPLAY ' ERROR - EFF DT CONVERT ' MA-CERT-NO
+      *       MOVE ZEROS               TO WS-CCK-EFF-DT
+      *    END-IF
+
+      *    MOVE MA-CERT-NO             TO WS-CCK-CERT-NO
+
+           IF CR-FULL-CONTROL < WS-COMPARE-CERT-KEY
+      *       DISPLAY ' LESS THAN ' WS-CCK-CARRIER ' '
+      *          WS-CCK-STATE ' ' WS-CCK-ACCOUNT ' ' WS-CCK-EFF-DT ' '
+      *          WS-CCK-CERT-NO
+      *          DISPLAY ' FULL CONTROL ' CR-ACCT-CONTROL ' '
+      *            CR-DT ' ' CR-CERT-NO
+              PERFORM 0370-READ-CERT   THRU 0370-EXIT
+              GO TO 0360-PROCESS-CERT
+           ELSE
+              IF CR-FULL-CONTROL > WS-COMPARE-CERT-KEY
+                 DISPLAY ' ERROR - NO MATCHING CERT ' WS-CCK-CARRIER ' '
+                 WS-CCK-STATE ' ' WS-CCK-ACCOUNT ' ' WS-CCK-EFF-DT ' '
+111114           WS-CCK-CERT-NO ' bypassing '
+                 DISPLAY ' FULL CONTROL ' CR-ACCT-CONTROL ' '
+                   CR-DT ' ' CR-CERT-NO
+111114           MOVE 'S' TO EX-PC-IND
+111114*          PERFORM ABEND-PGM
+              ELSE
+                 SET FOUND-CERT        TO TRUE
+              END-IF
+           END-IF
+
+           .
+       0360-EXIT.
+           EXIT.
+
+       0370-READ-CERT.
+
+           READ CERT-IN AT END
+              SET END-OF-CERT          TO TRUE
+           END-READ
+           
+           IF NOT END-OF-CERT
+              ADD 1                    TO WS-CERT-IN-CNT
+           END-IF
+
+           .
+       0370-EXIT.
+           EXIT.
+
+       0400-OPEN-FILES.
+
+072403     OPEN INPUT ELCERT ERMAIL CERT-IN
+               OUTPUT EXTR-OUT
+
+           IF ELCERT-FILE-STATUS = '00' OR '97'
+              CONTINUE
+           ELSE
+              DISPLAY 'ERROR ON ELCERT - OPEN ' ELCERT-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF
+
+           IF ERMAIL-FILE-STATUS = '00' OR '97'
+              CONTINUE
+           ELSE
+              DISPLAY 'ERROR ON ERMAIL - OPEN ' ERMAIL-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF
+
+           .
+       0400-EXIT.
+           EXIT.
+
+       0500-CLOSE-FILES.
+
+           CLOSE ELCERT EXTR-OUT ERMAIL CERT-IN
+
+           IF ELCERT-FILE-STATUS = '00'
+              CONTINUE
+           ELSE
+              DISPLAY 'ERROR ON ELCERT - CLOSE ' ELCERT-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF
+
+           IF ERMAIL-FILE-STATUS = '00'
+              CONTINUE
+           ELSE
+              DISPLAY 'ERROR ON ERMAIL - CLOSE ' ERMAIL-FILE-STATUS
+              PERFORM ABEND-PGM
+           END-IF
+
+           .
+       0500-EXIT.
+           EXIT.
+
+       0550-START-ERMAIL.
+
+           MOVE LOW-VALUES             TO MA-CONTROL-PRIMARY
+
+030404     MOVE DTE-CLASIC-COMPANY-CD  TO MA-COMPANY-CD
+
+           START ERMAIL KEY IS NOT < MA-CONTROL-PRIMARY
+
+           IF ERMAIL-FILE-STATUS = '10' OR '23'
+              SET END-OF-ERMAIL        TO TRUE
+           ELSE
+              IF ERMAIL-FILE-STATUS NOT = '00'
+                 DISPLAY 'ERROR ON ERMAIL - START ' ERMAIL-FILE-STATUS
+                 SET END-OF-ERMAIL     TO TRUE
+              END-IF
+           END-IF
+
+           .
+       0550-EXIT.
+           EXIT.
+
+
+       0600-INITIALIZE.
+
+           MOVE SPACES                 TO EXTR-DETAIL-RECORD
+052704     MOVE ';'                    TO EX-TAB1
+                                          EX-TAB2
+                                          EX-TAB3
+                                          EX-TAB4
+                                          EX-TAB5
+                                          EX-TAB6
+                                          EX-TAB7
+                                          EX-TAB8
+                                          EX-TAB9
+                                          EX-TAB10
+                                          EX-TAB11
+                                          EX-TAB12
+                                          EX-TAB13
+                                          EX-TAB14
+                                          EX-TAB15 
+                                          EX-TAB16
+                                          EX-TAB17
+                                          EX-TAB21
+           PERFORM VARYING S1 FROM +1 BY +1 UNTIL
+              S1 > +7
+              MOVE ';'                 TO EX-TAB18 (S1)
+                                          EX-TAB19 (S1)
+                                          EX-TAB20 (S1)
+           END-PERFORM
+           MOVE 'E'                    TO EX-EOR
+
+           MOVE EXTR-DETAIL-RECORD     TO WS-SAVE-EXTR
+           PERFORM 0550-START-ERMAIL   THRU 0550-EXIT
+           PERFORM 0200-READ-ERMAIL    THRU 0200-EXIT
+           PERFORM 0370-READ-CERT      THRU 0370-EXIT
+
+           .
+       0600-EXIT.
+           EXIT.
+
+       8510-DATE-CONVERSION.
+
+           CALL 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+       8590-EXIT.
+           EXIT.
+
+030404 ABEND-PGM. COPY ELCABEND.

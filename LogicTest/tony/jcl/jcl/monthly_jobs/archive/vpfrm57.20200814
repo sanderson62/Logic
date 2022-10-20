@@ -1,0 +1,85 @@
+################################################################################
+#
+#  Job:  vpfrm57
+#
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=FNB169
+################################################################################
+ASSGNDD ddname='SYS010' dataset='VP.XX.DET010' gdg='0' filename='$SEQFILES/VP.XX.DET010' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCTV' disp='i-o' 
+ASSGNDD ddname='ERPDEF' type='VS' filename='ERPDEF' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/FN.DL.FX.VPPFEES' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/VP.XX.CERT_00' disp='i-o'
+ASSGNDD ddname='SYS013' type='DUMMY'
+
+EXECPGM pgmname='VPP169' stepname='FNB169' parm='@MEMMDDYYYY' 
+
+################################################################################
+LABEL name=DCC170 
+################################################################################
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='$SEQFILES/VPFRM57A' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/FN.DL.FX.VPPFEES' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='DCC170' parm='VPPFEES'
+
+
+################################################################################
+LABEL name=CPYM57A
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/VPFRM57A' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.FN.FX.FRM57' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPYM57A' parm='ALL'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/VPFRM57A' disp='i-o' 
+ASSGNDD ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY1   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *             FREEDOM INTERFACE FOR DCC DEALER INCENTIVE
+#  *
+#  *  SYSUT2 is ftp'd to ntfree2
+#  *------------------------------------------------------------------- 
+#  * 
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/FN.DL.FX.VPPFEES' disp='i-o' abend='k' normal='k' recfmt='F'
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/VPPFEES_@MEMM-DD-YY.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+EXECPGM pgmname='IDCAMS' stepname='COPY1'   
+
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+   ftp -n ntcso1 < $JCLLIB/ftp-vpfrm57
+   ftp -n ntfree2 < $JCLLIB/ftp-vpfrm57-ntfree2
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 040517 CR2015082500001 PEMA   NEW JOB for VPP

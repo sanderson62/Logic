@@ -1,0 +1,43 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+################################################################################
+LABEL name=SQLEPX24
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.XX.EPEC_00' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i'
+
+EXECPGM pgmname='SQLBEPEC24' stepname='SQLEPX24' 
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the v_trend_analysis view and creates a spreadsheet
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/CreateTrendSS.pl @MEMMDDYYYY $SEQFILES/TrendAnalysis_@CCYYYYMM.xlsx
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=FTP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM' << !
+ftp -n ntcso1 < $JCLLIB/ftp-sqlbepec24
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+   "smtp -f slunikix -t pema,PremTrend@cso.com -s 'Trend Anaylysis Spreadsheet is available' -ml 'It can be found here \\ntcso1\userdata\bus_grp\ci\logic\reports\monthly'"
+else
+   echo " Job aborted, print not released "
+endif
+
+ENDJOB 

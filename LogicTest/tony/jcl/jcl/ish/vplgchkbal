@@ -1,0 +1,65 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job Aborted, Not MDOFF"
+#   exit 1
+#endif
+
+setenv ODBCINI /usr/local/etc/odbc.ini
+setenv ODBCSYSINI /usr/local/etc
+
+echo $ODBCINI
+echo $ODBCSYSINI
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/balance_eom.pl 20220831 09302022 VPP $SEQFILES/
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+#
+#  The value in VPPbalstat.txt will be 0 if everything balanced okay
+#  If it's not, then we don't want to initiate submission of day 2
+#  The users will deal with it in the morning and we will go from there
+#
+################################################################################
+
+if (`cat $SEQFILES/VPPbalstat.txt` != 0) then
+   GOTO NOBAL
+endif
+
+################################################################################
+LABEL name=YESBAL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+echo "20220930" > $SEQFILES/M50.VPP.Balancing.Trigger.txt
+ftp -n ntcso1 < $JCLLIB/ftp-vplgchkbal
+smtp -f slunikix -t DCCMEBalanced -s 'VPP Month end is in Balance ' -ml 'The VPP Month end reports are in balance '
+mutt -s 'VPP Month end balanced ' -a $SEQFILES/VPPMebal.xlsx MEAutoBalance@cso.com < /dev/null
+!
+EXECPGM pgmname='BPXBATCH' stepname='YESBAL' parm='SH'
+
+################################################################################
+LABEL name=PERL2
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/eom2constr.pl 20220930 VPP
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL2' parm='SH'
+
+GOTO END_JOB
+
+################################################################################
+LABEL name=NOBAL
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+mutt -s 'VPP Month end DID NOT balance ' -a $SEQFILES/VPPMebal.xlsx MEDidNotBalanceEmail@cso.com < /dev/null
+smtp -f slunikix -t MEDidNotBalanceText -s 'VPP Month end DID NOT balance ' -ml 'Action needed '
+!
+EXECPGM pgmname='BPXBATCH' stepname='NOBAL' parm='SH'
+
+ENDJOB 

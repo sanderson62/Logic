@@ -1,0 +1,370 @@
+      $SET SQL(dbman=ODBC, TARGETDB=MSSQLSERVER, NOAUTOCOMMIT)
+      ****************************************************************
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. sqlroll24b.
+       AUTHOR.   Pablo.
+
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT FILE-IN          ASSIGN TO SYS010
+                                   ORGANIZATION IS LINE SEQUENTIAL.
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  FILE-IN
+           BLOCK CONTAINS 0 RECORDS
+           RECORDING MODE F.
+
+       01  FILE-IN-REC                PIC X(249).
+
+       working-storage section.
+
+       EXEC SQL
+          INCLUDE SQLCA
+       END-EXEC
+      
+       77  rec-cnt                     pic 9(7) value zeros.
+       77  ws-recs-in                  pic 9(7) value zeros.
+       77  eof-sw                      pic x value ' '.
+           88  end-of-input               value 'Y'.
+
+       EXEC SQL
+          BEGIN DECLARE SECTION
+       END-EXEC
+
+       01  svr                         pic x(32).
+       01  usr                         pic x(32).
+       01  pass                        pic x(32).
+       01  usr-pass                    pic x(64).
+       01  ws-disp-code                pic s9(11).
+
+       01  EXTRACT-RECORD.
+           05  EXT-CARRIER             PIC X.
+           05  F                       PIC X.
+           05  EXT-GROUP               PIC X(6).
+           05  F                       PIC X.
+           05  EXT-STATE               PIC XX.
+           05  F                       PIC X.
+           05  EXT-ACCOUNT             PIC X(10).
+           05  F                       PIC X.
+           05  ext-exp-dt              pic x(10).
+           05  f                       pic x.
+           05  ext-eff-dt              pic x(10).
+           05  F                       PIC X.
+           05  EXT-YEAR                PIC 9(4).
+           05  f                       pic x.
+           05  EXT-MONTH               PIC 99.
+           05  F                       PIC X.
+           05  EXT-REPORT-CDE1         PIC X(10).
+           05  F                       PIC X.
+           05  EXT-REPORT-CDE2         PIC X(10).
+           05  F                       PIC X.
+           05  EXT-REPORT-CDE3         PIC X(10).
+           05  F                       PIC X.
+           05  EXT-LF-BEN              PIC X(14).
+           05  F                       PIC X.
+           05  EXT-LF-PREM             PIC X(12).
+           05  F                       PIC X.
+           05  EXT-LF-CLMS             PIC X(12).
+           05  F                       PIC X.
+           05  EXT-AH-BEN              PIC X(14).
+           05  F                       PIC X.
+           05  EXT-AH-PREM             PIC X(12).
+           05  F                       PIC X.
+           05  EXT-AH-CLMS             PIC X(12).
+           05  F                       PIC X.
+           05  EXT-TOT-PREM            PIC X(14).
+           05  F                       PIC X.
+           05  EXT-TOT-COMM            PIC X(12).
+           05  F                       PIC X.
+           05  EXT-NET-COUNT           PIC X(9).
+           05  F                       PIC X.
+           05  ext-account-name        pic x(30).
+           05  F                       PIC X.
+           05  EXT-HI-CERT-DT          PIC X(10).
+           05  F                       PIC X.
+           05  EXT-EOR                 PIC X.
+       EXEC SQL
+          END DECLARE SECTION
+       END-EXEC
+
+       procedure division.
+       0000-begin.
+
+           display ' Begin Program '
+           perform 0010-init           thru 0010-exit
+           perform 0020-connect        thru 0020-exit
+      *    perform 0030-drop-table     thru 0030-exit
+      *    perform 0040-create-table   thru 0040-exit
+           perform 0035-truncate-table thru 0035-exit
+
+           open input file-in
+
+           EXEC SQL
+              SET AUTOCOMMIT OFF
+           END-EXEC
+
+           perform 0046-read-input     thru 0046-exit
+           perform 0045-process-input  thru 0045-exit until
+              end-of-input
+      *      or ws-recs-in > 10000
+
+           perform 0060-finish-up      thru 0060-exit
+           close file-in
+           display ' End Program '
+           display ' rows inserted ' rec-cnt
+           display ' records read  ' ws-recs-in
+           goback
+
+           .
+       0010-init.
+
+           move 'NTCSO2_Logic'         to svr
+           move 'sa'                   to usr
+           move 'ntcso2'               to pass
+
+      *    move 'NTSQLTST2'            to svr
+      *    move 'sa'                   to usr
+      *    move 'sql2008r2'            to pass
+
+           .
+       0010-exit.
+           exit.
+
+       0020-connect.
+
+           display 'Begin connect to DB '
+           string
+               usr delimited space
+               "." delimited size
+               pass delimited space into usr-pass
+           end-string
+
+           display ' usr pass ' usr-pass
+
+           EXEC SQL
+              CONNECT TO :svr USER :usr-pass
+           END-EXEC
+
+           if sqlcode not = 0
+              display "Error: cannot connect "
+              display sqlcode
+              display sqlerrmc
+              goback
+           end-if
+
+           display " connect to DB successful "
+
+           .
+       0020-exit.
+           exit.
+
+       0030-drop-table.
+
+           display 'Begin Drop table'
+           EXEC SQL
+               drop table ROLL24_CPS
+           END-EXEC
+           if sqlcode not = 0
+              display "Error(anticipated) : cannot drop table "
+              display sqlcode
+              display sqlerrmc
+      *       goback
+           end-if
+
+           display ' sql return code ' sqlcode
+           display ' sql err mess    ' sqlerrmc
+
+           .
+       0030-exit.
+           exit.
+
+       0035-truncate-table.
+
+           display '*** Begin Truncate table ***'
+           EXEC SQL
+               truncate table ROLL24_CPS
+           END-EXEC
+           if sqlcode not = 0
+              display "Error : cannot truncate table "
+              display sqlcode
+              display sqlerrmc
+              goback
+           end-if
+
+           display ' sql return code ' sqlcode
+           display ' sql err mess    ' sqlerrmc
+           display '***  End  Truncate table ***'
+
+           .
+       0035-exit.
+           exit.
+
+       0040-create-table.
+
+           display ' Begin Create table'
+           EXEC SQL
+              create table ROLL24_CPS (
+	              carrier char(1),
+	              grouping char(6),
+	              state char(2),
+	              account char(10),
+	              exp_date datetime,
+	              eff_date datetime,
+	              year int,
+	              month int,
+	              report_cd1 char(10),
+	              report_cd2 char(10),
+	              report_cd3 char(10),
+	              lf_net_benefits decimal(13,2),
+	              lf_net_premium decimal(11,2),
+	              lf_claims decimal(11,2),
+	              ah_net_benefits decimal(13,2),
+	              ah_net_premium decimal(11,2),
+	              ah_claims decimal(11,2),
+	              tot_net_premium decimal(13,2),
+	              tot_net_acct_commission decimal(11,2),
+	              net_count decimal(9,0),
+	              account_name varchar(30),
+	              hi_cert_date datetime)
+           END-EXEC
+           if sqlcode not = 0
+              display "Error: cannot create table "
+              move sqlcode             to ws-disp-code
+              display ' sql return code ' ws-disp-code
+              display ' sql err mess    ' sqlerrmc
+              goback
+           end-if
+
+           display " Create table successful "
+
+           .
+       0040-exit.
+           exit.
+
+       0045-process-input.
+
+           perform 0050-insert-row     thru 0050-exit
+           perform 0046-read-input     thru 0046-exit
+
+           .
+       0045-exit.
+           exit.
+
+       0046-read-input.
+
+           read file-in at end
+              set end-of-input         to true
+           end-read
+           
+           if not end-of-input
+              move file-in-rec         to extract-record
+              add 1                    to ws-recs-in
+           end-if
+
+
+           .
+       0046-exit.
+           exit.
+
+
+       0050-insert-row.
+
+      *    display ' Begin Insert row '
+
+           EXEC SQL
+              insert into ROLL24_CPS (
+	              carrier,
+	              grouping,
+	              state,
+	              account,
+	              exp_date,
+	              eff_date,
+	              year,
+	              month,
+	              report_cd1,
+	              report_cd2,
+	              report_cd3,
+	              lf_net_benefits,
+	              lf_net_premium,
+	              lf_claims,
+	              ah_net_benefits,
+	              ah_net_premium,
+	              ah_claims,
+	              tot_net_premium,
+	              tot_net_acct_commission,
+	              net_count,
+	              account_name,
+	              hi_cert_date)
+	              values (
+                  :EXT-CARRIER,
+                  :EXT-GROUP,
+                  :EXT-STATE,
+                  :EXT-ACCOUNT,
+                  :ext-exp-dt,
+                  :ext-eff-dt,
+                  :EXT-YEAR,
+                  :EXT-MONTH,
+                  :EXT-REPORT-CDE1,
+                  :EXT-REPORT-CDE2,
+                  :EXT-REPORT-CDE3,
+                  :EXT-LF-BEN,
+                  :EXT-LF-PREM,
+                  :EXT-LF-CLMS,
+                  :EXT-AH-BEN,
+                  :EXT-AH-PREM,
+                  :EXT-AH-CLMS,
+                  :EXT-TOT-PREM,
+                  :EXT-TOT-COMM,
+                  :EXT-NET-COUNT,
+                  :ext-account-name,
+                  :EXT-HI-CERT-DT)
+           END-EXEC
+           if sqlcode not = 0
+              display "Error: cannot insert row "
+              display ' sql return code ' sqlcode
+              display ' sql err mess    ' sqlerrmc
+              display ' recs so far ' rec-cnt
+              display ' offending rec ' extract-record
+              goback
+           end-if
+
+           add 1 to rec-cnt
+
+           .
+       0050-exit.
+           exit.
+
+       0060-finish-up.
+
+           display ' Begin Commit '
+           EXEC SQL
+               commit transaction
+           END-EXEC
+           if sqlcode not = 0
+              display "Error: commit "
+              display ' sql return code ' sqlcode
+              display ' sql err mess    ' sqlerrmc
+              goback
+           end-if
+      
+           display " Commit trans successful "
+
+           display ' Begin Disconnect '
+           EXEC SQL
+               commit work release
+           END-EXEC
+           if sqlcode not = 0
+              display "Error: commit release "
+              display ' sql return code ' sqlcode
+              display ' sql err mess    ' sqlerrmc
+           end-if
+
+           .
+       0060-exit.
+           exit.
+

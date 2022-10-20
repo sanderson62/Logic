@@ -1,0 +1,121 @@
+BEGINJOB
+
+if ($EBMSYS != 'tony') then
+   echo "Job Aborting, not Tony"
+   exit 1
+endif
+
+
+
+################################################################################
+LABEL name=EL515 
+################################################################################
+ONRETCODE MAXRC GT '8' BYPASS scope='STEP'  
+
+#  ********************************************************************* 
+#  *       PRINTS THE 'EDIT LISTING'                                     
+#  ********************************************************************* 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELERRS' dataset='CI.DD.LG.ELERRS' type='VS' filename='ELERRS' disp='i-o' 
+ASSGNDD ddname='ERCRTC' dataset='CI.DD.LG.ERCRTC' type='VS' filename='ERCRTC' disp='i-o' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ERPNDB' dataset='CI.DD.LG.ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='ERPNDC' dataset='CI.DD.LG.ERPNDC' type='VS' filename='ERPNDC' disp='i-o' 
+ASSGNDD ddname='ELREPT' dataset='CI.DD.LG.ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='SYS020' filename='\${SEQFILES}/ZC.EX.FICH515' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SYS008' type='DUMMY' 
+
+EXECPGM pgmname='EL515' stepname='EL515' 
+
+################################################################################
+
+
+################################################################################
+#     JOB: dccbal331
+#       This job checks the totals from job cidclg331 step EL331.
+################################################################################
+
+################################################################################
+# 
+# PERL1 Checks EL331 Against Totals from cidclgm15 ECS010     
+#
+################################################################################
+LABEL name=PERL1
+################################################################################
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH_perl_/export/home/mtpadmin/cpschkbal2.pl_/data/test/tony/seqfiles/zajrdccmth2.ECS010.ME50.BAL.AMTS_/data/test/tony/seqfiles/zajrdccme50.EL331.ME50.BAL.AMTS_/data/test/tony/seqfiles/dccafter50.20090331.txt_/export/home/mtpadmin/cpschkbal2.$$.msgs'
+
+################################################################################
+LABEL name=FTPPUT1
+################################################################################
+EXECPGM pgmname='BPXBATCH' stepname='FTPPUT1' parm='SH_ftp_-n_ntcso1_< /apps/test/tony/jcl/ish/ftp-zajrdcbal331'
+
+################################################################################
+
+
+################################################################################
+#     Job: cidclgm541b 
+################################################################################
+
+################################################################################
+LABEL name=EL541B 
+################################################################################
+#  ***                                                                   
+#  ***         REPORT MONTH-END BALANCES AND DISCREPANCIES                      
+#  ***
+ASSGNDD ddname='SYS019' dataset='DC.DD.ER.DATECARD' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY'
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+EXECPGM pgmname='EL541' stepname='EL541B' 
+
+################################################################################
+LABEL name=CPY541B
+################################################################################
+ASSGNDD ddname='SYS010' filename='\$SYSOUTDIR/$JOBNAME/EL541B/SYS008_\${JON}' disp='i'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZC.DL.CIADM.FICH541B' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY541B' parm='ALL'
+
+################################################################################
+
+
+
+################################################################################
+#     opnvsam 
+################################################################################
+
+kixfile -p ELCNTL 
+kixfile -bN ELCNTL
+kixfile -p ELCNTL 
+#echo 'Status returned after 1 ' $?
+
+################################################################################
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "cp ${SEQFILES}/DC.DL.CIADM.FICH501 /data/test/tony/convertin"
+    "cp ${SEQFILES}/DC.DL.CIADM.FICH509 /data/test/tony/convertin"
+    "cp ${SEQFILES}/DC.DL.CIADM.FICH525 /data/test/tony/convertin"
+    "cp ${SEQFILES}/DC.DL.CIADM.FICH530 /data/test/tony/convertin"
+    "cp ${SEQFILES}/ZC.DL.CIADM.FICH331 /data/test/tony/convertin"
+    "cp ${SEQFILES}/ZC.DL.CIADM.FICH517A /data/test/tony/convertin"
+    "cp ${SEQFILES}/ZC.DL.CIADM.FICH541B /data/test/tony/convertin"
+    "perl /export/home/mtpadmin/bin/dcc_new_dl_tony.pl /export/home/mtpadmin/bin/dcc_rpt_hash_file"
+    "cp /data/test/tony/convertin/*.CVT /data/test/tony/convertout"
+    "rm /data/test/tony/convertin/*"
+
+    "ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajrdcclgm50"
+    "ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajropra525"
+    "ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajrdcclg331"
+    "ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajropra331"
+    "ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajrdcclgm541b"
+else
+    echo " Job aborted, print not released "
+    echo " Balancing may be outside of tolerance"
+    echo " Results file is dccafter50.20090331.txt"
+    "ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajrdcbal331"
+endif

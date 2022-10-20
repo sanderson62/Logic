@@ -1,0 +1,68 @@
+################################################################################
+BEGINJOB mode='MVS'
+
+if ($EBMSYS != "tony") then
+   echo "Job Aborting, not tony"
+   exit 1
+endif
+
+################################################################################
+LABEL name=EL300A
+################################################################################
+#  ****     THE FOLLOWING JCL BUILDS THE SYSTEM ENVIRONMENT ( DATE       
+#  ****     CARD) FILE FOR THE NEW CREDIT SYSTEM.                        
+#  **************************************************** INPUT FILES      
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' dataset='CI.DD.LG.ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' dataset='CI.DD.LG.ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' dataset='CI.DD.LG.ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER502.DATECARD' filename='\${SEQFILES}/CI.DD.ER502.DATECARD' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCCID1 
+CLAS123112
+!
+
+EXECPGM pgmname='EL300' stepname='EL300A'
+
+################################################################################
+
+unikixbld -i -dERACCTT
+
+################################################################################
+LABEL name=EL502 
+################################################################################
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERCTBL' dataset='CI.DD.LG.ERCTBL' type='VS' filename='ERCTBL' disp='i-o' 
+ASSGNDD ddname='ERREIN' dataset='CI.DD.LG.ERREIN' type='VS' filename='ERREIN' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER502.DATECARD' filename='\${SEQFILES}/CI.DD.ER502.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS020' dataset='ZI.EX.FICH502' filename='\${SEQFILES}/ZI.EX.FICH502' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+
+EXECPGM pgmname='EL502' stepname='EL502' 
+
+################################################################################
+LABEL name=CPY502
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/$JOBNAME/EL502/SYS008_${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.DL.CIADM.FICH502' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY502' parm='ALL' 
+
+################################################################################
+
+
+
+if ($JOBSTATUS == 0) then
+    echo " Test job, dont want any print "
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

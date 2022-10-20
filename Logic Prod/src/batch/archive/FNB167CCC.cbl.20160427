@@ -1,0 +1,476 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.    FNB167CCC.
+       AUTHOR.        PABLO.
+                                                                        
+      ***************************************************************** 
+      *                                                               * 
+      *             ACCOUNTING INTERFACE FOR DCC/CCC RESERVES         * 
+      *                                                               * 
+      *****************************************************************
+031102******************************************************************
+031102*                   C H A N G E   L O G
+031102*
+031102* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+031102*-----------------------------------------------------------------
+031102*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+031102* EFFECTIVE    NUMBER
+031102*-----------------------------------------------------------------
+101708* 101708    2008050500001  AJRA  NEW PROGRAM FOR CCC
+052814* 052814  CR2014012300001  PEMA  DCC CREDIT UNION CHANGES
+031102******************************************************************
+                                                                        
+       ENVIRONMENT DIVISION.                                            
+       INPUT-OUTPUT SECTION.                                            
+       FILE-CONTROL.                                                    
+                                                                        
+           SELECT LOGIC-GAAP                                            
+               ASSIGN TO SYS010                                         
+               FILE STATUS IS SYS010-STATUS.                            
+                                                                        
+101708     SELECT CCC-FREEDOM-EXTRACT-LF                                    
+               ASSIGN TO SYS013
+               ORGANIZATION IS LINE SEQUENTIAL.
+
+           SELECT LOGIC-CONTROL-FILE                                    
+               ASSIGN TO ELCNTL                                         
+               ORGANIZATION IS INDEXED                                  
+               ACCESS IS SEQUENTIAL                                     
+               RECORD KEY IS CF-CONTROL-PRIMARY                         
+               FILE STATUS IS ELCNTL-STATUS.                            
+                                                                        
+           SELECT LOGIC-ACCOUNT-MASTER                                  
+               ASSIGN TO ERACCT                                         
+               ORGANIZATION IS INDEXED                                  
+               ACCESS IS DYNAMIC                                        
+               RECORD KEY IS AM-CONTROL-PRIMARY                         
+               FILE STATUS IS ERACCT-STATUS.                            
+                                                                        
+103002     SELECT DISK-DATE        ASSIGN TO SYS019.
+                                                                        
+       DATA DIVISION.                                                   
+       FILE SECTION.                                                    
+                                                                        
+       FD  LOGIC-GAAP                                                   
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           RECORD CONTAINS 365 CHARACTERS                               
+           BLOCK CONTAINS 0 RECORDS.                                    
+           COPY ECSGAP01.                                               
+
+101708 FD  CCC-FREEDOM-EXTRACT-LF
+           LABEL RECORDS ARE STANDARD
+           RECORDING MODE IS F
+           BLOCK CONTAINS 0 RECORDS.
+101708 01  CCC-EXTRACT-RECORD-LF       PIC X(255).
+
+       FD  LOGIC-CONTROL-FILE.                                          
+           COPY ELCCNTL.                                                
+                                                                        
+       FD  LOGIC-ACCOUNT-MASTER.                                        
+           COPY ERCACCT.                                                
+                                                                        
+103002 FD  DISK-DATE                                                    
+103002     COPY ELCDTEFD.                                               
+
+       WORKING-STORAGE SECTION.                                         
+                                                                        
+       01  FILLER                  COMP-3.                              
+           05  WS-TOT-AMT          PIC S9(9)V99     VALUE +0.           
+                                                                        
+     ***  THE FOLLOWING AMOUNTS ARE 4 DECIMAL PLACES IN ORDER TO        
+     ***  ACCOUNT FOR THE 1/2 CENT CREATED DURING THE UNEARNED          
+     ***  PREMIUM CALCULATION.                                          
+                                                                        
+           05  WS-BAL-AMT          PIC S9(9)V9999   VALUE +0.           
+           05  WS-MEAN-AMT         PIC S9(7)V9999   VALUE +0.           
+                                                                        
+       01  FILLER.                                                      
+010303     05  WS-TEMP-AMT             PIC S9(7)V99 COMP-3 VALUE +0.
+103002     05  WS-ZERO                 PIC S9(3)  COMP-3  VALUE +0.
+103002     05  WS-ABEND-MESSAGE        PIC X(80)  VALUE SPACES.    
+103002     05  PGM-SUB                 PIC S9(4) COMP VALUE +310.
+103002     05  WS-RETURN-CODE          PIC S999  COMP-3 VALUE +0.
+           05  DUMP                PIC X     VALUE ' '.                 
+           05  FORCE-DUMP REDEFINES DUMP PIC S9 COMP-3.                 
+           05  SUB                 PIC S9    COMP-3.                    
+           05  REC-COUNT           PIC S9(9) VALUE +0  COMP-3.          
+030304     05  WS-EXTRACT-RECORD-CNT PIC S9(9) VALUE +0  COMP-3.          
+           05  SYS010-STATUS       PIC XX    VALUE '00'.                
+               88  EOF                       VALUE '10'.                
+           05  DATE-SW             PIC X     VALUE ' '.                 
+               88  VALID-DATE                VALUE 'V'.
+
+031102     05  WS-1200-LOOP-SW     PIC X(01) VALUE 'N'.
+031102         88  GOT-RIGHT-CITY-ZIP        VALUE 'Y'.
+031102         88  NEW-LOOP                  VALUE 'N'.
+
+           05  ELCNTL-STATUS       PIC XX    VALUE '00'.                
+           05  ERACCT-STATUS       PIC XX    VALUE '00'.                
+           05  WS-EDIT-AMT         PIC Z,ZZZ,ZZZ,ZZZ.99BCR.             
+           05  WS-LF-PLAN.                                              
+               10  WS-LF-PLAN1     PIC X.                               
+               10  WS-LF-PLAN2     PIC XXX.                             
+           05  WS-AH-PLAN.                                              
+               10  WS-AH-PLAN1     PIC X.                               
+               10  WS-AH-PLAN2     PIC XXX.                             
+           05  WS-DATE             PIC 9(11).                           
+           05  REDEFINES WS-DATE.                                       
+               10  FILLER          PIC 999.                             
+               10  WS-YR           PIC 9999.                            
+               10  WS-MO           PIC 99.                              
+               10  WS-DAY          PIC 99.                              
+                                                                        
+       01  WS-EXTRACT-RECORD.                                           
+           COPY FNC022.
+                                                                        
+       01  FILLER.                                                      
+010207     05  BENEFIT-CODE-TABLE OCCURS 150 TIMES INDEXED BY BEN-INDEX.
+               10  BEN-NUM       PIC XX    VALUE HIGH-VALUE.            
+               10  BEN-ALPHA     PIC XXX   VALUE HIGH-VALUE.            
+                                                                        
+       01  FNX001-PARMS.                                                
+           05  FNX001-DATA       PIC X(50).                             
+           05  FNX001-CITY       PIC X(30).                             
+           05  FNX001-STATE      PIC X(02).                             
+           05  FNX001-ZIP        PIC X(09).                             
+                                                                        
+031102 01  SYSTEM-DATE.
+031102     05  SYS-MO         PIC 9(2).
+031102     05  SYS-DA         PIC 9(2).
+031102     05  SYS-CCYY       PIC 9(4).
+
+031102* FUNCTION-DATE COPYBOOK
+031102                                      COPY ELCFUNDT.
+
+031102* STATE EDIT TABLE
+031102 COPY FNC018.
+
+103002     COPY ELCDTECX.                                               
+103002     COPY ELCDTEVR.                                               
+                                                                        
+       LINKAGE SECTION.                                                 
+                                                                        
+       01  PARM.                                                        
+           05  PARM-LENGTH      PIC S9(4)   COMP.                       
+           05  CYCLE-DATE       PIC X(8).                               
+
+       PROCEDURE DIVISION USING PARM.                                   
+
+103002*************************************************************     
+103002                                 COPY ELCDTERX.                   
+103002*************************************************************     
+           PERFORM 0000-HOUSEKEEPING   THRU 0000-EXIT
+                                                                        
+           PERFORM 1000-PROCESS        THRU 1000-EXIT UNTIL EOF
+                                                                        
+           IF WS-EXTRACT-RECORD-CNT > +0
+               PERFORM 9000-BALANCE    THRU 9000-EXIT                          
+           END-IF
+
+           CLOSE LOGIC-GAAP
+101708           CCC-FREEDOM-EXTRACT-LF
+                 LOGIC-ACCOUNT-MASTER                                                                        
+
+           GOBACK
+
+           .
+       1000-PROCESS.                                                    
+
+           READ LOGIC-GAAP AT END
+              GO TO 1000-EXIT
+           END-READ
+
+052814     IF (GR-CARRIER = '5' OR '6' or '7')
+101708      AND (GR-REINCO = '800' OR '900')
+              CONTINUE
+           ELSE
+              GO TO 1000-EXIT
+           END-IF
+                                                                        
+TEST       ADD +1 TO REC-COUNT                                          
+TEST       IF REC-COUNT = +100000
+               DISPLAY 'REC: 100000'
+           ELSE
+TEST           IF REC-COUNT = +200000
+                   DISPLAY 'REC: 200000'
+               ELSE
+TEST               IF REC-COUNT = +300000
+                       DISPLAY 'REC: 300000'
+031102             END-IF
+031102         END-IF
+031102     END-IF
+                                                                        
+           MOVE SPACES TO WS-EXTRACT-RECORD                             
+
+           MOVE '30'          TO FX-TRAN-TYPE                           
+
+           MOVE CYCLE-DATE    TO FX-POSTING-DATE                        
+           MOVE GR-CERT-NO    TO FX-POLICY-NO                           
+
+           IF GR-DCC-CLP-STATE = SPACES
+              MOVE GR-STATE            TO GR-DCC-CLP-STATE
+           END-IF
+
+           MOVE GR-DCC-CLP-STATE       TO FX-STATE
+
+           PERFORM  1200-READ-ACCOUNT  THRU 1200-EXIT
+
+101708     MOVE 'CCCDCCRESV'           TO FX-SYSTEM
+           MOVE 'LOGIC '               TO FX-SOURCE-CODE
+101708     MOVE '50'                   TO FX-DIVISION
+           MOVE ' '                    TO FX-FY-REN
+
+           MOVE 'Y'                    TO FX-LOC-CODE
+           MOVE GR-ACCT-PRIME          TO FX-AGENT-01
+           MOVE ' '                    TO FX-DISTR
+           MOVE ' '                    TO FX-SOURCE-ACCT
+           MOVE 'LOGIC CSO-VALUATION'  TO FX-DESCRIPTION
+           MOVE ' '                    TO FX-REFERENCE
+                                                                        
+           MOVE GR-LFTYP               TO WS-LF-PLAN
+           MOVE GR-AHTYP               TO WS-AH-PLAN
+                                                                        
+           IF GR-AHTYP NOT = '00'                                       
+               PERFORM 2000-WRITE-AH   THRU 2000-EXIT
+           END-IF
+                                                                        
+           IF GR-LFTYP NOT = '00'                                       
+               PERFORM 3000-WRITE-LIFE THRU 3000-EXIT
+           END-IF
+
+           .
+       1000-EXIT.                                                       
+           EXIT.                                                        
+
+       1200-READ-ACCOUNT.                                               
+
+           MOVE GR-COMPANY-CD          TO AM-COMPANY-CD
+           MOVE GR-CARRIER             TO AM-CARRIER
+           MOVE GR-GROUPING            TO AM-GROUPING
+           MOVE GR-STATE               TO AM-STATE
+           MOVE GR-ACCOUNT             TO AM-ACCOUNT
+           MOVE LOW-VALUE              TO AM-EXPIRATION-DT
+                                                                        
+           START LOGIC-ACCOUNT-MASTER                                   
+               KEY >= AM-CONTROL-PRIMARY
+
+031102     IF ERACCT-STATUS = '00'
+               SET NEW-LOOP      TO TRUE
+031102         PERFORM 1200-LOOP THRU 1200-LOOP-EXIT
+031102             UNTIL GOT-RIGHT-CITY-ZIP
+031102         MOVE FX-CITY      TO FNX001-DATA
+031102         CALL 'FNX001'     USING FNX001-PARMS
+031102         MOVE FNX001-CITY  TO FX-CITY
+031102     ELSE
+               GO TO 1200-EXIT
+031102     END-IF
+
+031102     .
+031102 1200-EXIT.
+031102     EXIT.
+
+       1200-LOOP.
+
+           READ LOGIC-ACCOUNT-MASTER NEXT                               
+                                                                        
+           IF (ERACCT-STATUS = '00')                                    
+              AND (AM-COMPANY-CD = GR-COMPANY-CD)                       
+              AND (AM-CARRIER    = GR-CARRIER)                          
+              AND (AM-GROUPING   = GR-GROUPING)                         
+              AND (AM-STATE      = GR-STATE)                            
+              AND (AM-ACCOUNT    = GR-ACCOUNT)                          
+                 MOVE AM-CITY TO FX-CITY                                
+                 MOVE AM-ZIP  TO FX-ZIP-CODE                            
+031102     ELSE
+031102         SET GOT-RIGHT-CITY-ZIP TO TRUE
+031102     END-IF
+
+           .                                                            
+       1200-LOOP-EXIT.
+           EXIT.                                                        
+
+       2000-WRITE-AH.                                                   
+
+           MOVE WS-AH-PLAN             TO FX-PLAN-CODE
+
+031102     PERFORM 4000-OTHER-FX-DATA  THRU 4000-EXIT
+
+031102     MOVE '10'                TO FX-SUB-TYPE
+033104     MOVE GRS-AHPRM           TO FX-AMOUNT                              
+033104     ADD GRS-AHPRM            TO WS-TOT-AMT                             
+033104     ADD GRS-AHPRM            TO WS-BAL-AMT                             
+
+           IF FX-AMOUNT NOT = ZERO
+              MOVE '*'                 TO WS-EXTRACT-RECORD(250:1)
+101708        WRITE CCC-EXTRACT-RECORD-LF
+                                       FROM WS-EXTRACT-RECORD
+              ADD +1                   TO WS-EXTRACT-RECORD-CNT
+           END-IF
+
+           .                                                            
+       2000-EXIT.                                                       
+           EXIT.                                                        
+
+       2100-CALC-MEAN.                                                  
+
+022699     IF (GR-STATE = 'CO') AND (GR-EFF < 19970000)                 
+              MOVE GRS-AHPRM TO WS-MEAN-AMT                             
+           ELSE                                                         
+061402        IF (GR-STATE = 'VA')
+061402           AND (GR-EFF < 20020701)
+061402           MOVE GRR-AHPRM        TO WS-MEAN-AMT
+061402        ELSE
+                 COMPUTE WS-MEAN-AMT = (GRP-AHPRM + GRR-AHPRM) / +2.00     
+061402        END-IF
+           END-IF
+
+           .                                                            
+       2100-EXIT.                                                       
+           EXIT.                                                        
+
+       3000-WRITE-LIFE.                                                 
+
+           IF GRS-LFPRM = ZERO
+              GO TO 3000-EXIT
+           END-IF
+                                                                        
+           MOVE WS-LF-PLAN TO FX-PLAN-CODE
+
+031102     PERFORM 4000-OTHER-FX-DATA  THRU 4000-EXIT
+
+031102     MOVE '12'                   TO FX-SUB-TYPE
+
+110304     MOVE GRS-LFPRM              TO FX-AMOUNT
+              
+031102     MOVE '*'                    TO WS-EXTRACT-RECORD(255:1)
+
+101708     WRITE CCC-EXTRACT-RECORD-LF FROM WS-EXTRACT-RECORD
+           
+           .                                                            
+       3000-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+031102 4000-OTHER-FX-DATA.
+
+031102**** SEARCH PULLED FROM FNB160
+031102     IF FX-STATE NOT = SPACES
+031102         SEARCH ALL STATE-TABLE
+031102             AT END DISPLAY 'INVALID STATE CODE: ' FX-STATE
+031102             WHEN ST-STATE (ST-INDEX) = FX-STATE
+031102             MOVE ST-ALT-STATE (ST-INDEX) TO FX-STATE
+031102         END-SEARCH
+031102     END-IF
+
+031102     MOVE SYSTEM-DATE              TO FX-JOURNAL-DATE
+
+031102     .
+031102 4000-EXIT.
+031102     EXIT.
+
+
+       0000-HOUSEKEEPING.                                               
+      *                                                                 
+           CALL 'DATEEDIT' USING CYCLE-DATE,  DATE-SW
+           IF VALID-DATE AND PARM-LENGTH = +8                           
+               CONTINUE                                                 
+           ELSE                                                         
+               DISPLAY 'INVALID PARAMETER DATE: ' CYCLE-DATE            
+               ADD +1 TO FORCE-DUMP
+031102     END-IF
+
+031102     MOVE FUNCTION CURRENT-DATE
+031102                                 TO FUNCTION-DATE
+031102     MOVE WS-FN-MO               TO SYS-MO
+031102     MOVE WS-FN-DA               TO SYS-DA
+031102     MOVE WS-FN-CCYR             TO SYS-CCYY
+
+           PERFORM 0100-LOAD-BENEFIT-TABLE THRU 0100-EXIT
+                                                                        
+           OPEN INPUT LOGIC-ACCOUNT-MASTER                              
+           IF ERACCT-STATUS = '00' OR '97'                              
+               MOVE '00' TO ERACCT-STATUS                               
+           ELSE                                                         
+               DISPLAY 'OPEN ERROR ' ERACCT-STATUS ' ON ERACCT'         
+               ADD +1 TO FORCE-DUMP
+031102     END-IF
+                                                                        
+           OPEN  INPUT LOGIC-GAAP                                       
+101708          OUTPUT CCC-FREEDOM-EXTRACT-LF                               
+
+           .
+       0000-EXIT.                                                       
+           EXIT.                                                        
+
+       0100-LOAD-BENEFIT-TABLE.                                         
+
+           OPEN INPUT LOGIC-CONTROL-FILE                                
+           IF ELCNTL-STATUS = '00' OR '97'                              
+               MOVE '00' TO ELCNTL-STATUS                               
+           ELSE                                                         
+               DISPLAY 'OPEN ERROR ' ELCNTL-STATUS ' ON ELCNTL'         
+               ADD +1 TO FORCE-DUMP
+031102     END-IF
+                                                                        
+           SET BEN-INDEX TO +1
+           READ LOGIC-CONTROL-FILE                                      
+                                                                        
+           PERFORM UNTIL ELCNTL-STATUS NOT = '00'                       
+             IF (CF-COMPANY-ID = 'CID') AND (CF-RECORD-TYPE = '4')      
+                PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 8           
+                  MOVE CF-BENEFIT-NUMERIC (SUB) TO BEN-NUM (BEN-INDEX)  
+                  MOVE CF-BENEFIT-ALPHA (SUB) TO BEN-ALPHA (BEN-INDEX)  
+                  SET BEN-INDEX UP BY +1                                
+010207            IF BEN-INDEX > 150 DISPLAY                            
+                    'TABLE OVERFLOW IN ROUTINE 0100-LOAD-BENEFIT-TABLE' 
+                    ADD +1 TO FORCE-DUMP                                
+                  END-IF                                                
+                END-PERFORM                                             
+             END-IF                                                     
+             READ LOGIC-CONTROL-FILE                                    
+           END-PERFORM                                                  
+                                                                        
+           CLOSE LOGIC-CONTROL-FILE                                     
+TEST       DISPLAY 'BENEFIT TABLE LOADED'                               
+
+           .
+       0100-EXIT.                                                       
+           EXIT.                                                        
+
+       9000-BALANCE.                                                    
+
+      *  THIS ROUTINE IS NECESSARY TO ACCOUNT FOR THE 1/2 CENT          
+      *  CREATED DURING THE CALCULATION OF THE MEAN RESERVE IN          
+      *  ROUTINE 2100-CALC-MEAN.                                        
+      *                                                                 
+           MOVE SPACES TO FX-POLICY-NO, FX-AGENT-01,                    
+031102                    FX-FORM
+031102**** "I01" IS THE LARGEST IN WRITTEN PREMIUMS FOR DISABILITY
+031102**** THIS ROUNDING FACTOR ADJUSTMENT AMOUNT IS INCLUDED UNDER THIS
+031102**** PLAN CODE PER JACKI KRENZER, AS IT IS THE LARGEST
+031102**** PASSING PLAN CODE I01 TO THE NEW FREEDOM INTERFACE
+031102**** COMES UP WITH THE SAME RESULT OF RESERVE CAT 40 AND ANNUAL
+031102**** STATEMENT 005
+031102     MOVE 'I01'        TO FX-PLAN-CODE
+                                                                        
+           MOVE 'NE'         TO FX-STATE
+           MOVE '10'         TO FX-SUB-TYPE
+           MOVE '6620'       TO FX-COST-CENTER
+           MOVE '6170011100' TO FX-SOURCE-ACCT                          
+                                                                        
+           SUBTRACT WS-TOT-AMT FROM WS-BAL-AMT                          
+               GIVING FX-AMOUNT ROUNDED                                 
+           END-SUBTRACT                                                 
+                                                                        
+           MOVE FX-AMOUNT TO WS-EDIT-AMT                                
+           DISPLAY 'MEAN RESERVE BALANCE AMOUNT:' WS-EDIT-AMT           
+                                                                        
+101708     WRITE CCC-EXTRACT-RECORD-LF FROM WS-EXTRACT-RECORD
+
+           .
+       9000-EXIT.                                                       
+           EXIT.                                                        
+
+103002 ABEND-PGM SECTION.                                               00026280
+103002     DIVIDE WS-ZERO BY WS-ZERO GIVING WS-ZERO.                    00026290
+103002 ABEND-EXIT.                                                      00026300
+                                                                        

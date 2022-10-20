@@ -1,0 +1,87 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+if ($EBMSYS != "tony") then
+   echo "Job Aborted, Not tony"
+   exit 1
+endif
+
+setenv dtetme `date +%m%d%H%M%S`
+
+################################################################################
+#LABEL name=GETFILE
+################################################################################
+#ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+#rm -f $SEQFILES/Acct.Comments.txt
+#ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-cidntu1
+#!
+#EXECPGM pgmname='BPXBATCH' stepname='GETFILE' parm='SH'
+#
+################################################################################
+LABEL name=CHKFILE
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ -a /data/test/tony/seqfiles/Acct.Comments.txt ] ; then
+   echo "we got a file " ;
+else
+   echo "No file today "
+   exit 1
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='CHKFILE' parm='SH'
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+################################################################################
+LABEL name=CPYFILE
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cp $SEQFILES/Acct.Comments.txt $SEQFILES/Acct.Comments.txt.$dtetme
+!
+EXECPGM pgmname='BPXBATCH' stepname='CPYFILE' parm='SH'
+
+################################################################################
+LABEL name=BKPACNT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERACNT -s $SEQFILES/$JOBNAME.eracnt.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPACNT' parm='SH'
+
+################################################################################
+LABEL name=CIDNTU1
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/Acct.Comments.txt' disp='i-o' 
+ASSGNDD ddname='SYS008' filename='$SEQFILES/ZI.EX.ERACNT.RPT' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+#ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'
+ASSGNDD ddname='ERACNT' type='VS' filename='ERACNT' disp='i-o'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o'
+
+EXECPGM pgmname='CIDNTU1' stepname='CIDNTU1'
+
+################################################################################
+LABEL name=CPYACNT
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.EX.ERACNT.RPT' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.FICHACNT' recsize='132' recfmt='F' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='CIB009L' stepname='CPYACNT' parm='ALL' 
+
+################################################################################
+LABEL name=FILETEST
+################################################################################
+# this tests for a file size to be > zero
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+if [ -s /data/test/tony/seqfiles/ZI.DL.CIADM.FICHACNT ] ; then
+##   smtp -f slunikix -t pema,sdga -s 'ERACNT UPDATE REPORT' -mf $SEQFILES/CI.DL.CIADM.FICHACNT
+   echo "Errors today "
+else
+   echo "No Errors today "
+fi
+!
+EXECPGM pgmname='BPXBATCH' stepname='FILETEST' parm='SH'
+
+ENDJOB 

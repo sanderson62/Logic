@@ -1,0 +1,61 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+ONRETCODE GT 7 GOTO END_JOB 
+
+if ($EBMSYS != "paul") then
+   echo "Job aborting, not PAUL"
+   exit 1
+endif
+
+################################################################################
+LABEL name=EL300
+################################################################################
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+ASSGNDD ddname='ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.EL694.DATECARD' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCCID1
+CLAS073008
+!
+EXECPGM pgmname='EL300' stepname='EL300'
+
+################################################################################
+LABEL name=EL694B
+################################################################################
+ONRETCODE MAXRC GT '11' BYPASS scope='STEP'  
+
+ASSGNDD ddname='ERARCH' type='VS' filename='ERARCH' disp='i-o' 
+ASSGNDD ddname='ERARCT' type='VS' filename='ERARCT' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.EL694.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' filename='$SEQFILES/CI.DD.LG.CRBLUE.LETTERS' recfmt='F' recsize='80' disp='o' normal='k' abend='d' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/CI.DD.LG.CRSORT.LETTERS' recfmt='F' recsize='80' disp='o' normal='k' abend='d' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+
+EXECPGM pgmname='EL694B' stepname='EL694B' 
+
+################################################################################
+LABEL name=CIB009LA
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.DD.LG.CRBLUE.LETTERS' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH694B' recfmt='F' recsize='80' disp='o' normal='k' abend='d'
+
+EXECPGM pgmname='CIB009LA' stepname='CIB009LA' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+#    echo " TEST JOB, DONT WANT TO PRINT "
+  "$HOME/bin/exelpr.sh isd003.parms '-p IS_PROG' $SEQFILES/CI.DD.LG.CRBLUE.LETTERS"
+  "/export/home/mwwa/bin/smtp -f logictest -t pema -s 'LETTERS ' -mf $SEQFILES/CI.DL.CIADM.FICH694B"
+else
+   echo " Job aborted print not released"
+endif
+
+################################################################################
+
+ENDJOB 
+################################################################################

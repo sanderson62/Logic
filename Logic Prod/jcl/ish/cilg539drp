@@ -1,0 +1,62 @@
+################################################################################
+#                        
+#     JOB: cilg539fix     
+#                       
+#  This job is used to fix the EL539 report for certs without loan officer 
+#  codes. Use the current monthend datecard or run cilg300fix to create a 
+#  special monthend datecard for earlier months. This job uses the monthend
+#  extracts instead of online files; be sure to point to the desired EXTR521 
+#  file. The loan officer codes must be fixed via the cert update screen for
+#  issues only.
+#  
+#  Affected accounts and certs must be hard coded in EL539F, moving the      
+#  appropriate loan officer code to PB-I-LOAN-OFFICER (for issues) and 
+#                                   PB-CI-LOAN-OFFICER (for cancels).           #  Issues are processed in paragraph 0430-PICKUP.
+#  Cancels are processed in paragraph 0440-CHK-CANCEL.
+################################################################################
+BEGINJOB mode='MVS'
+
+unikixbld -t s -d ERLOFC -s erlofc.txt
+unikixbld -i -dERLOFCT
+unikixbld -t v -d ERLOFCT -s erlofc.txt
+
+################################################################################
+LABEL name=EL539 
+################################################################################
+#  ******************************************************************    
+#  ***                   MONTHLY FILE VERIFICATION                       
+#  ******************************************************************    
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' dataset='CI.XX.EXTR521' gdg='0' filename='\${SEQFILES}/CI.XX.EXTR521' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+#ASSGNDD ddname='SYS019' filename='\${SEQFILES}/PRIOR_ME.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERPNDB2' dataset='CI.DD.LG.ERPNDB2' type='VS' filename='ERPNDB2' disp='i-o' 
+ASSGNDD ddname='ERLOFC' type='VS' filename='ERLOFCT' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+!
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='ELREPT' type='DUMMY'
+#  **************************************************** I/O FILES        
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL539DRP' stepname='EL539' 
+
+################################################################################
+LABEL name=CPY539
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/${JOBNAME}/EL539/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.CIADM.FICH539.FIX' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY539' parm='ALL' 
+
+################################################################################
+
+ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-cilg539fix
+
+################################################################################
+
+ENDJOB 

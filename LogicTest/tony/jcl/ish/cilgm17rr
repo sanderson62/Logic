@@ -1,0 +1,67 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 8 GOTO END_JOB 
+
+
+################################################################################
+# This step pulls ECS045A & ECS045C rpt lines for specific reinsurance companies#    into PRINT.WORK w/ a 45-char srt key
+#    Only ECS045C is pulled into PRINT.WORK2 for a 2nd copy of the 045C  
+################################################################################
+LABEL name=CIRE010 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.EX.FICH045' gdg='+0' filename='\${SEQFILES}/CI.EX.FICH045' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS014' type='VS' filename='ERREIN' disp='i-o' 
+ASSGNDD ddname='SYS015' filename='\${SEQFILES}/CI.WW.PRINT.WORK' disp='o' normal='k' abend='d' recfmt='F' recsize='179' 
+ASSGNDD ddname='SYS016' filename='\${SEQFILES}/CI.WW.PRINT.WORK2' disp='o' normal='k' abend='d' recfmt='F' recsize='179' 
+
+EXECPGM pgmname='CIRE010' stepname='CIRE010' 
+
+################################################################################
+# This step takes the output - PRINT.WORK from CIRE010 and sorts it
+#   This report consists of ECS045A and ECS045C  
+################################################################################
+LABEL name=PRT45 
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/CI.WW.PRINT.WORK' disp='i-o' normal='d' abend='k' 
+ASSGNDD  ddname='SYS011' type='SYSOUT' class='A' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS221' stepname='PRT45' 
+
+################################################################################
+# This step takes the output - PRINT.WORK2 - ECS045C from CIRE010 and sorts it
+################################################################################
+LABEL name=PRTWORK2 
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/CI.WW.PRINT.WORK2' disp='i-o' normal='d' abend='k' 
+ASSGNDD  ddname='SYS011' type='SYSOUT' class='A' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS221' stepname='PRTWORK2' 
+
+################################################################################
+LABEL name=CPY045AI
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.EX.FICH045.YTD.ITD' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH045A.YTD.ITD' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY045AI' parm='ECS045A'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+#     "exelpr.sh l132std.parms '-oti=SYS012 -ode=AT' $SYSOUTDIR/$JOBNAME/ECS083/SYS012_$JON"
+#     "exelpr.sh l132std.parms '-oti=SYS013 -ode=AP' $SYSOUTDIR/$JOBNAME/ECS083/SYS013_$JON"
+#     "exelpr.sh p60w1s.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/ECS045/SYS008_$JON"
+#     "exelpr.sh p60w1s.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/PRT45/SYS011_$JON"
+     "exelpr.sh p60w1s.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/PRTWORK2/SYS011_$JON"
+else
+	echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

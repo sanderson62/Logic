@@ -1,0 +1,693 @@
+       CBL NOADV                                                        
+       IDENTIFICATION DIVISION.                                         
+       PROGRAM-ID.    CIB007.                                           
+       DATE-WRITTEN.  APRIL, 2000.                                      
+                                                                        
+      ***************************************************************** 
+      *                                                               * 
+      *  THIS PROGRAM READS THE BILLING STATEMENT PRINT LINES CREATED * 
+      *  IN PROGRAM EL562 AND CREATES:                                * 
+      *                                                               * 
+      *   1) BILLING STATEMENTS FOR ACCOUNTS WITH A BILL/REMIT CODE   * 
+      *      ON THE COMPENSATION MASTER OF "B" AND THE REMIT AMOUNT   * 
+      *      IS POSITIVE.  THE PROGRAM ADDS A BARCODE TO THE STATEMENT* 
+      *      AND WRITES THE STATEMENT LINES TO A FILE.  A COVER LETTER* 
+      *      WITH A MATCHING BARCODE IS ADDED BEFORE EACH STATEMENT.  * 
+      *      THE COVER LETTERS AND STATEMENTS ARE PRINTED BY A PRINT  * 
+      *      UTILITY PROGRAM AND ARE SENT TO THE MAIL ROOM WHERE THEY * 
+      *      ARE MERGED, STUFFED INTO ENVELOPES AND MAILED.           * 
+      *                                                               * 
+      *   2) BILLING STATEMENTS FOR ACCOUNTS WITH A BILL/REMIT CODE   * 
+      *      ON THE COMPENSATION MASTER OF "B" AND THE REMIT AMOUNT   * 
+      *      IS NEGATIVE (REFUND).  THE PROGRAM ADDS A COVER LETTER   * 
+      *      AND A CASH DISBURSMENT VOUCHER BEFORE EACH STATEMENT.    * 
+      *      THE COVER LETTERS AND STATEMENTS ARE PRINTED BY A PRINT  * 
+      *      UTILITY PROGRAM AND ARE SENT TO CID.                     * 
+      *                                                               * 
+      *   3) BILLING STATEMENTS FOR ACCOUNTS WITH A BILL/REMIT CODE   * 
+      *      ON THE COMPENSATION MASTER OF "S".   THESE ARE PRINTED   * 
+      *      BY A UTILITY PROGRAM AND SENT TO CID.                    * 
+      *                                                               * 
+      *   4) BILLING STATEMENTS FOR ACCOUNTS WITH A BILL/REMIT CODE   * 
+      *      ON THE COMPENSATION MASTER OF "T" OR " ".  THESE ARE     * 
+      *      PRINTED BY A UTILITY AND SENT TO CID.                    * 
+      *                                                               * 
+      *                                                               * 
+      *  NOTES:                                                       * 
+      *  ======                                                       * 
+      *   1)  CBL NOADV WAS SET BECAUSE THE INPUT RECORDS ALREADY     * 
+      *       HAVE PRINTER CONTROL CHARACTERS                         * 
+      *                                                               * 
+      *                                                               * 
+      *  CHANGES:                                                     * 
+      *  ========                                                     * 
+DAN01 *   1)  CHANGED ADDRESS TO PRINT CONTROL NAME THEN MAIL NAME    * 
+      *       THEN ACCOUNT NAME ON THE COVER LETTER.                  * 
+DAN02 *   2)  ADDED FINANCIAL RESP NUMBER TO LETTER                   * 
+      *                                                               * 
+      ***************************************************************** 
+                                                                        
+      /                                                                 
+       ENVIRONMENT DIVISION.                                            
+                                                                        
+       INPUT-OUTPUT SECTION.                                            
+                                                                        
+       FILE-CONTROL.                                                    
+                                                                        
+           SELECT BILLING-STATEMENTS                                    
+                  ASSIGN TO SYS010                                      
+                  FILE STATUS IS SYS010-STATUS.                         
+                                                                        
+           SELECT ERCOMP                                                
+                  ASSIGN TO SYS018-FBA1-ERCOMP                          
+                  ORGANIZATION IS INDEXED                               
+                  ACCESS IS DYNAMIC                                     
+                  RECORD KEY IS CO-CONTROL-PRIMARY                      
+                  FILE STATUS IS ERCOMP-STATUS.                         
+                                                                        
+           SELECT DISK-DATE                                             
+                  ASSIGN TO SYS019.                                     
+                                                                        
+           SELECT REMIT-STATEMENTS                                      
+                  ASSIGN TO SYS020.                                     
+                                                                        
+           SELECT REFUND-STATEMENTS                                     
+                  ASSIGN TO SYS021.                                     
+                                                                        
+           SELECT TYPE-S-STATEMENTS                                     
+                  ASSIGN TO SYS022.                                     
+                                                                        
+           SELECT TYPE-T-STATEMENTS                                     
+                  ASSIGN TO SYS023.                                     
+                                                                        
+      *** INPUT FILE ***                                                
+           SELECT REMIT-LETTER                                          
+                  ASSIGN TO SYS030                                      
+                  FILE STATUS IS SYS030-STATUS.                         
+                                                                        
+      *** INPUT FILE ***                                                
+           SELECT REFUND-LETTER                                         
+                  ASSIGN TO SYS031                                      
+                  FILE STATUS IS SYS031-STATUS.                         
+                                                                        
+      *** INPUT FILE ***                                                
+           SELECT ZERO-LETTER                                           
+                  ASSIGN TO SYS032                                      
+                  FILE STATUS IS SYS032-STATUS.                         
+                                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       DATA DIVISION.                                                   
+                                                                        
+       FILE SECTION.                                                    
+                                                                        
+       FD  BILLING-STATEMENTS                                           
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  STMT-RECORD       PIC X(133).                                
+                                                                        
+       FD  ERCOMP.                                                      
+           COPY ERCCOMP.                                                
+                                                                        
+       FD  DISK-DATE                                                    
+           COPY ELCDTEFD.                                               
+                                                                        
+       FD  REMIT-STATEMENTS                                             
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  REMIT-RECORD      PIC X(133).                                
+                                                                        
+       FD  REFUND-STATEMENTS                                            
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  REFUND-RECORD     PIC X(133).                                
+                                                                        
+       FD  TYPE-S-STATEMENTS                                            
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  TYPE-S-RECORD     PIC X(133).                                
+                                                                        
+       FD  TYPE-T-STATEMENTS                                            
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  TYPE-T-RECORD     PIC X(133).                                
+                                                                        
+       FD  REMIT-LETTER                                                 
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  PIC X(132).                                                  
+                                                                        
+       FD  REFUND-LETTER                                                
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  PIC X(132).                                                  
+                                                                        
+       FD  ZERO-LETTER                                                  
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+       01  PIC X(132).                                                  
+                                                                        
+                                                                        
+                                                                        
+           EJECT                                                        
+                                                                        
+       WORKING-STORAGE SECTION.                                         
+       copy "ctypes.cpy".
+                                                                        
+       01  FILLER.                                                      
+           05  S0C7                PIC X       VALUE SPACE.             
+           05  FORCE-DUMP REDEFINES S0C7 PIC S9 COMP-3.                 
+           05  SYS010-STATUS       PIC X(2)    VALUE SPACE.             
+               88  EOF                         VALUE '10'.              
+           05  ERCOMP-STATUS       PIC X(2)    VALUE SPACE.             
+           05  SYS030-STATUS       PIC X(2)    VALUE SPACE.             
+           05  SYS031-STATUS       PIC X(2)    VALUE SPACE.             
+           05  SYS032-STATUS       PIC X(2)    VALUE SPACE.             
+           05  SAVE-BARCODE        PIC X(50)   VALUE SPACE.             
+           05  PREV-CO-CONTROL     PIC X(29)   VALUE SPACE.             
+           05  TYPE-OF-STATEMENT   PIC X(6)    VALUE SPACE.             
+           05  REMIT-PAGE-NO       PIC 9(6)    VALUE ZERO.              
+           05  WS-DATE             PIC 9(8)    VALUE ZERO.              
+           05  WS-HDG  OCCURS 4 TIMES PIC X(133).                       
+DAN01      05  WK-ADDR OCCURS 6 TIMES PIC X(30).                        
+           05  WK-AMT              PIC ZZZ,ZZZ,ZZZ.99/.                 
+                                                                        
+       01  FILLER               COMP-3.                                 
+           05  STRT             PIC S9(3)   VALUE +0.                   
+           05  SUB              PIC S9(3)   VALUE +0.                   
+           05  WK1              PIC S9(7)   VALUE +0.                   
+           05  WK2              PIC S9(7)   VALUE +0.                   
+                                                                        
+       01  WS-REMIT-LETTER.                                             
+           05  REM-CC           PIC X       VALUE SPACE.                
+           05  REM-ID           PIC X(15)   VALUE SPACE.                
+           05  REM-DATE         PIC X(18)   VALUE SPACE.                
+           05  REM-ACCOUNT.                                             
+               10  REM-CARR     PIC X(07)   VALUE SPACE.                
+               10  REM-ACCT     PIC X(10)   VALUE SPACE.                
+           05  REM-AMT          PIC X(15)   VALUE SPACE.                
+           05  REM-BARCODE      PIC X(50)   VALUE SPACE.                
+DAN02      05  REM-RESP         PIC X(10)   VALUE SPACE.                
+DAN02      05  FILLER           PIC X(07)   VALUE SPACE.                
+       01  REDEFINES WS-REMIT-LETTER.                                   
+           05  FILLER           PIC X.                                  
+           05  REM-ADDRESS      PIC X(132).                             
+       01  REDEFINES WS-REMIT-LETTER.                                   
+           05  FILLER           PIC X.                                  
+           05  REM-TEXT         PIC X(132).                             
+                                                                        
+       01  WS-REFUND-LETTER.                                            
+           05  REF-CC           PIC X       VALUE SPACE.                
+           05  REF-ID           PIC X(15)   VALUE SPACE.                
+           05  REF-DATE         PIC X(18)   VALUE SPACE.                
+           05  REF-ACCOUNT.                                             
+               10  REF-CARR     PIC X(07)   VALUE SPACE.                
+               10  REF-ACCT     PIC X(10)   VALUE SPACE.                
+           05  REF-AMT          PIC ZZZZ,ZZZ,ZZZ.99   BLANK ZEROS.      
+DAN02      05  REF-RESP         PIC X(10)   VALUE SPACE.                
+DAN02      05  FILLER           PIC X(57)   VALUE SPACE.                
+       01  REDEFINES WS-REFUND-LETTER.                                  
+           05  FILLER           PIC X.                                  
+           05  REF-ADDRESS      PIC X(132).                             
+       01  REDEFINES WS-REFUND-LETTER.                                  
+           05  FILLER           PIC X.                                  
+           05  REF-TEXT         PIC X(132).                             
+                                                                        
+       01  WS-VOUCHER-RECORD.                                           
+           05  VR-CC            PIC X       VALUE SPACE.                
+           05  VR-ID            PIC X(15)   VALUE SPACE.                
+           05  VR-DATE1         PIC X(18)   VALUE SPACE.                
+           05  VR-DATE2         PIC X(08)   VALUE SPACE.                
+           05  VR-ACCOUNT.                                              
+               10  VR-CARR      PIC X(07)   VALUE SPACE.                
+               10  VR-ACCT      PIC X(10)   VALUE SPACE.                
+           05  VR-AMT           PIC ZZZZ,ZZZ,ZZZ.99.                    
+           05  FILLER           PIC X(59)   VALUE SPACE.                
+       01  REDEFINES WS-VOUCHER-RECORD.                                 
+           05  FILLER           PIC X.                                  
+           05  VR-ADDRESS       PIC X(132).                             
+                                                                        
+       01  LETTER-TABLES          VALUE IS SPACE.                       
+           05  REMIT-LETTER-LINE  OCCURS 10 TIMES PIC X(132).           
+           05  REFUND-LETTER-LINE OCCURS 10 TIMES PIC X(132).           
+           05  ZERO-LETTER-LINE   OCCURS 10 TIMES PIC X(132).           
+                                                                        
+      ***************************************************************** 
+      *  BARCODE ROUTINE                                              * 
+      ***************************************************************** 
+       01  AGEB16-WORKAREA.                                             
+      *     05  AGEB16-LEN       PIC 9(4)    VALUE ZERO.                 
+           05  AGEB16-LEN       short.                 
+           05  AGEB16-INPUT     PIC X(28)   VALUE SPACE.                
+           05  AGEB16-OUTPUT    PIC X(128)  VALUE SPACE.                
+                                                                        
+       01  BARCODE.                                                     
+           05  BC-ENCL-CODE        PIC X(2)    VALUE ZERO.              
+           05  BC-MAIL-CODE        PIC X       VALUE '1'.               
+           05  BC-DIV-CODE         PIC X       VALUE '1'.               
+           05  BC-ACCT-NO.                                              
+               10  BC-CARR         PIC X(07)   VALUE ZERO.              
+               10  BC-ACCT         PIC X(10)   VALUE ZERO.              
+           05  BC-SEQ-NO           PIC 9(4)    VALUE ZERO.              
+                                                                        
+       COPY ELCDTECX SUPPRESS.                                          
+                                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       PROCEDURE DIVISION.                                              
+                                                                        
+           PERFORM 0000-INIT-ROUTINE THRU 0000-EXIT                     
+           PERFORM 1000-PROCESS-FILE THRU 1000-EXIT UNTIL EOF           
+           PERFORM 9000-END-OF-JOB   THRU 9000-EXIT                     
+           STOP RUN.                                                    
+                                                                        
+                                                                        
+      /                                                                 
+       0000-INIT-ROUTINE.                                               
+      *                                                                 
+           OPEN INPUT BILLING-STATEMENTS                                
+           IF SYS010-STATUS NOT = '00'                                  
+              DISPLAY 'OPEN ERROR ' SYS010-STATUS ' ON SYS010'          
+              MOVE +16 TO RETURN-CODE                                   
+              ADD +1 TO FORCE-DUMP.                                     
+                                                                        
+           OPEN INPUT ERCOMP                                            
+           IF ERCOMP-STATUS NOT = '00'                                  
+              DISPLAY 'OPEN ERROR ' ERCOMP-STATUS ' ON ERCOMP'          
+              MOVE +16 TO RETURN-CODE                                   
+              ADD +1 TO FORCE-DUMP.                                     
+                                                                        
+           OPEN OUTPUT REMIT-STATEMENTS                                 
+                       REFUND-STATEMENTS                                
+                       TYPE-S-STATEMENTS                                
+                       TYPE-T-STATEMENTS                                
+                                                                        
+           OPEN INPUT DISK-DATE                                         
+           READ DISK-DATE INTO DATE-CARD                                
+           CLOSE DISK-DATE                                              
+                                                                        
+           PERFORM 0100-LOAD-REMIT-LETTER  THRU 0100-EXIT               
+           PERFORM 0200-LOAD-REFUND-LETTER THRU 0200-EXIT               
+           PERFORM 0300-LOAD-ZERO-LETTER THRU 0300-EXIT                 
+           .                                                            
+       0000-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       0100-LOAD-REMIT-LETTER.                                          
+      *                                                                 
+           OPEN INPUT REMIT-LETTER                                      
+           PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 10               
+              IF SYS030-STATUS = '00'                                   
+                 READ REMIT-LETTER INTO REMIT-LETTER-LINE(SUB)          
+              ELSE
+                 DISPLAY ' SYS030 remit not open '
+              END-IF                                                    
+           END-PERFORM                                                  
+           CLOSE REMIT-LETTER                                           
+           .                                                            
+       0100-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       0200-LOAD-REFUND-LETTER.                                         
+      *                                                                 
+           OPEN INPUT REFUND-LETTER                                     
+           PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 10               
+              IF SYS031-STATUS = '00'                                   
+                 READ REFUND-LETTER INTO REFUND-LETTER-LINE(SUB)        
+              ELSE
+                 DISPLAY ' SYS031 refund not open '
+              END-IF                                                    
+           END-PERFORM                                                  
+           CLOSE REFUND-LETTER                                          
+           .                                                            
+       0200-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       0300-LOAD-ZERO-LETTER.                                           
+      *                                                                 
+           OPEN INPUT ZERO-LETTER                                       
+           PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 10               
+              IF SYS032-STATUS = '00'                                   
+                 READ ZERO-LETTER INTO ZERO-LETTER-LINE(SUB)            
+              END-IF                                                    
+           END-PERFORM                                                  
+           CLOSE ZERO-LETTER                                            
+           .                                                            
+       0300-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       1000-PROCESS-FILE.                                               
+      *                                                                 
+           READ BILLING-STATEMENTS                                      
+                AT END GO TO 1000-EXIT.                                 
+                                                                        
+           IF STMT-RECORD(1:1) = '1'                                    
+              PERFORM 2000-NEW-PAGE THRU 2000-EXIT                      
+              GO TO 1000-EXIT.                                          
+                                                                        
+           EVALUATE TYPE-OF-STATEMENT                                   
+              WHEN 'REMIT ' WRITE REMIT-RECORD  FROM STMT-RECORD        
+                            DISPLAY ' REMIT WRITE '
+              WHEN 'REFUND' WRITE REFUND-RECORD FROM STMT-RECORD        
+                            DISPLAY ' REFUND WRITE '
+              WHEN 'TYPE-S' WRITE TYPE-S-RECORD FROM STMT-RECORD        
+                            DISPLAY ' TYPE S WRITE '
+              WHEN 'TYPE-T' WRITE TYPE-T-RECORD FROM STMT-RECORD        
+                            DISPLAY ' TYPE T WRITE '
+           END-EVALUATE                                                 
+           .                                                            
+       1000-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       2000-NEW-PAGE.                                                   
+      *                                                                 
+      ***--------------------------------------------------***          
+      ***  CHECK TO SEE IF A BARCODE LINE IS NEEDED                     
+      ***  ON THE PREVIOUS PAGE BEFORE PRINTING THIS PAGE.              
+      ***  NOTE:  BARCODES ARE ONLY ON ODD NUMBERED PAGES.              
+      ***--------------------------------------------------***          
+           IF TYPE-OF-STATEMENT = 'REMIT'                               
+              MOVE WS-HDG(3)(126:6) TO REMIT-PAGE-NO                    
+              DIVIDE REMIT-PAGE-NO BY 2 GIVING WK1 REMAINDER WK2        
+              IF WK2 = 1                                                
+                 MOVE 'C' TO REMIT-RECORD                               
+                 PERFORM 2100-BUILD-BARCODE THRU 2100-EXIT              
+                 MOVE SAVE-BARCODE TO REMIT-RECORD(40:50)               
+                 WRITE REMIT-RECORD                                     
+              END-IF                                                    
+           END-IF                                                       
+                                                                        
+           MOVE SPACE TO TYPE-OF-STATEMENT                              
+                                                                        
+           MOVE STMT-RECORD TO WS-HDG(1)                                
+           PERFORM VARYING SUB FROM 2 BY 1 UNTIL SUB > 4                
+              READ BILLING-STATEMENTS NEXT INTO WS-HDG(SUB)             
+           END-PERFORM                                                  
+                                                                        
+           IF WS-HDG(1)(61:13) = 'OVERALL RECAP'                        
+              GO TO 2000-EXIT.                                          
+                                                                        
+           PERFORM 2200-READ-ERCOMP THRU 2200-EXIT                      
+           IF ERCOMP-STATUS NOT = '00'                                  
+              GO TO 2000-EXIT.                                          
+                                                                        
+           IF CO-TYPE NOT = 'A'                                         
+              GO TO 2000-EXIT.                                          
+                                                                        
+           IF CO-BILL-SW = 'B'                                          
+              IF CO-CURRENT-END-BAL IS POSITIVE                         
+                 MOVE 'REMIT' TO TYPE-OF-STATEMENT                      
+                 PERFORM 2300-REMIT-LETTER  THRU 2300-EXIT              
+                 PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 4          
+                   WRITE REMIT-RECORD FROM WS-HDG(SUB)                  
+                 END-PERFORM                                            
+              ELSE                                                      
+                 MOVE 'REFUND' TO TYPE-OF-STATEMENT                     
+                 PERFORM 2400-PRINT-VOUCHER THRU 2400-EXIT              
+                 PERFORM 2500-REFUND-LETTER THRU 2500-EXIT              
+                 PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 4          
+                   WRITE REFUND-RECORD FROM WS-HDG(SUB)                 
+                 END-PERFORM                                            
+              END-IF                                                    
+           END-IF                                                       
+                                                                        
+           IF CO-BILL-SW = 'S'                                          
+              MOVE 'TYPE-S' TO TYPE-OF-STATEMENT                        
+              PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 4             
+                WRITE TYPE-S-RECORD FROM WS-HDG(SUB)                    
+              END-PERFORM                                               
+           END-IF                                                       
+                                                                        
+           IF CO-BILL-SW = 'T' OR ' '                                   
+              MOVE 'TYPE-T' TO TYPE-OF-STATEMENT                        
+              PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 4             
+                WRITE TYPE-T-RECORD FROM WS-HDG(SUB)                    
+              END-PERFORM                                               
+           END-IF                                                       
+                                                                        
+           MOVE CO-CONTROL-PRIMARY TO PREV-CO-CONTROL                   
+           .                                                            
+       2000-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       2100-BUILD-BARCODE.                                              
+      *                                                                 
+           MOVE CO-CARR-GROUP TO BC-CARR                                
+           MOVE CO-ACCOUNT TO BC-ACCT                                   
+           ADD 1 TO BC-SEQ-NO                                           
+           MOVE  25      TO AGEB16-LEN                                  
+           MOVE BARCODE  TO AGEB16-INPUT                                
+           MOVE SPACES   TO AGEB16-OUTPUT                               
+           CALL 'AGEB16' USING AGEB16-LEN                               
+                               AGEB16-INPUT                             
+                               AGEB16-OUTPUT                            
+           IF AGEB16-LEN = +128                                         
+              DISPLAY 'AGEB16 - BARCODE ROUTINE ERROR'                  
+           ELSE                                                         
+              MOVE AGEB16-OUTPUT TO SAVE-BARCODE                        
+           END-IF                                                       
+TEST***    DISPLAY  BARCODE                                             
+           .                                                            
+       2100-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       2200-READ-ERCOMP.                                                
+      *                                                                 
+           MOVE DTE-CLASIC-COMPANY-CD  TO CO-COMPANY-CD                       
+      *    MOVE X'04'            TO CO-COMPANY-CD                       
+           MOVE WS-HDG(4)(16:01) TO CO-CARRIER                          
+           MOVE WS-HDG(4)(17:06) TO CO-GROUPING                         
+           MOVE WS-HDG(4)(90:10) TO CO-RESP-NO                          
+           MOVE WS-HDG(4)(24:10) TO CO-ACCOUNT                          
+           MOVE 'A'              TO CO-TYPE                             
+           IF CO-RESP-NO = SPACES                                       
+              MOVE CO-ACCOUNT TO CO-RESP-NO                             
+           END-IF                                                       
+                                                                        
+           IF CO-CONTROL-PRIMARY = PREV-CO-CONTROL                      
+              GO TO 2200-EXIT.                                          
+                                                                        
+           READ ERCOMP                                                  
+           IF ERCOMP-STATUS NOT = '00'                                  
+              DISPLAY 'READ ERROR ' ERCOMP-STATUS ' ON ERCOMP.   '      
+                      'KEY=' CO-CONTROL-PRIMARY                         
+           END-IF                                                       
+           .                                                            
+       2200-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       2300-REMIT-LETTER.                                               
+      *                                                                 
+           IF CO-CONTROL-PRIMARY = PREV-CO-CONTROL                      
+              GO TO 2300-EXIT.                                          
+                                                                        
+           MOVE '1' TO REM-CC                                           
+           MOVE 'REMIT LETTER' TO REM-ID                                
+           MOVE +0 TO STRT                                              
+           INSPECT ALPH-DATE TALLYING STRT FOR LEADING ' '              
+           MOVE ALPH-DATE(STRT + 1:) TO REM-DATE                        
+           MOVE CO-CARR-GROUP TO REM-CARR                               
+DAN02      MOVE CO-RESP-NO TO REM-RESP                                  
+           MOVE CO-ACCOUNT TO REM-ACCT                                  
+                                                                        
+           MOVE +0 TO STRT                                              
+           MOVE CO-CURRENT-END-BAL TO WK-AMT                            
+           INSPECT WK-AMT TALLYING STRT FOR LEADING ' '                 
+                          REPLACING ALL '/' BY '.'                      
+           MOVE WK-AMT(STRT:) TO REM-AMT                                
+           PERFORM 2100-BUILD-BARCODE THRU 2100-EXIT                    
+           MOVE SAVE-BARCODE  TO REM-BARCODE                            
+           WRITE REMIT-RECORD FROM WS-REMIT-LETTER                      
+                                                                        
+           MOVE ' ' TO REM-CC                                           
+           PERFORM 2310-ADJ-ADDRESS THRU 2310-EXIT                      
+DAN01      PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 6                
+              MOVE WK-ADDR(SUB) TO REM-ADDRESS                          
+              WRITE REMIT-RECORD FROM WS-REMIT-LETTER                   
+           END-PERFORM                                                  
+                                                                        
+           MOVE ' ' TO REM-CC                                           
+           PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 10               
+              MOVE REMIT-LETTER-LINE(SUB) TO REM-TEXT                   
+              WRITE REMIT-RECORD FROM WS-REMIT-LETTER                   
+           END-PERFORM                                                  
+           .                                                            
+       2300-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       2310-ADJ-ADDRESS.                                                
+      *                                                                 
+           MOVE CO-CONTROL-NAME TO WK-ADDR(1)                           
+           MOVE CO-MAIL-NAME    TO WK-ADDR(2)                           
+           MOVE CO-ACCT-NAME    TO WK-ADDR(3)                           
+           IF CO-MAIL-NAME(1:3) = 'C/O'                                 
+              MOVE CO-ACCT-NAME TO WK-ADDR(2)                           
+              MOVE CO-MAIL-NAME TO WK-ADDR(3)                           
+           END-IF                                                       
+           MOVE CO-ADDR-1 TO WK-ADDR(4)                                 
+           MOVE CO-ADDR-2 TO WK-ADDR(5)                                 
+           MOVE CO-ADDR-3 TO WK-ADDR(6)                                 
+           IF CO-ZIP-PLUS4 = SPACE                                      
+              MOVE CO-ZIP-PRIME TO WK-ADDR(6)(26:5)                     
+           ELSE                                                         
+              MOVE CO-ZIP TO WK-ADDR(6)(22:9)                           
+           END-IF                                                       
+                                                                        
+           IF WK-ADDR(2) = WK-ADDR(3)                                   
+              MOVE SPACES TO WK-ADDR(3)                                 
+           END-IF                                                       
+                                                                        
+           IF WK-ADDR(1) = SPACES                                       
+              MOVE WK-ADDR(2) TO WK-ADDR(1)                             
+              MOVE WK-ADDR(3) TO WK-ADDR(2)                             
+              MOVE WK-ADDR(4) TO WK-ADDR(3)                             
+              MOVE WK-ADDR(5) TO WK-ADDR(4)                             
+              MOVE WK-ADDR(6) TO WK-ADDR(5)                             
+              MOVE SPACES     TO WK-ADDR(6)                             
+           END-IF                                                       
+                                                                        
+           IF WK-ADDR(2) = SPACES                                       
+              MOVE WK-ADDR(3) TO WK-ADDR(2)                             
+              MOVE WK-ADDR(4) TO WK-ADDR(3)                             
+              MOVE WK-ADDR(5) TO WK-ADDR(4)                             
+              MOVE WK-ADDR(6) TO WK-ADDR(5)                             
+              MOVE SPACES     TO WK-ADDR(6)                             
+           END-IF                                                       
+                                                                        
+           IF WK-ADDR(3) = SPACES                                       
+              MOVE WK-ADDR(4) TO WK-ADDR(3)                             
+              MOVE WK-ADDR(5) TO WK-ADDR(4)                             
+              MOVE WK-ADDR(6) TO WK-ADDR(5)                             
+              MOVE SPACES     TO WK-ADDR(6)                             
+           END-IF                                                       
+                                                                        
+           IF WK-ADDR(4) = SPACES                                       
+              MOVE WK-ADDR(5) TO WK-ADDR(4)                             
+              MOVE WK-ADDR(6) TO WK-ADDR(5)                             
+              MOVE SPACES     TO WK-ADDR(6)                             
+           END-IF                                                       
+                                                                        
+           IF WK-ADDR(5) = SPACES                                       
+              MOVE WK-ADDR(6) TO WK-ADDR(5)                             
+              MOVE SPACES     TO WK-ADDR(6)                             
+           END-IF                                                       
+           .                                                            
+       2310-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       2400-PRINT-VOUCHER.                                              
+      *                                                                 
+      *    IF CO-CURRENT-END-BAL = ZERO                                 
+      *       GO TO 2400-EXIT.                                          
+                                                                        
+           IF CO-CONTROL-PRIMARY = PREV-CO-CONTROL                      
+              GO TO 2400-EXIT.                                          
+                                                                        
+           MOVE '1' TO VR-CC                                            
+           MOVE 'VOUCHER' TO VR-ID                                      
+           MOVE +0 TO STRT                                              
+           INSPECT ALPH-DATE TALLYING STRT FOR LEADING ' '              
+           MOVE ALPH-DATE(STRT + 1:) TO VR-DATE1                        
+           MOVE RUN-DATE TO WS-DATE                                     
+           STRING WS-DATE(5:2) '/' WS-DATE(7:2) '/' WS-DATE(3:2)        
+                  DELIMITED BY SIZE INTO VR-DATE2                       
+                                                                        
+           MOVE CO-CARR-GROUP TO VR-CARR                                
+           MOVE CO-ACCOUNT TO VR-ACCT                                   
+           MOVE CO-CURRENT-END-BAL TO VR-AMT                            
+           WRITE REFUND-RECORD FROM WS-VOUCHER-RECORD                   
+                                                                        
+           MOVE ' ' TO VR-CC                                            
+           PERFORM 2310-ADJ-ADDRESS THRU 2310-EXIT                      
+DAN01      PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 6                
+              MOVE WK-ADDR(SUB) TO VR-ADDRESS                           
+              WRITE REFUND-RECORD FROM WS-VOUCHER-RECORD                
+           END-PERFORM                                                  
+           .                                                            
+       2400-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       2500-REFUND-LETTER.                                              
+      *                                                                 
+           IF CO-CONTROL-PRIMARY = PREV-CO-CONTROL                      
+              GO TO 2500-EXIT.                                          
+                                                                        
+           MOVE '1' TO REF-CC                                           
+           MOVE 'REFUND LETTER' TO REF-ID                               
+                                                                        
+           MOVE +0 TO STRT                                              
+           INSPECT ALPH-DATE TALLYING STRT FOR LEADING ' '              
+           MOVE ALPH-DATE(STRT + 1:) TO REF-DATE                        
+           MOVE CO-CARR-GROUP TO REF-CARR                               
+DAN02      MOVE CO-RESP-NO TO REF-RESP                                  
+           MOVE CO-ACCOUNT TO REF-ACCT                                  
+           WRITE REFUND-RECORD FROM WS-REFUND-LETTER                    
+                                                                        
+           MOVE ' ' TO REF-CC                                           
+           PERFORM 2310-ADJ-ADDRESS THRU 2310-EXIT                      
+DAN01      PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 6                
+              MOVE WK-ADDR(SUB) TO REF-ADDRESS                          
+              WRITE REFUND-RECORD FROM WS-REFUND-LETTER                 
+           END-PERFORM                                                  
+                                                                        
+           MOVE ' ' TO REF-CC                                           
+           PERFORM VARYING SUB FROM 1 BY 1 UNTIL SUB > 10               
+              IF CO-CURRENT-END-BAL = ZERO                              
+                 MOVE ZERO-LETTER-LINE(SUB) TO REF-TEXT                 
+              ELSE                                                      
+                 MOVE REFUND-LETTER-LINE(SUB) TO REF-TEXT               
+              END-IF                                                    
+              WRITE REFUND-RECORD FROM WS-REFUND-LETTER                 
+           END-PERFORM                                                  
+           .                                                            
+       2500-EXIT.                                                       
+           EXIT.                                                        
+                                                                        
+                                                                        
+      /                                                                 
+       9000-END-OF-JOB.                                                 
+      *                                                                 
+           DISPLAY 'EOJ - BILLING STATEMENT PRINT JOB'                  
+                                                                        
+           CLOSE BILLING-STATEMENTS                                     
+                 ERCOMP                                                 
+                 REMIT-STATEMENTS                                       
+                 REFUND-STATEMENTS                                      
+                 TYPE-S-STATEMENTS                                      
+                 TYPE-T-STATEMENTS                                      
+           .                                                            
+       9000-EXIT.                                                       
+           EXIT.                                                        
+                                                                        

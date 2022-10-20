@@ -1,0 +1,84 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+################################################################################
+LABEL name=EL300
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLOG' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='J' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD.EPX1' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCDCC1
+CLAS@MEMMDDYY                          1
+!
+
+EXECPGM pgmname='EL300' stepname='EL300'
+
+################################################################################
+LABEL name=CIDEPX1
+################################################################################
+
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTD' disp='i-o' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/DC.XX.EPEC_00' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD.EPX1' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.EPEC.EXTRACT.TMP' disp='o' normal='k' abend='d' recsize='687' recfmt='F' 
+
+EXECPGM pgmname='CIDEPX1' stepname='CIDEPX1' 
+
+################################################################################
+LABEL name=SORT1
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/DC.EPEC.EXTRACT.TMP' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/ext_dcc_epec_tmp' disp='o' normal='k' abend='k' recfmt='F' recsize='687'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+ASSGNDD ddname='SORTWK06' type='TEMP' 
+ASSGNDD ddname='SORTWK07' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 1)(3 6) (10 2) (13 10) (24 10)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT1' 
+
+################################################################################
+LABEL name=ADDCRLF
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/addcrlf.pl $SEQFILES/ext_dcc_epec_tmp $SEQFILES/ext_dcc_epec_srtd 687
+!
+EXECPGM pgmname='BPXBATCH' stepname='ADDCRLF' parm='SH'
+
+################################################################################
+LABEL name=EXTACCT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/run_dcc_eracct $SEQFILES/ERACCTS_DCC.TXT $SEQFILES/ext_dcc_eracct
+!
+EXECPGM pgmname='BPXBATCH' stepname='EXTACCT' parm='SH'
+
+################################################################################
+LABEL name=MTCHEPAM
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/run_dcc_epec_mtch $SEQFILES/ext_dcc_epec_srtd $SEQFILES/ext_dcc_eracct $SEQFILES/new_dcc_epec
+!
+EXECPGM pgmname='BPXBATCH' stepname='MTCHEPAM' parm='SH'
+
+ENDJOB 

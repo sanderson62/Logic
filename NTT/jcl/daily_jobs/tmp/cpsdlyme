@@ -1,0 +1,415 @@
+cd $PROJECT_ROOT/jcl
+
+#########################  B E G I N  S T E P  01   #########################
+echo "Begin Cycle Date Tests "
+
+setenv prevcydte `cat $SEQFILES/PrevCycleDate`
+setenv curcydte `cat $SEQFILES/CurCycleDate`
+
+if (`date +%Y%m%d` != @CCYYYYMMDD) then
+   echo "Cycle Date NOT equal Current date, aborting "
+   "echo 'Bad Current cycle date' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+   exit 1
+endif
+
+if (`cat $SEQFILES/PrevCycleDate` != @PCYYYYMMDD) then
+   echo " Previous cycle date not = last cycle date "
+   "echo 'Bad Prev cycle date' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+   exit 1
+endif
+
+if (`cat $SEQFILES/CurCycleDate` == @CCYYYYMMDD) then
+   echo " Current cycle already ran "
+   "echo 'Cycle already ran for today' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+   exit 1
+endif
+
+echo "Cycle Date Tests Complete"
+
+rm -f $SEQFILES/runtimes/CPSDAILY
+#########################    E N D    S T E P  01   #########################
+
+
+#########################  B E G I N  S T E P  02   #########################
+setenv JOBSTART `date +%Y/%m/%d/%H/%M/%S`
+setenv cdte `date +%m%d`
+echo $JOBSTART
+#########################    E N D    S T E P  02   #########################
+
+#########################  B E G I N  S T E P  03   #########################
+perl $HOME/bin/run_time_start.pl CPSDAILY CPSDAILY
+
+rm -f $PROJECT_ROOT/emails/printemail.txt $PROJECT_ROOT/reprints/dailycycle
+cp $PROJECT_ROOT/emails/emailinit.txt $PROJECT_ROOT/emails/printemail.txt
+touch $PROJECT_ROOT/reprints/dailycycle
+#########################    E N D    S T E P  03   #########################
+
+echo "clsvsam is about to start"
+unikixjob clsvsam -w -ca
+if ($status != 0) then
+    echo "clsvsam aborted"
+   "echo 'CLSVSAM' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "clsvsam terminated successfully"
+
+
+echo "ciddaily1 is about to start"
+unikixjob ciddaily1 -w -ca
+if ($status != 0) then
+    echo "ciddaily1 aborted"
+   "echo 'In CIDDAILY1' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "ciddaily1 terminated successfully"
+
+if (`date +%F` == 2016-12-29 || "@ccdow" == "Fri") then
+   echo "cidfriday is about to start"
+   unikixjob cidfriday -w -ca
+   if ($status != 0) then
+       echo "cidfriday aborted"
+      "echo 'In CIDFRIDAY' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+       exit 1
+   endif
+   echo "cidfriday terminated successfully"
+endif
+
+echo "ahldaily1 is about to start"
+unikixjob ahldaily1 -w -ca
+if ($status != 0) then
+    echo "ahldaily1 aborted"
+   "echo 'In AHLDAILY1' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "ahldaily1 terminated successfully"
+
+if (`date +%F` == 2016-12-29 || "@ccdow" == "Fri") then
+   echo "ahlfriday is about to start"
+   unikixjob ahlfriday -w -ca
+   if ($status != 0) then
+       echo "ahlfriday aborted"
+      "echo 'In AHLFRIDAY' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+       exit 1
+   endif
+   echo "ahlfriday terminated successfully"
+endif
+
+echo "dccdaily1 is about to start"
+unikixjob dccdaily1 -w -ca
+if ($status != 0) then
+    echo "dccdaily1 aborted"
+   "echo 'In DCCDAILY1' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "dccdaily1 terminated successfully"
+
+if (`date +%F` == 2016-12-29 || "@ccdow" == "Fri") then
+   echo "dccfriday is about to start"
+   unikixjob dccfriday -w -ca
+   if ($status != 0) then
+       echo "dccfriday aborted"
+      "echo 'In DCCFRIDAY' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+       exit 1
+   endif
+   echo "dccfriday terminated successfully"
+endif
+
+#########################  B E G I N  S T E P  04   #########################
+echo "File compression has been started"
+/export/home/mtpadmin/bin/gdgcomp
+#########################    E N D    S T E P  04   #########################
+
+#########################  B E G I N  S T E P  04.1 #########################
+echo "cilgmdoff is about to start"
+unikixjob cilgmdoff -w -ca
+if ($status != 0) then
+    echo "cilgmdoff aborted"
+   "echo 'cilgmdoff' | mutt -s 'Cycle Aborted'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cilgmdoff terminated successfully"
+#########################    E N D    S T E P  04.1 #########################
+
+#########################  B E G I N  S T E P  05   #########################
+"echo 'DAILY CYCLE COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com,pager.sdga@cso.com"
+
+perl $HOME/bin/run_time_dura.pl $JOBSTART CPSDAILY CPSDAILY
+cp $SEQFILES/runtimes/CPSDAILY $SEQFILES/runtimes/CPSDAILY.$cdte
+
+rm -f $SEQFILES/runtimes/CPSMONTHLY
+perl $HOME/bin/run_time_start.pl CPSMONTHLY CPSMONTHLY
+#########################    E N D    S T E P  05   #########################
+
+#########################  B E G I N  S T E P  06   #########################
+setenv JOBSTART `date +%Y/%m/%d/%H/%M/%S`
+echo $JOBSTART
+#########################    E N D    S T E P  06   #########################
+
+echo "cidmth1 is about to start"
+unikixjob cidmth1 -w -ca
+if ($status != 0) then
+    echo "cidmth1 aborted"
+   "echo 'In CIDMTH1' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidmth1 terminated successfully"
+
+
+#****************************
+#*****Check totals from cilgm10 EL524 and EL523
+
+unikixjob cpsbalcid1 -w -ca
+if ($status != 0) then
+    echo "cpsbalcid1 aborted"
+    echo "totals may be out of tolerance"
+   "echo 'In CPSBALCID1' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cpsbalcid1 terminated successfully"
+
+"echo 'CIDMTH1 COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+echo "cidmth2 is about to start"
+unikixjob cidmth2 -w -ca
+if ($status != 0) then
+    echo "cidmth2 aborted"
+   "echo 'In CIDMTH2' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidmth2 terminated successfully"
+
+
+#****************************
+#*****Check totals from cilgm15 ECS010
+
+unikixjob cpsbalcid2 -w -ca
+if ($status != 0) then
+    echo "cpsbalcid2 aborted"
+    echo "totals may be out of tolerance"
+   "echo 'In CPSBALCID2' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cpsbalcid2 terminated successfully"
+
+"echo 'CIDMTH2 COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+echo "cidmth3 is about to start"
+unikixjob cidmth3 -w -ca
+if ($status != 0) then
+    echo "cidmth3 aborted"
+   "echo 'In CIDMTH3' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidmth3 terminated successfully"
+
+
+#****************************
+#*****Check totals from cilgm17 ECS080
+
+unikixjob cpsbalcid3 -w -ca
+if ($status != 0) then
+    echo "cpsbalcid3 aborted"
+    echo "totals may be out of tolerance"
+   "echo 'In CPSBALCID3' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cpsbalcid3 terminated successfully"
+
+"echo 'CIDMTH3 COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+echo "cidmth4 is about to start"
+unikixjob cidmth4 -w -ca
+if ($status != 0) then
+    echo "cidmth4 aborted"
+   "echo 'In CIDMTH4' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidmth4 terminated successfully"
+
+"echo 'CIDMTH4 COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+echo "cidmth5 is about to start"
+unikixjob cidmth5 -w -ca
+if ($status != 0) then
+    echo "cidmth5 aborted"
+   "echo 'In CIDMTH5' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidmth5 terminated successfully"
+
+"echo 'CIDMTH5 COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+echo "dccmth1 is about to start"
+unikixjob dccmth1 -w -ca
+if ($status != 0) then
+    echo "dccmth1 aborted"
+   "echo 'In DCCMTH1' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "dccmth1 terminated successfully"
+
+"echo 'DCCMTH1 COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+#****************************
+#*****Check totals from cidclgm10 EL524 and EL523
+
+unikixjob cpsbaldcc1 -w -ca
+if ($status != 0) then
+    echo "cpsbaldcc1 aborted"
+    echo "totals may be out of tolerance"
+   "echo 'In CPSBALDCC1' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cpsbaldcc1 terminated successfully"
+
+echo "dccmth2 is about to start"
+unikixjob dccmth2 -w -ca
+if ($status != 0) then
+    echo "dccmth2 aborted"
+   "echo 'In DCCMTH2' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "dccmth2 terminated successfully"
+
+
+"echo 'DCCMTH2 COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+#****************************
+#*****Check totals from cidclgm15 ECS010
+
+unikixjob cpsbaldcc2 -w -ca
+if ($status != 0) then
+    echo "cpsbaldcc2 aborted"
+    echo "totals may be out of tolerance"
+   "echo 'In CPSBALDCC2' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cpsbaldcc2 terminated successfully"
+
+
+echo "dccmth3 is about to start"
+unikixjob dccmth3 -w -ca
+if ($status != 0) then
+    echo "dccmth3 aborted"
+   "echo 'In DCCMTH3' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "dccmth3 terminated successfully"
+
+"echo 'DCCMTH3 COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+echo "dccmth4 is about to start"
+unikixjob dccmth4 -w -ca
+if ($status != 0) then
+    echo "dccmth4 aborted"
+   "echo 'In DCCMTH4' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "dccmth4 terminated successfully"
+
+"echo 'DCCMTH4 COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+echo "dccmth5 is about to start"
+unikixjob dccmth5 -w -ca
+if ($status != 0) then
+    echo "dccmth5 aborted"
+   "echo 'In DCCMTH5' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "dccmth5 terminated successfully"
+
+"echo 'DCCMTH5 COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+"echo 'Critical portion is finished' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+echo "opnvsam is about to start"
+unikixjob opnvsam -w -ca
+if ($status != 0) then
+    echo "opnvsam aborted"
+   "echo 'In OPNVSAM' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "opnvsam terminated successfully"
+
+echo "cidmtha is about to start"
+unikixjob cidmtha -ca
+if ($status != 0) then
+    echo "cidmtha aborted"
+   "echo 'In CIDMTHA' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidmtha terminated successfully"
+
+echo "cidmthb is about to start"
+unikixjob cidmthb -w -ca
+if ($status != 0) then
+    echo "cidmthb aborted"
+   "echo 'In CIDMTHB' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidmthb terminated successfully"
+
+"echo 'CIDMTHB COMPLETE' | mutt -s 'CYCLE UPDATE SUCCESS  pager.pema@cso.com,cycle@cso.com"
+
+ftp -n ntis1.cso.local < $JCLLIB/ftp-rdsfiles
+
+rm $JCLLIB/date_hash
+
+#########################  B E G I N  S T E P  07   #########################
+"cat $PROJECT_ROOT/emails/printemail.txt | mutt -s 'Todays print list'  CPSPrintList@cso.com"
+cp $PROJECT_ROOT/reprints/dailycycle $PROJECT_ROOT/reprints/dailycycle.$cdte
+
+echo "@ccyyyymmdd" > $SEQFILES/Logic.daily.postcycle.done
+ftp -n ntis1.cso.local < $JCLLIB/ftp-postcycle
+#########################    E N D    S T E P  07   #########################
+
+#########################  B E G I N  S T E P  08   #########################
+if (`date +%F` == 2016-12-29 || "@ccdow" == "Fri") then
+   echo "@ccyyyymmdd" > $SEQFILES/dailyslunikix.txt
+   ftp -n ntis1.cso.local < $JCLLIB/ftp-cpsfrimedone
+endif
+#########################    E N D    S T E P  08   #########################
+
+#########################  B E G I N  S T E P  09   #########################
+echo "sqlbermebl is about to start"
+unikixjob sqlbermebl -w -ca
+if ($status != 0) then
+    echo "sqlbermebl aborted"
+   "echo 'In SQLBERMEBL' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "sqlbermebl terminated successfully"
+
+echo "cilgchkbal is about to start"
+unikixjob cilgchkbal -w -ca
+if ($status != 0) then
+    echo "cilgchkbal aborted"
+   "echo 'In CILGCHKBAL' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cilgchkbal terminated successfully"
+
+echo "cidclgchkbal is about to start"
+unikixjob cidclgchkbal -w -ca
+if ($status != 0) then
+    echo "cidclgchkbal aborted"
+   "echo 'In CIDCLGCHKBAL' | mutt -s 'CYCLE UPDATE ABORT'  pager.pema@cso.com,cycle@cso.com"
+    exit 1
+endif
+echo "cidclgchkbal terminated successfully"
+
+#########################    E N D    S T E P  09   #########################
+perl $HOME/bin/run_time_dura.pl $JOBSTART CPSMONTHLY CPSMONTHLY
+cp $SEQFILES/runtimes/CPSMONTHLY $SEQFILES/runtimes/CPSMONTHLY.$cdte
+
+echo "@CCYYYYMMDD" > $SEQFILES/CurCycleDate
+echo "@CCYYYYMMDD" > $SEQFILES/PrevCycleDate
+
+"echo 'Unikix Month | mutt -s 'Unikix Month cycle@cso.com"
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOBS
+# 052914  2014042300003  TANA   CHANGE SMTP TO USE DIST GROUP

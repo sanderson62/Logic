@@ -1,0 +1,88 @@
+cd /apps/prod/cid1p/jcl
+
+#########################  B E G I N  S T E P  01   #########################
+echo "Begin Cycle Date Tests "
+
+setenv prevcydte `cat $SEQFILES/PrevCycleDate`
+setenv curcydte `cat $SEQFILES/CurCycleDate`
+
+if (`date +%Y%m%d` != @CCYYYYMMDD) then
+   echo "Cycle Date NOT equal Current date, aborting "
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'Bad Current cycle date'"
+   exit 1
+endif
+
+if (`cat $SEQFILES/PrevCycleDate` != @PCYYYYMMDD) then
+   echo " Previous cycle date not = last cycle date "
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'Bad Prev cycle date'"
+   exit 1
+endif
+
+if (`cat $SEQFILES/CurCycleDate` == @CCYYYYMMDD) then
+   echo " Current cycle already ran "
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'Cycle already ran for today'"
+   exit 1
+endif
+
+echo "Cycle Date Tests Complete"
+
+#########################    E N D    S T E P  01   #########################
+
+
+#########################  B E G I N  S T E P  02   #########################
+
+rm -f /apps/prod/cid1p/emails/printemail.txt /apps/prod/cid1p/reprints/dailycycle
+cp /apps/prod/cid1p/emails/emailinit.txt /apps/prod/cid1p/emails/printemail.txt
+touch /apps/prod/cid1p/reprints/dailycycle
+
+#########################    E N D    S T E P  02   #########################
+
+echo "clsvsam is about to start"
+unikixjob clsvsam -w -ca
+if ($status != 0) then
+    echo "clsvsam aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'CLSVSAM'"
+    exit 1
+endif
+echo "clsvsam terminated successfully"
+
+
+echo "ciddaily1 is about to start"
+unikixjob ciddaily1 -w -ca
+if ($status != 0) then
+    echo "ciddaily1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'In CIDDAILY1'"
+    exit 1
+endif
+echo "ciddaily1 terminated successfully"
+
+if (`date +%Y%m%d` == @cpsedtyyyymmdd) then
+   echo "cilg344e is about to start"
+   unikixjob cilg344e -w -ca
+   if ($status != 0) then
+       echo "cilg344e aborted"
+      "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'In CILG344E'"
+       exit 1
+   endif
+   echo "cilg344e terminated successfully"
+endif
+
+if (`date +%Y%m%d` == @cpsedtyyyymmdd || `date +%Y%m%d` == @cpsnedtyyyymmdd) then
+   echo "cilgedit is about to start"
+   unikixjob cilgedit -w -ca
+   if ($status != 0) then
+       echo "cilgedit aborted"
+      "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'In CILGEDIT'"
+       exit 1
+   endif
+   echo "cilgedit terminated successfully"
+endif
+
+"smtp -f slunikix -t pager.pema,cycle,pager.sdga -s 'CID Daily Cycle Complete' -ml 'CID Daily Cycle Complete'"
+
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 071516 CR2016030300001 PEMA   NEW JOB Designed for Active Batch

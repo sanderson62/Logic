@@ -1,0 +1,172 @@
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2007 by Clerity Solutions, Inc.                 *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       ID  DIVISION.
+       PROGRAM-ID. KXINFLGN.
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       SPECIAL-NAMES.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+      *---------------------------------------------------------------*
+      *  Code the specific database name here, or use sit table info
+      *  to get the application name and use application name as the
+      *  database to use.
+      *---------------------------------------------------------------*
+          EXEC SQL BEGIN DECLARE SECTION END-EXEC.
+      01  DBMSNAME                     PIC X(40).
+      01  USERNAME                     PIC X(8).
+          EXEC SQL END DECLARE SECTION END-EXEC.
+           EXEC SQL INCLUDE SQLCA END-EXEC.
+       01  BG-FLAG                      PIC 9.
+       01  SQLCODE-DISP                   PIC -9(5).
+      *---------------------------------------------------------------*
+      * This copy book gives the tct and system information 
+      *---------------------------------------------------------------*
+       COPY "KXINFO.CPY".
+      *---------------------------------------------------------------*
+      * Sample COBOL program which contains entry points for
+      * interfacing UniKix's user exits with INFORMIX software. The main
+      * entry point(KXINFLGN) is for logging onto the INFORMIX server and
+      * is called by the UniKix transaction processors
+      * and batch vsam processor when they are
+      * initiated by the UniKix system. Entry point KXINFLGF is for
+      * logging off from the INFORMIX server and is called by the UniKix 
+      * transaction processors and batch vsam processors when they terminate.
+      *
+      * Entry point KXINFCOM is for executing an SQL COMMIT statement and
+      * will be called at UniKix sync point time. If the user COBOL programs
+      * are already doing COMMITs, then this statement will have no effect.
+      * Entry point KXINFROL is for executing an SQL ROLLBACK statement and
+      * will be called at UniKix rollback time. If the user COBOL programs
+      * are already doing ROLLBACKs, then this statement will have no effect.
+      *---------------------------------------------------------------*
+       PROCEDURE DIVISION.
+	   MOVE "KXINFLGN" TO KIX-MSG-ROUTINE.
+      *---------------------------------------------------------------*
+      * This call update the  sit information
+      * user can use this information to set the database name.
+      * In this example, application name is used as the database
+      *---------------------------------------------------------------*
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ABORT END-EXEC.
+	   CALL "kxsysinfo" using KIX-SYS-INFO.
+	   MOVE KIX-SIT-DB-NAME TO DBMSNAME
+           EXEC SQL DATABASE :DBMSNAME END-EXEC.
+	   SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXINFLGF".
+	   MOVE "KXINFLGN" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+	   IF BG-FLAG NOT EQUAL 1
+		EXEC SQL BEGIN WORK END-EXEC.
+           EXEC SQL ROLLBACK WORK END-EXEC.
+           EXEC SQL CLOSE DATABASE END-EXEC.
+	   SET RETURN-CODE TO 0.
+	   MOVE 0 TO BG-FLAG.
+           EXIT PROGRAM.
+       ENTRY "KXINFBGN".
+      *---------------------------------------------------------------*
+      *    This function should not be called for ANSI style database
+      *    Please comment all the lines for this entry point.
+      *---------------------------------------------------------------*
+	   MOVE "KXINFBGN" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ABORT END-EXEC.
+      *---------------------------------------------------------------*
+      * This call updates the tct information
+      *---------------------------------------------------------------*
+	   CALL "kxtctinfo" using KIX-TCT-INFO.
+      *---------------------------------------------------------------*
+      *  Informix specific security feature. Uncomment to use
+      *  Check for user authorization for the database. If ACCESS is
+      *  is granted to PUBLIC just ignore authorization checking.
+      *---------------------------------------------------------------*
+	   IF BG-FLAG NOT EQUAL 1
+	   	EXEC SQL BEGIN WORK END-EXEC.
+	   MOVE 1 TO BG-FLAG.
+      *    MOVE KIX-USRNAM TO USERNAME.
+      *	   EXEC SQL SELECT USERNAME FROM SYSUSERS
+      *		    WHERE USERNAME = :USERNAME END-EXEC.
+      *    IF SQLCODE = 100
+      *	      SET RETURN-CODE TO 1
+      *    ELSE
+	      SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXINFEND".
+      *---------------------------------------------------------------*
+      *    This function should not be called for ANSI style database
+      *    Please comment all the lines for this entry point.
+      *---------------------------------------------------------------*
+	   MOVE "KXINFEND" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+	   IF BG-FLAG NOT EQUAL 1
+		EXEC SQL BEGIN WORK END-EXEC.
+           EXEC SQL COMMIT WORK END-EXEC.
+           MOVE 0 TO BG-FLAG.
+	   SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXINFCOM".
+	   MOVE "KXINFCOM" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+      *---------------------------------------------------------------*
+      *    This BEGIN WORK statement should be commented out for     
+      *    ANSI style databases.  Comment the next 2 lines.
+      *---------------------------------------------------------------*
+NOANSI	   IF BG-FLAG NOT EQUAL 1
+NOANSI		EXEC SQL BEGIN WORK END-EXEC.
+           EXEC SQL COMMIT WORK END-EXEC.
+      *---------------------------------------------------------------*
+      *    This BEGIN WORK statement should be commented out for     
+      *    ANSI style databases.  Comment the next line.
+      *---------------------------------------------------------------*
+NOANSI	   EXEC SQL BEGIN WORK END-EXEC.
+	   MOVE 1 TO BG-FLAG.
+	   SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       ENTRY "KXINFROL".
+	   MOVE "KXINFROL" TO KIX-MSG-ROUTINE.
+	   EXEC SQL WHENEVER SQLERROR GOTO SQL-ERROR END-EXEC.
+      *---------------------------------------------------------------*
+      *    This BEGIN WORK statement should be commented out for     
+      *    ANSI style databases.  Comment the next 2 lines.
+      *---------------------------------------------------------------*
+NOANSI	   IF BG-FLAG NOT EQUAL 1                                
+NOANSI		EXEC SQL BEGIN WORK END-EXEC.
+           EXEC SQL ROLLBACK WORK END-EXEC.
+      *---------------------------------------------------------------*
+      *    This BEGIN WORK statement should be commented out for     
+      *    ANSI style databases.  Comment the next line.
+      *---------------------------------------------------------------*
+NOANSI	   EXEC SQL BEGIN WORK END-EXEC.
+	   MOVE 1 TO BG-FLAG.
+	   SET RETURN-CODE TO 0.
+           EXIT PROGRAM.
+       SQL-ABORT.
+      *---------------------------------------------------------------*
+      *    Set return-code to Failure (1) or Abort (-1)
+      *    Failure during allocation brings up the SERVER, without
+      *           the database connected.
+      *    Abort always aborts the  transaction SERVER
+      *    This example aborts the transaction SERVER
+      *---------------------------------------------------------------*
+	   MOVE SQLCODE TO SQLCODE-DISP.
+	   STRING "DATABASE ERROR. SQLCODE = ", SQLCODE-DISP
+		  DELIMITED BY SIZE INTO KIX-MSG-STR.
+           CALL "kxsetmsg" USING KIX-MSG-INFO.
+	   SET RETURN-CODE TO -1.
+           EXIT PROGRAM.
+       SQL-ERROR.
+      *---------------------------------------------------------------*
+      *    Set return-code to Failure (1) or Abort (-1)
+      *    Failure during other exits terminates the transaction
+      *    Abort always aborts the  transaction SERVER
+      *    This example terminates transaction.
+      *---------------------------------------------------------------*
+	   MOVE SQLCODE TO SQLCODE-DISP.
+	   STRING "DATABASE ERROR. SQLCODE = ", SQLCODE-DISP
+		  DELIMITED BY SIZE INTO KIX-MSG-STR.
+           CALL "kxsetmsg" USING KIX-MSG-INFO.
+	   SET RETURN-CODE TO 1.
+           EXIT PROGRAM.

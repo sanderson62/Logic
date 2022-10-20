@@ -1,0 +1,352 @@
+cd /apps/prod/cid1p/jcl
+
+#########################  B E G I N  S T E P  01   #########################
+echo "Begin Cycle Date Test "
+if (`date +%Y%m%d` != 20121002) then
+   echo "Cycle Date NOT equal Current date, aborting "
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'Bad cycle date'"
+   exit 1
+endif
+echo "Cycle Date Test Complete"
+
+rm -f $SEQFILES/runtimes/CPSDAILY
+#########################    E N D    S T E P  01   #########################
+
+#########################  B E G I N  S T E P  02   #########################
+setenv JOBSTART `date +%Y/%m/%d/%H/%M/%S`
+setenv cdte `date +%m%d`
+echo $JOBSTART
+#########################    E N D    S T E P  02   #########################
+
+#########################  B E G I N  S T E P  03   #########################
+perl $HOME/bin/run_time_start.pl CPSDAILY CPSDAILY
+
+rm -f /apps/prod/cid1p/emails/printemail.txt /apps/prod/cid1p/reprints/dailycycle
+cp /apps/prod/cid1p/emails/emailinit.txt /apps/prod/cid1p/emails/printemail.txt
+touch /apps/prod/cid1p/reprints/dailycycle
+#########################    E N D    S T E P  03   #########################
+
+echo "clsvsam is about to start"
+unikixjob clsvsam -w -ca
+if ($status != 0) then
+    echo "clsvsam aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'CLSVSAM'"
+    exit 1
+endif
+echo "clsvsam terminated successfully"
+
+
+echo "ciddaily1 is about to start"
+unikixjob ciddaily1 -w -ca
+if ($status != 0) then
+    echo "ciddaily1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDDAILY1'"
+    exit 1
+endif
+echo "ciddaily1 terminated successfully"
+
+if ("Tue" == "Fri") then
+   echo "cidfriday is about to start"
+   unikixjob cidfriday -w -ca
+   if ($status != 0) then
+       echo "cidfriday aborted"
+      "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDFRIDAY'"
+       exit 1
+   endif
+   echo "cidfriday terminated successfully"
+endif
+
+echo "ahldaily1 is about to start"
+unikixjob ahldaily1 -w -ca
+if ($status != 0) then
+    echo "ahldaily1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'In AHLDAILY1'"
+    exit 1
+endif
+echo "ahldaily1 terminated successfully"
+
+if ("Tue" == "Fri") then
+   echo "ahlfriday is about to start"
+   unikixjob ahlfriday -w -ca
+   if ($status != 0) then
+       echo "ahlfriday aborted"
+      "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'In AHLFRIDAY'"
+       exit 1
+   endif
+   echo "ahlfriday terminated successfully"
+endif
+
+echo "dccdaily1 is about to start"
+unikixjob dccdaily1 -w -ca
+if ($status != 0) then
+    echo "dccdaily1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In DCCDAILY1'"
+    exit 1
+endif
+echo "dccdaily1 terminated successfully"
+
+if ("Tue" == "Fri") then
+   echo "dccfriday is about to start"
+   unikixjob dccfriday -w -ca
+   if ($status != 0) then
+       echo "dccfriday aborted"
+      "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In DCCFRIDAY'"
+       exit 1
+   endif
+   echo "dccfriday terminated successfully"
+endif
+
+#########################  B E G I N  S T E P  04   #########################
+echo "File compression has been started"
+/export/home/mtpadmin/bin/gdgcomp
+#########################    E N D    S T E P  04   #########################
+
+#########################  B E G I N  S T E P  05   #########################
+"smtp -f slunikix -t pager.pema,cycle,pager.sdga -s 'CYCLE UPDATE SUCCESS' -ml 'DAILY CYCLE COMPLETE'"
+
+perl $HOME/bin/run_time_dura.pl $JOBSTART CPSDAILY CPSDAILY
+cp $SEQFILES/runtimes/CPSDAILY $SEQFILES/runtimes/CPSDAILY.$cdte
+
+rm -f $SEQFILES/runtimes/CPSMONTHLY
+perl $HOME/bin/run_time_start.pl CPSMONTHLY CPSMONTHLY
+#########################    E N D    S T E P  05   #########################
+
+#########################  B E G I N  S T E P  06   #########################
+setenv JOBSTART `date +%Y/%m/%d/%H/%M/%S`
+echo $JOBSTART
+#########################    E N D    S T E P  06   #########################
+
+unikixjob cpsgetmetots -w -ca
+if ($status != 0) then
+    echo "cpsgetmetots aborted"
+    echo "need to make sure balancing files have been received"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CPSGETMETOTS'"
+    exit 1
+endif
+echo "cpsgetmetots terminated successfully"
+
+
+echo "cidmth1 is about to start"
+unikixjob cidmth1 -w -ca
+if ($status != 0) then
+    echo "cidmth1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDMTH1'"
+    exit 1
+endif
+echo "cidmth1 terminated successfully"
+
+
+#****************************
+#*****Check totals from cilgm10 EL524 and EL523
+
+unikixjob cpsbalcid1 -w -ca
+if ($status != 0) then
+    echo "cpsbalcid1 aborted"
+    echo "totals may be out of tolerance"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CPSBALCID1'"
+    exit 1
+endif
+echo "cpsbalcid1 terminated successfully"
+
+
+
+echo "cidmth2 is about to start"
+unikixjob cidmth2 -w -ca
+if ($status != 0) then
+    echo "cidmth2 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDMTH2'"
+    exit 1
+endif
+echo "cidmth2 terminated successfully"
+
+
+#****************************
+#*****Check totals from cilgm15 ECS010
+
+unikixjob cpsbalcid2 -w -ca
+if ($status != 0) then
+    echo "cpsbalcid2 aborted"
+    echo "totals may be out of tolerance"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CPSBALCID2'"
+    exit 1
+endif
+echo "cpsbalcid2 terminated successfully"
+
+"smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE SUCCESS' -ml 'CIDMTH2 COMPLETE'"
+
+echo "cidmth3 is about to start"
+unikixjob cidmth3 -w -ca
+if ($status != 0) then
+    echo "cidmth3 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDMTH3'"
+    exit 1
+endif
+echo "cidmth3 terminated successfully"
+
+
+#****************************
+#*****Check totals from cilgm17 ECS080
+
+unikixjob cpsbalcid3 -w -ca
+if ($status != 0) then
+    echo "cpsbalcid3 aborted"
+    echo "totals may be out of tolerance"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CPSBALCID3'"
+    exit 1
+endif
+echo "cpsbalcid3 terminated successfully"
+
+"smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE SUCCESS' -ml 'CIDMTH3 COMPLETE'"
+
+echo "cidmth4 is about to start"
+unikixjob cidmth4 -w -ca
+if ($status != 0) then
+    echo "cidmth4 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDMTH4'"
+    exit 1
+endif
+echo "cidmth4 terminated successfully"
+
+"smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE SUCCESS' -ml 'CIDMTH4 COMPLETE'"
+
+echo "cidmth5 is about to start"
+unikixjob cidmth5 -w -ca
+if ($status != 0) then
+    echo "cidmth5 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDMTH5'"
+    exit 1
+endif
+echo "cidmth5 terminated successfully"
+
+"smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE SUCCESS' -ml 'CIDMTH5 COMPLETE'"
+
+echo "dccmth1 is about to start"
+unikixjob dccmth1 -w -ca
+if ($status != 0) then
+    echo "dccmth1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In DCCMTH1'"
+    exit 1
+endif
+echo "dccmth1 terminated successfully"
+
+"smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE SUCCESS' -ml 'DCCMTH1 COMPLETE'"
+
+#****************************
+#*****Check totals from cidclgm10 EL524 and EL523
+
+unikixjob cpsbaldcc1 -w -ca
+if ($status != 0) then
+    echo "cpsbaldcc1 aborted"
+    echo "totals may be out of tolerance"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CPSBALDCC1'"
+    exit 1
+endif
+echo "cpsbaldcc1 terminated successfully"
+
+echo "dccmth2 is about to start"
+unikixjob dccmth2 -w -ca
+if ($status != 0) then
+    echo "dccmth2 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In DCCMTH2'"
+    exit 1
+endif
+echo "dccmth2 terminated successfully"
+
+
+"smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE SUCCESS' -ml 'DCCMTH2 COMPLETE'"
+
+#****************************
+#*****Check totals from cidclgm15 ECS010
+
+unikixjob cpsbaldcc2 -w -ca
+if ($status != 0) then
+    echo "cpsbaldcc2 aborted"
+    echo "totals may be out of tolerance"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CPSBALDCC2'"
+    exit 1
+endif
+echo "cpsbaldcc2 terminated successfully"
+
+
+echo "dccmth3 is about to start"
+unikixjob dccmth3 -w -ca
+if ($status != 0) then
+    echo "dccmth3 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In DCCMTH3'"
+    exit 1
+endif
+echo "dccmth3 terminated successfully"
+
+"smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE SUCCESS' -ml 'DCCMTH3 COMPLETE'"
+
+echo "dccmth4 is about to start"
+unikixjob dccmth4 -w -ca
+if ($status != 0) then
+    echo "dccmth4 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In DCCMTH4'"
+    exit 1
+endif
+echo "dccmth4 terminated successfully"
+
+"smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE SUCCESS' -ml 'DCCMTH4 COMPLETE'"
+
+echo "dccmth5 is about to start"
+unikixjob dccmth5 -w -ca
+if ($status != 0) then
+    echo "dccmth5 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In DCCMTH5'"
+    exit 1
+endif
+echo "dccmth5 terminated successfully"
+
+"smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE SUCCESS' -ml 'Critical portion is finished'"
+
+echo "opnvsam is about to start"
+unikixjob opnvsam -w -ca
+if ($status != 0) then
+    echo "opnvsam aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In OPNVSAM'"
+    exit 1
+endif
+echo "opnvsam terminated successfully"
+
+echo "cidmtha is about to start"
+unikixjob cidmtha -w -ca
+if ($status != 0) then
+    echo "cidmtha aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDMTHA'"
+    exit 1
+endif
+echo "cidmtha terminated successfully"
+
+echo "cidmthb is about to start"
+unikixjob cidmthb -w -ca
+if ($status != 0) then
+    echo "cidmthb aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDMTHB'"
+    exit 1
+endif
+echo "cidmthb terminated successfully"
+
+ftp -n ntis2 < $JCLLIB/ftp-rdsfiles
+
+rm /apps/prod/cid1p/jcl/ish/date_hash
+
+#########################  B E G I N  S T E P  07   #########################
+"smtp -f slunikix -t saca,jwfa,jlhb,info,pema,sdga,jjhc -s 'Todays print list' -mf /apps/prod/cid1p/emails/printemail.txt"
+cp /apps/prod/cid1p/reprints/dailycycle /apps/prod/cid1p/reprints/dailycycle.$cdte
+
+echo "20121002" > /data/seqfiles/Logic.daily.postcycle.done
+ftp -n ntcso1 < $JCLLIB/ftp-postcycle
+#########################    E N D    S T E P  07   #########################
+
+#########################  B E G I N  S T E P  08   #########################
+if ("Tue" == "Fri") then
+   echo "20121002" > /data/seqfiles/dailyslunikix.txt
+   ftp -n ntcso1 < $JCLLIB/ftp-cpsfrimedone
+endif
+#########################    E N D    S T E P  08   #########################
+
+perl $HOME/bin/run_time_dura.pl $JOBSTART CPSMONTHLY CPSMONTHLY
+cp $SEQFILES/runtimes/CPSMONTHLY $SEQFILES/runtimes/CPSMONTHLY.$cdte
+

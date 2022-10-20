@@ -1,0 +1,160 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 8 GOTO END_JOB 
+
+################################################################################
+LABEL name=FTP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntis1.cso.local < $JCLLIB/ftp-getcisbr00
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+################################################################################
+LABEL name=BACKUP1  
+################################################################################
+#  ********************************************************************* 
+#  *** Keep 13 months back
+#  ********************************************************************* 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/sun_bank_data.txt' disp='i-o' recsize='401' 
+ASSGNDD ddname='SYSUT2' dataset='CI.XX.SUNFLOWER.TAPE' gdg='+1' filename='\${SEQFILES}/CI.XX.SUNFLOWER.TAPE' disp='o' normal='k' recsize='401' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='BACKUP1' 
+
+################################################################################
+LABEL name=CIDSNCPY 
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/sun_bank_data.txt' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${TAPELDFILES}/SUN_COPY.TXT' disp='o' normal='k' recsize='400' recfmt='F' 
+
+EXECPGM pgmname='CIDSNCPY' stepname='CIDSNCPY' 
+
+################################################################################
+LABEL name=SORTIT 
+################################################################################
+ASSGNDD ddname='SORTIN' filename='\${TAPELDFILES}/SUN_COPY.TXT' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTOUT' filename='\${TAPELDFILES}/CI.DD.SUNBK.DATA.SORTED' disp='o' normal='k' abend='d' recfmt='F' recsize='400' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SORTWK05' type='TEMP' 
+ASSGNDD ddname='SORTWK06' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(4 10) (2 2)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTIT' parm='SIZE=4096K' 
+
+################################################################################
+
+################################################################################
+LABEL name=CISB511 
+################################################################################
+#  ********************************************************************* 
+#  *  EXTRACT INPUT RECORDS FROM SUNFLOWER BANKS FILE AND CREATE THE     
+#  *  TRANSACTION LOAD FILE.                                             
+#  *  THE PP&A FILE IS NOT BEING GENERATED AT THIS TIME.                 
+#  ********************************************************************* 
+ASSGNDD ddname='SYS010' filename='\${TAPELDFILES}/CI.DD.SUNBK.DATA.SORTED' disp='i-o' 
+ASSGNDD ddname='SYS012' filename='\${TAPELDFILES}/CI.DD.SUNBK.LOGIC' disp='o' normal='k' abend='d' recsize='90' recfmt='F' 
+ASSGNDD ddname='SYS014' type='DUMMY' 
+ASSGNDD  ddname='SYS013' type='SYSOUT' class='A'  
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='CISB511' stepname='CISB511' 
+
+################################################################################
+LABEL name=CPY511
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/$JOBNAME/CISB511/SYS013_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${TAPELDFILES}/CI.DL.CIADM.FICH511.SUN' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY511' parm='ALL' 
+
+################################################################################
+LABEL name=SORTCNV 
+################################################################################
+#  ********************************************************************* 
+#  *   SORT AND CREATE NEW SORTED FILE                                   
+#  *   LEAVE THE OUTPUT BLKSIZE PARM AT A GIVEN NUMBER, NOT ZERO.    *   
+#  *                                                    ========         
+#  ********************************************************************* 
+ASSGNDD ddname='SORTIN' filename='\${TAPELDFILES}/CI.DD.SUNBK.LOGIC' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTOUT' filename='\${TAPELDFILES}/CI.WW.SUNBK.LOGIC.SORT' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(81 10)(1 10)(79 2)
+       ARRANGE=(1,80)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTCNV' 
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+#  ********************************************************************  
+#  *                                                                  *  
+#  *   PREPARE SUNFLOWER BANKS REFORMATTED RECORDS TO LOAD TO PENDING *  
+#  *   BUSINESS FILE.                                                 *  
+#  *                                                                  *  
+#  ********************************************************************  
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS010' filename='\${TAPELDFILES}/CI.WW.SUNBK.LOGIC.SORT' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${TAPELDFILES}/CI.WW.SUNBK.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.LG.VENDOR.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERACCT2' dataset='CI.DD.LG.ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.CFED.ELCNTL' type='VS' filename='CFCNTL' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/$JOBNAME/EL512/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${TAPELDFILES}/CI.DL.CIADM.FICH512.SUN' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL' 
+
+################################################################################
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+#   "exelpr.sh cit522.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/CISB511/SYS013_$JON"
+else
+   echo " Job aborted, print not released "
+endif
+
+ftp -n ntis1.cso.local < $JCLLIB/ftp-cisbr00
+
+ENDJOB
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 102202                 SMVA   REMOVE EXELPR CMD FOR CISB511 SYS008 - HAD BEEN
+#                               COMMENTED OUT IN PGM, ALSO SYSPRINTS & SYSDBOUTS
+# 110402                 SMVA   CHG OUTPUT DIR TO TAPELDFILES & ADD FTP COMMAND
+# 042303                 SMVA   REMOVE EL512 PRINT; WILL USE EL512 TEXT FILE   
+# 101603 2003070300006   SMVA   ADD BACKUP1 STEP AS PART OF CONV OFF MAINFRAME
+# 040504                 SMVA   CHG FROM L133STD PARMLIB MEMBER TO CIT522.PARMS
+# 121504                 PEMA   REMOVE BUILD OF CFCNTL PUT IN JOB CILGDBLD 
+# 060107                 PEMA   REMOVE 511 PRINT PER LINDA L.

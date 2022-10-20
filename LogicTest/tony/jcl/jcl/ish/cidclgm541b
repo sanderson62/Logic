@@ -1,0 +1,50 @@
+################################################################################
+#
+#     Job: cidclgm541b 
+#                     
+################################################################################
+BEGINJOB mode='MVS' 
+
+################################################################################
+LABEL name=EL541B 
+################################################################################
+#  ***                                                                   
+#  ***         REPORT MONTH-END BALANCES AND DISCREPANCIES                      
+#  ***
+ASSGNDD ddname='SYS019' dataset='DC.DD.ER.DATECARD' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY'
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+EXECPGM pgmname='EL541' stepname='EL541B' 
+
+################################################################################
+LABEL name=CPY541B
+################################################################################
+ASSGNDD ddname='SYS010' filename='\$SYSOUTDIR/$JOBNAME/EL541B/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/DC.DL.CIADM.FICH541B' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY541B' parm='ALL'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "cp ${SEQFILES}/DC.DL.CIADM.FICH541B /data/convertin"
+    "perl /export/home/mtpadmin/bin/dcc_new_dl.pl /export/home/mtpadmin/bin/dcc_rpt_hash_file"
+    "cp /data/converfin/*.CVT /data/convertout"
+    "rm /data/convertin/*"
+    "ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-cidclgm541b"
+    "smtp -f slunikix -t lgm541b -s 'Post-cidclgm50 balancing file is ready' -mf /apps/prod/cid1p/emails/$JOBNAME.txt"
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 042503                 SMVA   NEW JOB FOR DCC, MODELED AFTER CID JOB
+# 052914  2014042300003  TANA   CHANGE SMTP TO USE DIST GROUP

@@ -1,0 +1,439 @@
+* Micro Focus Server Express         V5.1 revision 000 06-Oct-15 17:19 Page   1
+* FNB170.cbl
+* Options: int("FNB170.int") anim csi verbose NOBOUND PARAMCOUNTCHECK
+*          directives(cobopt.bth) endp list("FNB170.lst")
+* Setting: NOACCEPTREFRESH NOADV ALIGN"8" ALPHASTART"1" NOALTER NOAMODE ANIM
+*          NOANIMPREP ANS85 APOST NOAREACHECK ARITHMETIC"OSVS" ASSIGN
+*          "EXTERNAL" NOASSIGN-PRINTER NOAUTOLOCK NOBELL NOBOUND NOBRIEF
+*          NOBS2000 BWZSTAR NOBYTEMODEMOVE CALLFH"ebmlsfile" NOCALLMCS
+*          NOCALLRECOVERY CALLSORT"EXTSM" CANCEL CANCELLBR NOCHANGEMESSAGE
+*          CHARSET"ASCII" NOCHECKDIV NOCHECKREFMOD NOCICS CICS-CPY
+*          NOCICSOPTIMIZE NOCMPR2 NOCOBFSTATCONV NOCOBIDY NOCOBOL370 COBOLDIR
+*          NOCOMP COMP-5"2" COMP-6"2" NOCOMS85 CONFIRM NOCONVERTRET CONVSPACE
+*          COPYEXT",cbl,cpy" NOCOPYLBR COPYLIST COPYLISTCOMMENT"1" CSI
+*          CURRENCY-SIGN"36" CURRENT-DATE"MMDDYY" NODATA DATACOMPRESS"0"
+*          NODATA-CONTEXT DATE DBCHECK DBCS"2" NODBCSSOSI DBSPACE DE-EDIT"2"
+*          DEFAULTBYTE"32" NODEFAULTCALLS DETECTLOCK NODG DIALECT"MF"
+*          NODIRECTIVES-IN-COMMENTS NODOSVS NODPCINSUBSCRIPT DYNAM
+*          NOEARLY-RELEASE ECHO NOECHOALL NOEDITOR ENSUITE"0" NOENTCOBOL
+*          ERRFORMAT"1" ERRLIST"EMBED" NOERRQ FASTSORT NOFCD3 NOFCDREG
+*          NOFDCLEAR NOFILESHARE FILETYPE"0" NOFLAG NOFLAGAS NOFLAGCD
+*          NOFLAGEUC NOFLAGMIG NOFLAGQ FLAGSINEDIT NOFLAGSTD NOFOLDCALLNAME
+*          NOFOLDCOPYNAME FORM"60" NOFP-ROUNDING NOHOSTARITHMETIC
+*          NOHOSTCONTZERO NOHOST-NUMCOMPARE NOHOST-NUMMOVE NOHOSTFD NOHOSTRW
+*          NOIBM-MS IBMCOMP IDXFORMAT"0" NOILGEN IMPLICITSCOPE NOINDD
+*          INFORETURN"0" NOINITCALL INITPTR INT"FNB170.int" INTDATE"ANSI"
+*          INTLEVEL"2" IOCONV NOISO2002 NOIXNLSKEY NOIXNUMKEY KEEP-INT
+*          KEYCHECK KEYCOMPRESS"0" LIBRARIAN"2" NOLINE-COUNT LIST"FNB170.lst"
+*          LISTPATH"" LISTWIDTH"80" LITVAL-SIZE"4" LOCKTYPE"0" NOMAPNAME
+*          NOMAXERROR METHODDEFAULT"REFERENCE" MF"15" MFCOMMENT NOMOVELENCHECK
+*          NOMS NOMVS NATIVE"ASCII" NONATIVEFLOATINGPOINT NONCHAR
+*          NONEWBASENAME NONLS NSYMBOL"DBCS" NOODOOSVS NOODOSLIDE
+*          NOOLDBLANKLINE NOOLDCOPY NOOLDINDEX NOOLDNEXTSENTENCE NOOLDREADINTO
+*          NOOLDSTRMIX OOCTRL"-C-E-G-P+Q+R-S+W" OPTIONAL-FILE NOOS390 OSEXT""
+*          NOOSVS NOOUTDD NOP64 NOPANVALET PERFORM-TYPE"OSVS" NOPREPLIST
+*          NOPREPROCESS NOPRINT-EXT NOPROFILE NOPROGID-COMMENT
+*          NOPROGID-INT-NAME NOPROTECT-LINKAGE PROTOTYPE"RELAXED" QUAL
+*          QUALPROC NOQUERY NOQUOTE NORAWLIST NORDW RECMODE"F" NOREENTRANT
+*          NOREF NOREFNO REMAINDER"1" REPORT-LINE"256" RESEQ NORETRYLOCK
+*          REWRITE-LS NORM RTNCODE-SIZE"4" NORWHARDPAGE NOSAA SEG NOSEQCHK
+*          SEQUENTIAL"RECORD" NOSERIAL SETTING"LINE" NOSHAREOUTDD NOSHOW-DIR
+*          SIGN"ASCII" NOSIGNDISCARD NOSIGNFIXUP SORTTYPE"DFSORT" SOURCEFORMAT
+*          "FIXED" SOURCETABSTOP"8" NOSPZERO NOSSRANGE STDERR NOSTICKY-LINKAGE
+*          NOSTICKY-PERFORM SUPFF SWITCHTYPE"1" SYMBSTART"1" SYSPUNCH"132"
+*          TERMPAGE TIME NOTRACE NOTRUNC NOTRUNCCALLNAME NOTRUNCCOPY TRUNCINC
+*          "10" UNICODE"NATIVE" VERBOSE VSC2"2" WARNING"1" NOWB NOWB2 NOWB3
+*          WEBSERVER"CGI" NOWRITELOCK NOWRITETHRU NOXOPEN NOXREF
+*          NOZEROLENGTHFALSE NOZEROSEQ NOZWB
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page   2
+* FNB170.cbl
+     2
+     3 IDENTIFICATION DIVISION.
+     4 PROGRAM-ID.    FNB170.
+     5******************************************************************
+     6*                   C H A N G E   L O G
+     7*
+     8* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+     9*-----------------------------------------------------------------
+    10*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+    11* EFFECTIVE    NUMBER
+    12*-----------------------------------------------------------------
+    13* 062403                   SMVA  ADD MSG TO CLAIM RPT IF INPUT
+    14*                                FILE IS EMPTY
+    15* 011604                   SMVA  ADD HDG LINE FOR CLIENT ID,FILE ID,
+    16*                                AND PGM ID
+    17* 082207  2007082100002    AJRA  ADD AFTER ADVANCING TO GET CC CHAR
+    18******************************************************************
+    19
+    20 ENVIRONMENT DIVISION.
+    21 INPUT-OUTPUT SECTION.
+    22 FILE-CONTROL.
+    23
+    24     SELECT TRANSACTION-REPORT
+    25         ASSIGN TO SYS007.
+    26
+    27     SELECT TRANSACTION-DETAIL
+    28         ASSIGN TO SYS010
+    29         organization is line sequential
+    30         FILE STATUS IS SYS010-STATUS.
+    31
+    32     SELECT SORT-FILE
+    33         ASSIGN TO SORTWK1.
+    34
+    35
+    36 DATA DIVISION.
+    37 FILE SECTION.
+    38
+    39 FD  TRANSACTION-REPORT
+    40     LABEL RECORDS ARE STANDARD
+    41     RECORDING MODE IS F
+    42*    RECORD CONTAINS 132 CHARACTERS
+    43     BLOCK CONTAINS 0 RECORDS.
+    44 01  PRINT-RECORD     PIC X(133).
+    45
+    46 FD  TRANSACTION-DETAIL
+    47     LABEL RECORDS ARE STANDARD
+    48     RECORDING MODE IS F
+    49     BLOCK CONTAINS 0 RECORDS.
+    50 01  FILLER           PIC X(250).
+    51
+    52 SD  SORT-FILE.
+    53 01  SORT-RECORD.
+*   54     COPY FNC022.
+    55     05  FX-COMMON-SECTION.                                       00010001
+    56         10  FX-SYSTEM             PIC X(10).                     00020001
+    57         10  FX-SOURCE-CODE        PIC X(6).                      00030001
+    58         10  FX-DIVISION           PIC X(2).                      00040001
+    59         10  FX-TRAN-TYPE          PIC X(2).                      00050001
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page   3
+* FNB170.cbl (/apps/prod/cid1p/copy/FNC022)
+    60         10  FX-SUB-TYPE           PIC X(2).                      00060001
+    61         10  FX-CLM-RES            PIC X(2).                      00070001
+    62         10  FX-ANN-STMT           PIC X(3).                      00080001
+    63         10  FX-PLAN-CODE          PIC X(6).                      00090001
+    64         10  FX-FORM               PIC X(3).                      00091001
+    65         10  FX-JOURNAL-DATE       PIC X(8).                      00092001
+    66         10  FX-POSTING-DATE       PIC X(8).                      00093001
+    67         10  FX-POLICY-NO          PIC X(10).                     00094001
+    68         10  FX-CITY               PIC X(30).                     00095002
+    69         10  FX-STATE              PIC X(2).                      00095102
+    70         10  FX-ZIP-CODE           PIC X(9).                      00096001
+    71         10  FX-LOC-CODE           PIC X.                         00096102
+    72         10  FX-FY-REN             PIC X.                         00097001
+    73         10  FX-AGENT-01           PIC X(9).                      00098001
+    74         10  FX-AGENT-50           PIC X(9).                      00099001
+    75         10  FX-COST-CENTER        PIC X(4).                      00100001
+    76         10  FX-TAXABLE            PIC X.                         00110004
+    77         10  FX-DISTR              PIC X(2).                      00120001
+    78         10  FX-SOURCE-ACCT        PIC X(10).                     00130001
+    79         10  FX-DESCRIPTION        PIC X(30).                     00140001
+    80         10  FX-REFERENCE          PIC X(10).                     00150001
+    81         10  FX-SUSPENSE           PIC X(15).                     00151002
+    82         10  FX-AMOUNT             PIC S9(10)V99                  00160001
+    83                                   SIGN IS TRAILING SEPARATE.     00170001
+    84                                                                  00180001
+    85     05  FX-CLAIM-SECTION.                                        00190001
+    86         10  FX-CLAIM-NO           PIC X(10).                     00200001
+    87         10  FX-CLAIM-TYPE         PIC X.                         00210001
+    88         10  FX-DRAFT-NO           PIC X(10).                     00220001
+    89         10  FX-DRAFT-STATUS       PIC X.                         00230001
+    90         10  FX-TAX-ID             PIC X(10).                     00240001
+    91         10  FILLER                PIC X(10).                     00250003
+    92                                                                  00290001
+    93
+    94
+    95
+    96
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page   4
+* FNB170.cbl
+    97/
+    98 WORKING-STORAGE SECTION.
+    99
+   100 01  FILLER.
+   101     05  SYS010-STATUS        PIC XX    VALUE '00'.
+   102         88  EOF                        VALUE '10'.
+   103     05  S0C7                 PIC X     VALUE ' '.
+   104     05  FORCE-DUMP REDEFINES S0C7 PIC S9    COMP-3.
+   105     05  PREV-TRAN-TYPE       PIC XX    VALUE SPACE.
+   106     05  PREV-SUB-TYPE        PIC XX    VALUE SPACE.
+   107
+   108 01  FILLER                 COMP-3.
+   109     05  LINE-COUNT         PIC S9(3)      VALUE ZERO.
+   110     05  PAGE-COUNT         PIC S9(5)      VALUE ZERO.
+   111     05  INPUT-COUNT        PIC S9(7)      VALUE ZERO.
+   112         88  FIRST-RECORD                  VALUE +1.
+   113     05  TOTALS             OCCURS 3 TIMES.
+   114         10  WS-COUNT       PIC S9(7)      COMP-3.
+   115         10  WS-DR-AMOUNT   PIC S9(11)V99  COMP-3.
+   116         10  WS-CR-AMOUNT   PIC S9(11)V99  COMP-3.
+   117
+   118 01  WS-NO-INPUT-MSG.
+   119     05  FILLER             PIC X(01)      VALUE '0'.
+   120     05  FILLER             PIC X(132)     VALUE
+   121     'THERE WERE NO CLAIM RECORDS TO PROCESS'.
+   122
+   123 01  HEADING-LINE-PGM-ID.
+   124     05  FILLER             PIC X(01)   VALUE '1'.
+   125     05  FILLER             PIC X(54)   VALUE SPACES.
+   126     05  HDG-CLIENT-ID      PIC X(03)   VALUE SPACES.
+   127     05  FILLER             PIC X(01)   VALUE SPACE.
+   128     05  HDG-FILE-ID        PIC X(06)   VALUE SPACES.
+   129     05  FILLER             PIC X(62)   VALUE SPACES.
+   130     05  HDG-PGM-ID         PIC X(06)   VALUE 'FNB170'.
+   131
+   132 01  HEADING-LINE-1.
+   133     05  filler      pic x       value spaces.
+   134     05  HDG-SYSTEM  PIC X(10)   VALUE SPACE.
+   135     05  FILLER      PIC X(24)   VALUE SPACE.
+   136     05  FILLER      PIC X(50)   VALUE
+   137         'F R E E D O M   I N T E R F A C E   S U M M A R Y '.
+   138     05  FILLER      PIC X(24)   VALUE SPACE.
+   139     05  HDG-DATE    PIC XX/XX/XXXX VALUE SPACE.
+   140     05  FILLER      PIC X(8)    VALUE '   PAGE '.
+   141     05  HDG-PAGE    PIC ZZ,ZZ9  VALUE ZERO.
+   142
+   143 01  HEADING-LINE-2.
+   144     05  filler      pic x       value spaces.
+   145     05  FILLER      PIC X(11)   VALUE 'TRAN TYPE  '.
+   146     05  FILLER      PIC X(15)   VALUE 'SUB TYPE       '.
+   147     05  FILLER      PIC X(16)   VALUE 'DR AMOUNT       '.
+   148     05  FILLER      PIC X(22)   VALUE 'CR AMOUNT             '.
+   149     05  FILLER      PIC X(08)   VALUE 'NET     '.
+   150     05  FILLER      PIC X(07)   VALUE 'RECORDS'.
+   151
+   152 01  HEADING-LINE-3.
+   153     05  filler      pic x       value spaces.
+   154     05  FILLER      PIC X(11)   VALUE '---------  '.
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page   5
+* FNB170.cbl
+   155     05  FILLER      PIC X(10)   VALUE '--------  '.
+   156     05  FILLER      PIC X(16)   VALUE '--------------  '.
+   157     05  FILLER      PIC X(16)   VALUE '--------------  '.
+   158     05  FILLER      PIC X(17)   VALUE '--------------   '.
+   159     05  FILLER      PIC X(09)   VALUE '---------'.
+   160
+   161 01  PRINT-LINE             VALUE SPACE.
+   162     05  filler      pic x.
+   163     05  PRT-TRAN-TYPE      PIC X(9).
+   164     05  FILLER             PIC X(2).
+   165     05  PRT-SUB-TYPE       PIC X(8).
+   166     05  FILLER             PIC X(2).
+   167     05  PRT-DR-AMT         PIC ZZZ,ZZZ,ZZZ.99.
+   168     05  FILLER             PIC XX.
+   169     05  PRT-CR-AMT         PIC ZZZ,ZZZ,ZZZ.99.
+   170     05  FILLER             PIC XX.
+   171     05  PRT-NET-AMT        PIC ZZZ,ZZZ,ZZZ.99-.
+   172     05  FILLER             PIC XX.
+   173     05  PRT-COUNT          PIC Z,ZZZ,ZZ9.
+   174
+   175 LINKAGE SECTION.
+   176
+   177 01  PARM.
+   178     05  PARM-LENGTH         PIC S9(04)   COMP.
+   179     05  PARM-CLIENT-ID      PIC X(03).
+   180     05  PARM-FILE-ID        PIC X(06).
+   181
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page   6
+* FNB170.cbl
+   182/
+   183 PROCEDURE DIVISION USING PARM.
+   184*
+   185 MAINLINE SECTION.
+   186
+   187     PERFORM 0000-HOUSEKEEPING THRU 0000-EXIT.
+   188
+   189     SORT SORT-FILE
+   190       ON ASCENDING KEY FX-TRAN-TYPE, FX-SUB-TYPE
+   191         USING TRANSACTION-DETAIL
+   192         OUTPUT PROCEDURE IS 1000-PRINT-REPORT THRU 1000-EXIT.
+   193
+   194     IF SORT-RETURN NOT = ZERO
+   195         DISPLAY ' '
+   196         DISPLAY ' '
+   197         DISPLAY 'INTERNAL SORT IN PROGRAM FNB170 FAILED'
+   198         DISPLAY 'TRY INCREASING SORTWORK SPACE'
+   199         DISPLAY 'JOB CANCELLED...'
+   200         ADD +1 TO FORCE-DUMP.
+   201
+   202     PERFORM 9000-PRINT-GRAND-TOTALS THRU 9000-EXIT.
+   203
+   204     STOP RUN.
+   205
+   206
+   207
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page   7
+* FNB170.cbl
+   208/
+   209 1000-PRINT-REPORT.
+   210*
+   211     RETURN SORT-FILE
+   212         AT END GO TO 1000-EXIT.
+   213     ADD +1 TO INPUT-COUNT.
+   214
+   215     IF FIRST-RECORD
+   216         MOVE FX-SYSTEM        TO HDG-SYSTEM
+   217         MOVE FX-POSTING-DATE  TO HDG-DATE
+   218         PERFORM 8000-HEADING THRU 8000-EXIT
+   219         MOVE FX-TRAN-TYPE TO PREV-TRAN-TYPE
+   220         MOVE FX-SUB-TYPE  TO PREV-SUB-TYPE.
+   221
+   222     IF FX-TRAN-TYPE = PREV-TRAN-TYPE
+   223         IF FX-SUB-TYPE = PREV-SUB-TYPE
+   224             CONTINUE
+   225         ELSE
+   226             PERFORM 2000-TOTAL-SUB-TYPE THRU 2000-EXIT
+   227     ELSE
+   228         PERFORM 3000-TOTAL-TRAN-TYPE THRU 3000-EXIT.
+   229
+   230     ADD +1 TO WS-COUNT (1).
+   231     IF FX-AMOUNT IS NEGATIVE
+   232         ADD FX-AMOUNT TO WS-CR-AMOUNT (1)
+   233     ELSE
+   234         ADD FX-AMOUNT TO WS-DR-AMOUNT (1).
+   235
+   236     MOVE FX-TRAN-TYPE TO PREV-TRAN-TYPE
+   237     MOVE FX-SUB-TYPE  TO PREV-SUB-TYPE
+   238     GO TO 1000-PRINT-REPORT.
+   239
+   240 1000-EXIT.
+   241     EXIT.
+   242
+   243
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page   8
+* FNB170.cbl
+   244/
+   245 2000-TOTAL-SUB-TYPE.
+   246*
+   247     MOVE PREV-SUB-TYPE    TO  PRT-SUB-TYPE
+   248     MOVE WS-DR-AMOUNT (1) TO  PRT-DR-AMT.
+   249     MOVE WS-CR-AMOUNT (1) TO  PRT-CR-AMT.
+   250     ADD WS-CR-AMOUNT (1), WS-DR-AMOUNT (1) GIVING PRT-NET-AMT.
+   251     MOVE WS-COUNT (1)     TO  PRT-COUNT.
+   252     WRITE PRINT-RECORD FROM PRINT-LINE
+   253         AFTER ADVANCING 1 LINE.
+   254     ADD +1 TO LINE-COUNT.
+   255     IF LINE-COUNT > +55
+   256         PERFORM 8000-HEADING THRU 8000-EXIT.
+   257
+   258     ADD WS-COUNT (1)     TO  WS-COUNT (2)
+   259     ADD WS-DR-AMOUNT (1) TO  WS-DR-AMOUNT (2)
+   260     ADD WS-CR-AMOUNT (1) TO  WS-CR-AMOUNT (2)
+   261     MOVE ZERO  TO  WS-COUNT (1)
+   262     MOVE ZERO  TO  WS-DR-AMOUNT (1)
+   263     MOVE ZERO  TO  WS-CR-AMOUNT (1)
+   264     MOVE SPACES TO PRINT-LINE
+   265     .
+   266 2000-EXIT.
+   267     EXIT.
+   268
+   269
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page   9
+* FNB170.cbl
+   270/
+   271 3000-TOTAL-TRAN-TYPE.
+   272*
+   273     PERFORM 2000-TOTAL-SUB-TYPE THRU 2000-EXIT
+   274     MOVE ' TOTAL'         TO  PRINT-LINE
+   275     MOVE WS-DR-AMOUNT (2) TO  PRT-DR-AMT.
+   276     MOVE WS-CR-AMOUNT (2) TO  PRT-CR-AMT.
+   277     ADD WS-CR-AMOUNT (2), WS-DR-AMOUNT (2) GIVING PRT-NET-AMT.
+   278     MOVE WS-COUNT (2)     TO  PRT-COUNT.
+   279     WRITE PRINT-RECORD FROM PRINT-LINE
+   280         AFTER ADVANCING 1 LINE.
+   281     MOVE SPACES TO PRINT-RECORD
+   282     WRITE PRINT-RECORD
+   283         AFTER ADVANCING 1 LINE.
+   284     ADD +2 TO LINE-COUNT.
+   285     IF LINE-COUNT > +55
+   286         PERFORM 8000-HEADING THRU 8000-EXIT.
+   287
+   288     ADD WS-COUNT     (2) TO WS-COUNT     (3)
+   289     ADD WS-DR-AMOUNT (2) TO WS-DR-AMOUNT (3)
+   290     ADD WS-CR-AMOUNT (2) TO WS-CR-AMOUNT (3)
+   291     MOVE ZERO  TO  WS-COUNT     (2)
+   292     MOVE ZERO  TO  WS-DR-AMOUNT (2)
+   293     MOVE ZERO  TO  WS-CR-AMOUNT (2)
+   294
+   295     MOVE FX-TRAN-TYPE TO PRT-TRAN-TYPE
+   296     MOVE FX-SUB-TYPE  TO PRT-SUB-TYPE
+   297     .
+   298 3000-EXIT.
+   299     EXIT.
+   300
+   301
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page  10
+* FNB170.cbl
+   302/
+   303 8000-HEADING.
+   304*
+   305     ADD +1 TO PAGE-COUNT.
+   306     WRITE PRINT-RECORD FROM HEADING-LINE-PGM-ID
+   307         AFTER ADVANCING PAGE.
+   308     MOVE PAGE-COUNT TO HDG-PAGE.
+   309     WRITE PRINT-RECORD FROM HEADING-LINE-1
+   310         AFTER ADVANCING 1 LINE.
+   311     WRITE PRINT-RECORD FROM HEADING-LINE-2
+   312         AFTER ADVANCING 4 LINES.
+   313     WRITE PRINT-RECORD FROM HEADING-LINE-3
+   314         AFTER ADVANCING 1 LINE.
+   315     MOVE SPACES TO PRINT-RECORD.
+   316     WRITE PRINT-RECORD
+   317         AFTER ADVANCING 2 LINES.
+   318     MOVE +9 TO LINE-COUNT.
+   319
+   320     MOVE FX-TRAN-TYPE TO PRT-TRAN-TYPE
+   321     MOVE FX-SUB-TYPE  TO PRT-SUB-TYPE.
+   322
+   323 8000-EXIT.
+   324     EXIT.
+   325
+   326
+   327
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page  11
+* FNB170.cbl
+   328/
+   329 0000-HOUSEKEEPING.
+   330*
+   331     MOVE PARM-CLIENT-ID TO HDG-CLIENT-ID.
+   332     MOVE PARM-FILE-ID   TO HDG-FILE-ID.
+   333     OPEN OUTPUT TRANSACTION-REPORT.
+   334     INITIALIZE TOTALS (1) TOTALS (2) TOTALS (3).
+   335
+   336 0000-EXIT.
+   337     EXIT.
+   338
+   339
+* TRANSACTION SUMMARY BY TYPE / SUB-TYPE               06-Oct-15 17:19 Page  12
+* FNB170.cbl
+   340/
+   341 9000-PRINT-GRAND-TOTALS.
+   342*
+   343     IF INPUT-COUNT = ZERO
+   344         DISPLAY '*** INPUT FILE IS EMPTY ***'
+   345         PERFORM 8000-HEADING THRU 8000-EXIT
+   346         MOVE WS-NO-INPUT-MSG TO PRINT-RECORD
+   347         WRITE PRINT-RECORD
+   348             AFTER ADVANCING 2 LINES
+   349         CLOSE TRANSACTION-REPORT TRANSACTION-DETAIL
+   350         GO TO 9000-EXIT
+   351     END-IF.
+   352
+   353     PERFORM 3000-TOTAL-TRAN-TYPE THRU 3000-EXIT.
+   354     MOVE ' GRAND TOTAL'   TO  PRINT-LINE
+   355     MOVE WS-DR-AMOUNT (3) TO  PRT-DR-AMT
+   356     MOVE WS-CR-AMOUNT (3) TO  PRT-CR-AMT
+   357     MOVE WS-COUNT (3)     TO  PRT-COUNT
+   358     ADD WS-CR-AMOUNT (3), WS-DR-AMOUNT (3) GIVING PRT-NET-AMT.
+   359     WRITE PRINT-RECORD FROM PRINT-LINE
+   360         AFTER ADVANCING 3 LINES.
+   361
+   362     CLOSE TRANSACTION-REPORT TRANSACTION-DETAIL.
+   363
+   364 9000-EXIT.
+   365     EXIT.
+   366
+* Micro Focus Server Express         V5.1 revision 000 Compiler
+* Copyright (C) Micro Focus IP Development Limited 1984-2012.
+*                                                        REF GNR-008065005AF
+* Total Messages:     0
+* Data:        3272     Code:        2300

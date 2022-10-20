@@ -1,0 +1,45 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='J' 
+
+if ($EBMSYS != "tony") then
+   echo "Job aborting, not Tony"
+   exit 1
+endif
+
+
+################################################################################
+LABEL name=EL353
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELACTQ' dataset='CI.DD.LG.ELACTQ' type='VS' filename='ELACTQ' disp='i-o' 
+ASSGNDD ddname='ELTRLR' dataset='CI.DD.LG.ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD  ddname='SYS010' type='SYSOUT' class='A' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL353' stepname='EL353' parm='20080522'
+
+################################################################################
+LABEL name=CPY353
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL353/SYS008_\${JON}' disp='i'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZC.DC.CIADM.FICH353' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY353' parm='ALL'
+
+
+################################################################################
+if ($JOBSTATUS == 0) then
+   "smtp -f slunikix -t ajra -s 'EL353 - DCC CHECKS NEEDING APPROVAL' -mf $SEQFILES/ZC.DC.CIADM.FICH353"
+
+#     "exelpr.sh isprog.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/EL353/SYS008_$JON"
+#     "exelpr.sh p60w1s.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/EL353/SYS008_$JON"
+else
+   echo "job aborted print not released "
+endif
+
+ENDJOB 
+################################################################################

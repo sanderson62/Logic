@@ -1,0 +1,111 @@
+################################################################################
+#
+#  Job:  cidclgm019
+#
+################################################################################
+BEGINJOB mode='MVS' 
+
+################################################################################
+LABEL name=DCC017 
+################################################################################
+#  ********************************************************************  
+#  ***                                                                   
+#  ***--               CREATE COMPENSATION TRANSACTIONS           --***  
+#  ***                                                                   
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTD' disp='i-o' 
+ASSGNDD ddname='ERPDEF' type='VS' filename='ERPDEF' disp='i-o'
+ASSGNDD ddname='SYS018' filename='$SEQFILES/DC.XX.DET010_00' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS014' filename='$SEQFILES/DC.WW.PRCMEXTRS' disp='o' normal='k' abend='d' recfmt='F' recsize='91' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/DC.EX.FICH017S' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+
+EXECPGM pgmname='DCC017' stepname='DCC017' parm='@MEMMDDYYYY'
+
+################################################################################
+LABEL name=CPY017
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/DCC017/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.DL.CIADM.FICH017S' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY017' parm='ALL'
+
+################################################################################
+LABEL name=SORT1
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y'
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y'
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/DC.WW.PRCMEXTRS' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/DC.WW.PRCMEXTRS.SRTD' disp='o' normal='k' abend='d' recfmt='F' recsize='91'
+ASSGNDD ddname='SORTWK01' type='TEMP'
+ASSGNDD ddname='SORTWK02' type='TEMP'
+ASSGNDD ddname='SORTWK03' type='TEMP'
+ASSGNDD ddname='SORTWK04' type='TEMP'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+     KEYS=(1 19 CHAR) (39 3 CHAR)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT1'
+
+################################################################################
+LABEL name=DCC019
+################################################################################
+#  ********************************************************************  
+#  ***                                                                   
+#  ***--         SUPER SPECIAL ECS019 SPECIAL                     --***  
+#  ***                                                                   
+#  ********************************************************************  
+#  ****************************************************  INPUT FILES     
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTD' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/DC.WW.PRCMEXTRS.SRTD' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o' 
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/DC.EX.FICH019S' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+
+EXECPGM pgmname='DCC019' stepname='DCC019'
+
+################################################################################
+LABEL name=CPY019
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/DC.EX.FICH019S' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.DL.CIADM.FICH019.SPEC' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY019' parm='ALL'
+
+################################################################################
+LABEL name=CPY019PRT
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/DCC019/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.DL.PRINT.ECS019' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY019PRT' parm='ALL'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "ftp -n ntfree2 < $JCLLIB/ftp-cidclgm019-ntfree2"
+#    "exelpr.sh p60w1s.parms '-ode=DCCO' $SYSOUTDIR/$JOBNAME/ECS019DCC/SYS008_$JON"
+else
+    echo " Job aborted, print not released "
+endif
+
+################################################################################
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 042503                 SMVA   NEW JOB FOR DCC
+# 053003                 SMVA   ADD DCCO HARDCOPY FOR ECS019DCC/SYS008 (19 SPEC)
+# 112309  2009111700001  AJRA   REMOVE CORP FIN PRINT, ADD CPY019PRT,FTP TO NTFREE2

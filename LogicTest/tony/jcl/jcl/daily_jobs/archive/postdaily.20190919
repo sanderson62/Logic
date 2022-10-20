@@ -1,0 +1,82 @@
+cd /apps/prod/cid1p/jcl
+
+echo "opnvsam is about to start"
+unikixjob opnvsam -w -ca
+if ($status != 0) then
+    echo "opnvsam aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'OPNVSAM'"
+    exit 1
+endif
+echo "opnvsam terminated successfully"
+
+#########################  B E G I N  S T E P  04   #########################
+rm /apps/prod/cid1p/jcl/ish/date_hash
+
+"smtp -f slunikix -t CPSPrintList -s 'Todays print list' -mf /apps/prod/cid1p/emails/printemail.txt"
+"smtp -f slunikix -t pager.pema,cycle,pager.sdga -s 'Cycle COMPLETE' -ml 'Logic cycle complete'"
+
+setenv cdte `date +%Y%m%d%H%M`
+cp /apps/prod/cid1p/reprints/dailycycle /apps/prod/cid1p/reprints/dailycycle.$cdte
+
+#########################    E N D    S T E P  04   #########################
+
+echo "cilgcff1 is about to start"
+unikixjob cilgcff1 -w -ca
+if ($status != 0) then
+    echo "cilgcff1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'CILGCFF1'"
+    exit 1
+endif
+echo "cilgcff1 terminated successfully"
+
+#########################  B E G I N  S T E P  05   #########################
+
+echo "cilgmdoff is about to start"
+unikixjob cilgmdoff -w -ca
+if ($status != 0) then
+    echo "cilgmdoff aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'cilgmdoff'"
+    exit 1
+endif
+echo "cilgmdoff terminated successfully"
+
+#########################    E N D    S T E P  05   #########################
+
+#########################  B E G I N  S T E P  06   #########################
+
+echo "cpscomp is about to start"
+unikixjob cpscomp -w -ca
+if ($status != 0) then
+    echo "cpscomp aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'cpscomp'"
+    exit 1
+endif
+echo "cpscomp submitted successfully"
+
+#########################    E N D    S T E P  06   #########################
+
+echo "daily backup is about to start"
+unikixjob dayunibkp -w -ca
+if ($status != 0) then
+    echo "dayunibkp aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'dayunibkp'"
+    exit 1
+endif
+echo "daily backup terminated successfully"
+"smtp -f slunikix -t pager.pema,cycle -s 'Backup Started' -ml 'Daily backup submitted'"
+
+#########################  B E G I N  S T E P  06   #########################
+echo "@ccyyyymmdd" > /data/seqfiles/Logic.daily.postcycle.done
+ftp -n ntcso1 < $JCLLIB/ftp-postcycle
+
+"smtp -f slunikix -t pager.pema,cycle,pager.sdga -s 'Post Logic Daily Cycle Complete' -ml 'Post Logic Daily Cycle Complete'"
+
+echo "@CCYYYYMMDD" > $SEQFILES/CurCycleDate
+echo "@CCYYYYMMDD" > $SEQFILES/PrevCycleDate
+
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 071516 CR2016030300001 PEMA   NEW JOB Designed for Active Batch

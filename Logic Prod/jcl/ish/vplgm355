@@ -1,0 +1,65 @@
+################################################################################
+#                                                                              #
+#     JOB: vplgm355                                                            #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+#if ($EBMSYS != 'mdoff') then
+#   echo "Job aborting, not MODEL OFFICE"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=EL355
+################################################################################
+ONRETCODE MAXRC GT '11' BYPASS scope='STEP'  
+
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ELDENY' type='VS' filename='ELDENY' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/VP.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='EL355' stepname='EL355'
+
+################################################################################
+LABEL name=CPY355
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL355/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/VP.DL.CIADM.FICH355' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPY355' parm='ALL'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the files from above and creates pdf files
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/VP.DL.CIADM.FICH355 $SEQFILES/VP.EL355.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+	  echo " Nothing to print at this time "
+    "mutt -s 'VPP EL355 Report' -a $SEQFILES/VP.EL355.pdf dsyslg324r@cso.com < /dev/null"
+else
+	echo " Job aborted, print not released "
+endif
+
+################################################################################
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 040517 CR2015082500001 PEMA   NEW JOB for VPP

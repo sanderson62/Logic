@@ -1,0 +1,76 @@
+################################################################################
+#
+#  Job:  fndcfrd52
+#
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=FNB165 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.DD.LG.ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i'
+#  DOWNLOAD
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/FN.DL.FX.DCCPYAJ' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='FNB165' stepname='FNB165' parm='12222003_12232003' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                     PRINT SUMMARY REPORT 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYS007' filename='\${SEQFILES}/FNDCFRD52' disp='o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/FN.DL.FX.DCCPYAJ' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' 
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/FNDCFRD52' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID pyaj 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/FN.DL.FX.DCCPYAJ' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/LPACPYAJ_12-23-03.DAT' disp='o' abend='d' normal='k' recsize='250' recfmt='F'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+
+################################################################################
+
+ftp -n ntfree2 < /apps/test/cid1t/jcl/ish/ftp-fndcfrd52-test
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+     "exelpr.sh l133std.parms '-ode=DCCO' $SYSOUTDIR/$JOBNAME/PRINT1/SYSUT2_$JON"
+else
+   echo "job aborted print not released"
+endif
+
+################################################################################
+
+
+ENDJOB
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################

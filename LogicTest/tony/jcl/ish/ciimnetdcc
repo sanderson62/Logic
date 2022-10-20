@@ -1,0 +1,74 @@
+################################################################################
+BEGINJOB mode='MVS' 
+
+################################################################################
+LABEL name=SORTPNDB 
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/DC.XX.CERT_00' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/DC.SORTED.CERT' disp='o' normal='k' abend='d' recfmt='F' recsize='1056' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(29 10)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORTPNDB'
+
+################################################################################
+LABEL name=BLDHDR 
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+#  *   BUILD IMNET HEADER RECORDS FROM CID CLAIM, CRTC AND PNDB          
+#  *      ONLINE FILES.                                                  
+#  *                                                                     
+#  *   ONLINE CERTIFICATE MASTER FILE IS NOT USED AT THIS TIME.          
+#  *                                                                     
+#  ********************************************************************* 
+ASSGNDD ddname='CLMFILE' type='DUMMY' 
+ASSGNDD ddname='CRTCFILE' type='DUMMY' 
+ASSGNDD ddname='PNDBFILE' filename='$SEQFILES/DC.SORTED.CERT' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='HDRFILE' filename='$SEQFILES/DC.XX.CIIMNET.DCC' disp='o' normal='k' abend='d' recfmt='F' recsize='80' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD  ddname='SYS022' type='SYSOUT' class='A' 
+ASSGNDD  ddname='SYS023' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+00/00/00 PREV CYC DATE = 10-04-07
+!
+
+EXECPGM pgmname='CIIMNETT' stepname='BLDHDR' 
+
+################################################################################
+LABEL name=CPYHDR 
+################################################################################
+#  **--                                                                  
+#  **--      BACKUP BATCH COMM FILE ON CART                              
+#  **--                                                                  
+#  ********************************************************************* 
+ASSGNDD ddname='INPUT' filename='$SEQFILES/DC.XX.CIIMNET.DCC' disp='i-o' normal='k' abend='k' recfmt='F'
+ASSGNDD ddname='OUTPUT' filename='$SEQFILES/DCCHDR.NEW.SPECIAL' disp='o' normal='k' recsize='70' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(INPUT) -                                                 
+         OFILE(OUTPUT)                                                  
+!
+
+EXECPGM pgmname='IDCAMS' stepname='CPYHDR' 
+
+################################################################################
+
+ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-ciimnett
+
+################################################################################
+
+#if ($JOBSTATUS == 0) then
+#     "exelpr.sh p81n1d.parms '-ode=FI' $SYSOUTDIR/$JOBNAME/BLDHDR/SYS022_$JON"
+#     "exelpr.sh p81n1d.parms '-ode=FI' $SYSOUTDIR/$JOBNAME/BLDHDR/SYS023_$JON"
+#else
+#   echo "Job aborted print not released"
+#endif
+
+ENDJOB 
+################################################################################

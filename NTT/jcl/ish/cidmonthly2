@@ -1,0 +1,56 @@
+cd $PROJECT_ROOT/jcl
+
+setenv cdte `date +%m%d`
+
+echo "cidmtha is about to start"
+unikixjob cidmtha -ca -k $EBMSYS
+if ($status != 0) then
+    echo "cidmtha aborted"
+    exit 1
+endif
+echo "cidmtha terminated successfully"
+
+echo "cidmthb is about to start"
+unikixjob cidmthb -w -ca -k $EBMSYS
+if ($status != 0) then
+    echo "cidmthb aborted"
+    exit 1
+endif
+echo "cidmthb terminated successfully"
+
+
+ftp -n ntis1.cso.local < $JCLLIB/ftp-rdsfiles
+
+rm $JCLLIB/date_hash
+
+#########################  B E G I N  S T E P  07   #########################
+cp $PROJECT_ROOT/reprints/dailycycle $PROJECT_ROOT/reprints/dailycycle.$cdte
+
+echo "20211130" > $SEQFILES/Logic.daily.postcycle.done
+ftp -n ntis1.cso.local < $JCLLIB/ftp-postcycle
+#########################    E N D    S T E P  07   #########################
+
+#########################  B E G I N  S T E P  08   #########################
+if (`date +%F` == 2016-12-29 || "Tue" == "Fri") then
+   echo "20211130" > $SEQFILES/dailyslunikix.txt
+   ftp -n ntis1.cso.local < $JCLLIB/ftp-cpsfrimedone
+endif
+#########################    E N D    S T E P  08   #########################
+
+#########################  B E G I N  S T E P  09   #########################
+echo "sqlbermebl is about to start"
+unikixjob sqlbermebl -w -ca -k $EBMSYS
+if ($status != 0) then
+    echo "sqlbermebl aborted"
+    exit 1
+endif
+echo "sqlbermebl terminated successfully"
+
+
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOBS
+# 052914  2014042300003  TANA   CHANGE SMTP TO USE DIST GROUP

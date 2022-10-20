@@ -1,0 +1,63 @@
+BEGINJOB mode='MVS' jobclass='M' 
+
+if ($EBMSYS != "paul") then
+   echo "Job aborting, not paul"
+   exit 1
+endif
+
+
+################################################################################
+LABEL name=EL300
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLOG' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='J' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' dataset='CI.DD.LG.ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMS' dataset='CI.DD.LG.ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELPGMO' dataset='CI.DD.LG.ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='/data/test/tony/seqfiles/ZH.DD.ER.DATECARD.AHLEPX' disp='o' normal='k' abend='d' recsize='100' recfmt='F' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCAHL1
+CLAS033112                          1
+!
+
+EXECPGM pgmname='EL300' stepname='EL300'
+
+################################################################################
+LABEL name=FNBEPXAHL
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+
+ASSGNDD ddname='ERRTBLT' type='VS' filename='ERRTBLA' disp='i-o' 
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTA' disp='i-o' 
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/AH.XX.EPEC.FEB2012.ZERO' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='/data/test/tony/seqfiles/ZH.DD.ER.DATECARD.AHLEPX' disp='i'
+ASSGNDD ddname='SYS011' filename='/data/test/tony/seqfiles/ZH.EPEC.EXTRACT.FNAHLST.MAR12' disp='o' normal='k' abend='k' recsize='250' recfmt='f' 
+
+EXECPGM pgmname='FNBEPXAHL' stepname='FNBEPXAHL' 
+
+
+################################################################################
+LABEL name=COPY1   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR DCC 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='/data/test/tony/seqfiles/ZH.EPEC.EXTRACT.FNAHLST.MAR12' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='/data/test/tony/seqfiles/AHL_TEMP_03-31-12.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+EXECPGM pgmname='IDCAMS' stepname='COPY1'   
+
+
+ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajrfrahltmp
+
+ENDJOB 

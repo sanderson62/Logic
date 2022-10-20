@@ -1,0 +1,605 @@
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2015 by Central States Health and Life          *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       identification division.
+       program-id. EL203.
+      *
+      *AUTHOR.    Cowtown.
+      *           Colleyville, TEXAS.
+
+      *REMARKS.
+      ***-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_***
+      ***                                                            ***
+      ***  This program is waken up by a http client/request         ***
+      ***  and is passed several variables in the url. Cert key info,***
+      ***  agent first and last names, license number and npn number.***
+      ***  Next the program will read the certificate trailer file   ***
+      ***  for that particular cert and update it with the agent     ***
+      ***  name, license no and npn number.                          ***
+      ***                                                            ***
+      ***_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-***
+
+022715******************************************************************
+022715*                   C H A N G E   L O G
+022715*
+022715* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+022715*-----------------------------------------------------------------
+022715*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+022715* EFFECTIVE    NUMBER
+022715*-----------------------------------------------------------------
+022715* 091114  CR2015010800003  PEMA  NEW PROGRAM
+020816* 020816  CR2015082500001  PEMA  ADD PROCESSING FOR NEW COMP VPP
+022715*-----------------------------------------------------------------
+
+       environment division.
+       data division.
+       working-storage section.
+
+       77  s1                          pic s999 comp-3 value +0.
+       77  s2                          pic s999 comp-3 value +0.
+082014 77  i1                          pic s999 comp-3 value +0.
+082014 77  o1                          pic s999 comp-3 value +0.
+       77  c1                          pic s999 comp-3 value +0.
+       77  ws-current-bin-dt           pic xx value low-values.
+       77  ws-bin-eom-dt               pic xx value low-values.
+       77  ws-build-note-sw            pic x value ' '.
+           88  finished-with-notes      value 'Y'.
+       77  ws-cert-note-generic-key-len pic s9(4) comp value +34.
+       77  note-count                  pic s999 comp-3 value +0.
+       77  ws-ercnot-sw                pic x  value spaces.
+           88  ercnot-startbr            value 'Y'.
+
+       01  P pointer.
+       01  KIXSYS                      pic X(7)  VALUE Z"KIXSYS".
+       01  var-ptr pointer.
+       01  env-var-len                 pic 9(4)  binary.
+       01  rc                          pic 9(9)  binary.
+      
+       01  WS-KIXSYS.
+           05  WS-KIX-FIL1             PIC X(10).
+           05  WS-KIX-APPS             PIC X(10).
+           05  WS-KIX-ENV              PIC X(10).
+           05  WS-KIX-MYENV            PIC X(10).
+           05  WS-KIX-SYS              PIC X(10).
+
+
+       01  ws-remit-id-a               pic x(10).
+       01  ws-remit-id redefines
+           ws-remit-id-a               pic 9(10).
+
+       01  ws-key-stuff.
+           05  ws-cert-key.
+               10  ws-carrier          pic x.
+               10  ws-state            pic xx.
+               10  ws-account          pic x(10).
+               10  ws-eff-date         pic x(8).
+               10  ws-certificate      pic x(10).
+               10  ws-cert-sfx         pic x.
+               10  ws-batch-no         pic x(6).
+               10  ws-region-id        pic x(6).
+               10  ws-comp-id          pic xxx.
+           05  filler                  pic x(10).
+           05  ws-agent-first-name     pic x(20).
+           05  ws-agent-mi             pic x.
+           05  ws-agent-last-name      pic x(25).
+           05  ws-agent-license-no     pic x(15).
+           05  ws-agent-npn-no         pic x(10).
+           05  ws-proc-id              pic x(4).
+
+       01  ws-error-message            pic x(50) value spaces.
+
+       01  WS-CZ-KEY.
+           05  WS-CZ-COMPANY-CD        PIC X.                                       
+           05  WS-CZ-CARRIER           PIC X.                                       
+           05  WS-CZ-GROUP             PIC X(6).                                    
+           05  WS-CZ-STATE             PIC XX.   
+           05  WS-CZ-ACCOUNT           PIC X(10).
+           05  WS-CZ-EFF-DT            PIC XX.
+           05  WS-CZ-CERT-NO           PIC X(11).
+           05  WS-CZ-REC-TYPE          PIC X.
+           05  ws-cz-note-seq          pic s9(4) comp.
+
+       01  FILE-KEYS.
+           05  elcert-key.
+               10  elcert-company-cd   pic x.
+               10  elcert-carrier      pic x.
+               10  elcert-grouping     pic x(6).
+               10  elcert-state        pic xx.
+               10  elcert-account      pic x(10).
+               10  elcert-eff-dt       pic xx.
+               10  elcert-certificate.
+                   15  elcert-cert     pic x(10).
+                   15  elcert-cert-sfx pic x.
+
+           05  elcrtt-key.
+               10  elcrtt-company-cd   pic x.
+               10  elcrtt-carrier      pic x.
+               10  elcrtt-grouping     pic x(6).
+               10  elcrtt-state        pic xx.
+               10  elcrtt-account      pic x(10).
+               10  elcrtt-eff-dt       pic xx.
+               10  elcrtt-cert-no      pic x(11).
+               10  elcrtt-rec-type     pic x.
+
+
+       01  cert-note-records-holder.
+           05  cert-note-record occurs 300.
+               10  filler              pic x(48).
+               10  cnr-rest            pic x(102).
+
+       01  ws-init-erpndb-rec          pic x(585) value spaces.
+       01  ws-init-erpndm              pic x(374) value spaces.
+       01  f.
+           05  ws-batch-seq-no         pic s9(4) comp value +0.
+           05  ws-connect-sw               pic x  value ' '.
+               88  connected-to-db             value 'Y'.
+           05  ws-comp-cd              pic x.
+
+       01  WS-RESPONSE                 PIC S9(8) COMP VALUE +0.
+           88  RESP-NORMAL                    VALUE +0.
+           88  resp-file-notfnd               value +12.
+           88  RESP-NOTFND                    VALUE +13.
+           88  resp-duprec                    value +14.
+           88  resp-dupkey                    value +15.
+           88  resp-invreq                    value +16.
+           88  RESP-NOTOPEN                   VALUE +19.
+           88  RESP-ENDFILE                   VALUE +20.
+           88  resp-lengtherr                 value +22.
+
+       01  ws-display-response         pic s9(5) value zeros.
+       01  ws-work-time-a              pic x(6).
+       01  ws-work-time redefines ws-work-time-a
+                                       pic 9(6).
+       01  ws-work-amt-alpha           pic x(11).
+       01  ws-work-amt-num redefines ws-work-amt-alpha
+                                       pic 9(9)v99.
+       01  ws-qry-string               pic x(150) value spaces.
+       01  ws-string-out               pic x(150) value spaces.
+       01  ws-qrystr-len               pic s9(8) comp value +150.
+       01  ws-var-alpha                pic x(10).
+       01  ws-seq-alpha                pic x(5).
+       01  ws-seq-no-num redefines ws-seq-alpha
+                                       pic 9(5).
+
+                                       copy ELCFUNDT.
+                                       COPY ELCDATE.
+                                       COPY ELCCNTL.
+                                       copy ELCCERT.
+                                       copy ELCCRTT.
+                                       copy ERCCNOT.
+
+       01  w-doctoken                  pic x(16).
+
+       01 output-data.
+          05  filler                   pic x(6) value "TITLE=".
+          05  output-title             pic x(26) value 'AGENT SIG'.
+          05  filler                   pic x(8) value "&COMPID=".
+          05  out-comp-id              pic xxx.
+          05  filler                   pic x(5) value "&MSG=".
+          05  output-msg               pic x(50).
+
+       LINKAGE SECTION.                                                 
+       01  DFHCOMMAREA                     PIC X(1024).                 
+      
+       01  var  pic x(30).
+
+       procedure division.
+
+      *    display ' Entering EL203 '
+
+           MOVE FUNCTION CURRENT-DATE  TO FUNCTION-DATE
+           string ws-fn-hours ws-fn-minutes ws-fn-seconds
+              delimited by size into ws-work-time-a
+           end-string
+           move ws-fn-cymd             to dc-greg-date-cymd
+           move 'L'                    to dc-option-code
+           perform 9700-date-convert   thru 9700-exit
+           if no-conversion-error
+              move dc-bin-date-1       to ws-current-bin-dt
+           else
+              display ' error current dt invalid ' dc-error-code
+           end-if
+
+           set P to address of KIXSYS
+           CALL "getenv" using by value P returning var-ptr
+           if var-ptr = null then
+              display ' kixsys not set '
+           else
+              set address of var to var-ptr
+              move 0 to env-var-len
+              inspect var tallying env-var-len
+                for characters before X'00' 
+              unstring var (1:env-var-len) delimited by '/'
+                 into WS-KIX-FIL1 WS-KIX-APPS WS-KIX-ENV WS-KIX-MYENV
+                    WS-KIX-SYS
+              end-unstring
+           end-if
+
+           exec cics web extract
+              querystring  (ws-qry-string)
+              querystrlen  (ws-qrystr-len)
+           end-exec
+
+      *    display ' qry string ' ws-qry-string
+      *    display ' gry len    ' ws-qrystr-len
+
+           move +1                     to o1
+           perform varying i1 from +1 by +1 until
+              (i1 > +200)
+              or (ws-qry-string (i1:1) = ' ')
+              if ws-qry-string (i1:3) = '%20'  *>   space
+                 move ' '              to ws-string-out (o1:1)
+                 add +2                to i1
+                 add +1                to o1
+              else
+                 move ws-qry-string (i1:1)
+                                       to ws-string-out (o1:1)
+                 add +1                to o1
+              end-if
+           end-perform
+
+      *    display ' string out ' ws-string-out
+
+           unstring ws-string-out delimited by '?' or '&'
+              into  ws-cert-key
+                 ws-agent-first-name
+                 ws-agent-mi
+                 ws-agent-last-name
+                 ws-agent-license-no
+                 ws-agent-npn-no
+                 ws-proc-id
+           end-unstring
+
+           evaluate true
+              when ws-comp-id = 'CID'
+                 move X'04'            to ws-comp-cd
+              when ws-comp-id = 'DCC'
+                 move X'05'            to ws-comp-cd
+              when ws-comp-id = 'AHL'
+                 move X'06'            to ws-comp-cd
+020816        when ws-comp-id = 'VPP'
+020816           move X'07'            to ws-comp-cd
+           end-evaluate
+
+      *    display ' cert key   :**' ws-cert-key '**'
+      *    display ' first name : ' ws-agent-first-name
+      *    display ' middle int : ' ws-agent-mi
+      *    display ' last name  : ' ws-agent-last-name
+      *    display ' license no : ' ws-agent-license-no
+      *    display ' nbn number : ' ws-agent-npn-no
+      *    display ' proc ID    : ' ws-proc-id
+
+           move ws-comp-cd             to elcert-company-cd
+           move ws-carrier             to elcert-carrier
+           move '000000'               to elcert-grouping
+           move ws-state               to elcert-state
+           move ws-account             to elcert-account
+           move ws-certificate         to elcert-cert
+           move ws-cert-sfx            to elcert-cert-sfx
+           move ws-eff-date (7:2)      to dc-ymd-year
+           move ws-eff-date (1:2)      to dc-ymd-month
+           move ws-eff-date (4:2)      to dc-ymd-day
+           move '3'                    to dc-option-code
+           perform 9700-date-convert   thru 9700-exit
+           if no-conversion-error
+              move dc-bin-date-1       to elcert-eff-dt
+           else
+              move ' Bad Eff Dte Convert '
+                                       to output-msg
+              display ' bad eff dte convert ' dc-error-code ' '
+                 ws-cert-key
+              go to 0000-return
+           end-if
+
+      *    display ' about to read elcert ' elcert-key (2:19) ' '
+      *       elcert-key (23:11)
+           exec cics read
+              dataset    ('ELCERT')
+              into       (certificate-master)
+              ridfld     (elcert-key)
+              resp       (ws-response)
+           end-exec
+
+           if resp-normal
+              continue
+           else
+              move ' Bad ELCERT Read  '
+                                       to output-msg
+              display ' bad read on elcert ' ws-response ' '
+                 ws-cert-key
+              go to 0000-return
+           end-if
+
+      *    display ' Read ELCERT okay '
+           move elcert-key             to elcrtt-key
+           move 'C'                    to elcrtt-rec-type
+
+      *    display ' about to read elcrtt ' elcrtt-key (2:19) ' '
+      *       elcrtt-key (23:12)
+           exec cics read
+              update
+              dataset    ('ELCRTT')
+              into       (certificate-trailers)
+              ridfld     (elcrtt-key)
+              resp       (ws-response)
+           end-exec
+
+           if resp-notfnd
+      *       display ' Read ELCrtt not found '
+              move spaces              to certificate-trailers
+              move 'CS'                to cs-record-id
+              move elcert-key          to cs-control-primary
+              move 'C'                 to cs-trailer-type
+              move ws-agent-first-name to cs-agent-fname
+              move ws-agent-mi         to cs-agent-mi
+              move ws-agent-last-name  to cs-agent-lname
+              move ws-agent-license-no to cs-license-no
+              move ws-agent-npn-no     to cs-npn-number
+              move 'V'                 to cs-agent-edit-status
+      *    display ' about to write elcrtt ' cs-control-primary (2:19)
+      *       ' ' cs-control-primary (23:12)
+              exec cics write
+                 dataset    ('ELCRTT')
+                 from       (certificate-trailers)
+                 ridfld     (cs-control-primary)
+                 resp       (ws-response)
+              end-exec
+              if resp-normal
+      *          display ' write ELCrtt okay '
+                 perform 0150-process-cert-notes
+                                       thru 0150-exit
+              else
+                 move ' Bad ELCRTT write  '
+                                       to output-msg
+                 display ' bad write on elcrtt ' ws-response ' '
+                    ws-cert-key
+                 go to 0000-return
+              end-if
+           else
+              if resp-normal
+      *          display ' Read ELCrtt okay '
+                 move ws-agent-first-name
+                                       to cs-agent-fname
+                 move ws-agent-mi      to cs-agent-mi
+                 move ws-agent-last-name
+                                       to cs-agent-lname
+                 move ws-agent-license-no
+                                       to cs-license-no
+                 move ws-agent-npn-no  to cs-npn-number
+                 move 'V'              to cs-agent-edit-status
+      *    display ' about to rewrite elcrtt '
+      *       cs-control-primary (2:19) ' '
+      *       cs-control-primary (23:12)
+                 exec cics rewrite
+                    dataset    ('ELCRTT')
+                    from       (certificate-trailers)
+                    resp       (ws-response)
+                 end-exec
+                 if resp-normal
+      *             display ' rewrite ELCrtt okay '
+                    perform 0150-process-cert-notes
+                                       thru 0150-exit
+                 else
+                    move ' Bad ELCRTT rewrite  '
+                                       to output-msg
+                    display ' bad rewrite on elcrtt ' ws-response ' '
+                       ws-cert-key
+                    go to 0000-return
+                 end-if
+              else
+                 move ' Bad ELCRTT Read  '
+                                       to output-msg
+                 display ' bad read on elcrtt ' ws-response ' '
+                    ws-cert-key
+                 go to 0000-return
+              end-if
+           end-if
+
+           .
+       0000-return.
+
+      *    perform 0220-send-form      thru 0220-exit
+
+           exec cics
+              return
+           end-exec
+           goback
+
+           .
+       0150-process-cert-notes.
+
+      *    display ' made it to 0150 '
+           move spaces                 to cert-note-records-holder
+                                          ws-build-note-sw
+                                          ws-ercnot-sw
+           move cm-control-primary     to ws-cz-key
+           move '1'                    to ws-cz-rec-type
+           move +0                     to ws-cz-note-seq
+                                          c1
+
+      *    display ' about to startbr ercnot ' ws-cz-key (2:19) ' '
+      *       ws-cz-key (23:12) ' ' ws-cz-note-seq
+           EXEC CICS STARTBR
+                DATASET    ('ERCNOT')
+                RIDFLD     (WS-CZ-KEY)
+                GTEQ
+                RESP       (WS-RESPONSE)
+           END-EXEC
+
+           IF RESP-NORMAL
+      *       display ' normal startbr '
+              set ercnot-startbr to true
+              perform until finished-with-notes
+      *    display ' about to readnext ercnot ' ws-cz-key (2:19) ' '
+      *       ws-cz-key (23:12) ' ' ws-cz-note-seq
+                 EXEC CICS READNEXT
+                    DATASET    ('ERCNOT')
+                    RIDFLD     (WS-CZ-KEY)
+                    INTO       (cert-note-file)
+                    resp       (ws-response)
+                 end-exec
+                 if (resp-normal)
+                    and (cz-control-primary (1:33) =
+                       cm-control-primary (1:33))
+                    if cz-record-type = '1'
+                       add +1 to c1
+                       move cert-note-file
+                                       to cert-note-record (c1)
+                    end-if
+                 else
+                    set finished-with-notes to true
+                 end-if
+              end-perform
+           end-if
+
+           if ercnot-startbr
+      *    display ' about to endbr ercnot '
+              exec cics endbr
+                 dataset    ('ERCNOT')
+              end-exec
+           end-if
+           move c1                     to note-count
+
+           if c1 = +0
+      *       display ' c1 equals 0 '
+              perform 0151-add-verify-agent-sig-note
+                                       thru 0151-exit
+           else
+              if cnr-rest (1) (1:24) = 'AGENT SIGNATURE VERIFIED'
+                 go to 0150-exit
+              else
+                 perform 0152-delete-cert-notes
+                                       thru 0152-exit
+                 if resp-normal
+                    perform 0151-add-verify-agent-sig-note
+                                       thru 0151-exit
+                 end-if
+                 if resp-normal
+                    perform 0153-put-back-cert-notes
+                                       thru 0153-exit
+                 end-if
+              end-if
+           end-if
+
+           .
+       0150-exit.
+           exit.
+
+       0151-add-verify-agent-sig-note.
+
+           move 'CZ'                to cert-note-file
+           move cm-control-primary  to cz-control-primary
+           move '1'                 to cz-record-type
+           move +1                  to cz-note-sequence
+           move ws-current-bin-dt   to cz-last-maint-dt
+           move eibtime             to cz-last-maint-hhmmss
+           move ws-proc-id          to cz-last-maint-user
+           MOVE 'AGENT SIGNATURE VERIFIED'
+                                    to cz-note
+      *    display ' about to write ercnot ' cz-control-primary (2:19)
+      *       ' ' cz-control-primary (23:12) ' ' cz-note-sequence
+           exec cics write
+              dataset   ('ERCNOT')
+              from      (cert-note-file)
+              ridfld    (cz-control-primary)
+              resp      (ws-response)
+           end-exec
+           if not resp-normal
+              display ' error-ercnot-write ' ws-response ' '
+                 cz-control-primary (2:19)
+              ' ' cz-control-primary (23:12) ' ' cz-note-sequence
+           end-if
+
+           .
+       0151-exit.
+           exit.
+
+       0152-delete-cert-notes.
+
+           move cm-control-primary     to ws-cz-key
+           move '1'                    to ws-cz-rec-type
+           move +0                     to ws-cz-note-seq
+      *    display ' about to delete ercnot ' ws-cz-key (2:19)
+      *       ' ' ws-cz-key (23:12) ' ' ws-cz-note-seq ' '
+      *       ws-cert-note-generic-key-len
+           exec cics delete
+              dataset    ('ERCNOT')
+              keylength  (ws-cert-note-generic-key-len)
+              ridfld     (ws-cz-key)
+              generic
+              resp       (ws-response)
+           end-exec
+
+           if resp-normal
+              continue
+      *       display ' generic delete okay '
+           else
+              display ' error-ercnot-delete ' ws-response
+           end-if
+
+           .
+       0152-exit.
+           exit.
+
+
+       0153-put-back-cert-notes.
+
+      *    display ' made it to 0153 '
+           perform varying c1 from +1 by +1 until
+              c1 > note-count
+              move cert-note-record (c1)
+                                       to cert-note-file
+              add +1                   to cz-note-sequence
+      *    display ' about to write ercnot ' cz-control-primary (2:19)
+      *       ' ' cz-control-primary (23:12) ' ' cz-note-sequence
+              exec cics write
+                 dataset ('ERCNOT')
+                 FROM    (cert-note-file)
+                 ridfld  (cz-control-primary)
+                 resp    (ws-response)
+              end-exec
+              if not resp-normal
+                 display ' error-ercnot-write subsequ ' ws-response ' '
+                    cz-control-primary (2:33)
+                 move +999             to c1
+              end-if
+           end-perform
+
+          .
+       0153-exit.
+           exit.
+
+       0220-send-form.
+
+           move ws-comp-id             to out-comp-id
+           move 'AGENT SIG  '          to output-title
+      *    display ' about to send form '
+
+           exec cics document create
+              doctoken   (w-doctoken)
+              template   ('AGENTSIG')
+              symbollist (output-data)
+              listlength (length of output-data)
+           end-exec
+
+           exec cics web send
+              doctoken(w-doctoken)
+           end-exec
+
+           .
+       0220-exit.
+           exit.
+
+       9700-DATE-CONVERT.
+
+           EXEC CICS LINK
+                PROGRAM  ('ELDATCV')
+                COMMAREA (DATE-CONVERSION-DATA)
+                LENGTH   (DC-COMM-LENGTH)
+           END-EXEC.
+
+       9700-EXIT.
+            EXIT.

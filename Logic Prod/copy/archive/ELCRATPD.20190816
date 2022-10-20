@@ -1,0 +1,2055 @@
+00001 ******************************************************************
+00002 *                                                                *
+00002 *                                                                *
+00003 *                            ELCRATPD                            *
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+00005 *                            VMOD=2.061                          *
+00006 *                                                                *
+00007 ******************************************************************
+120202******************************************************************
+120202*                   C H A N G E   L O G
+120202*
+120202* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+120202*-----------------------------------------------------------------
+120202*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+120202* EFFECTIVE    NUMBER
+120202*-----------------------------------------------------------------
+120202* 120202    2001061800003  PEMA  ADD DCC PROCESSING       
+120502* 120502                   PEMA  ADD SPECIAL IN CALC FOR CID
+032603* 032603                   PEMA  ADD SPECIAL AZ CALC
+100703* 100703    2003080800002  PEMA  ADD SUPER GAP PROCESSING
+120403* 120403                   PEMA  ADD SPECIAL TX CALC
+092205* 092205                   PEMA  FIX CRIT PER FOR DCC
+011707* 011707                   PEMA  ADD SC NP PLUS 6 PMTS
+021207* 021207                   PEMA  ADD PA NP
+022107* 022107                   PEMA  ADD NH NP AND NP TRUNC
+032807* 032807                   PEMA  ADD VT NP PLUS 2
+052808* 052808    2008032000002  PEMA  ADD CODE FOR AK NET PAY
+052808* 052808    2008050800003  PEMA  ADD CODE FOR NV NET +2
+060909* 060909    2008042300002  PEMA  ADD NEW FARM PLAN CALC
+010410* 010410    2008021200005  PEMA  ADD MN NET PAY BALLOON
+011410* 011410  CR2009050700003  PEMA  ADD SPP DEALER DIRECT
+040610* 040610  CR2010010400006  PEMA  ADD IN TO VT CODE
+041310* 041310  CR2008021200005  PEMA  ADD CODE FOR MN LEVEL
+071211* 071211    2010012700001  PEMA  ADD SPPDD
+071511* 071511    2011021500001  PEMA  ADD CODE FOR DCC 10C
+092311* 092311  IR2011092100001  PEMA  ID 10C MONTHLY
+112911* 112911  CR2011083000003  PEMA  ADD SPPDDF TRUNCATED
+032612* 032612  CR2011110200001  PEMA  AHL CHANGES
+111212* 111212  CR2012013100001  PEMA  CHANGES FOR MN AND WA
+122613* 122613  CR2011021500001  PEMA  ADD CODE 4 TRUNC BALLOON DCC 10C
+050713* 050713  CR2008042200001  PEMA  ADD CODE FOR ZERO APR
+020816* 020816  CR2015082500001  PEMA  ADD NEW VPP COMPANY
+021519* 021519  CR2019021100001  PEMA  non-monthly al calcs
+120202******************************************************************
+00008                                                                   
+00009  0110-CHECK-KEY.                                                  
+00010      IF SVRT-COMPANY-CD = RT-COMPANY-CD  AND                      
+00011         SVRT-ST-CODE    = RT-ST-CODE     AND                      
+00012         SVRT-ST-CLASS   = RT-ST-CLASS    AND                      
+00013         SVRT-ST-DEV     = RT-ST-DEV      AND                      
+00014         SVRT-L-AH       = RT-L-AH        AND                      
+00015         SVRT-LAH-NUM    = RT-LAH-NUM                              
+00016          NEXT SENTENCE                                            
+00017      ELSE                                                         
+00018          GO TO 9999-RATE-NOTFND.                                  
+00019                                                                   
+00020      IF  SVRT-HIGH-AGE GREATER RT-HIGH-AGE                        
+00021          GO TO 9999-RATE-NOTFND.                                  
+00022                                                                   
+00023      IF SVRT-HIGH-AMT NOT LESS THAN RT-HIGH-AMT                   
+00024         GO TO 0100-READ-RATE-LOOP.                                
+00025                                                                   
+00026      IF SVRT-EXPIRY-DATE GREATER RT-EXPIRY-DATE                   
+00027          GO TO 0100-READ-RATE-LOOP.                               
+00028                                                                   
+00029      IF SVRT-EXPIRY-DATE = RT-EXPIRY-DATE                         
+00030          GO TO 0100-READ-RATE-LOOP.                               
+00031                                                                   
+00032      IF RT-MAX-AGE = ZEROS                                        
+00033          NEXT SENTENCE                                            
+00034      ELSE                                                         
+00035          COMPUTE WS-AGE =                                         
+00036              (CP-ISSUE-AGE + (CP-ORIGINAL-TERM / 12))             
+00037          IF WS-AGE >= RT-MAX-AGE                             
+00038              MOVE 'B'               TO CP-RETURN-CODE.            
+00039                                                                   
+00040      IF CP-LOAN-TERM NOT NUMERIC                                  
+00041          MOVE +0                    TO CP-LOAN-TERM.              
+00042                                                                   
+00043      IF CP-LOAN-TERM = ZERO                                       
+00044          MOVE CP-ORIGINAL-TERM      TO CP-LOAN-TERM.              
+00045                                                                   
+00046      IF CP-TERM-OR-EXT-DAYS NOT NUMERIC                           
+00047          MOVE +0                    TO CP-TERM-OR-EXT-DAYS.       
+00048                                                                   
+00049      MOVE CP-R-MAX-MON-BEN          TO WS-MAX-MON-BEN.            
+00050      MOVE CP-R-MAX-TOT-BEN          TO WS-MAX-TOT-BEN.            
+00051                                                                   
+00052      IF CP-AH                                                     
+00053          GO TO 2000-TYPE-IS-AH.                                   
+00054
+      *    display ' ben type           ' cp-benefit-type
+      *    display ' earn meth          ' cp-earning-method
+      *    display ' process type       ' cp-process-type
+      *    display ' special            ' cp-special-calc-cd
+      *    display ' ben code           ' cp-benefit-cd
+      *    display ' ext days calc      ' cp-ext-days-calc
+      *    display ' rating meth        ' cp-rating-method
+      *    display ' orig ben           ' cp-original-benefit
+
+022613     evaluate true
+022613        when (rt-is-ob)
+022613           and (cp-company-id not = 'CID')
+022613              move cp-loan-term  to ws-rate-term
+020816        when (cp-company-id = 'DCC' OR 'VPP')
+022613           and (cp-benefit-cd (1:1) = 'P')
+022613           move cp-loan-term     to ws-rate-term
+022613        when other
+022613           move cp-original-term to ws-rate-term
+022613     end-evaluate                 
+022613
+022613*    IF ((RT-IS-OB)
+022613*       AND (CP-COMPANY-ID NOT EQUAL 'CID'))
+022613*                     OR
+022613*       ((CP-COMPANY-ID = 'DCC')
+022613*       AND (CP-BENEFIT-CD (1:1) = 'P'))
+022613*       MOVE CP-LOAN-TERM        TO WS-RATE-TERM               
+022613*    ELSE
+022613*       MOVE CP-ORIGINAL-TERM TO WS-RATE-TERM
+022613*    END-IF
+00059
+00061      MOVE CP-CERT-EFF-DT            TO DC-BIN-DATE-1.             
+00062      MOVE SPACE                     TO DC-OPTION-CODE.            
+00063                                                                   
+00064      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                    
+00065                                                                   
+00066  1000-TYPE-IS-LIFE.                                               
+00067      MOVE RT-MAX-AGE                TO CP-R-MAX-ATT-AGE.          
+00068                                                                   
+00069      MOVE ZERO                      TO CP-R-MAX-AGE               
+00070                                        CP-R-MAX-TERM              
+00071                                        CP-R-MAX-MON-BEN           
+00072                                        CP-R-MAX-TOT-BEN.          
+00073                                                                   
+00074      MOVE RT-LIFE-MORT-CODE         TO CP-MORTALITY-CODE.         
+00075                                                                   
+020816     IF RT-CANCEL-FEE NUMERIC                                     
+020816        MOVE RT-CANCEL-FEE          TO CP-CANCEL-FEE.             
+00078                                                                   
+00079      MOVE RT-DISCOUNT-OPTION     TO WS-DISCOUNT-OPTION.           
+00080                                                                   
+           if rt-discount-ob-rate not numeric
+              move zeros               to rt-discount-ob-rate
+           end-if
+
+00081      IF (RT-DISCOUNT-OPTION EQUAL                                 
+00082                      '1' OR '2' OR '3' OR '4' OR '5') AND         
+00083         (RT-DISCOUNT-OB-RATE NUMERIC)         AND                 
+00084         (RT-DISCOUNT-OB-RATE GREATER THAN +0)                     
+00085          NEXT SENTENCE                                            
+00086      ELSE                                                         
+00087          IF (RT-DISCOUNT-OPTION EQUAL '6') AND                    
+00088             (CP-STATE-STD-ABBRV EQUAL 'CA')                       
+00089              IF RT-DISCOUNT-RATE GREATER THAN ZERO                
+00090                  COMPUTE CA-DISCOUNT = RT-DISCOUNT-RATE / 100     
+00091                  GO TO 1050-REGULAR-RATES                         
+00092              ELSE                                                 
+00093                  GO TO 1050-REGULAR-RATES                         
+00094          ELSE                                                     
+00095              GO TO 1050-REGULAR-RATES.                            
+00096                                                                   
+      *    display ' discount option ' rt-discount-option
+00097      IF RT-DISCOUNT-RATE NOT NUMERIC                              
+00098         MOVE +0                  TO RT-DISCOUNT-RATE.             
+00099                                                                   
+00100      IF CP-ORIGINAL-TERM GREATER ZERO AND LESS 361                
+00101         NEXT SENTENCE                                             
+00102      ELSE                                                         
+00103         MOVE +0                  TO CP-PREMIUM-RATE               
+00104                                     CP-COMPOSITE-RATE             
+00105                                     CP-CALC-PREMIUM               
+00106          MOVE '4'                TO CP-RETURN-CODE                
+00107          GO TO 9999-CALC-RATE-PREM-X.                             
+00108                                                                   
+00109      IF RT-DISCOUNT-OPTION = '1' OR '3' OR '5'                    
+00110         MOVE RT-DISCOUNT-RATE TO WS-WORK-DIS-RATE                 
+00111      ELSE                                                         
+00112         MOVE CP-LOAN-APR TO WS-WORK-DIS-RATE.                     
+00113                                                                   
+00114 *    IF RT-DISCOUNT-OPTION EQUAL '4'                              
+00115 *       MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+00116 *       GO TO 1075-BYPASS-REGULAR-RATE.                           
+00117                                                                   
+00118      IF RT-DISCOUNT-OPTION EQUAL '3' OR '4' OR '5'                
+00119         MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+00120         COMPUTE WS-WORK-DIS-RATE EQUAL                            
+00121                 WS-WORK-DIS-RATE / +100                           
+00122         GO TO 1075-BYPASS-REGULAR-RATE.                           
+00123                                                                   
+00124      IF (CP-COMPANY-ID EQUAL 'WDS') AND                           
+00125         (CP-STATE-STD-ABBRV EQUAL 'MN' OR 'NC') AND               
+00126         (CP-EARN-AS-NET-PAY OR CP-EARN-AS-REG-BALLOON)            
+00127         MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+00128         GO TO 1075-BYPASS-REGULAR-RATE.                           
+00129                                                                   
+00130      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           
+00131         (CP-STATE-STD-ABBRV EQUAL 'NJ') AND                       
+00132         (CP-TRUNCATED-LIFE)                                       
+00133         MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+00134         GO TO 1075-BYPASS-REGULAR-RATE.                           
+00135                                                                   
+00136      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           
+00137         (CP-STATE-STD-ABBRV EQUAL 'GA') AND                       
+00138         (CP-EARN-AS-NET-PAY)                                      
+00139 *       (CP-TRUNCATED-LIFE)                                       
+00140         MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+00141         GO TO 1075-BYPASS-REGULAR-RATE.                           
+00142                                                                   
+00143      IF ((CP-COMPANY-ID EQUAL 'GTL') AND                          
+00144         (CP-STATE-STD-ABBRV EQUAL 'RI'))                          
+00145                    AND                                            
+00146         ((CP-EARN-AS-NET-PAY)                                     
+00147                OR                                                 
+00148         (CP-SPECIAL-CALC-CD EQUAL 'H'))                           
+00149         MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+00150         GO TO 1075-BYPASS-REGULAR-RATE.                           
+00151                                                                   
+00152      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           
+00153         (CP-STATE-STD-ABBRV EQUAL 'MA') AND                       
+00154         (CP-EARN-AS-NET-PAY) AND                                  
+00155         (CP-SPECIAL-CALC-CD EQUAL 'H')                            
+00156         MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+00157         GO TO 1075-BYPASS-REGULAR-RATE.                           
+00158                                                                   
+030515     if (cp-company-id = 'CID')
+021519        and (cp-state-std-abbrv = 'WA' or 'AL')
+030515        and (rt-discount-option = '1')
+030515        and (cp-earn-as-farm-plan)
+030515        move rt-discount-ob-rate to cp-premium-rate
+030515        go to 1075-bypass-regular-rate
+030515     end-if
+
+           IF (CP-COMPANY-ID = 'CID')
+              AND (CP-STATE-STD-ABBRV = 'MN')
+              AND (RT-DISCOUNT-OPTION = '1')
+              AND ((CP-EARN-AS-NET-PAY OR CP-EARN-AS-REG-BALLOON)
+041310                     OR
+111212            (CP-LEVEL-LIFE OR CP-EARN-AS-FARM-PLAN)
+041310            AND (CP-CERT-EFF-DT > X'A4FF'))
+              MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE
+      *       display ' made it to MN 1 ' cp-premium-rate
+              GO TO 1075-BYPASS-REGULAR-RATE
+           END-IF
+
+           if (cp-company-id = 'CID')
+              and (cp-earn-as-reg-balloon)
+              and (cp-ben-category = 'P' or 'I')
+              and (rt-discount-ob-rate not = zeros)
+              go to 1075-bypass-regular-rate
+           end-if
+
+011707     IF (CP-COMPANY-ID EQUAL 'CID')
+022107        AND ((CP-STATE-STD-ABBRV = 'NH' OR 'NV' OR 'WA' OR 'AK')
+                            OR
+                  (CP-BENEFIT-CD = '49' OR '50' OR '53' OR '54'))
+011707        AND (CP-EARN-AS-NET-PAY)
+011707        MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+011707        GO TO 1075-BYPASS-REGULAR-RATE
+011707     END-IF
+
+00165      IF (CP-COMPANY-ID EQUAL 'NCB') AND                           
+00166         (CP-STATE-STD-ABBRV EQUAL 'NC') AND                       
+00167         (CP-EARN-AS-NET-PAY OR CP-TRUNCATED-LIFE)                 
+00168          MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE              
+00169          GO TO 1075-BYPASS-REGULAR-RATE.                          
+00170                                                                   
+032612     IF CP-COMPANY-ID = 'CID' or 'AHL'
+CIDMOD        CONTINUE
+CIDMOD     ELSE
+CIDMOD        IF (CP-STATE-STD-ABBRV EQUAL 'NC') AND                    
+CIDMOD           (CP-EARN-AS-NET-PAY ) AND                              
+CIDMOD           (DC-GREG-DATE-CYMD GREATER THAN 19931231)              
+CIDMOD            GO TO 1075-BYPASS-REGULAR-RATE                        
+CIDMOD        END-IF
+CIDMOD     END-IF
+                                                                        
+CIDMOD     IF (CP-COMPANY-ID = 'CID') AND
+CIDMOD        (CP-EARN-AS-NET-PAY) AND
+CIDMOD        (CP-LEVEL-LIFE) AND
+CIDMOD        (CP-STATE-STD-ABBRV = 'CA') AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE)
+CIDMOD        COMPUTE WS-WORK-DIS-RATE =
+CIDMOD             RT-DISCOUNT-RATE / +100
+CIDMOD        MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+CIDMOD        GO TO 1075-BYPASS-REGULAR-RATE
+CIDMOD     END-IF
+CIDMOD
+           IF (CP-COMPANY-ID = 'CID')
+              AND (CP-EARN-AS-NET-PAY)
+              AND (CP-STATE-STD-ABBRV = 'ME')
+              COMPUTE WS-WORK-DIS-RATE =
+                   RT-DISCOUNT-RATE / +100
+              MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+              GO TO 1075-BYPASS-REGULAR-RATE
+           END-IF
+
+060909     IF (CP-COMPANY-ID = 'CID')
+060909        AND (CP-STATE-STD-ABBRV = 'ND' OR 'MT' OR 'NJ'
+111212           OR 'IN' OR 'AZ')
+060909        AND (CP-FARM-PLAN)
+060909        MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+060909        GO TO 1075-BYPASS-REGULAR-RATE
+060909     END-IF
+
+020816     IF (CP-COMPANY-ID = 'DCC' OR 'VPP')
+061909        AND (CP-BEN-CATEGORY = 'D')
+061909        AND (CP-EARN-AS-NET-PAY)
+061909        MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+011410        COMPUTE CP-PREMIUM-RATE ROUNDED = CP-PREMIUM-RATE *
+011410           (1 + CP-DCC-PMF-COMM) / (1 - CP-DCC-ACT-COMM)
+      *       DISPLAY ' ACT COMM ' CP-DCC-ACT-COMM
+      *       DISPLAY ' PMF COMM ' CP-DCC-PMF-COMM
+      *       DISPLAY ' OB RATE  ' RT-DISCOUNT-OB-RATE
+      *       DISPLAY ' NEW RATE ' CP-PREMIUM-RATE
+061909        GO TO 1075-BYPASS-REGULAR-RATE
+061909     END-IF
+
+CIDMOD     IF (CP-COMPANY-ID = 'CID') AND
+CIDMOD        (CP-EARN-AS-NET-PAY) AND
+021207        ((CP-STATE-STD-ABBRV = 'MT' OR 'NJ' OR 'PA'
+                                  OR 'VT')
+                         OR
+              ((CP-STATE-STD-ABBRV = 'IN') AND
+              (CP-CERT-EFF-DT > X'9A7F'))
+032603                   OR
+032603        ((CP-STATE-STD-ABBRV = 'AZ' OR 'ND') AND
+032603        (CP-CERT-EFF-DT > X'9ADF'))) AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE)
+CIDMOD        COMPUTE WS-WORK-DIS-RATE =
+CIDMOD             RT-DISCOUNT-RATE / +100
+CIDMOD        MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+CIDMOD        GO TO 1075-BYPASS-REGULAR-RATE
+CIDMOD     END-IF
+CIDMOD
+120403     IF (CP-COMPANY-ID = 'CID') AND
+120403        (CP-EARN-AS-NET-PAY) AND
+120403        (CP-STATE-STD-ABBRV = 'TX') AND
+120403        (CP-STATE-STD-ABBRV = CP-STATE) AND
+120403        (WS-DISCOUNT-OPTION NOT = ' ')
+120403        COMPUTE WS-WORK-DIS-RATE =
+120403             RT-DISCOUNT-RATE / +100
+120403        MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+120403        GO TO 1075-BYPASS-REGULAR-RATE
+120403     END-IF
+120403
+CIDMOD     IF (CP-COMPANY-ID = 'CID') AND
+CIDMOD        (CP-EARN-AS-NET-PAY) AND
+CIDMOD        (CP-TRUNCATED-LIFE) AND
+CIDMOD        (CP-STATE-STD-ABBRV = 'CA' OR 'VA') AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE) AND
+CIDMOD        (WS-DISCOUNT-OPTION NOT = ' ')
+CIDMOD        COMPUTE WS-WORK-DIS-RATE =
+CIDMOD             RT-DISCOUNT-RATE / +100
+CIDMOD        MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+CIDMOD        GO TO 1075-BYPASS-REGULAR-RATE
+CIDMOD     END-IF
+CIDMOD
+00176      IF CP-SPECIAL-CALC-CD EQUAL 'H'                              
+00177         IF WS-WORK-DIS-RATE NOT EQUAL +0                          
+00178            COMPUTE WS-WORK-DIS-RATE EQUAL                         
+00179                    WS-WORK-DIS-RATE / +100.                       
+00180                                                                   
+00181      IF CP-SPECIAL-CALC-CD EQUAL 'H'                              
+00182         IF CP-STATE-STD-ABBRV EQUAL 'NY'                          
+00183            IF CP-MONTHLY-PAYMENT EQUAL +0                         
+00184             IF CP-LOAN-APR GREATER THAN +2                        
+00185               COMPUTE CP-MONTHLY-PAYMENT EQUAL                    
+00186               CP-ORIGINAL-BENEFIT /                               
+00187                ((1 - (1 + (CP-LOAN-APR / +1200)) **               
+00188                (WS-RATE-TERM * -1)) / (CP-LOAN-APR / +1200))      
+00189             ELSE                                                  
+00190              COMPUTE CP-MONTHLY-PAYMENT EQUAL                     
+00191                CP-ORIGINAL-BENEFIT / CP-ORIGINAL-TERM.            
+00192                                                                   
+00193      IF CP-SPECIAL-CALC-CD EQUAL 'H'                              
+00194         IF CP-STATE-STD-ABBRV EQUAL 'NY'                          
+00195           IF WS-WORK-DIS-RATE GREATER THAN +0                     
+00196            COMPUTE WK1 ROUNDED EQUAL                              
+00197            (1 - 1 / (1 + WS-WORK-DIS-RATE / +12) **               
+00198                               (WS-RATE-TERM - +1)) /              
+00199                         (WS-WORK-DIS-RATE / +12)                  
+00200            COMPUTE WK2 ROUNDED EQUAL                              
+00201            (1 - 1 / (1 + WS-WORK-DIS-RATE / +12) **               
+00202                               (WS-RATE-TERM)) /                   
+00203                         (WS-WORK-DIS-RATE / +12)                  
+00204            COMPUTE WK3 EQUAL                                      
+00205                 RT-DISCOUNT-OB-RATE *                             
+00206                 (1 + WS-WORK-DIS-RATE / +12)                      
+00207                 MOVE WK3 TO CP-PREMIUM-RATE                       
+00208                 COMPUTE WK5 EQUAL WK3 / +1000                     
+00209            GO TO 1075-BYPASS-REGULAR-RATE.                        
+00210 *               (RT-DISCOUNT-OB-RATE / +1000) *                   
+00211 *               (1 + WS-WORK-DIS-RATE / +12)                      
+00212 *          GO TO 1075-BYPASS-REGULAR-RATE.                        
+00213                                                                   
+00214      IF CP-SPECIAL-CALC-CD EQUAL 'H'                              
+00215         IF RT-DISCOUNT-OB-RATE GREATER THAN +0                    
+00216            COMPUTE WK3 EQUAL                                      
+00217            RT-DISCOUNT-OB-RATE *                                  
+00218            (24 / (24 + WS-WORK-DIS-RATE * WS-RATE-TERM))          
+00219            MOVE WK3 TO CP-PREMIUM-RATE                            
+00220            COMPUTE WK5 EQUAL WK3 / +1000                          
+00221            GO TO 1075-BYPASS-REGULAR-RATE.                        
+00222                                                                   
+00223      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           
+00224         (CP-STATE-STD-ABBRV EQUAL 'VT' OR 'MA')                           
+00225         MOVE RT-DISCOUNT-OB-RATE TO CP-PREMIUM-RATE               
+00226         GO TO 1075-BYPASS-REGULAR-RATE.                           
+00227                                                                   
+00228      COMPUTE WS-SIN-PREM-RATE =                                   
+00229              (RT-DISCOUNT-OB-RATE / +1000) *                      
+00230              ((WS-RATE-TERM + +1) / +2).                          
+00231                                                                   
+00232      COMPUTE CP-PREMIUM-RATE =                                    
+00233              WS-SIN-PREM-RATE /                                   
+00234              (+1 + (((WS-WORK-DIS-RATE / +100) *                  
+00235              WS-RATE-TERM) / +24)).                               
+00236                                                                   
+00237      IF CP-PREMIUM-RATE NOT = +0                                  
+00238         MULTIPLY +100 BY CP-PREMIUM-RATE                          
+00239         MOVE CP-PREMIUM-RATE TO WS-PREMIUM-RATE                   
+00240         GO TO 1075-BYPASS-REGULAR-RATE.                           
+00241                                                                   
+00242  1050-REGULAR-RATES.                                              
+00243                                                                   
+00244      IF CP-SPECIAL-CALC-CD EQUAL 'H'                              
+00245         COMPUTE WK5 EQUAL                                         
+00246         ((WS-RATE-TERM * RT-L-RATE (+12)) / +100) /               
+00247         (6 * (WS-RATE-TERM + 1))                                  
+00248         MOVE WK5 TO CP-PREMIUM-RATE                               
+00249         GO TO 1075-BYPASS-REGULAR-RATE.                           
+00250                                                                   
+00251      IF (CP-COMPANY-ID EQUAL 'CSL') AND                           
+00252         (CP-CSL-VALID-NP-BENEFIT-CD)                              
+00253         IF CP-JOINT-INDICATOR EQUAL 'J'                           
+00254            MOVE RT-L-RATE (3) TO CP-PREMIUM-RATE                  
+00255            GO TO 1075-BYPASS-REGULAR-RATE                         
+00256         ELSE                                                      
+00257            MOVE RT-L-RATE (1) TO CP-PREMIUM-RATE                  
+00258            GO TO 1075-BYPASS-REGULAR-RATE.                        
+00259                                                                   
+00260      IF (CP-COMPANY-ID EQUAL 'GTL')     AND                       
+00261         (CP-STATE-STD-ABBRV EQUAL 'IA') AND                       
+00262         (CP-EARN-AS-NET-PAY )                                     
+00263         MOVE RT-L-RATE (12)      TO CP-PREMIUM-RATE               
+00264         MOVE CP-CERT-EFF-DT      TO DC-BIN-DATE-1                 
+00265         MOVE CP-FIRST-PAY-DATE   TO DC-BIN-DATE-2                 
+00266         MOVE '1'                 TO DC-OPTION-CODE                
+00267         PERFORM 9100-CONVERT-DATE THRU 9100-EXIT                  
+00268         IF DATE-CONVERSION-ERROR                                  
+00269             MOVE '2'                TO CP-RETURN-CODE             
+00270             GO TO 9999-CALC-RATE-PREM-X                           
+00271         ELSE                                                      
+00272             COMPUTE CP-ODD-DAYS-TO-PMT = DC-ELAPSED-MONTHS * 30 + 
+00273                                          DC-ODD-DAYS-OVER         
+00274             GO TO 1075-BYPASS-REGULAR-RATE.                       
+00275                                                                   
+00276      IF RT-COMPOSITE-RATE NOT NUMERIC                             
+00277          MOVE ZEROS                        TO RT-COMPOSITE-RATE.  
+00278                                                                   
+00279 *    IF CP-ORIGINAL-TERM GREATER ZERO AND LESS 361                
+00280      IF WS-RATE-TERM GREATER ZERO AND LESS 361                    
+00281          MOVE RT-L-RATE (WS-RATE-TERM)     TO CP-PREMIUM-RATE     
+00282                                               WS-PREMIUM-RATE     
+00283          MOVE RT-COMPOSITE-RATE            TO CP-COMPOSITE-RATE   
+00284      ELSE                                                         
+00285          MOVE +0                           TO CP-PREMIUM-RATE     
+00286                                               CP-COMPOSITE-RATE   
+00287                                               CP-CALC-PREMIUM     
+00288          GO TO 9999-CALC-RATE-PREM-X.                             
+
+011707     IF (CP-COMPANY-ID EQUAL 'CID')
+011707        AND (CP-STATE-STD-ABBRV EQUAL 'SC')
+              AND (CP-BENEFIT-CD = '2I' OR '2J' OR '2K' OR '2L')
+011707        AND (CP-EARN-AS-NET-PAY)
+011707        GO TO 1075-BYPASS-REGULAR-RATE
+011707     END-IF
+
+00290 ******************************************************            
+CIDMOD*    IF CP-COMPANY-ID NOT = 'LBL'                                 
+CIDMOD     IF (CP-COMPANY-ID NOT = 'LBL' AND 'CID')
+                         or
+              ((cp-company-id = 'CID')
+              and (cp-earn-as-reg-balloon)
+              and (cp-ben-category = 'P' or 'I'))
+00292          GO TO 1075-BYPASS-REGULAR-RATE.                          
+00293                                                                   
+00294      MOVE CP-CERT-EFF-DT         TO DC-BIN-DATE-1.                
+00295      MOVE CP-FIRST-PAY-DATE      TO DC-BIN-DATE-2.                
+00296      MOVE '1'                    TO DC-OPTION-CODE.               
+00297      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                    
+00298      IF DATE-CONVERSION-ERROR                                     
+00299          MOVE '2'                TO CP-RETURN-CODE                
+00300          GO TO 9999-CALC-RATE-PREM-X                              
+00301        ELSE                                                       
+00302          MOVE DC-ELAPSED-MONTHS  TO CP-MNTHS-TO-FIRST-PMT         
+00303          MOVE DC-ODD-DAYS-OVER   TO CP-ODD-DAYS-TO-PMT.           
+00304                                                                   
+00305      IF CP-MNTHS-TO-FIRST-PMT GREATER THAN 1                      
+00306         COMPUTE CP-ODD-DAYS-TO-PMT EQUAL CP-ODD-DAYS-TO-PMT +     
+00307         ((CP-MNTHS-TO-FIRST-PMT - 1) * +30).                      
+00308                                                                   
+00309      IF (CP-EXT-CHG-LF OR CP-EXT-CHG-LF-AH)                       
+00310         IF (CP-ODD-DAYS-TO-PMT NOT = ZEROS)                       
+00311            NEXT SENTENCE                                          
+00312          ELSE                                                     
+00313            GO TO 1075-BYPASS-REGULAR-RATE                         
+00314        ELSE                                                       
+00315         IF (CP-MNTHS-TO-FIRST-PMT = ZERO) AND                     
+00316            (CP-ODD-DAYS-TO-PMT NOT = ZEROS)                       
+00317            NEXT SENTENCE                                          
+00318          ELSE                                                     
+00319            GO TO 1075-BYPASS-REGULAR-RATE.                        
+00320                                                                   
+00321      IF CP-MNTHS-TO-FIRST-PMT GREATER ZERO                        
+00322         COMPUTE CP-PREMIUM-RATE =                                 
+00323         ((CP-PREMIUM-RATE / CP-ORIGINAL-TERM                      
+00324          * (CP-ORIGINAL-TERM + 1)) - CP-PREMIUM-RATE)             
+00325          * (CP-ODD-DAYS-TO-PMT * 12 / 365) + CP-PREMIUM-RATE.     
+00326                                                                   
+00327      IF CP-MNTHS-TO-FIRST-PMT = ZEROS                             
+00328         COMPUTE CP-PREMIUM-RATE =                                 
+00329         (CP-PREMIUM-RATE - (CP-PREMIUM-RATE /                     
+00330         CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM - 1))) *             
+00331         (CP-ODD-DAYS-TO-PMT * 12 / 365) +                         
+00332         (CP-PREMIUM-RATE / CP-ORIGINAL-TERM                       
+00333          * (CP-ORIGINAL-TERM - 1)).                               
+00334 ******************************************************            
+00335                                                                   
+00336  1075-BYPASS-REGULAR-RATE.                                        
+00337                                                                   
+00338      MOVE CP-LOAN-TERM              TO WS-RATE-TERM.              
+00339                                                                   
+00340      MOVE +1 TO LINDX.                                            
+00341                                                                   
+00342      IF CP-COMPANY-ID EQUAL 'CRI'                                 
+00343         IF CP-SIG-SWITCH EQUAL 'S' OR 'J'                         
+00344            MOVE +5               TO LINDX                         
+00345            IF RT-L-EX-AGE (LINDX) EQUAL ZERO                      
+00346               MOVE 'F'           TO CP-RETURN-CODE                
+00347               GO TO 1200-CALCULATE-PREMIUMS.                      
+00348                                                                   
+00349      IF RT-L-EX-AGE (LINDX) = ZERO                                
+00350           GO TO 1200-CALCULATE-PREMIUMS.                          
+00351                                                                   
+00352  1100-SEARCH-LIFE-LIMITS.                                         
+00353                                                                   
+00354      IF CP-COMPANY-ID EQUAL 'CRI'                                 
+00355         IF CP-SIG-SWITCH NOT EQUAL 'S' AND 'J'                    
+00356            IF LINDX GREATER THAN +4                               
+00357               MOVE 'A'           TO CP-RETURN-CODE                
+00358               GO TO 1200-CALCULATE-PREMIUMS.                      
+00359                                                                   
+00360      IF LINDX GREATER +8                                          
+00361          MOVE 'A'                TO CP-RETURN-CODE                
+00362          GO TO 1200-CALCULATE-PREMIUMS.                           
+00363                                                                   
+00364      IF CP-ISSUE-AGE GREATER RT-L-EX-AGE (LINDX)                  
+00365          IF RT-L-EX-AGE (LINDX) = ZEROS                           
+00366              ADD +1              TO LINDX                         
+00367              GO TO 1100-SEARCH-LIFE-LIMITS                        
+00368          ELSE                                                     
+00369              MOVE RT-L-EX-AGE (LINDX)                             
+00370                                  TO CP-R-MAX-AGE                  
+00371              MOVE RT-L-EX-TERM (LINDX)                            
+00372                                  TO CP-R-MAX-TERM                 
+00373              MOVE RT-L-EX-FACE (LINDX)                            
+00374                                  TO CP-R-MAX-TOT-BEN              
+00375              ADD +1              TO LINDX                         
+00376              GO TO 1100-SEARCH-LIFE-LIMITS                        
+00377      ELSE                                                         
+00378          MOVE RT-L-EX-AGE (LINDX)                                 
+00379                                  TO CP-R-MAX-AGE                  
+00380          MOVE RT-L-EX-TERM (LINDX)                                
+00381                                  TO CP-R-MAX-TERM                 
+00382          MOVE RT-L-EX-FACE (LINDX)                                
+00383                                  TO CP-R-MAX-TOT-BEN.             
+00384                                                                   
+00385      IF CP-ORIGINAL-TERM GREATER RT-L-EX-TERM (LINDX)             
+00386          MOVE '9'                TO CP-RETURN-CODE.               
+00387                                                                   
+00388      IF CP-ORIGINAL-BENEFIT GREATER RT-L-EX-FACE (LINDX)          
+00389          MOVE '8'                TO CP-RETURN-CODE.               
+00390                                                                   
+00391  1200-CALCULATE-PREMIUMS.                                         
+00392                                                                   
+00393      IF CP-COMPANY-ID = 'CSL'                                     
+00394         IF CP-CSL-VALID-NP-BENEFIT-CD                             
+00395            GO TO 1240-NET-PAY-CONT                                
+00396         ELSE                                                      
+00397            GO TO 1250-CSL-CALC.                                   
+00398                                                                   
+00399      IF CP-COMPANY-ID = 'WDS'                                     
+00400         IF CP-STATE-STD-ABBRV = 'MN' OR 'NC'                      
+00401            IF CP-EARN-AS-REG-BALLOON                              
+00402               GO TO 1240-NET-PAY-CONT.                            
+00403                                                                   
+           IF (CP-COMPANY-ID = 'CID')
+              AND (CP-STATE-STD-ABBRV = 'MN')
+111212        AND (CP-EARN-AS-REG-BALLOON OR CP-EARN-AS-FARM-PLAN)
+              AND (CP-CERT-EFF-DT > X'A4FF')
+      *       display ' made it to mn 2 '
+              GO TO 1240-NET-PAY-CONT
+           END-IF
+
+111212     IF (CP-COMPANY-ID = 'CID')
+021519        AND (CP-STATE-STD-ABBRV = 'WA' or 'AL')
+111212        AND (CP-FARM-PLAN)
+111212        GO TO 1240-NET-PAY-CONT
+111212     END-IF
+
+
+           if (cp-company-id = 'CID')
+              and (cp-earn-as-reg-balloon)
+              and (cp-ben-category = 'P' or 'I')
+              display ' found balloon p or i ' rt-discount-ob-rate
+              evaluate true
+                 when (cp-net-only-state = 'Y')
+                    and (rt-discount-ob-rate > zeros)
+                    compute cp-premium-rate = rt-discount-ob-rate / 10
+                 when (cp-net-only-state = 'Y')
+                    and (rt-discount-ob-rate = zeros)
+                    display ' not ob rate     ' cp-premium-rate
+                    compute cp-premium-rate =
+                       cp-premium-rate / cp-original-term * 12
+                    display ' new rate ' cp-premium-rate
+                    display ' net only state ' cp-premium-rate
+                    compute cp-premium-rate rounded =
+                      (cp-premium-rate *
+                         (cp-original-term + 1) / 12) /
+                      ((cp-original-term + 2) / 2)
+                    display ' new OB rate ' cp-premium-rate
+                 when (cp-net-only-state <> 'Y')
+                    and (rt-discount-ob-rate = zeros)
+                    display ' not net only st ' cp-premium-rate
+                    compute cp-premium-rate =
+                       cp-premium-rate / cp-original-term * 12
+                    display ' new rate ' cp-premium-rate
+              end-evaluate
+              go to 1240-net-pay-cont
+           end-if
+
+060909     IF (CP-COMPANY-ID = 'CID')
+060909        AND (CP-STATE-STD-ABBRV = 'ND' OR 'MT' OR 'NJ'
+060909           OR 'IN' OR 'AZ')
+060909        AND (CP-FARM-PLAN)
+060909***  OK, I DID THIS SO ERCNETP WOULDN'T ERROR OUT
+060909***  THE APR ISN'T EVEN USED IN THE ROUTINE, SO SUE ME :)
+060909        MOVE +1.0                TO CP-LOAN-APR
+060909        GO TO 1240-NET-PAY-CONT
+060909     END-IF
+
+00404      IF CP-RATE-AS-STANDARD                                       
+00405          GO TO 1210-REGULAR-RATE.                                 
+00406                                                                   
+00407      IF CP-CRITICAL-PERIOD                                        
+00408          GO TO 1220-CRITICAL-PERIOD-LF-CONT.                      
+00409                                                                   
+00410      IF CP-EARN-AS-TEXAS                                          
+00411          GO TO 1230-TEXAS-CONT.                                   
+00412                                                                   
+00413      IF CP-EARN-AS-NET-PAY                                        
+00414         IF CP-STATE-STD-ABBRV = 'MD'                              
+00415           IF CP-COMPANY-ID = 'MON'                                
+00416             IF CP-BENEFIT-CD = '11' OR '12' OR '13' OR            
+00417                                '14' OR '26' OR '47'               
+00418               GO TO 1210-REGULAR-RATE.                            
+00419                                                                   
+00420      IF CP-SPECIAL-CALC-CD EQUAL 'H'                              
+00421         IF CP-MONTHLY-PAYMENT EQUAL +0                            
+00422            COMPUTE CP-MONTHLY-PAYMENT EQUAL                       
+00423                 CP-ORIGINAL-BENEFIT / CP-ORIGINAL-TERM.           
+00424                                                                   
+00425      IF CP-COMPANY-ID EQUAL 'GTL'                                 
+00426         NEXT SENTENCE                                             
+00427      ELSE                                                         
+00428      IF CP-SPECIAL-CALC-CD EQUAL 'H'                              
+00429         IF CP-STATE-STD-ABBRV NOT EQUAL 'NY'                      
+00430            COMPUTE WK3 ROUNDED EQUAL                              
+00431            CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM - +1) *           
+00432            CP-MONTHLY-PAYMENT                                     
+00433            COMPUTE WK3 ROUNDED EQUAL WK3 / 2                      
+00434            COMPUTE WK3 ROUNDED EQUAL WK3 + (CP-ORIGINAL-TERM *    
+00435            CP-ALTERNATE-BENEFIT)                                  
+00436            COMPUTE CP-CALC-PREMIUM ROUNDED EQUAL                  
+00437            WK3 * WK5                                              
+00438            GO TO 9999-CALC-RATE-PREM-X                            
+00439         ELSE                                                      
+00440            COMPUTE WK3 ROUNDED EQUAL (CP-MONTHLY-PAYMENT *        
+00441            (CP-ORIGINAL-TERM - 1 - WK1)) /                        
+00442            (WS-WORK-DIS-RATE / +12)                               
+00443            COMPUTE WK3 EQUAL WK3 + (CP-ALTERNATE-BENEFIT * WK2)   
+00444            COMPUTE CP-CALC-PREMIUM ROUNDED EQUAL WK3 *            
+00445                                WK5                                
+00446            GO TO 9999-CALC-RATE-PREM-X.                           
+00447                                                                   
+00448      IF CP-COMPANY-ID EQUAL 'GTL' AND                             
+00449         CP-STATE-STD-ABBRV EQUAL 'RI' AND                         
+00450         CP-SPECIAL-CALC-CD EQUAL 'H' AND                          
+00451         CP-ORIGINAL-TERM LESS THAN +61                            
+00452         COMPUTE CP-CALC-PREMIUM EQUAL                             
+00453                         (CP-ORIGINAL-BENEFIT *                    
+00454            (CP-ORIGINAL-TERM + 1) * CP-PREMIUM-RATE) /            
+00455            (20 * (1 + .0019 * CP-ORIGINAL-TERM) * 100)            
+00456         COMPUTE CP-CALC-PREMIUM EQUAL                             
+00457                 CP-CALC-PREMIUM +                                 
+00458               (CP-ALTERNATE-BENEFIT * CP-PREMIUM-RATE *           
+00459         (CP-ORIGINAL-TERM + 1)) /                                 
+00460         (10 * (1 + .0027 * (CP-ORIGINAL-TERM + 1)) * 100)         
+00461         GO TO 9999-CALC-RATE-PREM-X.                              
+00462                                                                   
+00463      IF CP-COMPANY-ID = 'GTL'     AND                             
+00464         CP-STATE-STD-ABBRV = 'PA' AND                             
+00465         CP-SPECIAL-CALC-CD = 'H'                                  
+00466          GO TO 1260-GTL-PA-LEASE.                                 
+00467                                                                   
+00468      IF (CP-EARN-AS-NET-PAY)
+050713*       AND (CP-LOAN-APR > ZEROS)
+00469         GO TO 1240-NET-PAY-CONT
+           END-IF
+00470                                                                   
+00471      IF CP-LIFE-OVERRIDE-CODE NOT = 'L'                           
+00472          GO TO 1210-REGULAR-RATE.                                 
+00473                                                                   
+00474 **** CHECK TO SEE IF THE LEVEL PORTION OF A BALLOON IS BEING      
+00475 **** RATED AND BYPASS NET-PAY CHECK IF NO APR HAS BEEN ENTERED.   
+00476 ****                                                              
+00477      IF CP-DEVIATION-CODE = 'LEV' AND                             
+00478         CP-LOAN-APR = ZEROS                                       
+00479          GO TO 1210-REGULAR-RATE.                                 
+00480                                                                   
+00481      IF (CP-STATE-STD-ABBRV = 'OH')
+CIDMOD        AND (CP-CLASS-CODE NOT = 'L ')
+00482         AND (CP-ORIGINAL-TERM > 60)
+00483         AND (DC-GREG-DATE-CYMD > 19831031)
+102808        AND (CP-LOAN-APR > ZEROS)
+00484         GO TO 1240-NET-PAY-CONT
+           END-IF
+00485                                                                   
+00486      IF (CP-STATE-STD-ABBRV = 'UT')
+00487         AND (CP-ORIGINAL-TERM > 62)
+00488         AND (DC-GREG-DATE-CYMD > 19810831)
+00489         AND (DC-GREG-DATE-CYMD < 19830901)
+102808        AND (CP-LOAN-APR > ZEROS)
+00490         GO TO 1240-NET-PAY-CONT
+           END-IF
+00491                                                                   
+00492      IF (CP-STATE-STD-ABBRV = 'RI')
+00493         AND (CP-ORIGINAL-TERM > 60)
+00494         AND (DC-GREG-DATE-CYMD > 19831231)
+102808        AND (CP-LOAN-APR > ZEROS)
+00495         GO TO 1240-NET-PAY-CONT
+           END-IF
+
+           .
+00497  1210-REGULAR-RATE.                                               
+00498                                                                   
+           IF (CP-COMPANY-ID = 'CID')
+              AND (CP-EARN-AS-NET-PAY)
+              AND (CP-LOAN-APR = 0)
+              IF RT-L-RATE (WS-RATE-TERM) = 0
+00228            COMPUTE WS-SIN-PREM-RATE =
+00229               (RT-DISCOUNT-OB-RATE / +1000) *
+00230               ((WS-RATE-TERM + +1) / +2)
+00232            COMPUTE CP-PREMIUM-RATE =
+00233               WS-SIN-PREM-RATE /
+00234               (+1 + (((WS-WORK-DIS-RATE / +100) *
+00235               WS-RATE-TERM) / +24))
+              ELSE
+                 MOVE RT-L-RATE (WS-RATE-TERM) TO CP-PREMIUM-RATE
+              END-IF
+           END-IF                                                    
+
+00499 *    IF CP-SPECIAL-CALC-CD EQUAL 'H'                              
+00500 *       IF CP-MONTHLY-PAYMENT EQUAL +0                            
+00501 *          COMPUTE CP-MONTHLY-PAYMENT EQUAL                       
+00502 *               CP-ORIGINAL-BENEFIT / CP-ORIGINAL-TERM.           
+00503 *                                                                 
+00504 *    IF CP-SPECIAL-CALC-CD EQUAL 'H'                              
+00505 *       IF CP-STATE-STD-ABBRV NOT EQUAL 'NY'                      
+00506 *          COMPUTE WK3 ROUNDED EQUAL                              
+00507 *          CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM - +1) *           
+00508 *          CP-MONTHLY-PAYMENT                                     
+00509 *          COMPUTE WK3 ROUNDED EQUAL WK3 / 2                      
+00510 *          COMPUTE WK3 ROUNDED EQUAL WK3 + (CP-ORIGINAL-TERM *    
+00511 *          CP-ALTERNATE-BENEFIT)                                  
+00512 *          COMPUTE CP-CALC-PREMIUM ROUNDED EQUAL                  
+00513 *          WK3 * WK5                                              
+00514 *          GO TO 9999-CALC-RATE-PREM-X                            
+00515 *       ELSE                                                      
+00516 *          COMPUTE WK3 ROUNDED EQUAL (CP-MONTHLY-PAYMENT *        
+00517 *          (CP-ORIGINAL-TERM - 1 - WK1)) /                        
+00518 *          (WS-WORK-DIS-RATE / +12)                               
+00519 *          COMPUTE WK3 EQUAL WK3 + (CP-ALTERNATE-BENEFIT * WK2)   
+00520 *          COMPUTE CP-CALC-PREMIUM ROUNDED EQUAL WK3 *            
+00521 *                              WK5                                
+00522 *          GO TO 9999-CALC-RATE-PREM-X.                           
+00523                                                                   
+00524      IF CP-TERM-IS-DAYS                                           
+00525          COMPUTE CP-PREMIUM-RATE ROUNDED =                        
+00526              ((CP-PREMIUM-RATE / CP-ORIGINAL-TERM) * 12) / +365   
+00527          COMPUTE CP-CALC-PREMIUM ROUNDED =                        
+00528              ((CP-ORIGINAL-BENEFIT / 100) * CP-PREMIUM-RATE)      
+00529                           * CP-TERM-OR-EXT-DAYS                   
+00530            GO TO 9999-CALC-RATE-PREM-X.                           
+00531                                                                   
+032612     if (cp-company-id = 'AHL')
+032612        and (cp-loan-term > cp-original-term)
+032612        continue
+032612     else
+00532         IF NOT CP-TRUNCATED-LIFE                                     
+00533            GO TO 1212-GROSS-NOT-TRUNCATED
+032612        end-if
+032612     end-if
+00534                                                                   
+00535 ****  GROSS TRUNCATED CALCULATION                                 
+00536                                                                   
+00537      IF CP-LOAN-TERM NOT GREATER THAN CP-ORIGINAL-TERM            
+00538          MOVE 'H'                TO  CP-RETURN-CODE               
+00539          GO TO 9999-CALC-RATE-PREM-X.                             
+
+032612     if cp-company-id = 'AHL'
+032612        if (cp-state = 'AZ' OR 'GA' OR 'IN' OR 'MT' OR 'NH'
+032612           OR 'NJ' OR 'OH' OR 'PA' OR 'TX' OR 'VA')
+032612           compute cp-calc-premium rounded = (1 - (cp-loan-term -
+032612           cp-original-term) * (cp-loan-term - cp-original-term
+032612            + 1) / cp-loan-term / (cp-loan-term + 1)) *
+032612            cp-premium-rate / 100 * cp-original-term /
+032612            cp-loan-term * cp-original-benefit
+032612        else
+032612           compute cp-calc-premium rounded = (1 - (cp-loan-term -
+032612           cp-original-term) * (cp-loan-term - cp-original-term
+032612            + 1) / cp-loan-term / (cp-loan-term + 1)) *
+032612            cp-premium-rate * cp-original-benefit / 100
+032612        end-if
+032612        go to 9999-calc-rate-prem-x
+032612     end-if
+032612
+
+00541      IF CP-COMPANY-ID = 'NCL'                                     
+00542          COMPUTE WK-MONTHLY-RATE =                                
+00543                ((((CP-LOAN-TERM * (CP-LOAN-TERM + 1) -            
+00544                   (CP-LOAN-TERM - CP-ORIGINAL-TERM) *             
+00545                   (CP-LOAN-TERM - CP-ORIGINAL-TERM + 1))          
+00546                                  /                                
+00547                   (CP-LOAN-TERM * (CP-LOAN-TERM + 1))))           
+00548                                  *                                
+00549                   ((RT-L-RATE (12) * CP-LOAN-TERM / 12)))         
+00550          COMPUTE CP-CALC-PREMIUM =                                
+00551                  WK-MONTHLY-RATE * CP-ORIGINAL-BENEFIT / 100      
+00553      ELSE                                                         
+00554          COMPUTE CP-R-MAX-TERM = CP-LOAN-TERM -                   
+00555                                  CP-ORIGINAL-TERM                 
+00556          COMPUTE CP-CALC-PREMIUM = CP-ORIGINAL-BENEFIT *          
+00557                      ((RT-L-RATE (CP-LOAN-TERM)  -                
+00558                      (1 - (CP-ORIGINAL-TERM / CP-LOAN-TERM)) *    
+00559                      RT-L-RATE (CP-R-MAX-TERM)) / 100)            
+           END-IF
+
+00573      IF CP-EXT-CHG-LF OR CP-EXT-CHG-LF-AH
+00574         COMPUTE CP-CALC-PREMIUM ROUNDED = CP-CALC-PREMIUM +      
+00575            (((CP-ORIGINAL-BENEFIT / 100) * ((CP-PREMIUM-RATE /   
+00576            CP-ORIGINAL-TERM) / 30)) * CP-TERM-OR-EXT-DAYS)
+           END-IF
+
+           GO TO 9999-CALC-RATE-PREM-X
+
+           .
+00562  1212-GROSS-NOT-TRUNCATED.                                        
+      *    DISPLAY ' ELCRATPD '
+      *    DISPLAY ' MADE IT TO 1212-GROSS-NOT '
+      *    display ' premium rate ' cp-premium-rate
+00563                                                                   
+042208     IF (CP-COMPANY-ID = 'CID')
+              AND (CP-STATE-STD-ABBRV = 'VT' OR 'MA'
+040610           OR 'IN')
+              AND (CP-BENEFIT-CD = '55' OR '56')
+              COMPUTE CP-CALC-PREMIUM ROUNDED = 
+                (CP-ORIGINAL-BENEFIT / (CP-ORIGINAL-TERM)) *
+                (CP-ORIGINAL-TERM) *
+                ((CP-ORIGINAL-TERM) / 12) *
+                ((6.5 * RT-DISCOUNT-OB-RATE) / 1000)
+                GO TO 9999-CALC-RATE-PREM-X
+           END-IF
+              
+           IF (CP-COMPANY-ID = 'CID')
+              AND (CP-STATE-STD-ABBRV = 'GA')
+              AND (CP-BENEFIT-CD = '55' OR '56' OR '2M' OR '2N')
+              COMPUTE WK3 ROUNDED = 
+                CP-ORIGINAL-BENEFIT *
+                ((CP-ORIGINAL-TERM + 1) / 2) *
+                (RT-DISCOUNT-OB-RATE / 1000)
+                MOVE WK3 TO CP-CALC-PREMIUM
+                GO TO 9999-CALC-RATE-PREM-X
+           END-IF
+
+041310     IF (CP-COMPANY-ID EQUAL 'CID')
+041310        AND (CP-STATE-STD-ABBRV = 'MN')
+041310        AND (CP-LEVEL-LIFE)
+041310        AND (CP-CERT-EFF-DT > X'A4FF')
+      *       display ' made it to mn level '
+041310        MOVE CP-CERT-EFF-DT      TO DC-BIN-DATE-1
+041310        MOVE CP-EXPIRE-DT        TO DC-BIN-DATE-2
+041310        MOVE '1'                 TO DC-OPTION-CODE
+041310        PERFORM 9100-CONVERT-DATE
+041310                                 THRU 9100-EXIT
+041310        IF DATE-CONVERSION-ERROR
+041310           MOVE '2'              TO CP-RETURN-CODE
+041310           MOVE ZEROS            TO FACTOR
+041310                                 CP-CALC-PREMIUM
+041310           GO TO 9999-CALC-RATE-PREM-X
+041310        END-IF
+112410        MOVE DC-ELAPSED-DAYS     TO D
+112410        COMPUTE CP-MONTHLY-PAYMENT = CP-ORIGINAL-BENEFIT /
+112410           (1 / (1 + (CP-LOAN-APR / 100) * D / 360) -
+112410           (CP-PREMIUM-RATE * 12 / 365 * D / 1000))
+112410        COMPUTE CP-CALC-PREMIUM = CP-MONTHLY-PAYMENT *
+112410           CP-PREMIUM-RATE * 12 / 365 * D / 1000
+041310        GO TO 9999-CALC-RATE-PREM-X
+041310     END-IF
+
+120202     IF (CP-COMPANY-ID = 'CID')
+120202        AND (CP-BENEFIT-CD (1:1) = 'M' OR 'N' OR 'H')
+120202        COMPUTE CP-CALC-PREMIUM ROUNDED =
+120202           (CP-ORIGINAL-BENEFIT / 1000) * CP-PREMIUM-RATE
+120202     ELSE
+00564         COMPUTE CP-CALC-PREMIUM ROUNDED =                            
+00565                  (CP-ORIGINAL-BENEFIT / 100) * CP-PREMIUM-RATE
+120202     END-IF
+      *    display ' calc premium ' cp-calc-premium
+00566                                                                   
+CIDMOD*    IF CP-COMPANY-ID = 'LBL'                                     
+CIDMOD     IF (CP-COMPANY-ID = 'LBL' OR 'CID')
+102808        AND (NOT CP-EARN-AS-NET-PAY)
+00568         GO TO 9999-CALC-RATE-PREM-X
+           END-IF
+00569                                                                   
+      *    display ' fell through to ext days '
+00570      IF CP-TERM-OR-EXT-DAYS = ZEROS                               
+00571          GO TO 9999-CALC-RATE-PREM-X.                             
+00572                                                                   
+00573      IF CP-EXT-CHG-LF OR CP-EXT-CHG-LF-AH                         
+00574          COMPUTE CP-CALC-PREMIUM ROUNDED = CP-CALC-PREMIUM +      
+00575             (((CP-ORIGINAL-BENEFIT / 100) * ((CP-PREMIUM-RATE /   
+00576                CP-ORIGINAL-TERM) / 30)) * CP-TERM-OR-EXT-DAYS).   
+00577                                                                   
+00578      GO TO 9999-CALC-RATE-PREM-X.                                 
+00579                                                                   
+00580  1220-CRITICAL-PERIOD-LF-CONT.                                    
+00581      COMPUTE CP-CALC-PREMIUM ROUNDED =                            
+00582                (CP-ORIGINAL-BENEFIT / +100) * CP-PREMIUM-RATE.    
+00583                                                                   
+00584      GO TO 9999-CALC-RATE-PREM-X.                                 
+00585                                                                   
+00586  1230-TEXAS-CONT.                                                 
+00587      IF CP-FARM-PLAN                                              
+00588          GO TO 1235-TEXAS-FARM-CONT.                              
+00589                                                                   
+00590      COMPUTE CP-CALC-PREMIUM ROUNDED =                            
+00591                (CP-ORIGINAL-BENEFIT / 100) * CP-PREMIUM-RATE.     
+00592                                                                   
+00593      COMPUTE TEX-FACT-9 =                                         
+00594                  (CP-ORIGINAL-TERM + CP-PAY-FREQUENCY) /          
+00595                  (CP-ORIGINAL-TERM + 1).                          
+00596                                                                   
+00597      COMPUTE CP-CALC-PREMIUM ROUNDED =                            
+00598                  CP-CALC-PREMIUM * TEX-FACT-9.                    
+00599                                                                   
+00600      GO TO 9999-CALC-RATE-PREM-X.                                 
+00601                                                                   
+00602  1235-TEXAS-FARM-CONT.                                            
+00603      COMPUTE WS-FARM-TERM =                                       
+00604                (CP-ORIGINAL-TERM + CP-PAY-FREQUENCY).             
+00605                                                                   
+00606      COMPUTE WS-PREMIUM-RATE = RT-L-RATE (WS-FARM-TERM) / 2.      
+00607      MOVE WS-PREMIUM-RATE         TO CP-PREMIUM-RATE.             
+00608                                                                   
+00609                                                                   
+00610      COMPUTE CP-CALC-PREMIUM ROUNDED =                            
+00611               (CP-ORIGINAL-BENEFIT / 100) * CP-PREMIUM-RATE.      
+00612                                                                   
+00613      GO TO 9999-CALC-RATE-PREM-X.                                 
+00614                                                                   
+00615  1240-NET-PAY-CONT.                                               
+00616                                                                   
+00617      MOVE CP-LOAN-APR             TO N-P-APR.                     
+00618      MOVE CP-ORIGINAL-TERM        TO N-P-ORIG                     
+00619                                      N-P-REM                      
+00620                                      N-P-LOAN.                    
+00621                                                                   
+00622      MOVE CP-SPECIAL-CALC-CD      TO N-P-OPT.                     
+00623                                                                   
+00624      IF CP-TRUNCATED-LIFE                                         
+00625          MOVE CP-LOAN-TERM        TO N-P-LOAN.                    
+00626                                                                   
+00627      IF CP-COMPANY-ID EQUAL 'NCL'                                 
+00628         NEXT SENTENCE                                             
+00629      ELSE                                                         
+00630         GO TO 1241-NET-PAY-CONT.                                  
+00631                                                                   
+00632      MOVE CP-CERT-EFF-DT         TO DC-BIN-DATE-1                 
+00633      MOVE CP-FIRST-PAY-DATE      TO DC-BIN-DATE-2                 
+00634      MOVE '1'                    TO DC-OPTION-CODE                
+00635      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                    
+00636      IF DATE-CONVERSION-ERROR                                     
+00637          MOVE '2'                TO CP-RETURN-CODE                
+00638          GO TO 9999-CALC-RATE-PREM-X                              
+00639      ELSE                                                         
+00640         MOVE DC-ELAPSED-MONTHS   TO CP-MNTHS-TO-FIRST-PMT         
+00641         MOVE DC-ODD-DAYS-OVER    TO CP-ODD-DAYS-TO-PMT.           
+00642                                                                   
+00643      IF (CP-EXT-CHG-LF OR CP-EXT-CHG-LF-AH) AND                   
+00644         (CP-ODD-DAYS-TO-PMT NOT EQUAL ZEROS)                      
+00645         NEXT SENTENCE                                             
+00646      ELSE                                                         
+00647         MOVE +1                  TO ODF                           
+00648         GO TO 1241-NET-PAY-CONT.                                  
+00649                                                                   
+00650      IF CP-MNTHS-TO-FIRST-PMT GREATER THAN ZERO                   
+00651         COMPUTE CP-PREMIUM-RATE EQUAL                             
+00652         ((CP-PREMIUM-RATE / N-P-LOAN * (N-P-LOAN + 1)) -          
+00653         CP-PREMIUM-RATE) *                                        
+00654         (CP-ODD-DAYS-TO-PMT * 12 / 365) + CP-PREMIUM-RATE.        
+00655                                                                   
+00656      IF CP-MNTHS-TO-FIRST-PMT EQUAL ZEROS                         
+00657         COMPUTE CP-PREMIUM-RATE EQUAL                             
+00658         (CP-PREMIUM-RATE - (CP-PREMIUM-RATE /                     
+00659         N-P-LOAN * (N-P-LOAN - 1))) *                             
+00660         (CP-ODD-DAYS-TO-PMT * 12 / 365) +                         
+00661         (CP-PREMIUM-RATE / N-P-LOAN * (N-P-LOAN - 1)).            
+00662                                                                   
+00663      COMPUTE ODF EQUAL                                            
+00664      ((1 + (N-P-APR / +1200)) ** (1 - CP-MNTHS-TO-FIRST-PMT)) /   
+00665      ((1 + (CP-ODD-DAYS-TO-PMT * 12 / 36500))).                   
+00666                                                                   
+00667  1241-NET-PAY-CONT.                                               
+00668                                                                   
+00669      PERFORM 10000-NET-TERM THRU 99999-EXIT.                      
+00670                                                                   
+CIDMOD*    IF CP-RETURN-CODE EQUAL '0' OR '8'                           
+PEMMOD     IF CP-RETURN-CODE EQUAL '0' OR '8' OR '9' OR 'B'             
+00672         NEXT SENTENCE                                             
+00673      ELSE                                                         
+00674         GO TO 9999-CALC-RATE-PREM-X.                              
+00675                                                                   
+00676      IF RT-DISCOUNT-OPTION EQUAL '6'                              
+00677          GO TO 9999-CALC-RATE-PREM-X.                             
+00678                                                                   
+00679      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           
+00680         (CP-STATE-STD-ABBRV EQUAL 'IA')                           
+00681         GO TO 9999-CALC-RATE-PREM-X.                              
+00682                                                                   
+00683      MOVE N-P-FACTOR              TO CP-CDT-FACTOR.               
+00684                                                                   
+00685      IF RT-DISCOUNT-OPTION EQUAL '3' OR '4' OR '5'                
+00686         GO TO 9999-CALC-RATE-PREM-X.                              
+00687                                                                   
+00688      IF (CP-COMPANY-ID EQUAL 'MON') AND                           
+00689         (CP-STATE-STD-ABBRV EQUAL 'MD') AND                       
+00690         (CP-TRUNCATED-LIFE)                                       
+00691         GO TO 9999-CALC-RATE-PREM-X.                              
+00692                                                                   
+00693      IF (CP-COMPANY-ID EQUAL 'CSL') AND                           
+00694         (CP-CSL-VALID-NP-BENEFIT-CD)                              
+00695         GO TO 9999-CALC-RATE-PREM-X.                              
+00696                                                                   
+00697      IF (CP-COMPANY-ID EQUAL 'TMS') AND                           
+00698         (CP-STATE-STD-ABBRV EQUAL 'MN' OR 'CA' OR 'WA') AND       
+00699         (CP-EARN-AS-NET-PAY)                                      
+00700         GO TO 9999-CALC-RATE-PREM-X.                              
+00701                                                                   
+CIDMOD*    IF (CP-COMPANY-ID EQUAL 'CID') AND                           
+CIDMOD*       (CP-STATE-STD-ABBRV EQUAL 'NV') AND                       
+CIDMOD*       (CP-EARN-AS-NET-PAY OR CP-TRUNCATED-LIFE)                 
+CIDMOD*       GO TO 9999-CALC-RATE-PREM-X.                              
+00706                                                                   
+00707      IF (CP-COMPANY-ID EQUAL 'NCB') AND                           
+00708         (CP-STATE-STD-ABBRV EQUAL 'NC') AND                       
+00709         (CP-EARN-AS-NET-PAY)                                      
+00710         GO TO 9999-CALC-RATE-PREM-X.                              
+00711                                                                   
+00712      IF (CP-COMPANY-ID EQUAL 'WDS') AND                           
+00713         (CP-STATE-STD-ABBRV EQUAL 'MN' OR 'NC') AND               
+00714         (CP-EARN-AS-NET-PAY OR CP-EARN-AS-REG-BALLOON)            
+00715         GO TO 9999-CALC-RATE-PREM-X.                              
+00716                                                                   
+00717      IF (CP-COMPANY-ID EQUAL 'NCL') AND                           
+00718         (CP-EARN-AS-NET-PAY)                                      
+00719         GO TO 9999-CALC-RATE-PREM-X.                              
+00720                                                                   
+00721      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           
+00722         (CP-STATE-STD-ABBRV EQUAL 'NJ') AND                       
+00723         (CP-TRUNCATED-LIFE)                                       
+00724         GO TO 9999-CALC-RATE-PREM-X.                              
+00725                                                                   
+00726      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           
+00727         (CP-STATE-STD-ABBRV EQUAL 'GA') AND                       
+00728         (CP-EARN-AS-NET-PAY)                                      
+00729 *       (CP-TRUNCATED-LIFE)                                       
+00730         GO TO 9999-CALC-RATE-PREM-X.                              
+00731                                                                   
+00732      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           
+00733         (CP-STATE-STD-ABBRV EQUAL 'RI')                           
+00734                    AND                                            
+00735         ((CP-EARN-AS-NET-PAY)                                     
+00736                OR                                                 
+00737         (CP-SPECIAL-CALC-CD EQUAL 'H'))                           
+00738         GO TO 9999-CALC-RATE-PREM-X.                              
+00739                                                                   
+00740      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           
+00741         (CP-STATE-STD-ABBRV EQUAL 'MA') AND                       
+00742         (CP-EARN-AS-NET-PAY) AND                                  
+00743         (CP-SPECIAL-CALC-CD EQUAL 'H')                            
+00744         GO TO 9999-CALC-RATE-PREM-X.                              
+00745                                                                   
+00746      IF (CP-COMPANY-ID EQUAL 'GTL') AND                           
+00747         (CP-STATE-STD-ABBRV EQUAL 'OR') AND                       
+00748         (CP-EARN-AS-NET-PAY)                                      
+00749         GO TO 9999-CALC-RATE-PREM-X.                              
+00750                                                                   
+032612     IF CP-COMPANY-ID = 'CID' or 'AHL'
+CIDMOD        CONTINUE
+CIDMOD     ELSE
+CIDMOD        IF (CP-STATE-STD-ABBRV EQUAL 'NC') AND                    
+CIDMOD           (CP-EARN-AS-NET-PAY) AND                               
+CIDMOD           (DC-GREG-DATE-CYMD GREATER THAN 19931231)              
+CIDMOD           GO TO 9999-CALC-RATE-PREM-X                            
+CIDMOD        END-IF
+CIDMOD     END-IF
+00755                                                                   
+           IF (CP-COMPANY-ID = 'CID')
+              AND (CP-EARN-AS-NET-PAY)
+              AND (CP-STATE-STD-ABBRV = 'ME')
+              GO TO 9999-CALC-RATE-PREM-X                               
+           END-IF
+
+020816     IF (CP-COMPANY-ID = 'DCC' OR 'VPP')
+061909        AND (CP-BEN-CATEGORY = 'D')
+061909        AND (CP-EARN-AS-NET-PAY)
+060909        GO TO 9999-CALC-RATE-PREM-X                               
+061909     END-IF
+
+060909     IF (CP-COMPANY-ID = 'CID')
+060909        AND (CP-STATE-STD-ABBRV = 'ND' OR 'MT' OR 'NJ'
+111212           OR 'IN' OR 'AZ')
+060909        AND (CP-FARM-PLAN)
+060909        GO TO 9999-CALC-RATE-PREM-X                               
+060909     END-IF
+
+CIDMOD     IF (CP-COMPANY-ID = 'CID') AND
+CIDMOD        (CP-EARN-AS-NET-PAY) AND
+CIDMOD        (CP-LEVEL-LIFE) AND
+CIDMOD        (CP-STATE-STD-ABBRV = 'CA' OR 'MN') AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE)
+CIDMOD        GO TO 9999-CALC-RATE-PREM-X                               
+CIDMOD     END-IF
+CIDMOD
+CIDMOD     IF (CP-COMPANY-ID = 'CID') AND
+CIDMOD        (CP-EARN-AS-NET-PAY) AND
+021207        ((CP-STATE-STD-ABBRV = 'MT' OR 'NJ' OR 'PA'
+                                  OR 'VT')
+                         OR
+              ((CP-STATE-STD-ABBRV = 'IN') AND
+              (CP-CERT-EFF-DT > X'9A7F'))
+032603                   OR
+032603        ((CP-STATE-STD-ABBRV = 'AZ' OR 'ND') AND
+032603        (CP-CERT-EFF-DT > X'9ADF'))) AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE)
+CIDMOD        GO TO 9999-CALC-RATE-PREM-X                               
+CIDMOD     END-IF
+CIDMOD
+120403     IF (CP-COMPANY-ID = 'CID') AND
+120403        (CP-EARN-AS-NET-PAY) AND
+120403        (CP-STATE-STD-ABBRV = 'TX') AND
+120403        (CP-STATE-STD-ABBRV = CP-STATE) AND
+120403        (WS-DISCOUNT-OPTION NOT = ' ')
+120403        GO TO 9999-CALC-RATE-PREM-X                               
+120403     END-IF
+120403
+030515     if (cp-company-id = 'CID')
+021519        and (cp-state-std-abbrv = 'WA' or 'AL')
+030515        and (rt-discount-option = '1')
+030515        and (cp-earn-as-farm-plan)
+030515        go to 9999-calc-rate-prem-x
+030515     end-if
+
+           if (cp-company-id = 'CID')
+              and (cp-earn-as-reg-balloon)
+              and (cp-ben-category = 'P' or 'I')
+              GO TO 9999-CALC-RATE-PREM-X
+           end-if
+
+           IF (CP-COMPANY-ID = 'CID')
+              AND (CP-STATE-STD-ABBRV = 'MN')
+              AND (RT-DISCOUNT-OPTION = '1')
+              AND (CP-EARN-AS-NET-PAY OR CP-EARN-AS-REG-BALLOON OR
+111212           CP-EARN-AS-FARM-PLAN)
+      *       display ' made it to mn 4 '
+              GO TO 9999-CALC-RATE-PREM-X
+           END-IF
+
+011707     IF (CP-COMPANY-ID = 'CID')
+011707        AND (CP-EARN-AS-NET-PAY)
+011707        AND ((CP-STATE-STD-ABBRV = 'NH' OR 'NV' OR 'WA' OR 'AK')
+                            OR
+                  (CP-BENEFIT-CD = '49' OR '50' OR '53' OR '54'))
+011707        GO TO 9999-CALC-RATE-PREM-X
+           END-IF
+
+011707     IF (CP-COMPANY-ID = 'CID')
+011707        AND (CP-EARN-AS-NET-PAY)
+011707        AND (CP-STATE-STD-ABBRV = 'SC')
+011707        AND (CP-BENEFIT-CD = '2I' OR '2J' OR '2K' OR '2L')
+011707        GO TO 9999-CALC-RATE-PREM-X                               
+           END-IF
+
+CIDMOD     IF (CP-COMPANY-ID = 'CID') AND
+CIDMOD        (CP-EARN-AS-NET-PAY) AND
+CIDMOD        (CP-TRUNCATED-LIFE) AND
+CIDMOD        (CP-STATE-STD-ABBRV = 'CA' OR 'VA') AND
+CIDMOD        (CP-STATE-STD-ABBRV = CP-STATE) AND
+CIDMOD        (WS-DISCOUNT-OPTION NOT = ' ')
+CIDMOD        GO TO 9999-CALC-RATE-PREM-X                               
+CIDMOD     END-IF
+CIDMOD
+020816     IF (CP-COMPANY-ID EQUAL 'DCC' OR 'VPP') AND                           
+120202        (CP-EARN-AS-NET-PAY)                                      
+120202        MOVE WS-PREMIUM-RATE  TO CP-PREMIUM-RATE
+120202        GO TO 9999-CALC-RATE-PREM-X                               
+120202     END-IF                                                       
+120202
+120202     IF (CP-COMPANY-ID EQUAL 'CID')
+120202        AND (CP-EARN-AS-NET-PAY)
+120202        AND (CP-BENEFIT-CD (1:1) = 'M' OR 'N' OR 'H')
+120202        GO TO 9999-CALC-RATE-PREM-X                               
+120202     END-IF                                                       
+120202
+00756      IF (RT-IS-OB) AND                                            
+00757         (CP-COMPANY-ID NOT EQUAL 'CID')                           
+00758         COMPUTE CP-PREMIUM-RATE ROUNDED =                         
+00759                (CP-PREMIUM-RATE * 12) / CP-LOAN-TERM              
+00760       ELSE                                                        
+020816         IF (CP-COMPANY-ID = 'DCC' OR 'VPP')
+120202            AND (CP-RATE-DEV-PCT NOT = ZEROS)
+120202            COMPUTE CP-CALC-PREMIUM ROUNDED =
+120202*           COMPUTE CP-PREMIUM-RATE ROUNDED =
+120202             (CP-PREMIUM-RATE * CP-RATE-DEV-PCT * 12) / 
+120202               CP-ORIGINAL-TERM
+120202             MOVE CP-CALC-PREMIUM TO CP-PREMIUM-RATE
+120202             MOVE ZEROS          TO CP-RATE-DEV-PCT
+120202        ELSE
+00761            COMPUTE CP-PREMIUM-RATE ROUNDED =                         
+00762                (CP-PREMIUM-RATE * 12) / CP-ORIGINAL-TERM
+120202        END-IF
+120202     END-IF
+00763                                                                   
+00764      IF CP-ROA-PREM-AT-REFUND                                     
+00765          COMPUTE NET-BEN ROUNDED =                                
+00766              (CP-REMAINING-BENEFIT - CP-ORIGINAL-PREMIUM) / 1000  
+00767      ELSE                                                         
+00768          COMPUTE NET-BEN ROUNDED =                                
+00769               (CP-ORIGINAL-BENEFIT - CP-ORIGINAL-PREMIUM) / 1000. 
+00770                                                                   
+00771      IF (CP-EXT-CHG-LF OR CP-EXT-CHG-LF-AH) AND                   
+00772         (CP-TERM-OR-EXT-DAYS NOT = ZERO)                          
+00773           COMPUTE NET-BEN ROUNDED =                               
+00774               NET-BEN * (1 + (CP-LOAN-APR / 1200) *               
+00775                          (CP-TERM-OR-EXT-DAYS / 30)).             
+00776                                                                   
+CIDMOD     IF CP-COMPANY-ID = 'CDC' OR 'GTL' OR 'CID' OR 'MON' OR 'HAN'
+120202*       OR 'DCC' 
+CIDMOD*    IF CP-COMPANY-ID = 'CDC' OR 'GTL' OR 'MON' OR 'HAN'          
+00778      COMPUTE CP-CALC-PREMIUM ROUNDED = NET-BEN * 1000 *           
+00779        (N-P-FACTOR * CP-PREMIUM-RATE * CP-ORIGINAL-TERM / 1200) / 
+00780        (1 - (N-P-FACTOR * CP-PREMIUM-RATE                         
+00781                         * CP-ORIGINAL-TERM / 1200))               
+00782      ELSE                                                         
+00783      COMPUTE CP-CALC-PREMIUM ROUNDED = NET-BEN * 1000 *           
+00784        (N-P-FACTOR * CP-PREMIUM-RATE * WS-RATE-TERM / 1200) /     
+00785        (1 - (N-P-FACTOR * CP-PREMIUM-RATE * WS-RATE-TERM / 1200)).
+00786                                                                   
+00787 ****** THE BELOW VERSION OF THE NET PAY FORMULA IS USED WHEN NO   
+00788 ****** INTEREST IS CHARGED ON PREMIUM.                            
+00789                                                                   
+00790 *    IF CP-STATE-STD-ABBRV = 'MI'                                 
+00791 *         COMPUTE CP-CALC-PREMIUM ROUNDED = NET-BEN * 1000 *      
+00792 *          (N-P-FACTOR * CP-PREMIUM-RATE * WS-RATE-TERM / 1200).  
+00793                                                                   
+00794      MOVE WS-PREMIUM-RATE  TO CP-PREMIUM-RATE.                    
+00795                                                                   
+00796      GO TO 9999-CALC-RATE-PREM-X.                                 
+00797                                                                   
+00798 ******                                                            
+00799 ****** BELOW ARE PREMIUM CALCULATIONS FOR CSL                     
+00800 ******                                                            
+00801                                                                   
+00802  1250-CSL-CALC.                                                   
+00803      MOVE CP-CERT-EFF-DT TO DC-BIN-DATE-1.                        
+00804      MOVE CP-FIRST-PAY-DATE TO DC-BIN-DATE-2.                     
+00805      MOVE '1' TO DC-OPTION-CODE.                                  
+00806      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                    
+00807                                                                   
+00808      IF DATE-CONVERSION-ERROR                                     
+00809          MOVE '2' TO CP-RETURN-CODE                               
+00810          GO TO 9999-CALC-RATE-PREM-X.                             
+00811                                                                   
+00812      IF CP-JOINT-INDICATOR = 'J'                                  
+00813          MOVE RT-L-RATE (3) TO WK-RED-RATE                        
+00814      ELSE                                                         
+00815          MOVE RT-L-RATE (1) TO WK-RED-RATE.                       
+00816                                                                   
+00817      MOVE WK-RED-RATE TO CP-PREMIUM-RATE.                         
+00818      MOVE CP-REMAINING-BENEFIT TO WK-PAY-AMT.                     
+00819                                                                   
+00820      IF CP-PAY-FREQUENCY = 12                                     
+00821          MOVE 01               TO WS-PAY-SCH.                     
+00822      IF CP-PAY-FREQUENCY = 04                                     
+00823          MOVE 03               TO WS-PAY-SCH.                     
+00824      IF CP-PAY-FREQUENCY = 02                                     
+00825          MOVE 06               TO WS-PAY-SCH.                     
+00826      IF CP-PAY-FREQUENCY = 01                                     
+00827          MOVE 12               TO WS-PAY-SCH.                     
+00828                                                                   
+00829      COMPUTE WS-NUM-PAYMTS = CP-ORIGINAL-TERM / WS-PAY-SCH.       
+00830      IF CP-PAY-FREQUENCY NOT = 12                                 
+00831          COMPUTE WK-PAY-AMT = CP-REMAINING-BENEFIT /              
+00832                                 WS-NUM-PAYMTS.                    
+00833                                                                   
+00834      IF CP-STATE = 'SC'  AND                                      
+00835        (CP-BENEFIT-CD = '07'  OR  '08')                           
+00836          GO TO 1250-CSL-CALC-LIFE-6.                              
+00837                                                                   
+00838      IF CP-CSL-METH-1                                             
+00839          GO TO 1250-CSL-CALC-LIFE-1.                              
+00840                                                                   
+00841      IF CP-CSL-METH-2                                             
+00842          IF (WK-PAY-AMT * CP-LOAN-TERM) GREATER THAN              
+00843                           WS-MAX-TOT-BEN                          
+00844              GO TO 1250-CSL-CALC-LIFE-2                           
+00845          ELSE                                                     
+00846              GO TO 1250-CSL-CALC-LIFE-1.                          
+00847                                                                   
+00848      IF CP-CSL-METH-3                                             
+00849          IF WK-PAY-AMT GREATER THAN WS-MAX-MON-BEN                
+00850              GO TO 1250-CSL-CALC-LIFE-2                           
+00851          ELSE                                                     
+00852              GO TO 1250-CSL-CALC-LIFE-3.                          
+00853                                                                   
+00854      IF CP-CSL-METH-4                                             
+00855          IF (WK-PAY-AMT * WS-NUM-PAYMTS) GREATER THAN             
+00856                           WS-MAX-TOT-BEN                          
+00857              GO TO 1250-CSL-CALC-LIFE-5                           
+00858          ELSE                                                     
+00859              GO TO 1250-CSL-CALC-LIFE-4.                          
+00860                                                                   
+00861  1250-CSL-CALC-LIFE-1.                                            
+00862      IF CP-JOINT-INDICATOR = 'J'                                  
+00863          MOVE RT-L-RATE (4) TO WK-LEV-RATE                        
+00864      ELSE                                                         
+00865          MOVE RT-L-RATE (2) TO WK-LEV-RATE.                       
+00866                                                                   
+00867      COMPUTE WK-D = (((DC-ELAPSED-DAYS * CP-PAY-FREQUENCY) /      
+00868                     365) - 1) * 365 / 12.                         
+00869      COMPUTE WK-S ROUNDED = ((144 * WK-D * WK-LEV-RATE) +         
+00870                     (365 * WS-NUM-PAYMTS * WK-RED-RATE)) /        
+00871                     4380.                                         
+00872      COMPUTE CP-CALC-PREMIUM ROUNDED = WK-PAY-AMT *               
+00873                     WS-NUM-PAYMTS * WK-S.                         
+00874                                                                   
+00875      GO TO 9999-CALC-RATE-PREM-X.                                 
+00876                                                                   
+00877  1250-CSL-CALC-LIFE-2.                                            
+00878      IF CP-JOINT-INDICATOR = 'J'                                  
+00879          MOVE RT-L-RATE (4) TO WK-LEV-RATE                        
+00880      ELSE                                                         
+00881          MOVE RT-L-RATE (2) TO WK-LEV-RATE.                       
+00882                                                                   
+00883      COMPUTE WK-K = WS-MAX-TOT-BEN / WK-PAY-AMT.                  
+00884      COMPUTE WK-S ROUNDED = (WK-K * WK-RED-RATE) / 12.            
+00885      COMPUTE WK-D = (((DC-ELAPSED-DAYS * CP-PAY-FREQUENCY / 365)  
+00886                     - 1) + WS-NUM-PAYMTS - WK-K) *                
+00887                     (WK-LEV-RATE * WS-MAX-TOT-BEN).               
+00888      COMPUTE CP-CALC-PREMIUM ROUNDED = (WK-PAY-AMT * WK-K *       
+00889                     WK-S) + WK-D.                                 
+00890                                                                   
+00891      GO TO 9999-CALC-RATE-PREM-X.                                 
+00892                                                                   
+00893  1250-CSL-CALC-LIFE-3.                                            
+00894      IF CP-JOINT-INDICATOR = 'J'                                  
+00895          MOVE RT-L-RATE (4) TO WK-LEV-RATE                        
+00896      ELSE                                                         
+00897          MOVE RT-L-RATE (2) TO WK-LEV-RATE.                       
+00898                                                                   
+00899      COMPUTE WK-K = WS-MAX-TOT-BEN / WK-PAY-AMT.                  
+00900      COMPUTE WK-S ROUNDED = (WK-K * WK-RED-RATE) / 12.            
+00901      COMPUTE WK-D = (((DC-ELAPSED-DAYS * CP-PAY-FREQUENCY / 365)  
+00902                     - 1) + WS-NUM-PAYMTS - WK-K) *                
+00903                     (WK-LEV-RATE * WS-MAX-TOT-BEN).               
+00904      COMPUTE CP-CALC-PREMIUM ROUNDED = (WK-PAY-AMT * WK-K *       
+00905                     WK-S) + WK-D.                                 
+00906                                                                   
+00907      GO TO 9999-CALC-RATE-PREM-X.                                 
+00908                                                                   
+00909  1250-CSL-CALC-LIFE-4.                                            
+00910      IF CP-JOINT-INDICATOR = 'J'                                  
+00911          MOVE RT-L-RATE (4) TO WK-LEV-RATE                        
+00912      ELSE                                                         
+00913          MOVE RT-L-RATE (2) TO WK-LEV-RATE.                       
+00914                                                                   
+00915      COMPUTE WK-D = DC-ELAPSED-DAYS * 12 / 365.                   
+00916      COMPUTE WK-S ROUNDED =                                       
+00917                     (((6 * (WS-NUM-PAYMTS - 1)) + (WK-D *         
+00918                     CP-PAY-FREQUENCY)) * WK-LEV-RATE) /           
+00919                     CP-PAY-FREQUENCY.                             
+00920      COMPUTE CP-CALC-PREMIUM ROUNDED =  WK-PAY-AMT *              
+00921                     WS-NUM-PAYMTS * WK-S.                         
+00922                                                                   
+00923      GO TO 9999-CALC-RATE-PREM-X.                                 
+00924                                                                   
+00925  1250-CSL-CALC-LIFE-5.                                            
+00926      IF CP-JOINT-INDICATOR = 'J'                                  
+00927          MOVE RT-L-RATE (4) TO WK-LEV-RATE                        
+00928      ELSE                                                         
+00929          MOVE RT-L-RATE (2) TO WK-LEV-RATE.                       
+00930                                                                   
+00931      COMPUTE WK-K = WS-MAX-TOT-BEN / WK-PAY-AMT.                  
+00932      COMPUTE WK-S ROUNDED = (6 * (WK-K + 1) * WK-LEV-RATE) /      
+00933                     CP-PAY-FREQUENCY.                             
+00934      COMPUTE WK-U = ((((DC-ELAPSED-DAYS * CP-PAY-FREQUENCY / 365) 
+00935                     - 1) + WS-NUM-PAYMTS) * 12) /                 
+00936                     CP-PAY-FREQUENCY.                             
+00937      COMPUTE WK-L = WK-U - (12 * WK-K / CP-PAY-FREQUENCY).        
+00938      COMPUTE CP-CALC-PREMIUM ROUNDED = (WK-L * WK-LEV-RATE *      
+00939                     WS-MAX-TOT-BEN) + (WK-K * WK-PAY-AMT * WK-S). 
+00940                                                                   
+00941      GO TO 9999-CALC-RATE-PREM-X.                                 
+00942                                                                   
+00943  1250-CSL-CALC-LIFE-6.                                            
+00944                                                                   
+00945      COMPUTE CP-PREMIUM-RATE ROUNDED =                            
+00946                 (CP-PREMIUM-RATE * CP-ORIGINAL-TERM) / 12.        
+00947                                                                   
+00948      COMPUTE CP-CALC-PREMIUM ROUNDED =                            
+00949                     CP-ORIGINAL-BENEFIT * CP-PREMIUM-RATE.        
+00950                                                                   
+00951      GO TO 9999-CALC-RATE-PREM-X.                                 
+00952                                                                   
+00953 ******                                                            
+00954 ****** END OF PREMIUM CALCULATIONS FOR CSL                        
+00955 ******                                                            
+00956                                                                   
+00957  1260-GTL-PA-LEASE.                                               
+00958                                                                   
+00959      IF CP-REDUCING-LIFE                                          
+00960          MOVE RT-L-RATE (CP-ORIGINAL-TERM)                        
+00961                                  TO  CP-PREMIUM-RATE              
+00962          COMPUTE CP-CALC-PREMIUM ROUNDED EQUAL                    
+00963                  CP-ORIGINAL-BENEFIT * CP-PREMIUM-RATE / +100     
+00964      ELSE                                                         
+00965          MOVE RT-L-RATE (CP-ORIGINAL-TERM)                        
+00966                                  TO  CP-PREMIUM-RATE              
+00967          COMPUTE CP-CALC-PREMIUM ROUNDED EQUAL                    
+00968                  CP-ORIGINAL-BENEFIT * CP-PREMIUM-RATE *          
+00969                  (+1 + CP-SALES-TAX) / +100.                      
+00970                                                                   
+00971      GO TO 9999-CALC-RATE-PREM-X.                                 
+00972                                                                   
+00973      EJECT                                                        
+00974 ******************************************************************
+00975  2000-TYPE-IS-AH.                                                 
+00976      MOVE RT-MAX-AGE                TO CP-R-MAX-ATT-AGE.          
+00977                                                                   
+00978      MOVE ZERO                      TO CP-R-MAX-AGE               
+00979                                        CP-R-MAX-TERM              
+00980                                        CP-R-MAX-MON-BEN           
+00981                                        CP-R-MAX-TOT-BEN.          
+00982                                                                   
+020816     IF RT-CANCEL-FEE NUMERIC                                     
+020816        MOVE RT-CANCEL-FEE          TO CP-CANCEL-FEE.
+00985                                                                   
+00986      IF RT-COMPOSITE-RATE NOT NUMERIC                             
+00987         MOVE ZEROS                          TO RT-COMPOSITE-RATE. 
+00988                                                                   
+
+00989      IF CP-ORIGINAL-TERM > ZERO AND < 361
+00990         MOVE RT-AH-RATE (CP-ORIGINAL-TERM)
+                                       TO CP-PREMIUM-RATE
+00991                                     WS-PREMIUM-RATE
+00992         MOVE RT-COMPOSITE-RATE   TO CP-COMPOSITE-RATE
+00993      ELSE
+00994          MOVE +0                 TO CP-PREMIUM-RATE
+00995                                     CP-CALC-PREMIUM
+00996          GO TO 9999-CALC-RATE-PREM-X
+           END-IF
+00997                                                                   
+020816     IF (CP-COMPANY-ID = 'DCC' OR 'VPP')
+022613        AND (CP-DDF-SPEC-CALC = 'T')
+022613        AND (CP-LOAN-TERM > ZERO AND < 361)
+022613        MOVE RT-AH-RATE (CP-LOAN-TERM)
+022613                                 TO CP-PREMIUM-RATE
+022613                                    WS-PREMIUM-RATE
+022613     END-IF
+
+022613*    IF (CP-COMPANY-ID = 'DCC')
+022613*       AND ((CP-BENEFIT-CD (1:1) = 'P')
+022613*       OR (CP-DDF-SPEC-CALC = 'T'))
+022613*       AND (CP-LOAN-TERM > ZERO AND < 361)
+022613*       MOVE RT-AH-RATE (CP-LOAN-TERM)
+022613*                                TO CP-PREMIUM-RATE
+022613*                                   WS-PREMIUM-RATE
+022613*    END-IF
+
+00998      MOVE +1 TO AHNDX.                                            
+00999                                                                   
+01000      IF CP-COMPANY-ID EQUAL 'CRI'                                 
+01001         IF CP-SIG-SWITCH EQUAL 'S' OR 'J'                         
+01002            MOVE +5               TO AHNDX                         
+01003            IF RT-AH-AGE (AHNDX) EQUAL ZERO                        
+01004               MOVE 'F'           TO CP-RETURN-CODE                
+01005               GO TO 2200-CALCULATE-PREMIUMS.                      
+01006                                                                   
+01007      IF RT-AH-AGE (AHNDX) = ZERO                                  
+01008           GO TO 2200-CALCULATE-PREMIUMS.                          
+01009                                                                   
+01010  2100-SEARCH-AH-LIMITS.                                           
+01011                                                                   
+01012      IF CP-COMPANY-ID EQUAL 'CRI'                                 
+01013         IF CP-SIG-SWITCH NOT EQUAL 'S' AND 'J'                    
+01014            IF AHNDX GREATER THAN +4                               
+01015               MOVE 'A'             TO CP-RETURN-CODE              
+01016               GO TO 2200-CALCULATE-PREMIUMS.                      
+01017                                                                   
+01018      IF AHNDX GREATER +8                                          
+01019          MOVE 'A'                TO CP-RETURN-CODE                
+01020          GO TO 2200-CALCULATE-PREMIUMS.                           
+01021                                                                   
+01022      IF CP-ISSUE-AGE GREATER RT-AH-AGE (AHNDX)                    
+01023          IF RT-AH-AGE (AHNDX) = ZEROS                             
+01024              ADD +1               TO AHNDX                        
+01025              GO TO 2100-SEARCH-AH-LIMITS                          
+01026          ELSE                                                     
+01027              MOVE RT-AH-AGE (AHNDX)                               
+01028                                  TO CP-R-MAX-AGE                  
+01029              MOVE RT-AH-TERM (AHNDX)                              
+01030                                  TO CP-R-MAX-TERM                 
+01031              MOVE RT-AH-BEN-M (AHNDX)                             
+01032                                  TO CP-R-MAX-MON-BEN              
+01033              ADD +1               TO AHNDX                        
+01034              GO TO 2100-SEARCH-AH-LIMITS                          
+01035      ELSE                                                         
+01036          MOVE RT-AH-AGE  (AHNDX) TO CP-R-MAX-AGE                  
+01037          MOVE RT-AH-TERM (AHNDX) TO CP-R-MAX-TERM                 
+01038          MOVE RT-AH-BEN-M (AHNDX)                                 
+01039                                  TO CP-R-MAX-MON-BEN.             
+01040                                                                   
+01041      IF CP-ORIGINAL-TERM GREATER RT-AH-TERM (AHNDX)               
+01042          MOVE '9'                 TO CP-RETURN-CODE.              
+01043                                                                   
+01044      IF CP-ORIGINAL-BENEFIT GREATER RT-AH-BEN-M (AHNDX)           
+01045          MOVE '8'                 TO CP-RETURN-CODE.              
+01046                                                                   
+01047      MULTIPLY CP-ORIGINAL-BENEFIT BY CP-ORIGINAL-TERM             
+01048          GIVING WS-AH-FACE-BENEFIT.                               
+01049                                                                   
+01050      IF WS-AH-FACE-BENEFIT GREATER RT-AH-BEN-F (AHNDX)            
+01051          MOVE 'C'                 TO CP-RETURN-CODE.              
+01052                                                                   
+01053  2200-CALCULATE-PREMIUMS.                                         
+01054                                                                   
+01055      IF CP-COMPANY-ID = 'CSL'                                     
+01056          GO TO 2250-CSL-CALC.                                     
+01057                                                                   
+120903*    IF CP-CRITICAL-PERIOD
+120903*       GO TO 2200-CRITICAL-PERIOD-AH-CONT.
+01060                                                                   
+120903     IF CP-CRITICAL-PERIOD
+020816        IF (CP-COMPANY-ID = 'DCC' OR 'VPP')
+120903           AND ((CP-BENEFIT-CD (1:1) = 'N' OR 'M' OR 'H'
+                     OR 'S' OR 'P')
+092205                          OR
+092205                (CP-BEN-CATEGORY = 'G' OR 'L'))
+120903           CONTINUE
+120903        ELSE
+120903           GO TO 2200-CRITICAL-PERIOD-AH-CONT
+120903        END-IF
+120903     END-IF
+01060                                                                   
+020816     IF (CP-COMPANY-ID = 'DCC' OR 'VPP')
+011410        AND (CP-BEN-CATEGORY = 'D')
+011410        COMPUTE CP-PREMIUM-RATE ROUNDED = CP-PREMIUM-RATE *
+011410           (1 + CP-DCC-PMF-COMM) / (1 - CP-DCC-ACT-COMM)
+011410     END-IF
+
+021519     IF (CP-COMPANY-ID = 'CID')
+021519        AND (CP-STATE-STD-ABBRV = 'AL')
+021519        and (cp-pmt-mode <> ' ')
+021519        continue
+021519     else
+021519        go to 2200-continue
+021519     end-if
+021519
+021519     evaluate true
+021519        when cp-pmt-mode = 'B' *> Bi-Weekly
+021519           move 26               to c-pmts-per-year
+021519           move 14               to c-days-in-pmt-per
+021519        when cp-pmt-mode = 'W' *> Weekly
+021519           move 52               to c-pmts-per-year
+021519           move 07               to c-days-in-pmt-per
+021519        when cp-pmt-mode = 'S' *> Semi-Monthly
+021519           move 24               to c-pmts-per-year
+021519           move 15               to c-days-in-pmt-per
+021519        when cp-pmt-mode = 'A' *> Annual
+021519           move 1                to c-pmts-per-year
+021519           move 360              to c-days-in-pmt-per
+021519        when cp-pmt-mode = 'T' *> Semi-Annual
+021519           move 2                to c-pmts-per-year
+021519           move 180              to c-days-in-pmt-per
+021519        when cp-pmt-mode = 'Q' *> Quarterly
+021519           move 4                to c-pmts-per-year
+021519           move 90               to c-days-in-pmt-per
+021519        when cp-pmt-mode = 'N' *> Bi-Monthly ??
+021519           move 6                to c-pmts-per-year
+021519           move 60               to c-days-in-pmt-per
+021519        when other             *> Assume Monthly
+021519           move 12               to c-pmts-per-year
+021519           move 30               to c-days-in-pmt-per
+021519     end-evaluate
+021519
+021519     compute c-tot-pmts =
+021519        cp-original-term / 12 * c-pmts-per-year
+021519
+021519     compute wk7 rounded =    *> tv3
+021519        (cp-original-benefit * +12) / c-pmts-per-year
+021519
+021519     compute wk6 rounded =
+021519        (wk7 * c-tot-pmts / 100) * cp-premium-rate
+021519
+021519     move wk6                    to cp-calc-premium
+021519
+021519     GO TO 9999-CALC-RATE-PREM-X
+021519
+021519     .
+021519 2200-continue.
+
+01061      IF CP-SPECIAL-CALC-CD EQUAL 'H'                              
+01062         COMPUTE WS-TERM-MINUS-ONE EQUAL CP-ORIGINAL-TERM - +1     
+01063         MOVE RT-AH-RATE (WS-TERM-MINUS-ONE) TO                    
+01064                                      CP-PREMIUM-RATE              
+01065         COMPUTE CP-CALC-PREMIUM ROUNDED EQUAL                     
+01066         (CP-ORIGINAL-BENEFIT * (CP-LOAN-TERM - +1) *              
+01067         CP-PREMIUM-RATE) / +100                                   
+01068      ELSE                                                         
+020816        IF (CP-COMPANY-ID = 'DCC' OR 'VPP')
+100703           AND (CP-BEN-CATEGORY NOT = 'G' AND 'L')
+011904           MOVE CP-PREMIUM-RATE  TO WK-S
+011904*          MOVE CP-PREMIUM-RATE  TO CP-CALC-PREMIUM
+011904           IF CP-RATE-DEV-PCT NOT = ZEROS
+120202              COMPUTE WK-S ROUNDED =
+120202                 (CP-PREMIUM-RATE * CP-RATE-DEV-PCT)
+011904           END-IF
+120202           IF CP-BENEFIT-CD (1:1) = 'M'
+120202              COMPUTE CP-CALC-PREMIUM ROUNDED = 
+120202              CP-ORIGINAL-BENEFIT * WK-S / 100
+120202           ELSE
+120202              IF CP-BENEFIT-CD (1:1) = 'H'
+120202                 COMPUTE CP-CALC-PREMIUM ROUNDED =                         
+120202                    (CP-ORIGINAL-BENEFIT * CP-LOAN-TERM *
+120202                    WK-S) / 1000
+011904              ELSE
+021005                 IF CP-BENEFIT-CD (1:1) = 'N' OR 'S'
+                          GO TO 2300-CALC-DCC-MOB-NET-AH
+120202                 ELSE
+011410                    IF CP-BEN-CATEGORY = 'D'
+011410                       COMPUTE CP-CALC-PREMIUM ROUNDED =
+011410                        CP-ORIGINAL-BENEFIT *
+011410                        CP-ORIGINAL-TERM * WK-S / 100
+011410                    ELSE
+                            IF CP-BENEFIT-CD (1:1) = 'P'
+                               GO TO 2300-CALC-DCC-BEN-P-AH
+                            ELSE
+120202                       COMPUTE CP-CALC-PREMIUM ROUNDED =
+120202                        (CP-ORIGINAL-BENEFIT * CP-LOAN-TERM *
+120202                        WK-S) / 100
+                            END-IF
+011410                    END-IF
+011904                 END-IF
+120202              END-IF
+120202           END-IF
+120202           MOVE ZEROS            TO CP-RATE-DEV-PCT
+120202        ELSE
+120202           IF CP-BENEFIT-CD (1:1) = 'M'
+120202              COMPUTE CP-CALC-PREMIUM ROUNDED =
+120202                 CP-ORIGINAL-BENEFIT * CP-PREMIUM-RATE / 100
+120202           ELSE   
+120202              IF CP-BENEFIT-CD (1:1) = 'N' OR 'H'
+120202                 COMPUTE CP-CALC-PREMIUM ROUNDED =                         
+120202                    (CP-NET-BENEFIT-AMT * 
+120202                    CP-PREMIUM-RATE) / 1000
+120202              ELSE
+                       IF CP-AH-BALLOON-SW = 'Y'
+                          COMPUTE CP-CALC-PREMIUM ROUNDED =
+                            (CP-ORIGINAL-BENEFIT * (CP-LOAN-TERM) *
+                            CP-PREMIUM-RATE) / 100
+                       ELSE
+120202                   COMPUTE CP-CALC-PREMIUM ROUNDED =                         
+020304                    (CP-ORIGINAL-BENEFIT * CP-ORIGINAL-TERM *             
+01071                     CP-PREMIUM-RATE) / 100
+                       END-IF
+120202              END-IF
+120202           END-IF
+120202        END-IF
+120202     END-IF                               
+01072                                                                   
+020816     IF (CP-COMPANY-ID = 'DCC' OR 'VPP')
+100703        AND (CP-BEN-CATEGORY = 'G' OR 'L')
+100703        COMPUTE CP-CALC-PREMIUM = CP-PREMIUM-RATE * +1000
+100703     END-IF
+
+01073      IF CP-TERM-OR-EXT-DAYS = ZEROS                               
+01074          GO TO 9999-CALC-RATE-PREM-X.                             
+01075                                                                   
+01076      IF CP-EXT-CHG-AH OR CP-EXT-CHG-LF-AH                         
+01077          COMPUTE CP-CALC-PREMIUM ROUNDED =                        
+01078              CP-CALC-PREMIUM +                                    
+01079                  (((CP-CALC-PREMIUM / CP-ORIGINAL-TERM) / 30)     
+01080                                        * CP-TERM-OR-EXT-DAYS).    
+01081                                                                   
+01082      GO TO 9999-CALC-RATE-PREM-X.                                 
+01083                                                                   
+01084  2200-CRITICAL-PERIOD-AH-CONT.                                    
+01085                                                                   
+01086      IF CP-COMPANY-ID = 'WDS'                                     
+01087          IF CP-ORIGINAL-TERM GREATER THAN 60                      
+01088              MOVE 60              TO CP-LOAN-TERM.                
+01089                                                                   
+01090      IF CP-COMPANY-ID EQUAL 'CVL'                                 
+01091          COMPUTE CP-CALC-PREMIUM ROUNDED =                        
+01092            ((CP-ORIGINAL-BENEFIT * CP-CRITICAL-MONTHS) / +100)    
+01093                                        * CP-PREMIUM-RATE          
+01094          GO TO 9999-CALC-RATE-PREM-X.                             
+01095                                                                   
+01096      COMPUTE CP-CALC-PREMIUM ROUNDED =                            
+020304           ((CP-ORIGINAL-BENEFIT * CP-ORIGINAL-TERM) / +100)
+01098                                        * CP-PREMIUM-RATE.         
+01099                                                                   
+01100      GO TO 9999-CALC-RATE-PREM-X.                                 
+01101                                                                   
+01102  2250-CSL-CALC.                                                   
+01103                                                                   
+01104      IF RT-DAILY-RATE NOT NUMERIC OR                              
+01105         RT-DAILY-RATE = ZEROS                                     
+01106             MOVE ZEROS TO CP-CALC-PREMIUM                         
+01107             MOVE '7' TO CP-RETURN-CODE                            
+01108             GO TO 9999-CALC-RATE-PREM-X.                          
+01109                                                                   
+01110      COMPUTE WK-DAILY-RATE = RT-DAILY-RATE / 100.                 
+01111      COMPUTE WK-MONTHLY-RATE =                                    
+01112           RT-AH-RATE (CP-ORIGINAL-TERM) / 100.                    
+01113                                                                   
+01114      MOVE CP-CERT-EFF-DT TO DC-BIN-DATE-1.                        
+01115      MOVE CP-FIRST-PAY-DATE TO DC-BIN-DATE-2.                     
+01116      MOVE '1' TO DC-OPTION-CODE.                                  
+01117      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                    
+01118      IF DATE-CONVERSION-ERROR                                     
+01119          MOVE '2' TO CP-RETURN-CODE                               
+01120          GO TO 9999-CALC-RATE-PREM-X.                             
+01121                                                                   
+01122      MOVE CP-REMAINING-BENEFIT TO WK-PAY-AMT.                     
+01123      IF CP-CSL-METH-1                                             
+01124          GO TO 2250-CSL-CALC-AH-1.                                
+01125      IF CP-CSL-METH-2                                             
+01126          GO TO 2250-CSL-CALC-AH-2.                                
+01127      IF CP-CSL-METH-3                                             
+01128          IF WK-PAY-AMT GREATER THAN WS-MAX-MON-BEN                
+01129              GO TO 2250-CSL-CALC-AH-4                             
+01130          ELSE                                                     
+01131              GO TO 2250-CSL-CALC-AH-3.                            
+01132                                                                   
+01133  2250-CSL-CALC-AH-1.                                              
+01134                                                                   
+01135      COMPUTE WK-D = DC-ELAPSED-DAYS * CP-PAY-FREQUENCY / 365.     
+01136      COMPUTE WK-D = (((WK-D - 1) * (365 / 12)) * WK-DAILY-RATE)   
+01137                     + WK-MONTHLY-RATE.                            
+01138      COMPUTE CP-CALC-PREMIUM ROUNDED = CP-MONTHLY-PAYMENT *       
+01139                     CP-ORIGINAL-TERM * WK-D.                      
+01140                                                                   
+01141      GO TO 9999-CALC-RATE-PREM-X.                                 
+01142                                                                   
+01143                                                                   
+01144  2250-CSL-CALC-AH-2.                                              
+01145      COMPUTE WK-D = DC-ELAPSED-DAYS * CP-PAY-FREQUENCY / 365.     
+01146      COMPUTE WK-D = (((WK-D - 1) * (365 / 12)) * WK-DAILY-RATE)   
+01147                     + WK-MONTHLY-RATE.                            
+01148      COMPUTE CP-CALC-PREMIUM ROUNDED = WS-MAX-MON-BEN *           
+01149                     CP-ORIGINAL-TERM * WK-D.                      
+01150                                                                   
+01151      GO TO 9999-CALC-RATE-PREM-X.                                 
+01152                                                                   
+01153  2250-CSL-CALC-AH-3.                                              
+01154                                                                   
+01155      COMPUTE WK-K = WS-MAX-TOT-BEN / WK-PAY-AMT.                  
+01156      COMPUTE WK-T = WK-K + 1.                                     
+01157      COMPUTE WK-MONTHLY-RATE-T =                                  
+01158           RT-AH-RATE (WK-T) / 100.                                
+01159      COMPUTE WK-C = (CP-ORIGINAL-TERM - (WK-T * 2) + 1).          
+01160                                                                   
+01161      COMPUTE WK-T1 = WK-K * (CP-ORIGINAL-TERM - WK-T).            
+01162      IF WK-T1 EQUAL ZEROS                                         
+01163          MOVE ZEROS TO CP-CALC-PREMIUM                            
+01164          MOVE 'G' TO CP-RETURN-CODE                               
+01165          GO TO 9999-CALC-RATE-PREM-X.                             
+01166                                                                   
+01167      COMPUTE WK-C = ((WK-C * WK-MONTHLY-RATE-T) + ((WK-T - 1) *   
+01168                     WK-MONTHLY-RATE)) / (WK-K * (CP-ORIGINAL-TERM 
+01169                     - WK-T)).                                     
+01170      COMPUTE WK-D = (DC-ELAPSED-DAYS * CP-PAY-FREQUENCY / 365)    
+01171      COMPUTE WK-PREM = ((CP-ORIGINAL-TERM -                       
+01172                        (WK-K + 1) + (WK-D - 1))) * (WK-C *        
+01173                        WS-MAX-TOT-BEN).                           
+01174      COMPUTE CP-CALC-PREMIUM ROUNDED = (WK-PAY-AMT * (WK-K + 1) * 
+01175                     WK-MONTHLY-RATE-T) + WK-PREM.                 
+01176                                                                   
+01177      GO TO 9999-CALC-RATE-PREM-X.                                 
+01178                                                                   
+01179  2250-CSL-CALC-AH-4.                                              
+01180      COMPUTE WK-K = WS-MAX-TOT-BEN / WK-PAY-AMT.                  
+01181      COMPUTE WK-J = WS-MAX-TOT-BEN / WS-MAX-MON-BEN.              
+01182      COMPUTE WK-MONTHLY-RATE-J =                                  
+01183           RT-AH-RATE (WK-J) / 100.                                
+01184      COMPUTE WK-T = WK-J + 1.                                     
+01185      COMPUTE WK-MONTHLY-RATE-T =                                  
+01186           RT-AH-RATE (WK-T) / 100.                                
+01187      COMPUTE WK-C = (CP-ORIGINAL-TERM - (WK-T * 2) + 1).          
+01188      COMPUTE WK-C = ((WK-C * WK-MONTHLY-RATE-T) + ((WK-T - 1) *   
+01189                     WK-MONTHLY-RATE)) / ((WK-T - 1) *             
+01190                     (CP-ORIGINAL-TERM - WK-T)).                   
+01191      COMPUTE WK-D = (DC-ELAPSED-DAYS * CP-PAY-FREQUENCY / 365)    
+01192      COMPUTE WK-PREM = (CP-ORIGINAL-TERM -                        
+01193                        (WK-J + 1) + (WK-D - 1)) * (WK-C *         
+01194                        WS-MAX-TOT-BEN).                           
+01195      COMPUTE CP-CALC-PREMIUM ROUNDED = WK-PREM + ((WK-J + 1) *    
+01196                    (WS-MAX-MON-BEN * WK-MONTHLY-RATE-T)).         
+01197                                                                   
+01198      GO TO 9999-CALC-RATE-PREM-X.                                 
+01199                                                                   
+
+       2300-CALC-DCC-BEN-P-AH.
+
+           IF CP-NO-OF-PMTS NOT NUMERIC
+              MOVE +0                  TO CP-NO-OF-PMTS
+           END-IF
+           IF CP-PMT-MODE NOT = 'W' AND 'S' AND 'B' AND 'T'
+              AND ' ' AND 'M'
+              MOVE ' '                 TO CP-PMT-MODE
+           END-IF
+
+022613******************************************************************
+022613***   Default is monthly, use loan term for rate and amort     ***
+022613******************************************************************
+022613     move cp-loan-term         to c-tot-pmts
+022613     MOVE +30                  TO C-DAYS-IN-PMT-PER
+022613     MOVE +12                  TO C-PMTS-PER-YEAR
+022613******************************************************************
+022613
+022613     evaluate true
+022613        when cp-pmt-mode = 'W'
+022613           MOVE +52              TO C-PMTS-PER-YEAR
+022613           compute c-tot-pmts = cp-loan-term /
+022613              12 * c-pmts-per-year
+022613           MOVE +7               TO C-DAYS-IN-PMT-PER
+022613        when cp-pmt-mode = 'B'
+022613           MOVE +26              TO C-PMTS-PER-YEAR
+022613           compute c-tot-pmts = cp-loan-term /
+022613              12 * c-pmts-per-year
+022613           MOVE +14              TO C-DAYS-IN-PMT-PER
+022613     end-evaluate
+
+           COMPUTE I = CP-LOAN-APR / C-PMTS-PER-YEAR / 100
+
+050713     if i = zeros
+050713        move .0000000001         to i
+050713     end-if
+
+           COMPUTE Y = (1 + (CP-DAYS-TO-1ST-PMT * I /
+              C-DAYS-IN-PMT-PER)) / (1 + I)
+
+           COMPUTE ANGLEN = (1 - ((1 + I) ** (C-TOT-PMTS * -1))) / I
+           COMPUTE ANGLEN-1 = ANGLEN / Y
+           COMPUTE WK3 = (CP-NET-BENEFIT-AMT - CP-ORIGINAL-PREMIUM)
+              / ANGLEN-1
+
+           if cp-net-benefit-amt = zeros
+              compute wk3 = cp-original-benefit - cp-original-premium
+           end-if
+           COMPUTE CP-CALC-PREMIUM = (WK3 / 100) * WK-S
+
+           GO TO 9999-CALC-RATE-PREM-X
+
+           .
+       2300-CALC-DCC-MOB-NET-AH.
+
+           IF CP-ALTERNATE-BENEFIT = ZEROS
+              CONTINUE
+           ELSE
+              GO TO 2300-CALC-DCC-MOB-BAL-AH
+           END-IF
+
+           MOVE CP-ORIGINAL-TERM       TO M
+           MOVE CP-LOAN-TERM           TO N
+           IF N = ZEROS
+              MOVE M                   TO N
+           END-IF
+           COMPUTE I = CP-LOAN-APR / +1200
+
+050713     if i = zeros
+050713        move .0000000001         to i
+050713     end-if
+           IF CP-BENEFIT-CD (1:1) = 'S'
+              COMPUTE OD = CP-DAYS-TO-1ST-PMT - 30
+              COMPUTE WK3 = CP-ORIGINAL-BENEFIT *
+              ((M * (M + 1) / 2) + (M * OD / 30)) *
+                (WK-S / 1000)
+                * 1
+              MOVE WK3                 TO CP-CALC-PREMIUM
+              GO TO 9999-CALC-RATE-PREM-X
+           END-IF
+
+           COMPUTE OD = (1 + ((CP-TERM-OR-EXT-DAYS + +30) * I / 30))
+              / (1 + I)
+011904     COMPUTE ANGLEN-M = ((1 - ((1 + I)
+                ** ((N - M) * -1))) / I)
+           COMPUTE ANGLEN-M = ANGLEN-M / OD
+011904     COMPUTE J = I + (WK-S / +1000)
+           COMPUTE WK2 = (1 + J) ** (M * -1)
+           COMPUTE ANGLEN-M = ANGLEN-M * WK2
+
+
+011904     COMPUTE ANGLEM = ((1 - ((1 + J)
+                ** (M * -1))) / J) / OD
+           IF CP-NET-BENEFIT-AMT = ZEROS
+              COMPUTE CP-NET-BENEFIT-AMT = CP-ORIGINAL-BENEFIT
+                 * ANGLEM
+           END-IF
+           COMPUTE RA = CP-NET-BENEFIT-AMT / (ANGLEM + ANGLEN-M)
+
+011904     COMPUTE ANGLEN-M = ((1 - ((1 + I)
+                ** ((N - M) * -1))) / I)
+
+           MOVE +0                     TO WK3
+011904     PERFORM VARYING WS-COUNTER FROM +1 BY +1 UNTIL
+011904        (WS-COUNTER > M)
+011904        COMPUTE ANGLEM = (1 - ((1 + J)
+                ** ((M - WS-COUNTER + 1) * -1))) / J
+	      COMPUTE WK2 = (1 / (1 + j)) ** (M - WS-COUNTER + 1)
+              COMPUTE WK5-CSL = RA * (ANGLEM + (ANGLEN-M * WK2))
+              COMPUTE WK3 = WK3 + (WK5-CSL * WK-S / +1000)
+           END-PERFORM
+
+011904     MOVE WK3                    TO CP-CALC-PREMIUM
+
+           GO TO 9999-CALC-RATE-PREM-X
+           .
+
+       2300-CALC-DCC-MOB-BAL-AH.
+
+           IF CP-BENEFIT-CD (1:1) = 'S'
+              GO TO 2300-CALC-DCC-MOB-BAL-AHSUM
+           END-IF
+           MOVE CP-ORIGINAL-TERM       TO M
+           MOVE CP-LOAN-TERM           TO N
+           IF N = ZEROS
+              MOVE M                   TO N
+           END-IF
+           COMPUTE I = CP-LOAN-APR / +1200
+050713     if i = zeros
+050713        move .0000000001         to i
+050713     end-if
+           COMPUTE OD = (1 + ((CP-TERM-OR-EXT-DAYS + +30) * I / 30))
+              / (1 + I)
+           COMPUTE ANGLEN-M = (WK5 / I) / OD
+011904     COMPUTE J = I + (WK-S / +1000)
+011904     COMPUTE K = I + (CP-DCC-LF-RATE / +1000)
+           MOVE I TO K
+           COMPUTE WK2 = (1 + J) ** (M * -1)
+           COMPUTE ANGLEN-M = ANGLEN-M * WK2
+
+011904     COMPUTE ANGLEM-1 = ((1 - ((1 + J)
+                ** ((M - 1) * -1))) / J)
+
+011904     COMPUTE ANGLEM = ((1 - ((1 + J)
+                ** (M * -1))) / J) / OD
+
+           IF CP-NET-BENEFIT-AMT = ZEROS
+              COMPUTE CP-NET-BENEFIT-AMT = CP-ORIGINAL-BENEFIT
+                 * ANGLEM
+           END-IF
+           COMPUTE RA = (CP-NET-BENEFIT-AMT * OD -
+              (CP-ALTERNATE-BENEFIT * (1 + K) ** (M * -1)))
+              / ANGLEM-1
+
+011904     COMPUTE ANGLEN-M = ((1 - ((1 + I)
+                ** ((N - M) * -1))) / I)
+
+           MOVE +0                     TO WK3
+011904     PERFORM VARYING WS-COUNTER FROM +1 BY +1 UNTIL
+011904        (WS-COUNTER > M)
+011904        COMPUTE ANGLEM = (1 - ((1 + J)
+                ** ((M - WS-COUNTER) * -1))) / J
+	      COMPUTE WK2 = (1 / (1 + K)) ** (M - WS-COUNTER + 1)
+              COMPUTE WK5-CSL = (RA * ANGLEM)
+              + (CP-ALTERNATE-BENEFIT * WK2)
+              COMPUTE WK3 = WK3 + (WK5-CSL - (CP-ALTERNATE-BENEFIT *
+                (1 / (1 + K) ** (M - WS-COUNTER + 1)))) * 
+                (WK-S / 1000)
+           END-PERFORM
+
+011904     MOVE WK3                    TO CP-CALC-PREMIUM
+           GO TO 9999-CALC-RATE-PREM-X
+           .
+       2300-CALC-DCC-MOB-BAL-AHSUM.
+       
+           MOVE CP-ORIGINAL-TERM       TO M
+
+           COMPUTE WK3 = CP-ORIGINAL-BENEFIT * ((M - 1) * M / 2
+              + (M - 1) * (CP-DAYS-TO-1ST-PMT - 30) / 30)
+              * WK-S / 1000
+
+      *    COMPUTE WK3 = CP-ORIGINAL-BENEFIT * ((M - 1) * M / 2
+      *       + (M - 1) * ((CP-TERM-OR-EXT-DAYS + 30) - 30) / 30)
+      *       * WK-S / 1000
+
+
+
+011904     MOVE WK3                    TO CP-CALC-PREMIUM
+
+           
+           GO TO 9999-CALC-RATE-PREM-X
+           .
+01200  9999-RATE-NOTFND.                                                
+01201      MOVE '6'                    TO CP-RETURN-CODE.               
+01202      GO TO 9999-CALC-RATE-PREM-X.                                 
+01203                                                                   
+01204  9999-RATE-NOTOPEN.                                               
+01205      MOVE 'D'                    TO CP-RETURN-CODE.               
+01206      GO TO 9999-CALC-RATE-PREM-X.                                 
+01207                                                                   
+01208  9999-CALC-RATE-PREM-X.                                           
+020816     IF (CP-COMPANY-ID = 'DCC' OR 'VPP')
+              AND (CP-BENEFIT-CD (1:1) = 'N' OR 'S' OR 'P')
+              CONTINUE
+           ELSE
+01209         IF CP-RATE-DEV-PCT NOT = ZERO                                
+01210            COMPUTE CP-CALC-PREMIUM =                                
+01211               CP-CALC-PREMIUM * CP-RATE-DEV-PCT.               
+01212                                                                   

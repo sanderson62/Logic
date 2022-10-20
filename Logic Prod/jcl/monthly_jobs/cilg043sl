@@ -1,0 +1,52 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 8 GOTO END_JOB 
+
+################################################################################
+LABEL name=ECS043SL
+################################################################################
+#  ********************************************************************  
+#  **--                                                                  
+#  **--          PRINT EARNED REVIEW STATEMENTS                          
+#  **--   SEE RESTART INSTRUCTIONS BEFORE RESTARTING                     
+#  **--                                                                  
+#  ********************************************************************  
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.XX.EPEC_00' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERPLAN' dataset='CI.DD.LG.ERPLAN' type='VS' filename='ERPLAN' disp='i-o' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.EX.ECS043SL.RDS.INDEXES' disp='o' normal='k' abend='d' recsize='60' recfmt='F' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/CI.EX.FICH043SL' disp='o' normal='k' abend='d' recsize='151' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS043SL' stepname='ECS043SL' 
+
+################################################################################
+LABEL name=CPY043SL
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.EX.FICH043SL' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH043SL' disp='o' normal='k' abend='d' recfmt='F' recsize='150' 
+
+EXECPGM pgmname='CIB009151' stepname='CPY043SL' parm='ALL'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/ECS043SLtoPDF.plx $SEQFILES/CI.DL.CIADM.FICH043SL $RDSFILES/ECS043SL.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=FTP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < $JCLLIB/ftp-cilg043sl
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+ENDJOB 
+################################################################################

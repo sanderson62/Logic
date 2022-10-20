@@ -1,0 +1,51 @@
+cd /apps/prod/cid1p/jcl
+
+#########################  B E G I N  S T E P  01   #########################
+#########################  B E G I N  S T E P  02   #########################
+setenv cdte `date +%m%d`
+#########################    E N D    S T E P  02   #########################
+
+#########################  B E G I N  S T E P  03   #########################
+
+
+#########################  B E G I N  S T E P  06   #########################
+setenv JOBSTART `date +%Y/%m/%d/%H/%M/%S`
+echo $JOBSTART
+#########################    E N D    S T E P  06   #########################
+
+
+#****************************
+#*****Check totals from cilgm10 EL524 and EL523
+
+
+echo "cidmthb is about to start"
+unikixjob cidmthb -w -ca
+if ($status != 0) then
+    echo "cidmthb aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'CYCLE UPDATE ABORT' -ml 'In CIDMTHB'"
+    exit 1
+endif
+echo "cidmthb terminated successfully"
+
+ftp -n ntis2 < $JCLLIB/ftp-rdsfiles
+
+rm /apps/prod/cid1p/jcl/ish/date_hash
+
+#########################  B E G I N  S T E P  07   #########################
+"smtp -f slunikix -t saca,jwfa,jlhb,info,pema,sdga,jjhc -s 'Todays print list' -mf /apps/prod/cid1p/emails/printemail.txt"
+cp /apps/prod/cid1p/reprints/dailycycle /apps/prod/cid1p/reprints/dailycycle.$cdte
+
+echo "20120928" > /data/seqfiles/Logic.daily.postcycle.done
+ftp -n ntcso1 < $JCLLIB/ftp-postcycle
+#########################    E N D    S T E P  07   #########################
+
+#########################  B E G I N  S T E P  08   #########################
+if ("Fri" == "Fri") then
+   echo "20120928" > /data/seqfiles/dailyslunikix.txt
+   ftp -n ntcso1 < $JCLLIB/ftp-cpsfrimedone
+endif
+#########################    E N D    S T E P  08   #########################
+
+perl $HOME/bin/run_time_dura.pl $JOBSTART CPSMONTHLY CPSMONTHLY
+cp $SEQFILES/runtimes/CPSMONTHLY $SEQFILES/runtimes/CPSMONTHLY.$cdte
+

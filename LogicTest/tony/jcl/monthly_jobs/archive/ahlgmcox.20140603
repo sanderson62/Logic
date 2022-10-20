@@ -1,0 +1,68 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: cilgmcox              Translated  : Wed Aug 23 12:33:47 2000        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+#setenv JOBDATE `date +"%Y%m"`
+#echo $JOBDATE
+
+################################################################################
+LABEL name=CIDCOX2 
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='ERCOMP' type='VS' filename='ERCOMP' disp='i-o' 
+ASSGNDD ddname='SYS010' dataset='AH.XX.PEND.STMT.KEYS' gdg='0' filename='$SEQFILES/AH.XX.PEND.STMT.KEYS' disp='i'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i'
+ASSGNDD ddname='COMPOT1' filename='$SEQFILES/@CCYYYYMM_AHL_JV_EXTRACT1.TXT' disp='o' normal='k' abend='d' recsize='265' recfmt='F' 
+ASSGNDD ddname='COMPOT2' filename='$SEQFILES/AHL_JV_EXTRACT2.TXT' disp='o' normal='k' abend='d' recsize='270' recfmt='F' 
+ASSGNDD ddname='COMPOT3' filename='$SEQFILES/@CCYYYYMM_AHL_JV_EXTRACT3.TXT' disp='o' normal='k' abend='d' recsize='265' recfmt='F' 
+ASSGNDD ddname='COMPOT4' filename='$SEQFILES/@CCYYYYMM_AHL_JV_EXTRACT4.TXT' disp='o' normal='k' abend='d' recsize='265' recfmt='F' 
+
+EXECPGM pgmname='CIDCOX2' stepname='CIDCOX2' 
+
+################################################################################
+LABEL name=SORT01
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/AHL_JV_EXTRACT2.TXT' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/AHL_JV_EXTRACT2.SRTD' disp='o' normal='k' abend='d' recfmt='F' recsize='270'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 4)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT01'
+
+################################################################################
+LABEL name=PERL01
+################################################################################
+#
+# This step reads the file from above and creates multiple extract files based
+# on how many unique CSR's there are.  The csr is in positions 1 thru 4
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/create_csr_jvextr.pl $SEQFILES/AHL_JV_EXTRACT2.SRTD AHL_JV_EXTRACT2 @CCYYYYMM $SEQFILES/
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL01' parm='SH'
+
+if ($JOBSTATUS == 0) then
+   ftp -n ntcso1 < $JCLLIB/ftp-ahlcox2
+   "smtp -f slunikix -t krha,jlmc,mdka,pema,amwa,tpta,klsc -s 'AHL JV File available' -mf /apps/prod/cid1p/emails/putahljv.txt"
+else
+   echo " Job aborted, ftp and email not performed "
+endif
+
+ENDJOB
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOB

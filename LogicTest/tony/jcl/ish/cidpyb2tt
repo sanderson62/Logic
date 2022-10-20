@@ -1,0 +1,60 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+if ($EBMSYS != "mdoff") then
+   echo "Job aborted, not MDOFF"
+   exit 1
+endif
+
+################################################################################
+LABEL name=GETGAJV
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/vouchers/cidgajvtmpin $SEQFILES/vouchers/cidgajvin $SEQFILES/vouchers/cidgafile
+touch $SEQFILES/vouchers/cidgafile
+cat -s $SEQFILES/vouchers/*_CID_GA_EXTRACT.Logic > $SEQFILES/vouchers/cidgajvtmpin
+if [ -a $SEQFILES/vouchers/cidgajvtmpin ] ; then
+   echo "we got a file " ;
+else
+   echo "No file today "
+   exit 1
+fi
+tr -d '\015' < $SEQFILES/vouchers/cidgajvtmpin > $SEQFILES/vouchers/cidgajvin
+cp $SEQFILES/vouchers/cidgajvin $SEQFILES/vouchers/cidgajvin.20110314
+rm -f $SEQFILES/vouchers/*_CID_GA_EXTRACT.Logic
+perl $HOME/bin/cidjvfixt.pl $SEQFILES/vouchers/cidgajvin $SEQFILES/vouchers/cidgafile
+!
+EXECPGM pgmname='BPXBATCH' stepname='GETGAJV' parm='SH'
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+
+################################################################################
+LABEL name=BKPPYAJ
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERPYAJ -s $SEQFILES/erpyaj_gajv.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPPYAJ' parm='SH'
+
+################################################################################
+LABEL name=CIDPYB2
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/vouchers/cidgafile' disp='i-o'
+ASSGNDD ddname='ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.DBLD' disp='i-o'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDPYB2G' stepname='CIDPYB2'
+
+if ($JOBSTATUS == 0) then
+        echo " Nothing to print "
+else
+        echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

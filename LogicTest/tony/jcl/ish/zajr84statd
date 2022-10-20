@@ -1,0 +1,147 @@
+################################################################################
+#                                                                              #
+#     JOB: cidclgm17
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' 
+ONRETCODE GT 8 GOTO END_JOB 
+
+if ($EBMSYS != "tony") then
+   echo "Job aborting, not tony"
+   exit 1
+endif
+
+#*******************************************************************************
+#*****
+#* This job is submitted via a job script <dccmth...> that may submit other
+#* jobs. Files beginning with DC.DL.CIADM... are ftp'd at the start of the next
+#* job script.  Other files not starting with DC.DL.. that are being
+#* transferred should be noted below.
+#*****
+#*******************************************************************************
+
+
+################################################################################
+LABEL name=ECS083 
+################################################################################
+#  ******************************************************************    
+#  **                                                                    
+#  ** UNEARNED PREMIUM AND COMMISSION EXTRACT (FOR INPUT TO ECS084).     
+#  **                                 =======                            
+#  ** ALSO REPORTS UNEARNED PREM FOR ACTUARIAL & FINANCIAL DEPTS.        
+#  **      =======                                                       
+#  ******************************************************************    
+ASSGNDD ddname='SYS004' filename='\${SEQFILES}/ZC.WW.ECS083.WORK1' disp='o' normal='k' abend='d' recfmt='F' recsize='156' 
+ASSGNDD ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='SYS011' dataset='DC.XX.GAAP_MAR14' filename='\${SEQFILES}/DC.XX.GAAP_MAR14' disp='i-o' 
+ASSGNDD  ddname='SYS012' type='SYSOUT' class='A' recfmt='F' recsize='132'
+ASSGNDD  ddname='SYS013' type='SYSOUT' class='A' recfmt='F' recsize='132'
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' filename='\${SEQFILES}/ZC.EX.FICH083' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+
+EXECPGM pgmname='CSO083DCC' stepname='ECS083' 
+
+################################################################################
+LABEL name=CPY083 
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SYSOUTDIR}/$JOBNAME/ECS083/SYS012_\${JON}' disp='i-o' normal='k' recfmt='F'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZC.DL.CIADM.FICH083.SPEC' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIDLS132' stepname='CPY083' 
+
+################################################################################
+LABEL name=ECS084 
+################################################################################
+#  ******************************************************************    
+#  **                                                                    
+#  **            UNEARNED PREMIUM AND COMMISSION HISTORY                 
+#  **                                                                    
+#  ******************************************************************    
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+SALL
+!
+ASSGNDD ddname='SYS008' type='DUMMY' 
+ASSGNDD ddname='SYS004' filename='\${SEQFILES}/ZC.WW.ECS083.WORK1' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' dataset='ZC.EX.FICH084.MO.STAT' filename='\${SEQFILES}/ZC.EX.FICH084.MO.STAT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='ECS084' stepname='ECS084' 
+
+################################################################################
+LABEL name=CPY084A
+################################################################################
+ASSGNDD ddname='SYS010' dataset='ZC.EX.FICH084.MO.STAT' filename='\${SEQFILES}/ZC.EX.FICH084.MO.STAT' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZC.DL.CIADM.FICH084.STAT' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY084A' parm='ALL'
+
+################################################################################
+LABEL name=CPY084S
+################################################################################
+
+#*******************************************************************************
+#* SYS011 is an onbase file that is ftp'd to //ntcso1/userdata/crp_grp/onbase
+#*******************************************************************************
+
+ASSGNDD ddname='SYS010' dataset='ZC.EX.FICH084.MO.STAT' filename='\${SEQFILES}/ZC.EX.FICH084.MO.STAT' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZC.FICH084.STAT.DCCTXT' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY084S' parm='ALL'
+
+################################################################################
+LABEL name=CPY084B 
+################################################################################
+#  ********************************************************************  
+#  ***                                                                   
+#  *** COPY FICH084 FOR INPUT TO CID SPECIAL REPORTING                   
+#  ***                                                                   
+#  ******************************************************************    
+ASSGNDD ddname='IN1' dataset='ZC.EX.FICH084.MO.STAT' filename='\${SEQFILES}/ZC.EX.FICH084.MO.STAT' disp='i-o' 
+ASSGNDD ddname='OUT1' dataset='ZC.EX.FICH084.MO.STAT.COPY' filename='\${SEQFILES}/ZC.EX.FICH084.MO.STAT.COPY' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO  IFILE(IN1)  -
+         OFILE(OUT1)
+  SET MAXCC=0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='CPY084B' 
+
+################################################################################
+
+
+"cp /data/test/tony/seqfiles/ZC.DL.CIADM.FICH084.STAT /data/test/tony/convertin"
+"perl /export/home/mtpadmin/bin/dcc_new_dl_tony.pl /export/home/mtpadmin/bin/dcc_rpt_hash_file"
+"cp -p /data/test/tony/convertin/*.CVT /data/test/tony/convertout"
+"rm /data/test/tony/convertin/*"
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    echo " Nothing to print for this job   "
+else
+    echo " Job aborted, print not released "
+endif
+
+################################################################################
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 042503                 SMVA   NEW JOB FOR DCC, MODELED AFTER CID JOB
+# 051403                 SMVA   REMOVE HARDCOPIES ECS045, PRT45, & PRTWORK2 FOR
+#                               CORP; WILL USE REPORT FROM MONARCH
+# 053003                 SMVA   ADD DCCO HARDCOPY OF ECS083/SYS012 (ECS083 SPEC)
+#                               CHG ECS083 PRT PAGE DEF FROM l132std TO l133std
+# 071003                 SMVA   ADD CPY016B STEP FOR FICH016 ERROR REPORT
+#                               MOD FTP SCRIPT AND EMAIL
+# 060304                 SMVA   ADD UNCATL04 STEP 
+# 063004                 SMVA   ADD SYS011 DD TO ECS080 STEP
+# 100504                 PEMA   REMOVE PRINT FOR CSO083
+# 112807   2004110200006 AJRA   ADD DUMMY FOR NEW CSO035 FILE
+# 083109   2009030400001 AJRA   ADD ECS035DR AND CPY035DR
+# 031411   2010021700003 AJRA   ADD DUMMY FOR NEW CSO035 FILE

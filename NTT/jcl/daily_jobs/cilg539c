@@ -1,0 +1,60 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: cilg539c              Translated  : Wed Aug 23 12:31:26 2000        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' 
+
+unikixbld -t s -d ERLOFC -s $SEQFILES/erlofc.bkp
+unikixbld -i -dERLOFCT
+unikixbld -t v -d ERLOFCT -s $SEQFILES/erlofc.bkp
+
+################################################################################
+LABEL name=EL539 
+################################################################################
+#*******************************************************************************
+#*   EL539 uses the prior month's date card file when processing for CNB
+#*   because it will use the monthend extract CI.XX.EXTR521 as input  
+#*   instead of the online pending business file.  
+#*******************************************************************************
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='SYS010' dataset='CI.XX.EXTR521' gdg='0' filename='\${SEQFILES}/CI.XX.EXTR521' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERPNDB2' dataset='CI.DD.LG.ERPNDB2' type='VS' filename='ERPNDB2' disp='i-o' 
+ASSGNDD ddname='ERLOFC' type='VS' filename='ERLOFCT' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+CNB
+!
+#  **************************************************** OUTPUT FILES     
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133'
+ASSGNDD ddname='ELREPT' type='DUMMY'
+#  **************************************************** I/O FILES        
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL539S' stepname='EL539' 
+
+################################################################################
+LABEL name=CPY539
+################################################################################
+ASSGNDD ddname='SYS010' filename='\$SYSOUTDIR/$JOBNAME/EL539/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.CIADM.FICH539.CNB' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY539' parm='ALL' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+   "ftp -n ntcso1 < $JCLLIB/ftp-cilg539c"
+   "cat $PROJECT_ROOT/emails/$JOBNAME.txt | mutt -s '$JOBNAME is complete' cilg539c"
+   "cat $PROJECT_ROOT/emails/$JOBNAME.txt | mutt -s '$JOBNAME is complete'  saca@cso.com,tmja@cso.com,pema@cso.com"
+else
+   echo " Job aborted, print not released "
+endif
+
+################################################################################
+ENDJOB

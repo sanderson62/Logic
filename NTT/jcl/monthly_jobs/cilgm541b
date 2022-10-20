@@ -1,0 +1,52 @@
+################################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: cilgm541b                                                           #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=EL541B 
+################################################################################
+#  ***                                                                   
+#  ***         REPORT MONTH-END BALANCES AND DISCREPANCIES                      
+#  ***
+ASSGNDD ddname='SYS019' dataset='CI.DD.ER.DATECARD' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY'
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+EXECPGM pgmname='EL541' stepname='EL541B' 
+
+################################################################################
+LABEL name=CPY541B
+################################################################################
+ASSGNDD ddname='SYS010' filename='\$SYSOUTDIR/$JOBNAME/EL541B/SYS008_\${JON}' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.CIADM.FICH541B' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY541B' parm='ALL'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "ftp -n ntcso1 < $JCLLIB/ftp-cilgm541b"
+    "cat $PROJECT_ROOT/emails/$JOBNAME.txt | mutt -s 'Post lgm541b@cso.com"
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 072402   2002061900012 SMVA   NEW JOB TO CREATE MONTH-END BALANCE REPORT RECRD
+# 091902                 SMVA   ADD SMTP COMMAND FOR EMAIL
+# 092002                 SMVA   CHG FICH541B FILE NAME
+# 110402                 SMVA   DUMMY OUT SYS020, ADD CPY STEP FOR TEXT FILE, &
+#                               ADD FTP COMMAND
+# 052914  2014042300003  TANA   CHANGE SMTP TO USE DIST GROUP

@@ -1,0 +1,67 @@
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 8 GOTO END_JOB 
+
+if ($EBMSYS != "paul") then
+   echo "Job aborting, not paul"
+   exit 1
+endif
+
+
+################################################################################
+LABEL name=ECS082 
+################################################################################
+#  ******************************************************************    
+#  **                   GAAP REPORTING                                   
+#  ******************************************************************    
+#  **                                                                    
+#  **            UNEARNED PREMIUM AND COMMISSION EXTRACT                 
+#  **          SEE RESTART INSTRUCTIONS BEFORE RESTARTING                
+#  **                                                                    
+#  ******************************************************************    
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/ahltst/exe/bat'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+#  ************************************************      INPUT FILES     
+#ASSGNDD ddname='SYS011' filename='/data/test/paul/seqfiles/AH.XX.GAAP_00' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='/data/test/paul/seqfiles/AH.XX.GAAP.MAR2012' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTA' disp='i-o' 
+ASSGNDD ddname='ERRTBLT' type='VS' filename='ERRTBLA' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='AH.DD.ER.DATECARD' filename='\${SEQFILES}/AH.DD.ER.DATECARD' disp='i-o' 
+#  *************************************************    OUTPUT FILES     
+ASSGNDD ddname='SYS020' dataset='ZH.DD.FICH082' filename='/data/test/tony/seqfiles/ZH.DD.FICH082' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS022' filename='/data/test/tony/seqfiles/ZH.EX.RPT082.FILE' disp='o' normal='k' abend='d' recsize='250' recfmt='F' 
+ASSGNDD ddname='SYS024' filename='/data/test/tony/seqfiles/ZH.EX.RPT082.FILE2.AHL' disp='o' normal='k' abend='d' recsize='650' recfmt='F' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+
+EXECPGM pgmname='AHL082EXT' stepname='ECS082' 
+
+################################################################################
+LABEL name=CPY082A
+################################################################################
+ASSGNDD ddname='SYS010' dataset='ZH.DD.FICH082' filename='/data/test/tony/seqfiles/ZH.DD.FICH082' disp='i'
+ASSGNDD ddname='SYS011' dataset='ZH.DL.CIADM.FICH082A' filename='/data/test/tony/seqfiles/ZH.DL.CIADM.FICH082A' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY082A' parm='ECS082A' 
+
+################################################################################
+LABEL name=CPY082R
+################################################################################
+ASSGNDD ddname='SYS010' dataset='ZH.DD.FICH082' filename='/data/test/tony/seqfiles/ZH.DD.FICH082' disp='i'
+ASSGNDD ddname='SYS011' dataset='ZH.DL.CIADM.FICH082R' filename='/data/test/tony/seqfiles/ZH.DL.CIADM.FICH082R' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY082R' parm='ECS082R' 
+
+
+ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-cilg082ahl
+
+
+if ($JOBSTATUS == 0) then
+    echo " Test job dont want print "
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

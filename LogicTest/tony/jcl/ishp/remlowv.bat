@@ -1,0 +1,1 @@
+perl e:/cid1p/jcl/ish/remlowv.pl \\ntsnap1\tempdir\pema\cid_patriot_extract.txt \\ntsnap1\tempdir\pema\cid_patriot_new.txt

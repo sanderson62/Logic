@@ -1,0 +1,74 @@
+BEGINJOB mode='MVS' jobclass='M' 
+
+if ($EBMSYS != "tony") then
+   echo "Job aborting, not tony"
+   exit 1
+endif
+
+################################################################################
+LABEL name=ZAJRENDSM
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='ERARCH' type='VS' filename='ERARCH' disp='i-o' 
+ASSGNDD ddname='ELLETR' type='VS' filename='ELLETR' disp='i-o' 
+ASSGNDD ddname='ERENDT2' type='VS' filename='ERENDT2' disp='i-o' 
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERCOMP' type='VS' filename='ERCOMP' disp='i-o' 
+ASSGNDD ddname='ACCTSUM' filename='/data/test/tony/seqfiles/ZI.ERENDT.ACCT.SUMM' disp='o' normal='k' abend='d' recsize='133' recfmt='f' 
+ASSGNDD ddname='CSOSUM' filename='/data/test/tony/seqfiles/ZI.ERENDT.CSO.SUMM' disp='o' normal='k' abend='d' recsize='133' recfmt='f' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTEXT' filename='/data/test/tony/seqfiles/ZI.ERENDT.SORT.EXT' disp='o' normal='k' abend='d' recsize='252' recfmt='f' 
+
+EXECPGM pgmname='CIDENDSM' stepname='ZAJRENDSM' parm='2012093020121031' 
+
+################################################################################
+LABEL name=CPYACCT
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.ERENDT.ACCT.SUMM' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.ACCT.SUMM' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPYACCT' parm='ALL'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/summary2pdf /data/test/tony/seqfiles/ZI.DL.CIADM.ACCT.SUMM $SEQFILES/ACCOUNTSUMMARY.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=CPYCSO
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.ERENDT.CSO.SUMM' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.CSO.SUMM' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPYCSO' parm='ALL'
+
+################################################################################
+LABEL name=PERL2
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/summary2pdf /data/test/tony/seqfiles/ZI.DL.CIADM.CSO.SUMM $SEQFILES/CSOSUMMARY.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL2' parm='SH'
+################################################################################
+
+ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-cidendsm
+
+################################################################################
+
+ENDJOB 

@@ -1,0 +1,43 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='J' 
+
+if ($EBMSYS != "tony") then
+   echo "Job aborting, not Tony"
+   exit 1
+endif
+
+
+################################################################################
+LABEL name=EL595
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELTRLR' dataset='CI.DD.LG.ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD  ddname='SYS010' type='SYSOUT' class='A' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL595' stepname='EL595' parm='20101220'
+
+################################################################################
+LABEL name=CPY595
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL595/SYS008_\${JON}' disp='i'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.DD.CIADM.FICH595' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY595' parm='ALL'
+
+
+################################################################################
+if ($JOBSTATUS == 0) then
+   "smtp -f slunikix -t ajra -s 'EL595 - CID CICM LETTERS' -mf $SEQFILES/ZI.DD.CIADM.FICH595"
+#    "/export/home/mtpadmin/exelprtony.sh isprog.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/EL595/SYS008_$JON"
+#     "exelpr.sh p60w1s.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/EL595/SYS008_$JON"
+else
+   echo "job aborted print not released "
+endif
+
+ENDJOB 
+################################################################################

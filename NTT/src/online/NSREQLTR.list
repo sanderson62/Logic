@@ -1,0 +1,2572 @@
+*>Copyright (c) 2016-2021 NTT DATA, Inc. All rights reserved.
+*>compiler version:  6.0.28692
+*>source file name:  NSREQLTR.cbl
+*>date generated  :  Mon Oct 03 10:10:33 CDT 2022
+*>compiler options:  -cv -apost -dcmi -dz -ld -sp=/apps/test/mdoff/copy:/apps/prod/cid1p/copy:/apps/test/mdoff/maps:/apps/prod/cid1p/maps:/apps/mtp/mtp/copy -dv=0 -od=/apps/test/mdoff/exe/onl -cirp2 -pt2 -cax -sl2 -rw=FILE-ID
+*>source encoding :  ISO-8859-1
+*>target encoding :  ISO-8859-1
+*>((program: NSREQLTR.cl2))                                        
+IDENTIFICATION DIVISION.                                         
+                                                                 
+PROGRAM-ID. NSREQLTR.                                            
+                                                                 
+*>AUTHOR.     PABLO                                                
+*>            COLLEYVILLE, TEXAS.                                  
+                                                                 
+*>REMARKS.    EXECUTED FROM INDEX.HTML                             
+                                                                 
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 121802    2009122800001  PEMA  NEW PROGRAM                      
+*> 022212    2011120900003  AJRA  ADD AHL                          
+*> 020816  CR2015082500001  PEMA  ADD PROCESSING FOR NEW COMP VPP  
+*> 061421  CR2017031500001  PEMA  Update to CCM8                   
+*>*****************************************************************
+ENVIRONMENT DIVISION.                                            
+                                                                 
+DATA DIVISION.                                                   
+working-storage section.                                         
+01  DFH-START PIC X(04).                                         
+                                                                 
+01  P pointer.                                                   
+01  KIXSYS                      pic X(7)  VALUE Z"KIXSYS".       
+01  var-ptr pointer.                                             
+01  env-var-len                 pic 9(4)  binary.                
+01  rc                          pic 9(9)  binary.                
+                                                                 
+01  filler.                                                      
+    05  a1                      pic s999 comp-3 value +0.        
+    05  a2                      pic s999 comp-3 value +0.        
+    05  m1                      pic s999 comp-3 value +0.        
+    05  v1                      pic s999 comp-3 value +0.        
+    05  v2                      pic s999 comp-3 value +0.        
+    05  WS-WORK-FIELD           PIC X(90)    VALUE SPACES.       
+                                                                 
+01  WS-KIXSYS.                                                   
+    05  WS-KIX-FIL1             PIC X(10).                       
+    05  WS-KIX-APPS             PIC X(10).                       
+    05  WS-KIX-ENV              PIC X(10).                       
+    05  WS-KIX-MYENV            PIC X(10).                       
+    05  WS-KIX-SYS              PIC X(10).                       
+                                                                 
+*>***********************************************                  
+*> commarea passed to the business logic                           
+*>***********************************************                  
+                                                                 
+01 srch-commarea.                                                
+*>                                copy ELCLTRSPI.                  
+*>>>((file: ELCLTRSPI))                                            
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 121802    2009122800001  PEMA  NEW COPYBOOK                     
+*>*****************************************************************
+*>***************************************                          
+*>  commarea for NaperSoft On Demand Claim letters                 
+*>  (business logic input & output)                                
+*>***************************************                          
+                                                                 
+    03  BL-INPUT.                                                
+        05  BL-CARRIER          PIC X.                           
+        05  BL-CLAIM-NO         PIC X(7).                        
+        05  BL-CERT-NO          PIC X(11).                       
+        05  BL-LETTER-ID        PIC XXXX.                        
+        05  BL-FOLLOW-UP-DT     PIC X(10).                       
+        05  BL-RESEND-DT        PIC X(10).                       
+        05  BL-NO-OF-COPIES     PIC 99.                          
+        05  BL-PROC-ID          PIC XXXX.                        
+        05  BL-COMP-ID          PIC XXX.                         
+        05  BL-PRINT-NOW-SW     PIC X.                           
+        05  BL-ENC-CD           PIC XXX.                         
+        05  BL-ARCHIVE-NO       PIC 9(8).                        
+        05  BL-REGARDING        PIC X(70).                       
+                                                                 
+    03  BL-OUTPUT.                                               
+        05  BL-STATUS                   PIC X.                   
+            88  BL-OK                      VALUE "P".            
+            88  BL-FAIL                  VALUE "F".              
+        05  BL-MESSAGE          PIC X(50).                       
+    03  BL-RECORD-PASSED-DATA   PIC X(2500).                     
+*><<((file: ELCLTRSPI))                                            
+                                                                 
+01  INPUT-FROM-FORM.                                             
+    05  IFF-CARRIER             PIC X.                           
+    05  IFF-CLAIM-NO            PIC X(7).                        
+    05  IFF-CERT-NO             PIC X(11).                       
+    05  IFF-LETTER-ID           PIC XXXX.                        
+    05  IFF-FOLLOW-UP-DT        PIC X(10).                       
+    05  IFF-RESEND-DT           PIC X(10).                       
+    05  IFF-NO-OF-COPIES        PIC 99.                          
+    05  IFF-PROC-ID             PIC XXXX.                        
+    05  IFF-COMP-ID             PIC XXX.                         
+    05  IFF-PRINT-NOW-SW        PIC X.                           
+    05  IFF-ENC-CD              PIC XXX.                         
+    05  IFF-REGARDING           PIC X(70).                       
+                                                                 
+*>***********************************                              
+*> fields used to read web data                                    
+*>***********************************                              
+                                                                 
+01  w-form-name       pic x(80).                                 
+01  w-form-value      pic x(80).                                 
+01  w-form-name-len   pic s9(8) comp.                            
+01  w-form-value-len  pic s9(8) comp.                            
+01  w-resp            pic s9(8) comp.                            
+01  w-doctoken        pic x(16).                                 
+                                                                 
+*> COMP ID TPE REGION   GROUP NAME       HOST          HTTP PORT   
+*>                                                                 
+*>  CID      CID1P      BatchClaims     sdv-nsft01       7001      
+*>  CID      MDOFF      BatchClaims     hov-nsft01       7003      
+*>  CID      CID1T      BatchClaims     hov-nsft01       6002      
+*>  CID      PAUL       BatchClaims     hov-nsft01       5002      
+*>  CID      TONY       BatchClaims     hov-nsft01       6003      
+*>  DCC      CID1P      BatchDCCClaims  sdv-nsft01       7001      
+*>  DCC      MDOFF      BatchDCCClaims  hov-nsft01       7003      
+*>  DCC      CID1T      BatchDCCClaims  hov-nsft01       6002      
+*>  DCC      PAUL       BatchDCCClaims  hov-nsft01       5002      
+*>  DCC      TONY       BatchDCCClaims  hov-nsft01       6003      
+*>  AHL      CID1P      BatchAHLClaims  sdv-nsft01       7001      
+*>  AHL      MDOFF      BatchAHLClaims  hov-nsft01       7003      
+*>  AHL      CID1T      BatchAHLClaims  hov-nsft01       6002      
+*>  AHL      PAUL       BatchAHLClaims  hov-nsft01       5002      
+*>  AHL      TONY       BatchAHLClaims  hov-nsft01       6003      
+*>  AHL      AHLTST     BatchAHLClaims  hov-nsft01       6007      
+*>  FNL      CID1P      BatchFNLClaims  sdv-nsft01       7001      
+*>  FNL      MDOFF      BatchFNLClaims  hov-nsft01       7003      
+*>  FNL      CID1T      BatchFNLClaims  hov-nsft01       6002      
+*>  FNL      PAUL       BatchFNLClaims  hov-nsft01       5002      
+*>  FNL      TONY       BatchFNLClaims  hov-nsft01       6003      
+*>  FNL      AHLTST     BatchFNLClaims  hov-nsft01       6007      
+                                                                 
+*>*****************************************                        
+*> symbol list text for PEMHDR template                            
+*>*****************************************                        
+                                                                 
+01  WS-PROD-CID-PEMHDR.                                          
+    05  F                       PIC X(7)  VALUE "SERVER=".       
+    05  F                       PIC X(20) VALUE                  
+                                   'sdv-nsft01.cso.local'.       
+    05  F                       PIC X(11) VALUE '&GROUPNAME='.   
+    05  F                       PIC X(11) VALUE 'BatchClaims'.   
+    05  F                       PIC X(7)  VALUE '&UNAME='.       
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+    05  F                       PIC X(11) VALUE '&UPASSWORD='.   
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+                                                                 
+01  WS-PROD-DCC-PEMHDR.                                          
+    05  F                       PIC X(7)  VALUE "SERVER=".       
+    05  F                       PIC X(20) VALUE                  
+                                   'sdv-nsft01.cso.local'.       
+    05  F                       PIC X(11) VALUE "&GROUPNAME=".   
+    05  F                       PIC X(14) VALUE 'BatchDCCClaims'.
+    05  F                       PIC X(7)  VALUE '&UNAME='.       
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+    05  F                       PIC X(11) VALUE '&UPASSWORD='.   
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+                                                                 
+01  WS-PROD-VPP-PEMHDR.                                          
+    05  F                       PIC X(7)  VALUE "SERVER=".       
+    05  F                       PIC X(20) VALUE                  
+                                   'sdv-nsft01.cso.local'.       
+    05  F                       PIC X(11) VALUE "&GROUPNAME=".   
+    05  F                       PIC X(14) VALUE 'BatchVPPClaims'.
+    05  F                       PIC X(7)  VALUE '&UNAME='.       
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+    05  F                       PIC X(11) VALUE '&UPASSWORD='.   
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+                                                                 
+01  WS-PROD-AHL-PEMHDR.                                          
+    05  F                       PIC X(7)  VALUE "SERVER=".       
+    05  F                       PIC X(20) VALUE                  
+                                   'sdv-nsft01.cso.local'.       
+    05  F                       PIC X(11) VALUE "&GROUPNAME=".   
+    05  F                       PIC X(14) VALUE 'BatchAHLClaims'.
+    05  F                       PIC X(7)  VALUE '&UNAME='.       
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+    05  F                       PIC X(11) VALUE '&UPASSWORD='.   
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+                                                                 
+01  WS-PROD-FNL-PEMHDR.                                          
+    05  F                       PIC X(7)  VALUE "SERVER=".       
+    05  F                       PIC X(20) VALUE                  
+                                   'sdv-nsft01.cso.local'.       
+    05  F                       PIC X(11) VALUE '&GROUPNAME='.   
+    05  F                       PIC X(14) VALUE 'BatchFNLClaims'.
+    05  F                       PIC X(7)  VALUE '&UNAME='.       
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+    05  F                       PIC X(11) VALUE '&UPASSWORD='.   
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+                                                                 
+01  WS-TEST-CID-PEMHDR.                                          
+    05  F                       PIC X(7)  VALUE "SERVER=".       
+    05  F                       PIC X(20) VALUE                  
+                         'hov-nsft02.cso.local'.                 
+    05  F                       PIC X(11) VALUE '&GROUPNAME='.   
+    05  F                       PIC X(11) VALUE 'BatchClaims'.   
+    05  F                       PIC X(7)  VALUE '&UNAME='.       
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+    05  F                       PIC X(11) VALUE '&UPASSWORD='.   
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+                                                                 
+01  WS-TEST-DCC-PEMHDR.                                          
+    05  F                       PIC X(7)  VALUE "SERVER=".       
+    05  F                       PIC X(20) VALUE                  
+                         'hov-nsft02.cso.local'.                 
+    05  F                       PIC X(11) VALUE "&GROUPNAME=".   
+    05  F                       PIC X(14) VALUE 'BatchDCCClaims'.
+    05  F                       PIC X(7)  VALUE '&UNAME='.       
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+    05  F                       PIC X(11) VALUE '&UPASSWORD='.   
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+                                                                 
+01  WS-TEST-VPP-PEMHDR.                                          
+    05  F                       PIC X(7)  VALUE "SERVER=".       
+    05  F                       PIC X(20) VALUE                  
+                         'hov-nsft02.cso.local'.                 
+    05  F                       PIC X(11) VALUE "&GROUPNAME=".   
+    05  F                       PIC X(14) VALUE 'BatchVPPClaims'.
+    05  F                       PIC X(7)  VALUE '&UNAME='.       
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+    05  F                       PIC X(11) VALUE '&UPASSWORD='.   
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+                                                                 
+01  WS-TEST-AHL-PEMHDR.                                          
+    05  F                       PIC X(7)  VALUE "SERVER=".       
+    05  F                       PIC X(20) VALUE                  
+                         'hov-nsft02.cso.local'.                 
+    05  F                       PIC X(11) VALUE "&GROUPNAME=".   
+    05  F                       PIC X(14) VALUE 'BatchAHLClaims'.
+    05  F                       PIC X(7)  VALUE '&UNAME='.       
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+    05  F                       PIC X(11) VALUE '&UPASSWORD='.   
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+                                                                 
+01  WS-TEST-FNL-PEMHDR.                                          
+    05  F                       PIC X(7)  VALUE "SERVER=".       
+    05  F                       PIC X(20) VALUE                  
+                         'hov-nsft02.cso.local'.                 
+    05  F                       PIC X(11) VALUE '&GROUPNAME='.   
+    05  F                       PIC X(14) VALUE 'BatchFNLClaims'.
+    05  F                       PIC X(7)  VALUE '&UNAME='.       
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+    05  F                       PIC X(11) VALUE '&UPASSWORD='.   
+    05  F                       PIC X(8)  VALUE 'batchjob'.      
+                                                                 
+*>*****************************************                        
+*> symbol list text for PEMFTR template                            
+*>*****************************************                        
+                                                                 
+01  ws-sl-var-length pic s9(8) comp value +33.                   
+01  WS-VAR-SLUNIKIX.                                             
+    05  FILLER                  PIC X(09) VALUE "HOSTINFO=".     
+    05  WS-SL-HOST-INFO         PIC X(09) VALUE 'slunikix:'.     
+    05  WS-SL-PORT              PIC XXXX  VALUE '7001'.          
+    05  WS-SL-REST              PIC X(200) VALUE SPACES.         
+                                                                 
+01  ws-lt-var-length pic s9(8) comp value +34.                   
+01  WS-VAR-LOGICTEST.                                            
+    05  FILLER                  PIC X(09) VALUE "HOSTINFO=".     
+    05  WS-LT-HOST-INFO         PIC X(10) VALUE 'logictest:'.    
+    05  WS-LT-PORT              PIC XXXX  VALUE '6002'.          
+    05  WS-LT-REST              PIC X(200) VALUE SPACES.         
+                                                                 
+01  finished-string.                                             
+    05  FILLER                   PIC X(11)  VALUE "&URLVARLST=". 
+    05  var-string               pic x(200) value spaces.        
+                                                                 
+01 WS-TEST-TESTER.                                               
+   05  FILLER                   PIC X(11)  VALUE "&URLVARLST=".  
+   05  WS-KEY.                                                   
+       10  OT-CARRIER           PIC X.                           
+       10  OT-CLMNO             PIC X(7).                        
+       10  OT-CRTNO             PIC X(11).                       
+       10  OT-LETTER-ID         PIC X(4).                        
+       10  OT-FOLLOW-UP-DT      PIC X(10).                       
+       10  OT-RESEND-DT         PIC X(10).                       
+       10  OT-NO-OF-COPIES      PIC 99.                          
+       10  OT-PROC-ID           PIC XXXX.                        
+       10  OT-COMP-ID           PIC XXX.                         
+       10  OT-PRINT-NOW-SW      PIC X.                           
+       10  OT-ENC-CD            PIC XXX.                         
+       10  OT-ARCHIVE-NO        PIC 9(08).                       
+       10  OT-REGARDING         PIC X(70).                       
+                                                                 
+                                                                 
+01  WS-ELMSTR-KEY.                                               
+    05  WS-ELMSTR-COMPANY-CD    PIC X.                           
+    05  WS-ELMSTR-CARRIER       PIC X.                           
+    05  WS-ELMSTR-CLAIM-NO      PIC X(7).                        
+    05  WS-ELMSTR-CERT-NO       PIC X(11).                       
+                                                                 
+*>                                COPY ELCMSTR.                    
+*>>>((file: ELCMSTR))                                              
+*>*****************************************************************
+*>                                                                *
+*>                            ELCMSTR.                            *
+*>           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+*>                            VMOD=2.012                          *
+*>                                                                *
+*>   FILE DESCRIPTION = CLAIM MASTER FILE                         *
+*>                                                                *
+*>   FILE TYPE = VSAM,KSDS                                        *
+*>   RECORD SIZE = 350  RECFORM = FIXED                           *
+*>                                                                *
+*>   BASE CLUSTER = ELMSTR                         RKP=2,LEN=20   *
+*>       ALTERNATE PATH1 = ELMSTR2 (BY NAME)       RKP=22,LEN=29  *
+*>       ALTERNATE PATH2 = ELMSTR3 (BY SOC SEC NO) RKP=51,LEN=12  *
+*>       ALTERNATE PATH3 = ELMSTR5 (BY CERT NO)    RKP=63,LEN=12  *
+*>       ALTERNATE PATH4 = ELMSTR6 (BY CREDIT CARD NO)            *
+*>                                                 RKP=75,LEN=21  *
+*>                                                                *
+*>   **** NOTE ****                                               *
+*>             ANY CHANGES TO THIS COPYBOOK MUST ALSO BE          *
+*>             IMPLEMENTED IN COPYBOOK ELCRETR (RETRIEVE MASTER)  *
+*>                                                                *
+*>   LOG = YES                                                    *
+*>   SERVREQ = BROWSE, DELETE, UPDATE, NEWREC                     *
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 120503    2003080800002  SMVA  INITIAL SECURE PAY CHANGES       
+*> 080307    2007032100001  PEMA  ADD TOTAL INTEREST PAID FIELD    
+*> 031213    2012113000002  PEMA  ADD ACCIDENT INDICATOR           
+*> 051414  CR2013021100002  PEMA  RECURRENT CLAIM CHANGES          
+*> 052614    2014022100001  AJRA  ADD FAMILY LEAVE CLAIM TYPE      
+*> 081817    2016100700001  TANA  ADD NBR OF EXTENSIONS            
+*> 100518  CR2017061500001  TANA  ADD OTHER CLAIM TYPE             
+*>*****************************************************************
+01  CLAIM-MASTER.                                                
+    12  CL-RECORD-ID                PIC XX.                      
+        88  VALID-CL-ID         VALUE 'CL'.                      
+                                                                 
+    12  CL-CONTROL-PRIMARY.                                      
+        16  CL-COMPANY-CD           PIC X.                       
+        16  CL-CARRIER              PIC X.                       
+        16  CL-CLAIM-NO             PIC X(7).                    
+        16  CL-CERT-NO.                                          
+            20  CL-CERT-PRIME       PIC X(10).                   
+            20  CL-CERT-SFX         PIC X.                       
+                                                                 
+    12  CL-CONTROL-BY-NAME.                                      
+        16  CL-COMPANY-CD-A1        PIC X.                       
+        16  CL-INSURED-LAST-NAME    PIC X(15).                   
+        16  CL-INSURED-NAME.                                     
+            20  CL-INSURED-1ST-NAME PIC X(12).                   
+            20  CL-INSURED-MID-INIT PIC X.                       
+                                                                 
+    12  CL-CONTROL-BY-SSN.                                       
+        16  CL-COMPANY-CD-A2        PIC X.                       
+        16  CL-SOC-SEC-NO.                                       
+            20  CL-SSN-STATE        PIC XX.                      
+            20  CL-SSN-ACCOUNT      PIC X(6).                    
+            20  CL-SSN-LN3          PIC X(3).                    
+                                                                 
+    12  CL-CONTROL-BY-CERT-NO.                                   
+        16  CL-COMPANY-CD-A4        PIC X.                       
+        16  CL-CERT-NO-A4.                                       
+            20  CL-CERT-A4-PRIME    PIC X(10).                   
+            20  CL-CERT-A4-SFX      PIC X.                       
+                                                                 
+    12  CL-CONTROL-BY-CCN.                                       
+        16  CL-COMPANY-CD-A5        PIC X.                       
+        16  CL-CCN-A5.                                           
+            20  CL-CCN.                                          
+                24  CL-CCN-PREFIX-A5 PIC X(4).                   
+                24  CL-CCN-PRIME-A5 PIC X(12).                   
+            20  CL-CCN-FILLER-A5    PIC X(4).                    
+                                                                 
+    12  CL-INSURED-PROFILE-DATA.                                 
+        16  CL-INSURED-BIRTH-DT     PIC XX.                      
+        16  CL-INSURED-SEX-CD       PIC X.                       
+            88  INSURED-IS-MALE        VALUE 'M'.                
+            88  INSURED-IS-FEMALE      VALUE 'F'.                
+            88  INSURED-SEX-UNKNOWN    VALUE ' '.                
+        16  CL-INSURED-OCC-CD       PIC X(6).                    
+        16  FILLER                  PIC X(5).                    
+                                                                 
+    12  CL-PROCESSING-INFO.                                      
+        16  CL-PROCESSOR-ID         PIC X(4).                    
+        16  CL-CLAIM-STATUS         PIC X.                       
+            88  CLAIM-IS-OPEN          VALUE 'O'.                
+            88  CLAIM-IS-CLOSED        VALUE 'C'.                
+        16  CL-CLAIM-TYPE           PIC X.                       
+*>            88  AH-CLAIM               VALUE 'A'.                
+*>            88  LIFE-CLAIM             VALUE 'L'.                
+*>            88  PROPERTY-CLAIM         VALUE 'P'.                
+*>            88  IUI-CLAIM              VALUE 'I'.                
+*>            88  GAP-CLAIM              VALUE 'G'.                
+*>            88  FAMILY-LEAVE-CLAIM     VALUE 'F'.                
+*>            88  OTHER-CLAIM            VALUE 'O'.                
+        16  CL-CLAIM-PREM-TYPE      PIC X.                       
+            88  SINGLE-PREMIUM         VALUE '1'.                
+            88  O-B-COVERAGE           VALUE '2'.                
+            88  OPEN-END-COVERAGE      VALUE '3'.                
+        16  CL-INCURRED-DT          PIC XX.                      
+        16  CL-REPORTED-DT          PIC XX.                      
+        16  CL-FILE-ESTABLISH-DT    PIC XX.                      
+        16  CL-EST-END-OF-DISAB-DT  PIC XX.                      
+        16  CL-LAST-PMT-DT          PIC XX.                      
+        16  CL-LAST-PMT-AMT         PIC S9(7)V99  COMP-3.        
+        16  CL-PAID-THRU-DT         PIC XX.                      
+        16  CL-TOTAL-PAID-AMT       PIC S9(7)V99  COMP-3.        
+        16  CL-NO-OF-PMTS-MADE      PIC S9(3)     COMP-3.        
+        16  CL-NO-OF-DAYS-PAID      PIC S9(4)     COMP.          
+        16  CL-PMT-CALC-METHOD      PIC X.                       
+            88  CL-360-DAY-YR          VALUE '1'.                
+            88  CL-365-DAY-YR          VALUE '2'.                
+            88  CL-FULL-MONTHS         VALUE '3'.                
+        16  CL-CAUSE-CD             PIC X(6).                    
+                                                                 
+        16  CL-PRIME-CERT-NO.                                    
+            20  CL-PRIME-CERT-PRIME PIC X(10).                   
+            20  CL-PRIME-CERT-SFX   PIC X.                       
+                                                                 
+        16  CL-SYSTEM-IDENTIFIER    PIC XX.                      
+            88  CL-CREDIT-CLAIM        VALUE 'CR'.               
+            88  CL-CONVENIENCE-CLAIM   VALUE 'CV'.               
+                                                                 
+        16  CL-MICROFILM-NO         PIC X(10).                   
+        16  FILLER REDEFINES CL-MICROFILM-NO.                    
+            20  CL-BENEFIT-PERIOD   PIC 99.                      
+            20  FILLER              PIC X(8).                    
+        16  CL-PROG-FORM-TYPE       PIC X.                       
+        16  CL-LAST-ADD-ON-DT       PIC XX.                      
+                                                                 
+        16  CL-LAST-REOPEN-DT       PIC XX.                      
+        16  CL-LAST-CLOSE-DT        PIC XX.                      
+        16  CL-LAST-CLOSE-REASON    PIC X(01).                   
+            88  FINAL-PAID             VALUE '1'.                
+            88  CLAIM-DENIED           VALUE '2'.                
+            88  AUTO-CLOSE             VALUE '3'.                
+            88  MANUAL-CLOSE           VALUE '4'.                
+            88  BENEFITS-CHANGED       VALUE 'C'.                
+            88  SETUP-ERRORS           VALUE 'E'.                
+        16  CL-ASSOC-CERT-SEQU      PIC S99.                     
+        16  CL-ASSOC-CERT-TOTAL     PIC S99.                     
+        16  CL-CLAIM-PAYMENT-STATUS PIC 9.                       
+            88  PAYMENT-IN-PREP        VALUE 1 THRU 9.           
+        16  CL-TOTAL-INT-PAID       PIC S9(5)V99 COMP-3.         
+        16  FILLER                  PIC X.                       
+                                                                 
+    12  CL-CERTIFICATE-DATA.                                     
+        16  CL-CERT-ORIGIN          PIC X.                       
+            88  CERT-WAS-ONLINE        VALUE '1'.                
+            88  CERT-WAS-CREATED       VALUE '2'.                
+            88  COVERAGE-WAS-ADDED     VALUE '3'.                
+        16  CL-CERT-KEY-DATA.                                    
+            20  CL-CERT-CARRIER     PIC X.                       
+            20  CL-CERT-GROUPING    PIC X(6).                    
+            20  CL-CERT-STATE       PIC XX.                      
+            20  CL-CERT-ACCOUNT.                                 
+                24  CL-CERT-ACCOUNT-PREFIX PIC X(4).             
+                24  CL-CERT-ACCOUNT-PRIME  PIC X(6).             
+            20  CL-CERT-EFF-DT      PIC XX.                      
+                                                                 
+    12  CL-STATUS-CONTROLS.                                      
+        16  CL-PRIORITY-CD          PIC X.                       
+            88  CONFIDENTIAL-DATA      VALUE '8'.                
+            88  HIGHEST-PRIORITY       VALUE '9'.                
+        16  CL-SUPV-ATTN-CD         PIC X.                       
+            88  SUPV-NOT-REQUIRED      VALUE ' ' 'N'.            
+            88  SUPV-IS-REQUIRED       VALUE 'Y'.                
+        16  CL-PURGED-DT            PIC XX.                      
+        16  CL-RESTORED-DT          PIC XX.                      
+        16  CL-NEXT-AUTO-PAY-DT     PIC XX.                      
+        16  CL-NEXT-RESEND-DT       PIC XX.                      
+        16  CL-NEXT-FOLLOWUP-DT     PIC XX.                      
+        16  CL-CRITICAL-PERIOD      PIC 99.                      
+*>        16  FILLER                  PIC XX.                      
+        16  CL-LAST-MAINT-DT        PIC XX.                      
+        16  CL-LAST-MAINT-USER      PIC X(4).                    
+        16  CL-LAST-MAINT-HHMMSS    PIC S9(6)     COMP-3.        
+        16  CL-LAST-MAINT-TYPE      PIC X.                       
+            88  CLAIM-SET-UP           VALUE ' '.                
+            88  PAYMENT-MADE           VALUE '1'.                
+            88  LETTER-SENT            VALUE '2'.                
+            88  MASTER-WAS-ALTERED     VALUE '3'.                
+            88  MASTER-WAS-RESTORED    VALUE '4'.                
+            88  INCURRED-DATE-CHANGED  VALUE '5'.                
+            88  FILE-CONVERTED         VALUE '6'.                
+            88  CHANGE-OF-BENEFITS     VALUE 'C'.                
+            88  ERROR-CORRECTION       VALUE 'E'.                
+        16  CL-RELATED-CLAIM-NO     PIC X(7).                    
+        16  CL-HISTORY-ARCHIVE-DT   PIC XX.                      
+        16  CL-BENEFICIARY          PIC X(10).                   
+        16  CL-FILE-ESTABLISHED-BY  PIC X(4).                    
+        16  CL-DENIAL-TYPE          PIC X.                       
+            88  CL-TYPE-DENIAL          VALUE '1'.               
+            88  CL-TYPE-RESCISSION      VALUE '2'.               
+            88  CL-TYPE-REFORMATION     VALUE '3'.               
+            88  CL-TYPE-REF-TO-RES      VALUE '4'.               
+            88  CL-TYPE-RECONSIDERED    VALUE '5'.               
+        16  CL-NO-OF-EXTENSIONS     PIC 99.                      
+                                                                 
+        16  filler                  pic x(3).                    
+*>        16  CL-CRIT-PER-RECURRENT   PIC X.                       
+*>        16  CL-CRIT-PER-RTW-MOS     PIC 99.                      
+*>        16  CL-RTW-DT               PIC XX.                      
+                                                                 
+    12  CL-TRAILER-CONTROLS.                                     
+        16  CL-TRAILER-SEQ-CNT      PIC S9(4)     COMP.          
+            88  CL-1ST-TRL-AVAIL       VALUE +4095.              
+            88  CL-LAST-TRL-AVAIL      VALUE +100.               
+            88  CL-RESV-EXP-HIST-TRLR  VALUE +0.                 
+        16  CL-LAST-INC-DT-CHANGE   PIC S9(4)     COMP.          
+        16  FILLER                  PIC XX.                      
+        16  CL-AUTO-PAY-SEQ         PIC S9(4)     COMP.          
+        16  CL-ADDRESS-TRAILER-CNT.                              
+            20  CL-INSURED-ADDR-CNT  PIC S9(1).                  
+                88  NO-INSURED-AVAILABLE    VALUE ZERO.          
+            20  CL-ACCOUNT-ADDR-CNT  PIC S9(1).                  
+                88  ACCOUNT-IS-ONLINE       VALUE ZERO.          
+            20  CL-BENIF-ADDR-CNT    PIC S9(1).                  
+                88  BENEFICIARY-IS-ONLINE   VALUE ZERO.          
+            20  CL-EMPLOYER-ADDR-CNT PIC S9(1).                  
+                88  NO-EMPLOY-AVAILABLE     VALUE ZERO.          
+            20  CL-DOCTOR-ADDR-CNT   PIC S9(1).                  
+                88  NO-DOCTOR-AVAILABLE     VALUE ZERO.          
+            20  CL-OTHER-1-ADDR-CNT  PIC S9(1).                  
+                88  NO-OTHER-1-ADDRESSES    VALUE ZERO.          
+            20  CL-OTHER-2-ADDR-CNT  PIC S9(1).                  
+                88  NO-OTHER-2-ADDRESSES    VALUE ZERO.          
+                                                                 
+    12  CL-CV-REFERENCE-NO.                                      
+        16  CL-CV-REFNO-PRIME       PIC X(18).                   
+        16  CL-CV-REFNO-SFX         PIC XX.                      
+                                                                 
+    12  CL-FILE-LOCATION            PIC X(4).                    
+                                                                 
+    12  CL-PROCESS-ERRORS.                                       
+        16  CL-FATAL-ERROR-CNT      PIC S9(4)     COMP.          
+            88  NO-FATAL-ERRORS        VALUE ZERO.               
+        16  CL-FORCEABLE-ERROR-CNT  PIC S9(4)     COMP.          
+            88  NO-FORCABLE-ERRORS     VALUE ZERO.               
+                                                                 
+    12  CL-PRODUCT-CD               PIC X.                       
+                                                                 
+    12  CL-CURRENT-KEY-DATA.                                     
+        16  CL-CURRENT-CARRIER      PIC X.                       
+        16  CL-CURRENT-GROUPING     PIC X(6).                    
+        16  CL-CURRENT-STATE        PIC XX.                      
+        16  CL-CURRENT-ACCOUNT      PIC X(10).                   
+                                                                 
+    12  CL-ASSOCIATES               PIC X.                       
+        88  CL-ASSOC-NO-INTERFACE      VALUE 'A'.                
+        88  CL-ASSOC-INTERFACE         VALUE 'I'.                
+        88  CL-NON-ASSOC-NO-INTERFACE  VALUE 'N'.                
+        88  CL-NON-ASSOC-INTERFACE     VALUE 'M'.                
+                                                                 
+    12  CL-ACTIVITY-CODE            PIC 99.                      
+    12  CL-ACTIVITY-MAINT-DT        PIC XX.                      
+    12  CL-ACTIVITY-MAINT-TYPE      PIC X(4).                    
+                                                                 
+    12  CL-LAPSE-REPORT-CODE        PIC 9.                       
+    12  CL-LAG-REPORT-CODE          PIC 9.                       
+    12  CL-LOAN-TYPE                PIC XX.                      
+    12  CL-LEGAL-STATE              PIC XX.                      
+                                                                 
+    12  CL-YESNOSW                  PIC X.                       
+    12  CL-ACCIDENT-CLAIM-SW        PIC X.                       
+        88  CL-ACCIDENT-NOT-SET           VALUE ' '.             
+        88  CL-CLAIM-DUE-TO-ACCIDENT      VALUE 'Y'.             
+        88  CL-CLAIM-NOT-DUE-TO-ACCIDENT  VALUE 'N'.             
+    12  cl-insured-type             pic x.                       
+        88  cl-claim-on-primary         value 'P'.               
+        88  cl-claim-on-co-borrower     value 'C'.               
+    12  cl-benefit-expiration-dt    PIC XX.                      
+*><<((file: ELCMSTR))                                              
+                                                                 
+01 output-msg.                                                   
+   05 filler              pic x(4) value "MSG=".                 
+   05 out-msg-text        pic x(50).                             
+                                                                 
+01  MISC.                                                        
+    12  WS-RESPONSE             PIC S9(8)   COMP.                
+        88  RESP-NORMAL                  VALUE +00.              
+        88  RESP-NOTFND                  VALUE +13.              
+        88  RESP-DUPREC                  VALUE +14.              
+        88  RESP-DUPKEY                  VALUE +15.              
+        88  RESP-NOTOPEN                 VALUE +19.              
+        88  RESP-ENDFILE                 VALUE +20.              
+                                                                 
+*>****************************************                         
+*> symbol list for the PEMBOD template                             
+*>****************************************                         
+                                                                 
+*>                                COPY NSCVARS.                    
+*>>>((file: NSCVARS))                                              
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 031912    2011110200002  AJRA  AHL CLAIM NUM                    
+*> 013013    2012110080002  AJRA  ADD ACCOUNT GPCD                 
+*> 031116    2015110400001  TANA  ADD EL150D FIELDS                
+*> 061217    2017060900001  TANA  INCREASE ATTACHMENTS FIELD SIZE  
+*> 071719    2019011600010  TANA  ADD VERIF CODE                   
+*>*****************************************************************
+01 NAPER-OUTPUT-DATA.                                            
+   05 FILLER              PIC X(6) VALUE "TEMPL=".               
+   05 OUT-TEMP            PIC X(4).                              
+   05 FILLER              PIC X(8) VALUE "&LETTER=".             
+   05 OUT-LETTER          PIC X(4).                              
+   05 FILLER              PIC X(6) VALUE "&CARR=".               
+   05 OUT-CARR            PIC X.                                 
+   05 FILLER              PIC X(7) VALUE "&CLMNO=".              
+   05 OUT-CLMNO           PIC X(7).                              
+   05 FILLER              PIC X(7) VALUE "&CRTNO=".              
+   05 OUT-CRTNO           PIC X(11).                             
+   05 FILLER              PIC X(7) VALUE "&ACTNO=".              
+   05 OUT-ACTNO           PIC X(10).                             
+   05 FILLER              PIC X(8) VALUE "&ILNAME=".             
+   05 OUT-ILNAME          PIC X(15).                             
+   05 FILLER              PIC X(8) VALUE "&IFNAME=".             
+   05 OUT-IFNAME          PIC X(10).                             
+   05 FILLER              PIC X(7) VALUE "&SEXCD=".              
+   05 OUT-SEX-CD          PIC X.                                 
+   05 FILLER              PIC X(5) VALUE "&SSN=".                
+   05 OUT-SSN             PIC X(11).                             
+   05 FILLER              PIC X(9) VALUE "&CLMSTAT=".            
+   05 OUT-CLMSTAT         PIC X.                                 
+   05 FILLER              PIC X(8) VALUE "&CLMTYP=".             
+   05 OUT-CLMTYPE         PIC X.                                 
+   05 FILLER              PIC X(7) VALUE "&ESTDT=".              
+   05 OUT-EST-DT          PIC X(21).                             
+   05 FILLER              PIC X(7) VALUE "&INCDT=".              
+   05 OUT-INC-DT          PIC X(21).                             
+   05 FILLER              PIC X(7) VALUE "&RPTDT=".              
+   05 OUT-RPT-DT          PIC X(21).                             
+   05 FILLER              PIC X(10) VALUE "&PDTHRUDT=".          
+   05 OUT-PD-THRU-DT      PIC X(21).                             
+   05 FILLER              PIC X(11) VALUE "&FORMDUEDT=".         
+   05 OUT-FORM-DUE-DT     PIC X(21).                             
+   05 FILLER              PIC X(8) VALUE "&LPMTDT=".             
+   05 OUT-LST-PMT-DT      PIC X(21).                             
+   05 FILLER              PIC X(8) VALUE "&NOPMTS=".             
+   05 OUT-NO-OF-PMTS      PIC X(10).                             
+   05 FILLER              PIC X(9) VALUE "&TOTPAID=".            
+   05 OUT-TOT-PAID        PIC 9999999.99.                        
+   05 FILLER              PIC X(8) VALUE "&LPDAMT=".             
+   05 OUT-LST-PD-AMT      PIC 9999999.99.                        
+   05 FILLER              PIC X(9) VALUE "&ADDRCNT=".            
+   05 OUT-ADDR-CNT        PIC 9.                                 
+   05 FILLER              PIC X(7) VALUE "&CRTST=".              
+   05 OUT-CRT-ST          PIC XX.                                
+   05 FILLER              PIC X(10) VALUE "&CERTACCT=".          
+   05 OUT-CERTACCT        PIC X(10).                             
+   05 FILLER              PIC X(7) VALUE "&EFFDT=".              
+   05 OUT-EFF-DT          PIC X(21).                             
+   05 FILLER              PIC X(8) VALUE "&LMNTDT=".             
+   05 OUT-LST-MAINT-DT    PIC X(21).                             
+   05 FILLER              PIC X(10) VALUE "&LMNTUSER=".          
+   05 OUT-LST-MAINT-USER  PIC X(10).                             
+   05 FILLER              PIC X(10) VALUE "&LMNTTYPE=".          
+   05 OUT-LST-MAINT-TYPE  PIC X(10).                             
+   05 FILLER              PIC X(6) VALUE "&DIAG=".               
+   05 OUT-DIAG            PIC X(66).                             
+   05 FILLER              PIC X(7) VALUE "&EXPDT=".              
+   05 OUT-EXP-DT          PIC X(21).                             
+   05 FILLER              PIC X(12) VALUE "&LCLSREASON=".        
+   05 OUT-LST-CLS-REA     PIC X(10).                             
+   05 FILLER              PIC X(8) VALUE "&BRTHDT=".             
+   05 OUT-BIRTH-DT        PIC X(21).                             
+   05 FILLER              PIC X(6) VALUE "&TERM=".               
+   05 OUT-TERM            PIC 999.                               
+   05 FILLER              PIC X(7) VALUE "&BENCD=".              
+   05 OUT-BEN-CD          PIC XX.                                
+   05 FILLER              PIC X(8) VALUE "&BENAMT=".             
+   05 OUT-BENAMT          PIC 9999999.99.                        
+   05 FILLER              PIC X(9) VALUE "&CRITPER=".            
+   05 OUT-CRIT-PER        PIC 999.                               
+   05 FILLER              PIC X(9) VALUE "&WAITPER=".            
+   05 OUT-WAIT-PER        PIC XX.                                
+   05 FILLER              PIC X(11)  VALUE "&LFINTRATE=".        
+   05 OUT-LF-INT-RATE     PIC 99.99999.                          
+   05 FILLER              PIC X(10) VALUE "&AUTOPYDT=".          
+   05 OUT-AUTO-PY-DT      PIC X(21).                             
+   05 FILLER              PIC X(12) VALUE "&AUTOSCHEND=".        
+   05 OUT-AUTO-SCHD-END   PIC X(21).                             
+   05 FILLER              PIC X(8) VALUE "&LOANNO=".             
+   05 OUT-LOAN-NO         PIC X(25).                             
+   05 FILLER              PIC X(5) VALUE "&APR=".                
+   05 OUT-APR             PIC 99.99999.                          
+   05 FILLER              PIC X(8) VALUE "&LACTDT=".             
+   05 OUT-LST-ACT-DT      PIC X(21).                             
+   05 FILLER              PIC X(7) VALUE "&ACTDT=".              
+   05 OUT-ACT-DT          PIC X(21).                             
+   05 FILLER              PIC X(10) VALUE "&LACTTYPE=".          
+   05 OUT-LST-ACT-TYPE    PIC X(15).                             
+   05 FILLER              PIC X(9) VALUE "&ACTTYPE=".            
+   05 OUT-ACT-TYPE        PIC X(15).                             
+   05 FILLER              PIC X(6) VALUE "&FORM=".               
+   05 OUT-FORM            PIC X(4).                              
+   05 FILLER              PIC X(9) VALUE "&INSNAME=".            
+   05 OUT-INS-NAME        PIC X(36).                             
+   05 FILLER              PIC X(10) VALUE "&INSADDR1=".          
+   05 OUT-INS-ADDR1       PIC X(36).                             
+   05 FILLER              PIC X(10) VALUE "&INSADDR2=".          
+   05 OUT-INS-ADDR2       PIC X(36).                             
+   05 FILLER              PIC X(9) VALUE "&INSCITY=".            
+   05 OUT-INS-CITY        PIC X(28).                             
+   05 FILLER              PIC X(10) VALUE "&INSSTATE=".          
+   05 OUT-INS-STATE       PIC XX.                                
+   05 FILLER              PIC X(8) VALUE "&INSZIP=".             
+   05 OUT-INS-ZIP         PIC X(10).                             
+   05 FILLER              PIC X(10) VALUE "&INSPHONE=".          
+   05 OUT-INS-PHONE       PIC X(13).                             
+   05 FILLER              PIC X(10) VALUE "&BENENAME=".          
+   05 OUT-BEN-NAME        PIC X(32).                             
+   05 FILLER              PIC X(11) VALUE "&BENEADDR1=".         
+   05 OUT-BEN-ADDR1       PIC X(36).                             
+   05 FILLER              PIC X(11) VALUE "&BENEADDR2=".         
+   05 OUT-BEN-ADDR2       PIC X(32).                             
+   05 FILLER              PIC X(10) VALUE "&BENECITY=".          
+   05 OUT-BEN-CITY        PIC X(28).                             
+   05 FILLER              PIC X(11) VALUE "&BENESTATE=".         
+   05 OUT-BEN-STATE       PIC XX.                                
+   05 FILLER              PIC X(9) VALUE "&BENEZIP=".            
+   05 OUT-BEN-ZIP         PIC X(10).                             
+   05 FILLER              PIC X(11) VALUE "&BENEPHONE=".         
+   05 OUT-BEN-PHONE       PIC X(13).                             
+   05 FILLER              PIC X(8) VALUE "&OANAME=".             
+   05 OUT-ORIG-NAME       PIC X(32).                             
+   05 FILLER              PIC X(10) VALUE "&ACCTNAME=".          
+   05 OUT-ACCT-NAME       PIC X(32).                             
+   05 FILLER              PIC X(11) VALUE "&ACCTADDR1=".         
+   05 OUT-ACCT-ADDR1      PIC X(36).                             
+   05 FILLER              PIC X(11) VALUE "&ACCTADDR2=".         
+   05 OUT-ACCT-ADDR2      PIC X(32).                             
+   05 FILLER              PIC X(10) VALUE "&ACCTCITY=".          
+   05 OUT-ACCT-CITY       PIC X(30).                             
+   05 FILLER              PIC X(11) VALUE "&ACCTSTATE=".         
+   05 OUT-ACCT-STATE      PIC XX.                                
+   05 FILLER              PIC X(9)  VALUE "&ACCTZIP=".           
+   05 OUT-ACCT-ZIP        PIC X(10).                             
+   05 FILLER              PIC X(11) VALUE "&ACCTPHONE=".         
+   05 OUT-ACCT-PHONE      PIC X(13).                             
+   05 FILLER              PIC X(7) VALUE "&ENCCD=".              
+   05 OUT-ENC-CODE        PIC XXX.                               
+   05 FILLER              PIC X(7) VALUE "&ENCST=".              
+   05 OUT-ENC-ST          PIC XX.                                
+   05 FILLER              PIC X(8) VALUE "&ARCHNO=".             
+   05 OUT-ARCHNO          PIC 999999999.                         
+   05 FILLER              PIC X(11) VALUE "&FLTRPRTDT=".         
+   05 OUT-1ST-LTR-PRT-DT  PIC X(21).                             
+   05 FILLER              PIC X(11) VALUE "&NEXTDUEDT=".         
+   05 OUT-NEXT-DUE-DT     PIC X(21).                             
+   05 FILLER              PIC X(8) VALUE "&JLNAME=".             
+   05 OUT-JLNAME          PIC X(15).                             
+   05 FILLER              PIC X(8) VALUE "&JFNAME=".             
+   05 OUT-JFNAME          PIC X(10).                             
+   05 FILLER              PIC X(9)  VALUE "&ENCLINE=".           
+   05 OUT-ENCLINE         PIC X(100).                            
+   05 FILLER              PIC X(9) VALUE "&ENCATTS=".            
+   05 OUT-ENCATTS         PIC X(255).                            
+   05 FILLER              PIC X(10) VALUE "&OUTSTACK=".          
+   05 OUT-OUTSTACK        PIC X.                                 
+   05 FILLER              PIC X(8) VALUE "&PROCID=".             
+   05 OUT-PROCID          PIC XXXX.                              
+   05 FILLER              PIC X(8) VALUE "&COMPID=".             
+   05 OUT-COMPID          PIC XXX.                               
+   05 FILLER              PIC X(8) VALUE "&PRTNOW=".             
+   05 OUT-PRINT-NOW-SW    PIC X.                                 
+   05 FILLER              PIC X(11) VALUE "&CYCLEDATE=".         
+   05 OUT-CYCLE-DATE      PIC X(8).                              
+   05 FILLER              PIC X(11) VALUE "&ENCSTNAME=".         
+   05 OUT-ENC-ST-NAME     PIC XX.                                
+   05 FILLER              PIC X(10) VALUE "&CARRIDLU=".          
+   05 OUT-CARR-LU         PIC X.                                 
+   05 FILLER              PIC X(5)  VALUE "&CCN=".               
+   05 OUT-AHL-CLAIM-NO    PIC X(9).                              
+   05 FILLER              PIC X(4) VALUE "&GP=".                 
+   05 OUT-ACCT-GPCD       PIC 99.                                
+   05 FILLER              PIC X(9) VALUE "&MAXBENS=".            
+   05 OUT-MAX-BENS        PIC 9(3).                              
+   05 FILLER              PIC X(10) VALUE "&PAIDBENS=".          
+   05 OUT-PAID-BENS       PIC 9(3).                              
+   05 FILLER              PIC X(9) VALUE "&REMBENS=".            
+   05 OUT-REM-BENS        PIC 9(3).                              
+   05 FILLER              PIC X(9) VALUE "&EXCLPER=".            
+   05 OUT-EXCL-PER        PIC 9(3).                              
+   05 FILLER              PIC X(8) VALUE "&RECMOS=".             
+   05 OUT-REC-MOS         PIC 9(2).                              
+   05 FILLER              PIC X(8) VALUE "&INSTYP=".             
+   05 OUT-INS-TYP         PIC X(4).                              
+   05 FILLER              PIC X(8) VALUE "&BENPER=".             
+   05 OUT-BEN-PER         PIC 9(2).                              
+   05 FILLER              PIC X(7) VALUE "&ACCSW=".              
+   05 OUT-ACC-SW          PIC X.                                 
+   05 FILLER              PIC X(7) VALUE "&VERCD=".              
+   05 OUT-VER-CD          PIC X(5).                              
+*><<((file: NSCVARS))                                              
+                                                                 
+*>***************************************************************  
+*>                                                                 
+*> Copyright (c) 2016-2020 NTT DATA, Inc.                          
+*> All rights reserved.                                            
+*>                                                                 
+*>***************************************************************  
+01  DFHEIV.                                                      
+  02  DFHEIV0               PIC X(35).                           
+  02  DFHEIV1               PIC X(08).                           
+  02  DFHEIV2               PIC X(08).                           
+  02  DFHEIV3               PIC X(08).                           
+  02  DFHEIV4               PIC X(06).                           
+  02  DFHEIV5               PIC X(04).                           
+  02  DFHEIV6               PIC X(04).                           
+  02  DFHEIV7               PIC X(02).                           
+  02  DFHEIV8               PIC X(02).                           
+  02  DFHEIV9               PIC X(01).                           
+  02  DFHEIV10              PIC S9(7) COMP-3.                    
+  02  DFHEIV11              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV12              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV13              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV14              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV15              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV16              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV17              PIC X(04).                           
+  02  DFHEIV18              PIC X(04).                           
+  02  DFHEIV19              PIC X(04).                           
+  02  DFHEIV20              USAGE IS POINTER.                    
+  02  DFHEIV21              USAGE IS POINTER.                    
+  02  DFHEIV22              USAGE IS POINTER.                    
+  02  DFHEIV23              USAGE IS POINTER.                    
+  02  DFHEIV24              USAGE IS POINTER.                    
+  02  DFHEIV25              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV26              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV27              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV28              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV29              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV30              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV31              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV32              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV33              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV34              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV35              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV97              PIC S9(7) COMP-3 VALUE ZERO.         
+  02  DFHEIV98              PIC S9(4) COMP SYNC VALUE ZERO.      
+  02  FILLER                PIC X(02).                           
+  02  DFHEIV99              PIC X(08) VALUE SPACE.               
+  02  DFHEIVL0              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL1              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL2              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL3              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL4              PIC X(255) VALUE SPACE.              
+  02  DFHEIVL5              PIC X(255) VALUE SPACE.              
+LINKAGE  SECTION.                                                
+*>**************************************************************** 
+*>                                                               * 
+*> Copyright (c) 2016-2020 NTT DATA, Inc.                        * 
+*> All rights reserved.                                          * 
+*>                                                               * 
+*>**************************************************************** 
+01  dfheiblk.                                                    
+    02  eibtime          pic s9(7) comp-3.                       
+    02  eibdate          pic s9(7) comp-3.                       
+    02  eibtrnid         pic x(4).                               
+    02  eibtaskn         pic s9(7) comp-3.                       
+    02  eibtrmid         pic x(4).                               
+    02  dfheigdi         pic s9(4) comp.                         
+    02  eibcposn         pic s9(4) comp.                         
+    02  eibcalen         pic s9(4) comp.                         
+    02  eibaid           pic x(1).                               
+    02  eibfiller1       pic x(1).                               
+    02  eibfn            pic x(2).                               
+    02  eibfiller2       pic x(2).                               
+    02  eibrcode         pic x(6).                               
+    02  eibfiller3       pic x(2).                               
+    02  eibds            pic x(8).                               
+    02  eibreqid         pic x(8).                               
+    02  eibrsrce         pic x(8).                               
+    02  eibsync          pic x(1).                               
+    02  eibfree          pic x(1).                               
+    02  eibrecv          pic x(1).                               
+    02  eibsend          pic x(1).                               
+    02  eibatt           pic x(1).                               
+    02  eibeoc           pic x(1).                               
+    02  eibfmh           pic x(1).                               
+    02  eibcompl         pic x(1).                               
+    02  eibsig           pic x(1).                               
+    02  eibconf          pic x(1).                               
+    02  eiberr           pic x(1).                               
+    02  eibrldbk         pic x(1).                               
+    02  eiberrcd         pic x(4).                               
+    02  eibsynrb         pic x(1).                               
+    02  eibnodat         pic x(1).                               
+    02  eibfiller5       pic x(2).                               
+    02  eibresp          pic s9(8) comp.                         
+    02  eibresp2         pic s9(8) comp.                         
+    02  dfheigdj         pic s9(4) comp.                         
+    02  dfheigdk         pic s9(4) comp.                         
+                                                                 
+01  DFHCOMMAREA       PIC X(01).                                 
+01  var  pic x(30).                                              
+                                                                 
+PROCEDURE DIVISION USING DFHEIBLK DFHCOMMAREA.                   
+0000-DFHEXIT SECTION.                                            
+    MOVE FUNCTION WHEN-COMPILED TO DFHEIVL0(1:21).               
+    MOVE '9#                    %   ' TO DFHEIV0.                
+    MOVE 'NSREQLTR' TO DFHEIV1.                                  
+    CALL 'kxdfhei1' USING DFHEIV0 DFH-START DFHEIV DFHEIV1       
+         DFHEIVL0.                                               
+VCOBOL-DUMMY-PROCEDURE.                                          
+                                                                 
+*>********************                                             
+*> Receive web input                                               
+*>********************                                             
+                                                                 
+    set P to address of KIXSYS                                   
+    CALL "getenv" using by value P returning var-ptr             
+    if var-ptr = null then                                       
+       display ' kixsys not set '                                
+    else                                                         
+       set address of var to var-ptr                             
+       move 0 to env-var-len                                     
+       inspect var tallying env-var-len                          
+         for characters before X'00'                             
+*>       DISPLAY '  KIXSYS = ' var (1:env-var-len)                 
+       unstring var (1:env-var-len) delimited by '/'             
+          into WS-KIX-FIL1 WS-KIX-APPS WS-KIX-ENV WS-KIX-MYENV   
+             WS-KIX-SYS                                          
+       end-unstring                                              
+*>       DISPLAY ' WS KIX SYS ' WS-KIXSYS                          
+*>       DISPLAY ' WS KIX MYENV ' WS-KIX-MYENV                     
+    end-if                                                       
+                                                                 
+                                                                 
+*> exec cics web                                                   
+*>       startbr formfield resp(w-resp)                            
+*>     end-exec.                                                   
+*>    MOVE 'X(f                   &  N#00000944' TO DFHEIV0        
+    MOVE X'582866202020202020202020' &                           
+         X'202020202020202020202620' &                           
+         X'204E233030303030393434' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO w-resp                                      
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+     perform read-form thru read-form-exit                       
+        until w-resp not = 0 .                                   
+*>   dfhresp(normal)                                               
+                                                                 
+                                                                 
+*> exec cics web                                                   
+*>       endbr formfield                                           
+*>     end-exec.                                                   
+*>    MOVE 'X,f                   #   #00000951' TO DFHEIV0        
+    MOVE X'582C66202020202020202020' &                           
+         X'202020202020202020202320' &                           
+         X'2020233030303030393531' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+    MOVE IFF-CARRIER             TO OT-CARRIER                   
+    MOVE IFF-CLAIM-NO            TO OT-CLMNO                     
+    MOVE IFF-CERT-NO             TO OT-CRTNO                     
+    MOVE IFF-LETTER-ID           TO OT-LETTER-ID                 
+    MOVE IFF-FOLLOW-UP-DT        TO OT-FOLLOW-UP-DT              
+    MOVE IFF-RESEND-DT           TO OT-RESEND-DT                 
+    MOVE IFF-NO-OF-COPIES        TO OT-NO-OF-COPIES              
+    MOVE IFF-PROC-ID             TO OT-PROC-ID                   
+    MOVE IFF-COMP-ID             TO OT-COMP-ID                   
+    MOVE IFF-PRINT-NOW-SW        TO OT-PRINT-NOW-SW              
+    MOVE IFF-ENC-CD              TO OT-ENC-CD                    
+    MOVE ZEROS                   TO OT-ARCHIVE-NO                
+    MOVE IFF-REGARDING           TO OT-REGARDING                 
+                                                                 
+*>    DISPLAY ' INPUT FORM ' WS-KEY                                
+*>****************************************                         
+*> Invoke the LETTER business logic                                
+*>****************************************                         
+                                                                 
+                                                                 
+*> exec cics link                                                  
+*>       program('NSRLTRBL')                                       
+*>       commarea(srch-commarea)                                   
+*>    end-exec.                                                    
+    MOVE LENGTH OF                                               
+     srch-commarea                                               
+      TO DFHEIV11                                                
+    MOVE 'NSRLTRBL' TO DFHEIV1                                   
+*>    MOVE '."C                   (   #00000974' TO DFHEIV0        
+    MOVE X'2E2243202020202020202020' &                           
+         X'202020202020202020202820' &                           
+         X'2020233030303030393734' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV1,                                               
+          srch-commarea,                                         
+          DFHEIV11,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+*>    DISPLAY ' MADE IT BACK FROM NSRLTRBL '                       
+    IF BL-OK                                                     
+*>       DISPLAY ' BL OK ' BL-ARCHIVE-NO                           
+       MOVE BL-RECORD-PASSED-DATA                                
+                                TO NAPER-OUTPUT-DATA             
+       MOVE BL-ARCHIVE-NO          TO OT-ARCHIVE-NO              
+    END-IF                                                       
+                                                                 
+    move +1 to v2                                                
+    perform varying v1 from +1 by +1 until v1 > +1               
+       if ot-carrier (v1:1) <> spaces                            
+          move ot-carrier(v1:1) to var-string(v2:1)              
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +7               
+       if ot-clmno (v1:1) <> spaces                              
+          move ot-clmno(v1:1) to var-string(v2:1)                
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +11              
+       if ot-crtno (v1:1) <> spaces                              
+          move ot-crtno(v1:1) to var-string(v2:1)                
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +4               
+       if ot-letter-id (v1:1) <> spaces                          
+          move ot-letter-id(v1:1) to var-string(v2:1)            
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +10              
+       if ot-follow-up-dt (v1:1) <> spaces                       
+          move ot-follow-up-dt(v1:1) to var-string(v2:1)         
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +10              
+       if ot-resend-dt (v1:1) <> spaces                          
+          move ot-resend-dt(v1:1) to var-string(v2:1)            
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +2               
+       if ot-no-of-copies (v1:1) <> spaces                       
+          move ot-no-of-copies(v1:1) to var-string(v2:1)         
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +4               
+       if ot-proc-id (v1:1) <> spaces                            
+          move ot-proc-id(v1:1) to var-string(v2:1)              
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +3               
+       if ot-comp-id (v1:1) <> spaces                            
+          move ot-comp-id(v1:1) to var-string(v2:1)              
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +1               
+       if ot-print-now-sw (v1:1) <> spaces                       
+          move ot-print-now-sw(v1:1) to var-string(v2:1)         
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +3               
+       if ot-enc-cd (v1:1) <> spaces                             
+          move ot-enc-cd(v1:1) to var-string(v2:1)               
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +8               
+       if ot-archive-no (v1:1) <> spaces                         
+          move ot-archive-no(v1:1) to var-string(v2:1)           
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    perform varying m1 from +70 by -1 until                      
+       (m1 < +1)                                                 
+       or (ot-regarding(m1:1) <> spaces)                         
+    end-perform                                                  
+                                                                 
+    move +1 to a2                                                
+    if m1 > +0                                                   
+       MOVE SPACES              TO WS-WORK-FIELD                 
+       perform varying a1 from +1 by +1 until a1 > m1            
+          if ot-regarding(a1:1) = ' '                            
+             move '~'           to ws-work-field(a2:1)           
+             add +1 to a2                                        
+          else                                                   
+             move ot-regarding(a1:1) to ws-work-field(a2:1)      
+             add +1 to a2                                        
+          end-if                                                 
+       end-perform                                               
+    end-if                                                       
+                                                                 
+    move ws-work-field to ot-regarding                           
+                                                                 
+    move '~~' to var-string(v2:2)                                
+    add +2 to v2                                                 
+    perform varying v1 from +1 by +1 until v1 > +70              
+       if ot-regarding (v1:1) <> spaces and '&'                  
+          move ot-regarding(v1:1) to var-string(v2:1)            
+          add +1 to v2                                           
+       end-if                                                    
+    end-perform                                                  
+                                                                 
+    move finished-string        to ws-lt-rest                    
+    evaluate ws-kix-myenv                                        
+       when 'cid1p'                                              
+          move finished-string  to ws-sl-rest                    
+          move '7001'           to ws-sl-port                    
+       when 'mdoff'                                              
+          move finished-string  to ws-sl-rest                    
+          move '7003'           to ws-sl-port                    
+       when 'paul'                                               
+          move '5002'           to ws-lt-port                    
+       when 'tony'                                               
+          move '6003'           to ws-lt-port                    
+       when 'ahltst'                                             
+          move '6007'           to ws-lt-port                    
+       when other                                                
+          move '6002'           to ws-lt-port                    
+    end-evaluate                                                 
+                                                                 
+*>    MOVE X'04'                  TO WS-ELMSTR-COMPANY-CD          
+*>    MOVE IFF-CARRIER            TO WS-ELMSTR-CARRIER             
+*>    MOVE IFF-CLAIM-NO           TO WS-ELMSTR-CLAIM-NO            
+*>    MOVE IFF-CERT-NO            TO WS-ELMSTR-CERT-NO             
+*>                                                                 
+*>    EXEC CICS READ                                               
+*>         DATASET    ('ELMSTR')                                   
+*>         INTO       (CLAIM-MASTER)                               
+*>         RIDFLD     (WS-ELMSTR-KEY)                              
+*>         RESP       (WS-RESPONSE)                                
+*>    END-EXEC.                                                    
+*>                                                                 
+*>    IF RESP-NORMAL                                               
+*>       MOVE IFF-LETTER-ID       TO OUT-TEMP                      
+*>                                   OUT-LETTER                    
+*>       MOVE CL-CARRIER          TO OUT-CARR                      
+*>       MOVE CL-INSURED-LAST-NAME                                 
+*>                                TO OUT-ILNAME                    
+*>       MOVE CL-INSURED-1ST-NAME TO OUT-IFNAME                    
+*>       MOVE CL-CLAIM-NO         TO OUT-CLMNO                     
+*>       MOVE CL-CERT-NO          TO OUT-CRTNO                     
+*>       MOVE CL-CERT-ACCOUNT     TO OUT-ACTNO                     
+*>    END-IF                                                       
+                                                                 
+*>    exec cics link program('NSRLTRBL')                           
+*>       commarea(srch-commarea)                                   
+*>    end-exec.                                                    
+                                                                 
+*>**********************************************************       
+*> Build output document.  There are three templates used          
+*> for this document.  PEMHDR and PEMFTR are the header            
+*> and footer, respectively.  PEMBOD is used for the               
+*> actual data.  For each array entry in the business              
+*> logic output, set the symbol list from the array                
+*> entry and insert into the document using the PEMBOD             
+*> template.                                                       
+*>**********************************************************       
+                                                                 
+*>    move bl-output-message to out-msg-text.                      
+                                                                 
+    evaluate true                                                
+       when iff-comp-id = 'DCC'                                  
+          IF WS-KIX-MYENV = 'cid1p'                              
+                                                                 
+*> exec cics document create                                       
+*>                doctoken   (w-doctoken)                          
+*>                template   ('PEMHDR')                            
+*>                symbollist (WS-PROD-DCC-PEMHDR)                  
+*>                resp       (WS-RESPONSE)                         
+*>             end-exec                                            
+    MOVE LENGTH OF                                               
+     WS-PROD-DCC-PEMHDR                                          
+      TO DFHEIV16                                                
+    MOVE 'PEMHDR' TO DFHEIV1                                     
+*>    MOVE '\"D tSL               )  N#00001185' TO DFHEIV0        
+    MOVE X'5C22442074534C2020202020' &                           
+         X'202020202020202020202920' &                           
+         X'204E233030303031313835' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV1,                                               
+          WS-PROD-DCC-PEMHDR,                                    
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+          ELSE                                                   
+                                                                 
+*> exec cics document create                                       
+*>                doctoken   (w-doctoken)                          
+*>                template   ('PEMHDR')                            
+*>                symbollist (WS-TEST-DCC-PEMHDR)                  
+*>                resp       (WS-RESPONSE)                         
+*>             end-exec                                            
+    MOVE LENGTH OF                                               
+     WS-TEST-DCC-PEMHDR                                          
+      TO DFHEIV16                                                
+    MOVE 'PEMHDR' TO DFHEIV1                                     
+*>    MOVE '\"D tSL               )  N#00001192' TO DFHEIV0        
+    MOVE X'5C22442074534C2020202020' &                           
+         X'202020202020202020202920' &                           
+         X'204E233030303031313932' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV1,                                               
+          WS-TEST-DCC-PEMHDR,                                    
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+          END-IF                                                 
+       when IFF-COMP-ID = 'AHL'                                  
+          IF WS-KIX-MYENV = 'cid1p'                              
+                                                                 
+*> exec cics document create                                       
+*>                doctoken   (w-doctoken)                          
+*>                template   ('PEMHDR')                            
+*>                symbollist (WS-PROD-AHL-PEMHDR)                  
+*>                resp       (WS-RESPONSE)                         
+*>             end-exec                                            
+    MOVE LENGTH OF                                               
+     WS-PROD-AHL-PEMHDR                                          
+      TO DFHEIV16                                                
+    MOVE 'PEMHDR' TO DFHEIV1                                     
+*>    MOVE '\"D tSL               )  N#00001201' TO DFHEIV0        
+    MOVE X'5C22442074534C2020202020' &                           
+         X'202020202020202020202920' &                           
+         X'204E233030303031323031' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV1,                                               
+          WS-PROD-AHL-PEMHDR,                                    
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+          ELSE                                                   
+                                                                 
+*> exec cics document create                                       
+*>                doctoken   (w-doctoken)                          
+*>                template   ('PEMHDR')                            
+*>                symbollist (WS-TEST-AHL-PEMHDR)                  
+*>                resp       (WS-RESPONSE)                         
+*>             end-exec                                            
+    MOVE LENGTH OF                                               
+     WS-TEST-AHL-PEMHDR                                          
+      TO DFHEIV16                                                
+    MOVE 'PEMHDR' TO DFHEIV1                                     
+*>    MOVE '\"D tSL               )  N#00001208' TO DFHEIV0        
+    MOVE X'5C22442074534C2020202020' &                           
+         X'202020202020202020202920' &                           
+         X'204E233030303031323038' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV1,                                               
+          WS-TEST-AHL-PEMHDR,                                    
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+          END-IF                                                 
+       when IFF-COMP-ID = 'VPP'                                  
+          IF WS-KIX-MYENV = 'cid1p'                              
+                                                                 
+*> exec cics document create                                       
+*>                doctoken   (w-doctoken)                          
+*>                template   ('PEMHDR')                            
+*>                symbollist (WS-PROD-VPP-PEMHDR)                  
+*>                resp       (WS-RESPONSE)                         
+*>             end-exec                                            
+    MOVE LENGTH OF                                               
+     WS-PROD-VPP-PEMHDR                                          
+      TO DFHEIV16                                                
+    MOVE 'PEMHDR' TO DFHEIV1                                     
+*>    MOVE '\"D tSL               )  N#00001217' TO DFHEIV0        
+    MOVE X'5C22442074534C2020202020' &                           
+         X'202020202020202020202920' &                           
+         X'204E233030303031323137' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV1,                                               
+          WS-PROD-VPP-PEMHDR,                                    
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+          ELSE                                                   
+                                                                 
+*> exec cics document create                                       
+*>                doctoken   (w-doctoken)                          
+*>                template   ('PEMHDR')                            
+*>                symbollist (WS-TEST-VPP-PEMHDR)                  
+*>                resp       (WS-RESPONSE)                         
+*>             end-exec                                            
+    MOVE LENGTH OF                                               
+     WS-TEST-VPP-PEMHDR                                          
+      TO DFHEIV16                                                
+    MOVE 'PEMHDR' TO DFHEIV1                                     
+*>    MOVE '\"D tSL               )  N#00001224' TO DFHEIV0        
+    MOVE X'5C22442074534C2020202020' &                           
+         X'202020202020202020202920' &                           
+         X'204E233030303031323234' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV1,                                               
+          WS-TEST-VPP-PEMHDR,                                    
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+          END-IF                                                 
+       when IFF-COMP-ID = 'FNL'                                  
+          IF WS-KIX-MYENV = 'cid1p'                              
+                                                                 
+*> exec cics document create                                       
+*>                doctoken   (w-doctoken)                          
+*>                template   ('PEMHDR')                            
+*>                symbollist (WS-PROD-FNL-PEMHDR)                  
+*>                resp       (WS-RESPONSE)                         
+*>             end-exec                                            
+    MOVE LENGTH OF                                               
+     WS-PROD-FNL-PEMHDR                                          
+      TO DFHEIV16                                                
+    MOVE 'PEMHDR' TO DFHEIV1                                     
+*>    MOVE '\"D tSL               )  N#00001233' TO DFHEIV0        
+    MOVE X'5C22442074534C2020202020' &                           
+         X'202020202020202020202920' &                           
+         X'204E233030303031323333' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV1,                                               
+          WS-PROD-FNL-PEMHDR,                                    
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+          ELSE                                                   
+                                                                 
+*> exec cics document create                                       
+*>                doctoken   (w-doctoken)                          
+*>                template   ('PEMHDR')                            
+*>                symbollist (WS-TEST-FNL-PEMHDR)                  
+*>                resp       (WS-RESPONSE)                         
+*>             end-exec                                            
+    MOVE LENGTH OF                                               
+     WS-TEST-FNL-PEMHDR                                          
+      TO DFHEIV16                                                
+    MOVE 'PEMHDR' TO DFHEIV1                                     
+*>    MOVE '\"D tSL               )  N#00001240' TO DFHEIV0        
+    MOVE X'5C22442074534C2020202020' &                           
+         X'202020202020202020202920' &                           
+         X'204E233030303031323430' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV1,                                               
+          WS-TEST-FNL-PEMHDR,                                    
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+          END-IF                                                 
+       when other                                                
+          IF WS-KIX-MYENV = 'cid1p'                              
+                                                                 
+*> exec cics document create                                       
+*>                doctoken   (w-doctoken)                          
+*>                template   ('PEMHDR')                            
+*>                symbollist (WS-PROD-CID-PEMHDR)                  
+*>                resp       (WS-RESPONSE)                         
+*>             end-exec                                            
+    MOVE LENGTH OF                                               
+     WS-PROD-CID-PEMHDR                                          
+      TO DFHEIV16                                                
+    MOVE 'PEMHDR' TO DFHEIV1                                     
+*>    MOVE '\"D tSL               )  N#00001249' TO DFHEIV0        
+    MOVE X'5C22442074534C2020202020' &                           
+         X'202020202020202020202920' &                           
+         X'204E233030303031323439' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV1,                                               
+          WS-PROD-CID-PEMHDR,                                    
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+          ELSE                                                   
+                                                                 
+*> exec cics document create                                       
+*>                doctoken   (w-doctoken)                          
+*>                template   ('PEMHDR')                            
+*>                symbollist (WS-TEST-CID-PEMHDR)                  
+*>                resp       (WS-RESPONSE)                         
+*>             end-exec                                            
+    MOVE LENGTH OF                                               
+     WS-TEST-CID-PEMHDR                                          
+      TO DFHEIV16                                                
+    MOVE 'PEMHDR' TO DFHEIV1                                     
+*>    MOVE '\"D tSL               )  N#00001256' TO DFHEIV0        
+    MOVE X'5C22442074534C2020202020' &                           
+         X'202020202020202020202920' &                           
+         X'204E233030303031323536' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV1,                                               
+          WS-TEST-CID-PEMHDR,                                    
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+          END-IF                                                 
+    end-evaluate                                                 
+                                                                 
+*>    DISPLAY ' PEMHDR DOC CREATE ' WS-RESPONSE                    
+                                                                 
+*>    move 1 to bl-index.                                          
+*>                                                                 
+*>    perform bl-output-record-count times                         
+*>                                                                 
+*>        move bl-output-account-number(bl-index)                  
+*>          to out-account-number                                  
+*>        move bl-output-last-name(bl-index)                       
+*>          to out-last-name                                       
+*>        move bl-output-first-name(bl-index)                      
+*>          to out-first-name                                      
+*>        move bl-output-middle-initial(bl-index)                  
+*>          to out-middle-initial                                  
+*>                                                                 
+                                                                 
+*>    MOVE 'CICM'                 TO OUT-TEMP                      
+*>    MOVE 'CICM'                 TO OUT-LETTER                    
+*>    MOVE '9'                    TO OUT-CARR                      
+*>    MOVE 'MCDANIEL'             TO OUT-ILNAME                    
+*>    MOVE 'KATHI'                TO OUT-IFNAME                    
+*>    MOVE '0151216'              TO OUT-CLMNO                     
+*>    MOVE '0009235906 '          TO OUT-CRTNO                     
+*>    MOVE '0990000208'           TO OUT-ACTNO                     
+                                                                 
+                                                                 
+*> exec cics document set                                          
+*>       doctoken(w-doctoken)                                      
+*>       symbollist(NAPER-OUTPUT-DATA)                             
+*>       length(length of NAPER-OUTPUT-DATA)                       
+*>                   resp   (WS-RESPONSE)                          
+*>    end-exec                                                     
+    MOVE LENGTH OF                                               
+     NAPER-OUTPUT-DATA TO DFHEIV16                               
+*>    MOVE '\(Ds L                ''  N#00001290' TO DFHEIV0       
+    MOVE X'5C284473204C202020202020' &                           
+         X'202020202020202020202720' &                           
+         X'204E233030303031323930' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          NAPER-OUTPUT-DATA,                                     
+          DFHEIV99,                                              
+          DFHEIV16,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+                                                                 
+                                                                 
+*> exec cics document insert                                       
+*>       doctoken(w-doctoken)                                      
+*>       template('PEMBOD')                                        
+*>                   resp   (WS-RESPONSE)                          
+*>    end-exec                                                     
+    MOVE 'PEMBOD' TO DFHEIV1                                     
+*>    MOVE '\$Dt                  (  N#00001297' TO DFHEIV0        
+    MOVE X'5C2444742020202020202020' &                           
+         X'202020202020202020202820' &                           
+         X'204E233030303031323937' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV1,                                               
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+                                                                 
+    INSPECT OT-REGARDING REPLACING ALL '&' BY ' '                
+                                                                 
+    if ws-kix-myenv = 'cid1p' or 'mdoff'                         
+       compute ws-sl-var-length =                                
+          (ws-sl-var-length + v2) - +1                           
+                                                                 
+*> exec cics document set                                          
+*>          doctoken(w-doctoken)                                   
+*>          symbollist(WS-VAR-SLUNIKIX)                            
+*>          length(ws-sl-var-length)                               
+*>                      resp   (WS-RESPONSE)                       
+*>       end-exec                                                  
+*>    MOVE '\(Ds L                ''  N#00001308' TO DFHEIV0       
+    MOVE X'5C284473204C202020202020' &                           
+         X'202020202020202020202720' &                           
+         X'204E233030303031333038' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          WS-VAR-SLUNIKIX,                                       
+          DFHEIV99,                                              
+          ws-sl-var-length,                                      
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+    else                                                         
+       compute ws-lt-var-length =                                
+          (ws-lt-var-length + v2) - +1                           
+                                                                 
+*> exec cics document set                                          
+*>          doctoken(w-doctoken)                                   
+*>          symbollist(WS-VAR-LOGICTEST)                           
+*>          length(ws-lt-var-length)                               
+*>                      resp   (WS-RESPONSE)                       
+*>       end-exec                                                  
+*>    MOVE '\(Ds L                ''  N#00001317' TO DFHEIV0       
+    MOVE X'5C284473204C202020202020' &                           
+         X'202020202020202020202720' &                           
+         X'204E233030303031333137' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          WS-VAR-LOGICTEST,                                      
+          DFHEIV99,                                              
+          ws-lt-var-length,                                      
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+    end-if                                                       
+                                                                 
+                                                                 
+*> exec cics document insert                                       
+*>       doctoken(w-doctoken)                                      
+*>       template('PEMFTR')                                        
+*>                   resp   (WS-RESPONSE)                          
+*>    end-exec                                                     
+    MOVE 'PEMFTR' TO DFHEIV1                                     
+*>    MOVE '\$Dt                  (  N#00001325' TO DFHEIV0        
+    MOVE X'5C2444742020202020202020' &                           
+         X'202020202020202020202820' &                           
+         X'204E233030303031333235' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV1,                                               
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK                     
+                                                                 
+*>***************************************                          
+*> Send the document and return.                                   
+*>***************************************                          
+                                                                 
+                                                                 
+*> exec cics web send                                              
+*>       doctoken(w-doctoken)                                      
+*>                   resp   (WS-RESPONSE)                          
+*>    end-exec.                                                    
+*>    MOVE 'X$D                   *  N#00001335' TO DFHEIV0        
+    MOVE X'582444202020202020202020' &                           
+         X'202020202020202020202A20' &                           
+         X'204E233030303031333335' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-doctoken,                                            
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    MOVE EIBRESP  TO WS-RESPONSE                                 
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+*>    DISPLAY ' WEB SEND  ' WS-RESPONSE                            
+                                                                 
+*>    DISPLAY ' ABOUT TO RETURN '                                  
+                                                                 
+*> exec cics                                                       
+*>       return                                                    
+*>    end-exec.                                                    
+*>    MOVE '.(                    ''   #00001343' TO DFHEIV0       
+    MOVE X'2E2820202020202020202020' &                           
+         X'202020202020202020202720' &                           
+         X'2020233030303031333433' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+                                                                 
+*>*****************************************************            
+*> Read all fields of the incoming form, moving                    
+*> each to the corresponding field of the commarea                 
+*> (business logic input fields).                                  
+*>*****************************************************            
+                                                                 
+read-form.                                                       
+    move spaces to w-form-name.                                  
+    move length of w-form-name to w-form-name-len.               
+          move spaces to w-form-value.                           
+    move length of w-form-value to w-form-value-len.             
+                                                                 
+*> exec cics web readnext                                          
+*>                  formfield(w-form-name)                         
+*>                  namelength(w-form-name-len)                    
+*>                  value(w-form-value)                            
+*>                  valuelength(w-form-value-len)                  
+*>                  resp(w-resp)                                   
+*>    end-exec.                                                    
+*>    MOVE 'X*FLVL                &  N#00001359' TO DFHEIV0        
+    MOVE X'582A464C564C202020202020' &                           
+         X'202020202020202020202620' &                           
+         X'204E233030303031333539' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          w-form-name,                                           
+          w-form-name-len,                                       
+          w-form-value,                                          
+          w-form-value-len,                                      
+          DFHEIV99                                               
+    MOVE EIBRESP  TO w-resp                                      
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+    evaluate w-resp                                              
+       when 0                                                    
+*>   dfhresp(normal)                                               
+          evaluate w-form-name(1:w-form-name-len)                
+             when 'carrier'                                      
+                if w-form-value-len not = 0                      
+                   move w-form-value(1:w-form-value-len)         
+                                                  to IFF-CARRIER 
+                                                     BL-CARRIER  
+                else                                             
+                               move spaces to IFF-CARRIER        
+                end-if                                           
+             when 'claim_no'                                     
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                                  to IFF-CLAIM-NO
+                                                     BL-CLAIM-NO 
+                else                                             
+                               move spaces  to IFF-CLAIM-NO      
+                end-if                                           
+             when 'cert_no'                                      
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                to IFF-CERT-NO                   
+                                   BL-CERT-NO                    
+                else                                             
+                               move spaces  to IFF-CERT-NO       
+                end-if                                           
+             when 'letter_id'                                    
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                to IFF-LETTER-ID                 
+                                   BL-LETTER-ID                  
+                else                                             
+                   move spaces  to IFF-LETTER-ID                 
+                end-if                                           
+             when 'fu_date'                                      
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                to IFF-FOLLOW-UP-DT              
+                                   BL-FOLLOW-UP-DT               
+                else                                             
+                               move spaces  to IFF-FOLLOW-UP-DT  
+                end-if                                           
+             when 'rs_date'                                      
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                to IFF-RESEND-DT                 
+                                   BL-RESEND-DT                  
+                else                                             
+                               move spaces  to IFF-RESEND-DT     
+                end-if                                           
+             when 'no_copies'                                    
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                to IFF-NO-OF-COPIES              
+                                   BL-NO-OF-COPIES               
+                else                                             
+                   move zeros   to IFF-NO-OF-COPIES              
+                end-if                                           
+             when 'proc_id'                                      
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                to IFF-PROC-ID                   
+                                   BL-PROC-ID                    
+                else                                             
+                   move 'KMSB'  to IFF-PROC-ID                   
+                end-if                                           
+             when 'comp_id'                                      
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                to IFF-COMP-ID                   
+                                   BL-COMP-ID                    
+                else                                             
+                   move 'CID'   to IFF-COMP-ID                   
+                end-if                                           
+             when 'prt_now'                                      
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                to IFF-PRINT-NOW-SW              
+                                   BL-PRINT-NOW-SW               
+                else                                             
+                   move 'N'     to IFF-PRINT-NOW-SW              
+                end-if                                           
+             when 'enc_cd'                                       
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                to IFF-ENC-CD                    
+                                   BL-ENC-CD                     
+                else                                             
+                   move '0'     to IFF-ENC-CD                    
+                end-if                                           
+             when 'regarding'                                    
+                            if w-form-value-len not = 0          
+                   move w-form-value(1:w-form-value-len)         
+                                to IFF-REGARDING                 
+                                   BL-REGARDING                  
+                else                                             
+                   move SPACES  to IFF-REGARDING BL-REGARDING    
+                end-if                                           
+          end-evaluate                                           
+       when other                                                
+          continue                                               
+    end-evaluate.                                                
+read-form-exit.                                                  
+                                                                 
+                                                                 
+                                                                 
+9999-DFHBACK SECTION.                                            
+    MOVE '9%                    "   ' TO DFHEIV0                 
+    MOVE 'NSREQLTR' TO DFHEIV1                                   
+    CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1                        
+    GOBACK.                                                      
+9999-DFHEXIT.                                                    
+    IF DFHEIGDJ EQUAL 0001                                       
+        NEXT SENTENCE.                                           
+    MOVE '9%                    "   ' TO DFHEIV0                 
+    MOVE 'NSREQLTR' TO DFHEIV1                                   
+    CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1                        
+    GOBACK.                                                      
+*> ------------------------------------------------------------------------------------------------------------------
+*> The source line number references in the following sections are either of
+*> the form <line-number> or <file-number>:<line-number>. The first form is
+*> used as an abbreviation for 0:<line-number>.
+*> The following is a key allowing the determination of the file name from
+*> the <file-number>.
+*>  
+*>          0: NSREQLTR.cl2
+*>          1: ELCLTRSPI
+*>          2: ELCMSTR
+*>          3: NSCVARS
+*>  
+*> ------------------------------------------------------------------------------------------------------------------
+*> DATA MAP KEY
+*>               Sec(Section) Fil = File Section                Type Flags: column O    ---> O = Occurs Item
+*>                            Wor = Working-Storage Section                 column R    ---> R = Redefines
+*>                            Loc = Local-Storage Section                   column X/G  ---> X = External
+*>                            Rep = Report Section                                           G = Global
+*>                            Lin = Linkage Section                         
+*> ------------------------------------------------------------------------------------------------------------------
+*> Data map for Program-Id: NSREQLTR
+*> ------------------------------------------------------------------------------------------------------------------
+*>     Line    Name                                                  Size Offset      Sec Flags Data Type
+*>                                                                                        O R X
+*>                                                                                            G
+*> ------------------------------------------------------------------------------------------------------------------
+*>       26 01 DFH-START                                                4             Wor       Display
+*>       28 01 P                                                        4             Wor       Pointer
+*>       29 01 KIXSYS                                                   7             Wor       Display
+*>       30 01 VAR-PTR                                                  4             Wor       Pointer
+*>       31 01 ENV-VAR-LEN                                              2             Wor       Binary
+*>       32 01 RC                                                       4             Wor       Binary
+*>       34 01 FILLER                                                 100             Wor       Group
+*>       35   05 A1                                                     2 (000000000)           Packed Decimal
+*>       36   05 A2                                                     2 (000000002)           Packed Decimal
+*>       37   05 M1                                                     2 (000000004)           Packed Decimal
+*>       38   05 V1                                                     2 (000000006)           Packed Decimal
+*>       39   05 V2                                                     2 (000000008)           Packed Decimal
+*>       40   05 WS-WORK-FIELD                                         90 (000000010)           Display
+*>       42 01 WS-KIXSYS                                               50             Wor       Group
+*>       43   05 WS-KIX-FIL1                                           10 (000000000)           Display
+*>       44   05 WS-KIX-APPS                                           10 (000000010)           Display
+*>       45   05 WS-KIX-ENV                                            10 (000000020)           Display
+*>       46   05 WS-KIX-MYENV                                          10 (000000030)           Display
+*>       47   05 WS-KIX-SYS                                            10 (000000040)           Display
+*>       53 01 SRCH-COMMAREA                                         2685             Wor       Group
+*>     1:16   03 BL-INPUT                                             134 (000000000)           Group
+*>     1:17     05 BL-CARRIER                                           1 (000000000)           Display
+*>     1:18     05 BL-CLAIM-NO                                          7 (000000001)           Display
+*>     1:19     05 BL-CERT-NO                                          11 (000000008)           Display
+*>     1:20     05 BL-LETTER-ID                                         4 (000000019)           Display
+*>     1:21     05 BL-FOLLOW-UP-DT                                     10 (000000023)           Display
+*>     1:22     05 BL-RESEND-DT                                        10 (000000033)           Display
+*>     1:23     05 BL-NO-OF-COPIES                                      2 (000000043)           Display Numeric
+*>     1:24     05 BL-PROC-ID                                           4 (000000045)           Display
+*>     1:25     05 BL-COMP-ID                                           3 (000000049)           Display
+*>     1:26     05 BL-PRINT-NOW-SW                                      1 (000000052)           Display
+*>     1:27     05 BL-ENC-CD                                            3 (000000053)           Display
+*>     1:28     05 BL-ARCHIVE-NO                                        8 (000000056)           Display Numeric
+*>     1:29     05 BL-REGARDING                                        70 (000000064)           Display
+*>     1:31   03 BL-OUTPUT                                             51 (000000134)           Group
+*>     1:32     05 BL-STATUS                                            1 (000000134)           Display
+*>     1:33       88 BL-OK                                                                      
+*>     1:34       88 BL-FAIL                                                                    
+*>     1:35     05 BL-MESSAGE                                          50 (000000135)           Display
+*>     1:36   03 BL-RECORD-PASSED-DATA                               2500 (000000185)           Display
+*>       56 01 INPUT-FROM-FORM                                        126             Wor       Group
+*>       57   05 IFF-CARRIER                                            1 (000000000)           Display
+*>       58   05 IFF-CLAIM-NO                                           7 (000000001)           Display
+*>       59   05 IFF-CERT-NO                                           11 (000000008)           Display
+*>       60   05 IFF-LETTER-ID                                          4 (000000019)           Display
+*>       61   05 IFF-FOLLOW-UP-DT                                      10 (000000023)           Display
+*>       62   05 IFF-RESEND-DT                                         10 (000000033)           Display
+*>       63   05 IFF-NO-OF-COPIES                                       2 (000000043)           Display Numeric
+*>       64   05 IFF-PROC-ID                                            4 (000000045)           Display
+*>       65   05 IFF-COMP-ID                                            3 (000000049)           Display
+*>       66   05 IFF-PRINT-NOW-SW                                       1 (000000052)           Display
+*>       67   05 IFF-ENC-CD                                             3 (000000053)           Display
+*>       68   05 IFF-REGARDING                                         70 (000000056)           Display
+*>       74 01 W-FORM-NAME                                             80             Wor       Display
+*>       75 01 W-FORM-VALUE                                            80             Wor       Display
+*>       76 01 W-FORM-NAME-LEN                                          4             Wor       Binary
+*>       77 01 W-FORM-VALUE-LEN                                         4             Wor       Binary
+*>       78 01 W-RESP                                                   4             Wor       Binary
+*>       79 01 W-DOCTOKEN                                              16             Wor       Display
+*>      110 01 WS-PROD-CID-PEMHDR                                      83             Wor       Group
+*>      111   05 F                                                      7 (000000000)           Display
+*>      112   05 F                                                     20 (000000007)           Display
+*>      114   05 F                                                     11 (000000027)           Display
+*>      115   05 F                                                     11 (000000038)           Display
+*>      116   05 F                                                      7 (000000049)           Display
+*>      117   05 F                                                      8 (000000056)           Display
+*>      118   05 F                                                     11 (000000064)           Display
+*>      119   05 F                                                      8 (000000075)           Display
+*>      121 01 WS-PROD-DCC-PEMHDR                                      86             Wor       Group
+*>      122   05 F                                                      7 (000000000)           Display
+*>      123   05 F                                                     20 (000000007)           Display
+*>      125   05 F                                                     11 (000000027)           Display
+*>      126   05 F                                                     14 (000000038)           Display
+*>      127   05 F                                                      7 (000000052)           Display
+*>      128   05 F                                                      8 (000000059)           Display
+*>      129   05 F                                                     11 (000000067)           Display
+*>      130   05 F                                                      8 (000000078)           Display
+*>      132 01 WS-PROD-VPP-PEMHDR                                      86             Wor       Group
+*>      133   05 F                                                      7 (000000000)           Display
+*>      134   05 F                                                     20 (000000007)           Display
+*>      136   05 F                                                     11 (000000027)           Display
+*>      137   05 F                                                     14 (000000038)           Display
+*>      138   05 F                                                      7 (000000052)           Display
+*>      139   05 F                                                      8 (000000059)           Display
+*>      140   05 F                                                     11 (000000067)           Display
+*>      141   05 F                                                      8 (000000078)           Display
+*>      143 01 WS-PROD-AHL-PEMHDR                                      86             Wor       Group
+*>      144   05 F                                                      7 (000000000)           Display
+*>      145   05 F                                                     20 (000000007)           Display
+*>      147   05 F                                                     11 (000000027)           Display
+*>      148   05 F                                                     14 (000000038)           Display
+*>      149   05 F                                                      7 (000000052)           Display
+*>      150   05 F                                                      8 (000000059)           Display
+*>      151   05 F                                                     11 (000000067)           Display
+*>      152   05 F                                                      8 (000000078)           Display
+*>      154 01 WS-PROD-FNL-PEMHDR                                      86             Wor       Group
+*>      155   05 F                                                      7 (000000000)           Display
+*>      156   05 F                                                     20 (000000007)           Display
+*>      158   05 F                                                     11 (000000027)           Display
+*>      159   05 F                                                     14 (000000038)           Display
+*>      160   05 F                                                      7 (000000052)           Display
+*>      161   05 F                                                      8 (000000059)           Display
+*>      162   05 F                                                     11 (000000067)           Display
+*>      163   05 F                                                      8 (000000078)           Display
+*>      165 01 WS-TEST-CID-PEMHDR                                      83             Wor       Group
+*>      166   05 F                                                      7 (000000000)           Display
+*>      167   05 F                                                     20 (000000007)           Display
+*>      169   05 F                                                     11 (000000027)           Display
+*>      170   05 F                                                     11 (000000038)           Display
+*>      171   05 F                                                      7 (000000049)           Display
+*>      172   05 F                                                      8 (000000056)           Display
+*>      173   05 F                                                     11 (000000064)           Display
+*>      174   05 F                                                      8 (000000075)           Display
+*>      176 01 WS-TEST-DCC-PEMHDR                                      86             Wor       Group
+*>      177   05 F                                                      7 (000000000)           Display
+*>      178   05 F                                                     20 (000000007)           Display
+*>      180   05 F                                                     11 (000000027)           Display
+*>      181   05 F                                                     14 (000000038)           Display
+*>      182   05 F                                                      7 (000000052)           Display
+*>      183   05 F                                                      8 (000000059)           Display
+*>      184   05 F                                                     11 (000000067)           Display
+*>      185   05 F                                                      8 (000000078)           Display
+*>      187 01 WS-TEST-VPP-PEMHDR                                      86             Wor       Group
+*>      188   05 F                                                      7 (000000000)           Display
+*>      189   05 F                                                     20 (000000007)           Display
+*>      191   05 F                                                     11 (000000027)           Display
+*>      192   05 F                                                     14 (000000038)           Display
+*>      193   05 F                                                      7 (000000052)           Display
+*>      194   05 F                                                      8 (000000059)           Display
+*>      195   05 F                                                     11 (000000067)           Display
+*>      196   05 F                                                      8 (000000078)           Display
+*>      198 01 WS-TEST-AHL-PEMHDR                                      86             Wor       Group
+*>      199   05 F                                                      7 (000000000)           Display
+*>      200   05 F                                                     20 (000000007)           Display
+*>      202   05 F                                                     11 (000000027)           Display
+*>      203   05 F                                                     14 (000000038)           Display
+*>      204   05 F                                                      7 (000000052)           Display
+*>      205   05 F                                                      8 (000000059)           Display
+*>      206   05 F                                                     11 (000000067)           Display
+*>      207   05 F                                                      8 (000000078)           Display
+*>      209 01 WS-TEST-FNL-PEMHDR                                      86             Wor       Group
+*>      210   05 F                                                      7 (000000000)           Display
+*>      211   05 F                                                     20 (000000007)           Display
+*>      213   05 F                                                     11 (000000027)           Display
+*>      214   05 F                                                     14 (000000038)           Display
+*>      215   05 F                                                      7 (000000052)           Display
+*>      216   05 F                                                      8 (000000059)           Display
+*>      217   05 F                                                     11 (000000067)           Display
+*>      218   05 F                                                      8 (000000078)           Display
+*>      224 01 WS-SL-VAR-LENGTH                                         4             Wor       Binary
+*>      225 01 WS-VAR-SLUNIKIX                                        222             Wor       Group
+*>      226   05 FILLER                                                 9 (000000000)           Display
+*>      227   05 WS-SL-HOST-INFO                                        9 (000000009)           Display
+*>      228   05 WS-SL-PORT                                             4 (000000018)           Display
+*>      229   05 WS-SL-REST                                           200 (000000022)           Display
+*>      231 01 WS-LT-VAR-LENGTH                                         4             Wor       Binary
+*>      232 01 WS-VAR-LOGICTEST                                       223             Wor       Group
+*>      233   05 FILLER                                                 9 (000000000)           Display
+*>      234   05 WS-LT-HOST-INFO                                       10 (000000009)           Display
+*>      235   05 WS-LT-PORT                                             4 (000000019)           Display
+*>      236   05 WS-LT-REST                                           200 (000000023)           Display
+*>      238 01 FINISHED-STRING                                        211             Wor       Group
+*>      239   05 FILLER                                                11 (000000000)           Display
+*>      240   05 VAR-STRING                                           200 (000000011)           Display
+*>      242 01 WS-TEST-TESTER                                         145             Wor       Group
+*>      243   05 FILLER                                                11 (000000000)           Display
+*>      244   05 WS-KEY                                               134 (000000011)           Group
+*>      245     10 OT-CARRIER                                           1 (000000011)           Display
+*>      246     10 OT-CLMNO                                             7 (000000012)           Display
+*>      247     10 OT-CRTNO                                            11 (000000019)           Display
+*>      248     10 OT-LETTER-ID                                         4 (000000030)           Display
+*>      249     10 OT-FOLLOW-UP-DT                                     10 (000000034)           Display
+*>      250     10 OT-RESEND-DT                                        10 (000000044)           Display
+*>      251     10 OT-NO-OF-COPIES                                      2 (000000054)           Display Numeric
+*>      252     10 OT-PROC-ID                                           4 (000000056)           Display
+*>      253     10 OT-COMP-ID                                           3 (000000060)           Display
+*>      254     10 OT-PRINT-NOW-SW                                      1 (000000063)           Display
+*>      255     10 OT-ENC-CD                                            3 (000000064)           Display
+*>      256     10 OT-ARCHIVE-NO                                        8 (000000067)           Display Numeric
+*>      257     10 OT-REGARDING                                        70 (000000075)           Display
+*>      260 01 WS-ELMSTR-KEY                                           20             Wor       Group
+*>      261   05 WS-ELMSTR-COMPANY-CD                                   1 (000000000)           Display
+*>      262   05 WS-ELMSTR-CARRIER                                      1 (000000001)           Display
+*>      263   05 WS-ELMSTR-CLAIM-NO                                     7 (000000002)           Display
+*>      264   05 WS-ELMSTR-CERT-NO                                     11 (000000009)           Display
+*>     2:41 01 CLAIM-MASTER                                           350             Wor       Group
+*>     2:42   12 CL-RECORD-ID                                           2 (000000000)           Display
+*>     2:43     88 VALID-CL-ID                                                                  
+*>     2:45   12 CL-CONTROL-PRIMARY                                    20 (000000002)           Group
+*>     2:46     16 CL-COMPANY-CD                                        1 (000000002)           Display
+*>     2:47     16 CL-CARRIER                                           1 (000000003)           Display
+*>     2:48     16 CL-CLAIM-NO                                          7 (000000004)           Display
+*>     2:49     16 CL-CERT-NO                                          11 (000000011)           Group
+*>     2:50       20 CL-CERT-PRIME                                     10 (000000011)           Display
+*>     2:51       20 CL-CERT-SFX                                        1 (000000021)           Display
+*>     2:53   12 CL-CONTROL-BY-NAME                                    29 (000000022)           Group
+*>     2:54     16 CL-COMPANY-CD-A1                                     1 (000000022)           Display
+*>     2:55     16 CL-INSURED-LAST-NAME                                15 (000000023)           Display
+*>     2:56     16 CL-INSURED-NAME                                     13 (000000038)           Group
+*>     2:57       20 CL-INSURED-1ST-NAME                               12 (000000038)           Display
+*>     2:58       20 CL-INSURED-MID-INIT                                1 (000000050)           Display
+*>     2:60   12 CL-CONTROL-BY-SSN                                     12 (000000051)           Group
+*>     2:61     16 CL-COMPANY-CD-A2                                     1 (000000051)           Display
+*>     2:62     16 CL-SOC-SEC-NO                                       11 (000000052)           Group
+*>     2:63       20 CL-SSN-STATE                                       2 (000000052)           Display
+*>     2:64       20 CL-SSN-ACCOUNT                                     6 (000000054)           Display
+*>     2:65       20 CL-SSN-LN3                                         3 (000000060)           Display
+*>     2:67   12 CL-CONTROL-BY-CERT-NO                                 12 (000000063)           Group
+*>     2:68     16 CL-COMPANY-CD-A4                                     1 (000000063)           Display
+*>     2:69     16 CL-CERT-NO-A4                                       11 (000000064)           Group
+*>     2:70       20 CL-CERT-A4-PRIME                                  10 (000000064)           Display
+*>     2:71       20 CL-CERT-A4-SFX                                     1 (000000074)           Display
+*>     2:73   12 CL-CONTROL-BY-CCN                                     21 (000000075)           Group
+*>     2:74     16 CL-COMPANY-CD-A5                                     1 (000000075)           Display
+*>     2:75     16 CL-CCN-A5                                           20 (000000076)           Group
+*>     2:76       20 CL-CCN                                            16 (000000076)           Group
+*>     2:77         24 CL-CCN-PREFIX-A5                                 4 (000000076)           Display
+*>     2:78         24 CL-CCN-PRIME-A5                                 12 (000000080)           Display
+*>     2:79       20 CL-CCN-FILLER-A5                                   4 (000000092)           Display
+*>     2:81   12 CL-INSURED-PROFILE-DATA                               14 (000000096)           Group
+*>     2:82     16 CL-INSURED-BIRTH-DT                                  2 (000000096)           Display
+*>     2:83     16 CL-INSURED-SEX-CD                                    1 (000000098)           Display
+*>     2:84       88 INSURED-IS-MALE                                                            
+*>     2:85       88 INSURED-IS-FEMALE                                                          
+*>     2:86       88 INSURED-SEX-UNKNOWN                                                        
+*>     2:87     16 CL-INSURED-OCC-CD                                    6 (000000099)           Display
+*>     2:88     16 FILLER                                               5 (000000105)           Display
+*>     2:90   12 CL-PROCESSING-INFO                                    81 (000000110)           Group
+*>     2:91     16 CL-PROCESSOR-ID                                      4 (000000110)           Display
+*>     2:92     16 CL-CLAIM-STATUS                                      1 (000000114)           Display
+*>     2:93       88 CLAIM-IS-OPEN                                                              
+*>     2:94       88 CLAIM-IS-CLOSED                                                            
+*>     2:95     16 CL-CLAIM-TYPE                                        1 (000000115)           Display
+*>    2:103     16 CL-CLAIM-PREM-TYPE                                   1 (000000116)           Display
+*>    2:104       88 SINGLE-PREMIUM                                                             
+*>    2:105       88 O-B-COVERAGE                                                               
+*>    2:106       88 OPEN-END-COVERAGE                                                          
+*>    2:107     16 CL-INCURRED-DT                                       2 (000000117)           Display
+*>    2:108     16 CL-REPORTED-DT                                       2 (000000119)           Display
+*>    2:109     16 CL-FILE-ESTABLISH-DT                                 2 (000000121)           Display
+*>    2:110     16 CL-EST-END-OF-DISAB-DT                               2 (000000123)           Display
+*>    2:111     16 CL-LAST-PMT-DT                                       2 (000000125)           Display
+*>    2:112     16 CL-LAST-PMT-AMT                                      5 (000000127)           Packed Decimal
+*>    2:113     16 CL-PAID-THRU-DT                                      2 (000000132)           Display
+*>    2:114     16 CL-TOTAL-PAID-AMT                                    5 (000000134)           Packed Decimal
+*>    2:115     16 CL-NO-OF-PMTS-MADE                                   2 (000000139)           Packed Decimal
+*>    2:116     16 CL-NO-OF-DAYS-PAID                                   2 (000000141)           Binary
+*>    2:117     16 CL-PMT-CALC-METHOD                                   1 (000000143)           Display
+*>    2:118       88 CL-360-DAY-YR                                                              
+*>    2:119       88 CL-365-DAY-YR                                                              
+*>    2:120       88 CL-FULL-MONTHS                                                             
+*>    2:121     16 CL-CAUSE-CD                                          6 (000000144)           Display
+*>    2:123     16 CL-PRIME-CERT-NO                                    11 (000000150)           Group
+*>    2:124       20 CL-PRIME-CERT-PRIME                               10 (000000150)           Display
+*>    2:125       20 CL-PRIME-CERT-SFX                                  1 (000000160)           Display
+*>    2:127     16 CL-SYSTEM-IDENTIFIER                                 2 (000000161)           Display
+*>    2:128       88 CL-CREDIT-CLAIM                                                            
+*>    2:129       88 CL-CONVENIENCE-CLAIM                                                       
+*>    2:131     16 CL-MICROFILM-NO                                     10 (000000163)           Display
+*>    2:132     16 FILLER                                              10 (000000163)       R   Group
+*>    2:133       20 CL-BENEFIT-PERIOD                                  2 (000000163)       R   Display Numeric
+*>    2:134       20 FILLER                                             8 (000000165)       R   Display
+*>    2:135     16 CL-PROG-FORM-TYPE                                    1 (000000173)           Display
+*>    2:136     16 CL-LAST-ADD-ON-DT                                    2 (000000174)           Display
+*>    2:138     16 CL-LAST-REOPEN-DT                                    2 (000000176)           Display
+*>    2:139     16 CL-LAST-CLOSE-DT                                     2 (000000178)           Display
+*>    2:140     16 CL-LAST-CLOSE-REASON                                 1 (000000180)           Display
+*>    2:141       88 FINAL-PAID                                                                 
+*>    2:142       88 CLAIM-DENIED                                                               
+*>    2:143       88 AUTO-CLOSE                                                                 
+*>    2:144       88 MANUAL-CLOSE                                                               
+*>    2:145       88 BENEFITS-CHANGED                                                           
+*>    2:146       88 SETUP-ERRORS                                                               
+*>    2:147     16 CL-ASSOC-CERT-SEQU                                   2 (000000181)           Display Numeric
+*>    2:148     16 CL-ASSOC-CERT-TOTAL                                  2 (000000183)           Display Numeric
+*>    2:149     16 CL-CLAIM-PAYMENT-STATUS                              1 (000000185)           Display Numeric
+*>    2:150       88 PAYMENT-IN-PREP                                                            
+*>    2:151     16 CL-TOTAL-INT-PAID                                    4 (000000186)           Packed Decimal
+*>    2:152     16 FILLER                                               1 (000000190)           Display
+*>    2:154   12 CL-CERTIFICATE-DATA                                   22 (000000191)           Group
+*>    2:155     16 CL-CERT-ORIGIN                                       1 (000000191)           Display
+*>    2:156       88 CERT-WAS-ONLINE                                                            
+*>    2:157       88 CERT-WAS-CREATED                                                           
+*>    2:158       88 COVERAGE-WAS-ADDED                                                         
+*>    2:159     16 CL-CERT-KEY-DATA                                    21 (000000192)           Group
+*>    2:160       20 CL-CERT-CARRIER                                    1 (000000192)           Display
+*>    2:161       20 CL-CERT-GROUPING                                   6 (000000193)           Display
+*>    2:162       20 CL-CERT-STATE                                      2 (000000199)           Display
+*>    2:163       20 CL-CERT-ACCOUNT                                   10 (000000201)           Group
+*>    2:164         24 CL-CERT-ACCOUNT-PREFIX                           4 (000000201)           Display
+*>    2:165         24 CL-CERT-ACCOUNT-PRIME                            6 (000000205)           Display
+*>    2:166       20 CL-CERT-EFF-DT                                     2 (000000211)           Display
+*>    2:168   12 CL-STATUS-CONTROLS                                    54 (000000213)           Group
+*>    2:169     16 CL-PRIORITY-CD                                       1 (000000213)           Display
+*>    2:170       88 CONFIDENTIAL-DATA                                                          
+*>    2:171       88 HIGHEST-PRIORITY                                                           
+*>    2:172     16 CL-SUPV-ATTN-CD                                      1 (000000214)           Display
+*>    2:173       88 SUPV-NOT-REQUIRED                                                          
+*>    2:174       88 SUPV-IS-REQUIRED                                                           
+*>    2:175     16 CL-PURGED-DT                                         2 (000000215)           Display
+*>    2:176     16 CL-RESTORED-DT                                       2 (000000217)           Display
+*>    2:177     16 CL-NEXT-AUTO-PAY-DT                                  2 (000000219)           Display
+*>    2:178     16 CL-NEXT-RESEND-DT                                    2 (000000221)           Display
+*>    2:179     16 CL-NEXT-FOLLOWUP-DT                                  2 (000000223)           Display
+*>    2:180     16 CL-CRITICAL-PERIOD                                   2 (000000225)           Display Numeric
+*>    2:182     16 CL-LAST-MAINT-DT                                     2 (000000227)           Display
+*>    2:183     16 CL-LAST-MAINT-USER                                   4 (000000229)           Display
+*>    2:184     16 CL-LAST-MAINT-HHMMSS                                 4 (000000233)           Packed Decimal
+*>    2:185     16 CL-LAST-MAINT-TYPE                                   1 (000000237)           Display
+*>    2:186       88 CLAIM-SET-UP                                                               
+*>    2:187       88 PAYMENT-MADE                                                               
+*>    2:188       88 LETTER-SENT                                                                
+*>    2:189       88 MASTER-WAS-ALTERED                                                         
+*>    2:190       88 MASTER-WAS-RESTORED                                                        
+*>    2:191       88 INCURRED-DATE-CHANGED                                                      
+*>    2:192       88 FILE-CONVERTED                                                             
+*>    2:193       88 CHANGE-OF-BENEFITS                                                         
+*>    2:194       88 ERROR-CORRECTION                                                           
+*>    2:195     16 CL-RELATED-CLAIM-NO                                  7 (000000238)           Display
+*>    2:196     16 CL-HISTORY-ARCHIVE-DT                                2 (000000245)           Display
+*>    2:197     16 CL-BENEFICIARY                                      10 (000000247)           Display
+*>    2:198     16 CL-FILE-ESTABLISHED-BY                               4 (000000257)           Display
+*>    2:199     16 CL-DENIAL-TYPE                                       1 (000000261)           Display
+*>    2:200       88 CL-TYPE-DENIAL                                                             
+*>    2:201       88 CL-TYPE-RESCISSION                                                         
+*>    2:202       88 CL-TYPE-REFORMATION                                                        
+*>    2:203       88 CL-TYPE-REF-TO-RES                                                         
+*>    2:204       88 CL-TYPE-RECONSIDERED                                                       
+*>    2:205     16 CL-NO-OF-EXTENSIONS                                  2 (000000262)           Display Numeric
+*>    2:207     16 FILLER                                               3 (000000264)           Display
+*>    2:212   12 CL-TRAILER-CONTROLS                                   15 (000000267)           Group
+*>    2:213     16 CL-TRAILER-SEQ-CNT                                   2 (000000267)           Binary
+*>    2:214       88 CL-1ST-TRL-AVAIL                                                           
+*>    2:215       88 CL-LAST-TRL-AVAIL                                                          
+*>    2:216       88 CL-RESV-EXP-HIST-TRLR                                                      
+*>    2:217     16 CL-LAST-INC-DT-CHANGE                                2 (000000269)           Binary
+*>    2:218     16 FILLER                                               2 (000000271)           Display
+*>    2:219     16 CL-AUTO-PAY-SEQ                                      2 (000000273)           Binary
+*>    2:220     16 CL-ADDRESS-TRAILER-CNT                               7 (000000275)           Group
+*>    2:221       20 CL-INSURED-ADDR-CNT                                1 (000000275)           Display Numeric
+*>    2:222         88 NO-INSURED-AVAILABLE                                                     
+*>    2:223       20 CL-ACCOUNT-ADDR-CNT                                1 (000000276)           Display Numeric
+*>    2:224         88 ACCOUNT-IS-ONLINE                                                        
+*>    2:225       20 CL-BENIF-ADDR-CNT                                  1 (000000277)           Display Numeric
+*>    2:226         88 BENEFICIARY-IS-ONLINE                                                    
+*>    2:227       20 CL-EMPLOYER-ADDR-CNT                               1 (000000278)           Display Numeric
+*>    2:228         88 NO-EMPLOY-AVAILABLE                                                      
+*>    2:229       20 CL-DOCTOR-ADDR-CNT                                 1 (000000279)           Display Numeric
+*>    2:230         88 NO-DOCTOR-AVAILABLE                                                      
+*>    2:231       20 CL-OTHER-1-ADDR-CNT                                1 (000000280)           Display Numeric
+*>    2:232         88 NO-OTHER-1-ADDRESSES                                                     
+*>    2:233       20 CL-OTHER-2-ADDR-CNT                                1 (000000281)           Display Numeric
+*>    2:234         88 NO-OTHER-2-ADDRESSES                                                     
+*>    2:236   12 CL-CV-REFERENCE-NO                                    20 (000000282)           Group
+*>    2:237     16 CL-CV-REFNO-PRIME                                   18 (000000282)           Display
+*>    2:238     16 CL-CV-REFNO-SFX                                      2 (000000300)           Display
+*>    2:240   12 CL-FILE-LOCATION                                       4 (000000302)           Display
+*>    2:242   12 CL-PROCESS-ERRORS                                      4 (000000306)           Group
+*>    2:243     16 CL-FATAL-ERROR-CNT                                   2 (000000306)           Binary
+*>    2:244       88 NO-FATAL-ERRORS                                                            
+*>    2:245     16 CL-FORCEABLE-ERROR-CNT                               2 (000000308)           Binary
+*>    2:246       88 NO-FORCABLE-ERRORS                                                         
+*>    2:248   12 CL-PRODUCT-CD                                          1 (000000310)           Display
+*>    2:250   12 CL-CURRENT-KEY-DATA                                   19 (000000311)           Group
+*>    2:251     16 CL-CURRENT-CARRIER                                   1 (000000311)           Display
+*>    2:252     16 CL-CURRENT-GROUPING                                  6 (000000312)           Display
+*>    2:253     16 CL-CURRENT-STATE                                     2 (000000318)           Display
+*>    2:254     16 CL-CURRENT-ACCOUNT                                  10 (000000320)           Display
+*>    2:256   12 CL-ASSOCIATES                                          1 (000000330)           Display
+*>    2:257     88 CL-ASSOC-NO-INTERFACE                                                        
+*>    2:258     88 CL-ASSOC-INTERFACE                                                           
+*>    2:259     88 CL-NON-ASSOC-NO-INTERFACE                                                    
+*>    2:260     88 CL-NON-ASSOC-INTERFACE                                                       
+*>    2:262   12 CL-ACTIVITY-CODE                                       2 (000000331)           Display Numeric
+*>    2:263   12 CL-ACTIVITY-MAINT-DT                                   2 (000000333)           Display
+*>    2:264   12 CL-ACTIVITY-MAINT-TYPE                                 4 (000000335)           Display
+*>    2:266   12 CL-LAPSE-REPORT-CODE                                   1 (000000339)           Display Numeric
+*>    2:267   12 CL-LAG-REPORT-CODE                                     1 (000000340)           Display Numeric
+*>    2:268   12 CL-LOAN-TYPE                                           2 (000000341)           Display
+*>    2:269   12 CL-LEGAL-STATE                                         2 (000000343)           Display
+*>    2:271   12 CL-YESNOSW                                             1 (000000345)           Display
+*>    2:272   12 CL-ACCIDENT-CLAIM-SW                                   1 (000000346)           Display
+*>    2:273     88 CL-ACCIDENT-NOT-SET                                                          
+*>    2:274     88 CL-CLAIM-DUE-TO-ACCIDENT                                                     
+*>    2:275     88 CL-CLAIM-NOT-DUE-TO-ACCIDENT                                                 
+*>    2:276   12 CL-INSURED-TYPE                                        1 (000000347)           Display
+*>    2:277     88 CL-CLAIM-ON-PRIMARY                                                          
+*>    2:278     88 CL-CLAIM-ON-CO-BORROWER                                                      
+*>    2:279   12 CL-BENEFIT-EXPIRATION-DT                               2 (000000348)           Display
+*>      268 01 OUTPUT-MSG                                              54             Wor       Group
+*>      269   05 FILLER                                                 4 (000000000)           Display
+*>      270   05 OUT-MSG-TEXT                                          50 (000000004)           Display
+*>      272 01 MISC                                                     4             Wor       Group
+*>      273   12 WS-RESPONSE                                            4 (000000000)           Binary
+*>      274     88 RESP-NORMAL                                                                  
+*>      275     88 RESP-NOTFND                                                                  
+*>      276     88 RESP-DUPREC                                                                  
+*>      277     88 RESP-DUPKEY                                                                  
+*>      278     88 RESP-NOTOPEN                                                                 
+*>      279     88 RESP-ENDFILE                                                                 
+*>     3:15 01 NAPER-OUTPUT-DATA                                     2426             Wor       Group
+*>     3:16   05 FILLER                                                 6 (000000000)           Display
+*>     3:17   05 OUT-TEMP                                               4 (000000006)           Display
+*>     3:18   05 FILLER                                                 8 (000000010)           Display
+*>     3:19   05 OUT-LETTER                                             4 (000000018)           Display
+*>     3:20   05 FILLER                                                 6 (000000022)           Display
+*>     3:21   05 OUT-CARR                                               1 (000000028)           Display
+*>     3:22   05 FILLER                                                 7 (000000029)           Display
+*>     3:23   05 OUT-CLMNO                                              7 (000000036)           Display
+*>     3:24   05 FILLER                                                 7 (000000043)           Display
+*>     3:25   05 OUT-CRTNO                                             11 (000000050)           Display
+*>     3:26   05 FILLER                                                 7 (000000061)           Display
+*>     3:27   05 OUT-ACTNO                                             10 (000000068)           Display
+*>     3:28   05 FILLER                                                 8 (000000078)           Display
+*>     3:29   05 OUT-ILNAME                                            15 (000000086)           Display
+*>     3:30   05 FILLER                                                 8 (000000101)           Display
+*>     3:31   05 OUT-IFNAME                                            10 (000000109)           Display
+*>     3:32   05 FILLER                                                 7 (000000119)           Display
+*>     3:33   05 OUT-SEX-CD                                             1 (000000126)           Display
+*>     3:34   05 FILLER                                                 5 (000000127)           Display
+*>     3:35   05 OUT-SSN                                               11 (000000132)           Display
+*>     3:36   05 FILLER                                                 9 (000000143)           Display
+*>     3:37   05 OUT-CLMSTAT                                            1 (000000152)           Display
+*>     3:38   05 FILLER                                                 8 (000000153)           Display
+*>     3:39   05 OUT-CLMTYPE                                            1 (000000161)           Display
+*>     3:40   05 FILLER                                                 7 (000000162)           Display
+*>     3:41   05 OUT-EST-DT                                            21 (000000169)           Display
+*>     3:42   05 FILLER                                                 7 (000000190)           Display
+*>     3:43   05 OUT-INC-DT                                            21 (000000197)           Display
+*>     3:44   05 FILLER                                                 7 (000000218)           Display
+*>     3:45   05 OUT-RPT-DT                                            21 (000000225)           Display
+*>     3:46   05 FILLER                                                10 (000000246)           Display
+*>     3:47   05 OUT-PD-THRU-DT                                        21 (000000256)           Display
+*>     3:48   05 FILLER                                                11 (000000277)           Display
+*>     3:49   05 OUT-FORM-DUE-DT                                       21 (000000288)           Display
+*>     3:50   05 FILLER                                                 8 (000000309)           Display
+*>     3:51   05 OUT-LST-PMT-DT                                        21 (000000317)           Display
+*>     3:52   05 FILLER                                                 8 (000000338)           Display
+*>     3:53   05 OUT-NO-OF-PMTS                                        10 (000000346)           Display
+*>     3:54   05 FILLER                                                 9 (000000356)           Display
+*>     3:55   05 OUT-TOT-PAID                                          10 (000000365)           Display Numeric Edit
+*>     3:56   05 FILLER                                                 8 (000000375)           Display
+*>     3:57   05 OUT-LST-PD-AMT                                        10 (000000383)           Display Numeric Edit
+*>     3:58   05 FILLER                                                 9 (000000393)           Display
+*>     3:59   05 OUT-ADDR-CNT                                           1 (000000402)           Display Numeric
+*>     3:60   05 FILLER                                                 7 (000000403)           Display
+*>     3:61   05 OUT-CRT-ST                                             2 (000000410)           Display
+*>     3:62   05 FILLER                                                10 (000000412)           Display
+*>     3:63   05 OUT-CERTACCT                                          10 (000000422)           Display
+*>     3:64   05 FILLER                                                 7 (000000432)           Display
+*>     3:65   05 OUT-EFF-DT                                            21 (000000439)           Display
+*>     3:66   05 FILLER                                                 8 (000000460)           Display
+*>     3:67   05 OUT-LST-MAINT-DT                                      21 (000000468)           Display
+*>     3:68   05 FILLER                                                10 (000000489)           Display
+*>     3:69   05 OUT-LST-MAINT-USER                                    10 (000000499)           Display
+*>     3:70   05 FILLER                                                10 (000000509)           Display
+*>     3:71   05 OUT-LST-MAINT-TYPE                                    10 (000000519)           Display
+*>     3:72   05 FILLER                                                 6 (000000529)           Display
+*>     3:73   05 OUT-DIAG                                              66 (000000535)           Display
+*>     3:74   05 FILLER                                                 7 (000000601)           Display
+*>     3:75   05 OUT-EXP-DT                                            21 (000000608)           Display
+*>     3:76   05 FILLER                                                12 (000000629)           Display
+*>     3:77   05 OUT-LST-CLS-REA                                       10 (000000641)           Display
+*>     3:78   05 FILLER                                                 8 (000000651)           Display
+*>     3:79   05 OUT-BIRTH-DT                                          21 (000000659)           Display
+*>     3:80   05 FILLER                                                 6 (000000680)           Display
+*>     3:81   05 OUT-TERM                                               3 (000000686)           Display Numeric
+*>     3:82   05 FILLER                                                 7 (000000689)           Display
+*>     3:83   05 OUT-BEN-CD                                             2 (000000696)           Display
+*>     3:84   05 FILLER                                                 8 (000000698)           Display
+*>     3:85   05 OUT-BENAMT                                            10 (000000706)           Display Numeric Edit
+*>     3:86   05 FILLER                                                 9 (000000716)           Display
+*>     3:87   05 OUT-CRIT-PER                                           3 (000000725)           Display Numeric
+*>     3:88   05 FILLER                                                 9 (000000728)           Display
+*>     3:89   05 OUT-WAIT-PER                                           2 (000000737)           Display
+*>     3:90   05 FILLER                                                11 (000000739)           Display
+*>     3:91   05 OUT-LF-INT-RATE                                        8 (000000750)           Display Numeric Edit
+*>     3:92   05 FILLER                                                10 (000000758)           Display
+*>     3:93   05 OUT-AUTO-PY-DT                                        21 (000000768)           Display
+*>     3:94   05 FILLER                                                12 (000000789)           Display
+*>     3:95   05 OUT-AUTO-SCHD-END                                     21 (000000801)           Display
+*>     3:96   05 FILLER                                                 8 (000000822)           Display
+*>     3:97   05 OUT-LOAN-NO                                           25 (000000830)           Display
+*>     3:98   05 FILLER                                                 5 (000000855)           Display
+*>     3:99   05 OUT-APR                                                8 (000000860)           Display Numeric Edit
+*>    3:100   05 FILLER                                                 8 (000000868)           Display
+*>    3:101   05 OUT-LST-ACT-DT                                        21 (000000876)           Display
+*>    3:102   05 FILLER                                                 7 (000000897)           Display
+*>    3:103   05 OUT-ACT-DT                                            21 (000000904)           Display
+*>    3:104   05 FILLER                                                10 (000000925)           Display
+*>    3:105   05 OUT-LST-ACT-TYPE                                      15 (000000935)           Display
+*>    3:106   05 FILLER                                                 9 (000000950)           Display
+*>    3:107   05 OUT-ACT-TYPE                                          15 (000000959)           Display
+*>    3:108   05 FILLER                                                 6 (000000974)           Display
+*>    3:109   05 OUT-FORM                                               4 (000000980)           Display
+*>    3:110   05 FILLER                                                 9 (000000984)           Display
+*>    3:111   05 OUT-INS-NAME                                          36 (000000993)           Display
+*>    3:112   05 FILLER                                                10 (000001029)           Display
+*>    3:113   05 OUT-INS-ADDR1                                         36 (000001039)           Display
+*>    3:114   05 FILLER                                                10 (000001075)           Display
+*>    3:115   05 OUT-INS-ADDR2                                         36 (000001085)           Display
+*>    3:116   05 FILLER                                                 9 (000001121)           Display
+*>    3:117   05 OUT-INS-CITY                                          28 (000001130)           Display
+*>    3:118   05 FILLER                                                10 (000001158)           Display
+*>    3:119   05 OUT-INS-STATE                                          2 (000001168)           Display
+*>    3:120   05 FILLER                                                 8 (000001170)           Display
+*>    3:121   05 OUT-INS-ZIP                                           10 (000001178)           Display
+*>    3:122   05 FILLER                                                10 (000001188)           Display
+*>    3:123   05 OUT-INS-PHONE                                         13 (000001198)           Display
+*>    3:124   05 FILLER                                                10 (000001211)           Display
+*>    3:125   05 OUT-BEN-NAME                                          32 (000001221)           Display
+*>    3:126   05 FILLER                                                11 (000001253)           Display
+*>    3:127   05 OUT-BEN-ADDR1                                         36 (000001264)           Display
+*>    3:128   05 FILLER                                                11 (000001300)           Display
+*>    3:129   05 OUT-BEN-ADDR2                                         32 (000001311)           Display
+*>    3:130   05 FILLER                                                10 (000001343)           Display
+*>    3:131   05 OUT-BEN-CITY                                          28 (000001353)           Display
+*>    3:132   05 FILLER                                                11 (000001381)           Display
+*>    3:133   05 OUT-BEN-STATE                                          2 (000001392)           Display
+*>    3:134   05 FILLER                                                 9 (000001394)           Display
+*>    3:135   05 OUT-BEN-ZIP                                           10 (000001403)           Display
+*>    3:136   05 FILLER                                                11 (000001413)           Display
+*>    3:137   05 OUT-BEN-PHONE                                         13 (000001424)           Display
+*>    3:138   05 FILLER                                                 8 (000001437)           Display
+*>    3:139   05 OUT-ORIG-NAME                                         32 (000001445)           Display
+*>    3:140   05 FILLER                                                10 (000001477)           Display
+*>    3:141   05 OUT-ACCT-NAME                                         32 (000001487)           Display
+*>    3:142   05 FILLER                                                11 (000001519)           Display
+*>    3:143   05 OUT-ACCT-ADDR1                                        36 (000001530)           Display
+*>    3:144   05 FILLER                                                11 (000001566)           Display
+*>    3:145   05 OUT-ACCT-ADDR2                                        32 (000001577)           Display
+*>    3:146   05 FILLER                                                10 (000001609)           Display
+*>    3:147   05 OUT-ACCT-CITY                                         30 (000001619)           Display
+*>    3:148   05 FILLER                                                11 (000001649)           Display
+*>    3:149   05 OUT-ACCT-STATE                                         2 (000001660)           Display
+*>    3:150   05 FILLER                                                 9 (000001662)           Display
+*>    3:151   05 OUT-ACCT-ZIP                                          10 (000001671)           Display
+*>    3:152   05 FILLER                                                11 (000001681)           Display
+*>    3:153   05 OUT-ACCT-PHONE                                        13 (000001692)           Display
+*>    3:154   05 FILLER                                                 7 (000001705)           Display
+*>    3:155   05 OUT-ENC-CODE                                           3 (000001712)           Display
+*>    3:156   05 FILLER                                                 7 (000001715)           Display
+*>    3:157   05 OUT-ENC-ST                                             2 (000001722)           Display
+*>    3:158   05 FILLER                                                 8 (000001724)           Display
+*>    3:159   05 OUT-ARCHNO                                             9 (000001732)           Display Numeric
+*>    3:160   05 FILLER                                                11 (000001741)           Display
+*>    3:161   05 OUT-1ST-LTR-PRT-DT                                    21 (000001752)           Display
+*>    3:162   05 FILLER                                                11 (000001773)           Display
+*>    3:163   05 OUT-NEXT-DUE-DT                                       21 (000001784)           Display
+*>    3:164   05 FILLER                                                 8 (000001805)           Display
+*>    3:165   05 OUT-JLNAME                                            15 (000001813)           Display
+*>    3:166   05 FILLER                                                 8 (000001828)           Display
+*>    3:167   05 OUT-JFNAME                                            10 (000001836)           Display
+*>    3:168   05 FILLER                                                 9 (000001846)           Display
+*>    3:169   05 OUT-ENCLINE                                          100 (000001855)           Display
+*>    3:170   05 FILLER                                                 9 (000001955)           Display
+*>    3:171   05 OUT-ENCATTS                                          255 (000001964)           Display
+*>    3:172   05 FILLER                                                10 (000002219)           Display
+*>    3:173   05 OUT-OUTSTACK                                           1 (000002229)           Display
+*>    3:174   05 FILLER                                                 8 (000002230)           Display
+*>    3:175   05 OUT-PROCID                                             4 (000002238)           Display
+*>    3:176   05 FILLER                                                 8 (000002242)           Display
+*>    3:177   05 OUT-COMPID                                             3 (000002250)           Display
+*>    3:178   05 FILLER                                                 8 (000002253)           Display
+*>    3:179   05 OUT-PRINT-NOW-SW                                       1 (000002261)           Display
+*>    3:180   05 FILLER                                                11 (000002262)           Display
+*>    3:181   05 OUT-CYCLE-DATE                                         8 (000002273)           Display
+*>    3:182   05 FILLER                                                11 (000002281)           Display
+*>    3:183   05 OUT-ENC-ST-NAME                                        2 (000002292)           Display
+*>    3:184   05 FILLER                                                10 (000002294)           Display
+*>    3:185   05 OUT-CARR-LU                                            1 (000002304)           Display
+*>    3:186   05 FILLER                                                 5 (000002305)           Display
+*>    3:187   05 OUT-AHL-CLAIM-NO                                       9 (000002310)           Display
+*>    3:188   05 FILLER                                                 4 (000002319)           Display
+*>    3:189   05 OUT-ACCT-GPCD                                          2 (000002323)           Display Numeric
+*>    3:190   05 FILLER                                                 9 (000002325)           Display
+*>    3:191   05 OUT-MAX-BENS                                           3 (000002334)           Display Numeric
+*>    3:192   05 FILLER                                                10 (000002337)           Display
+*>    3:193   05 OUT-PAID-BENS                                          3 (000002347)           Display Numeric
+*>    3:194   05 FILLER                                                 9 (000002350)           Display
+*>    3:195   05 OUT-REM-BENS                                           3 (000002359)           Display Numeric
+*>    3:196   05 FILLER                                                 9 (000002362)           Display
+*>    3:197   05 OUT-EXCL-PER                                           3 (000002371)           Display Numeric
+*>    3:198   05 FILLER                                                 8 (000002374)           Display
+*>    3:199   05 OUT-REC-MOS                                            2 (000002382)           Display Numeric
+*>    3:200   05 FILLER                                                 8 (000002384)           Display
+*>    3:201   05 OUT-INS-TYP                                            4 (000002392)           Display
+*>    3:202   05 FILLER                                                 8 (000002396)           Display
+*>    3:203   05 OUT-BEN-PER                                            2 (000002404)           Display Numeric
+*>    3:204   05 FILLER                                                 7 (000002406)           Display
+*>    3:205   05 OUT-ACC-SW                                             1 (000002413)           Display
+*>    3:206   05 FILLER                                                 7 (000002414)           Display
+*>    3:207   05 OUT-VER-CD                                             5 (000002421)           Display
+*>      286 01 DFHEIV                                                 882             Wor       Group
+*>      286   02 DFHEIV0                                               35 (000000000)           Display
+*>      286   02 DFHEIV1                                                8 (000000035)           Display
+*>      286   02 DFHEIV2                                                8 (000000043)           Display
+*>      286   02 DFHEIV3                                                8 (000000051)           Display
+*>      286   02 DFHEIV4                                                6 (000000059)           Display
+*>      286   02 DFHEIV5                                                4 (000000065)           Display
+*>      286   02 DFHEIV6                                                4 (000000069)           Display
+*>      286   02 DFHEIV7                                                2 (000000073)           Display
+*>      286   02 DFHEIV8                                                2 (000000075)           Display
+*>      286   02 DFHEIV9                                                1 (000000077)           Display
+*>      286   02 DFHEIV10                                               4 (000000078)           Packed Decimal
+*>      286   02 DFHEIV11                                               2 (000000082)           Binary
+*>      286   02 DFHEIV12                                               2 (000000084)           Binary
+*>      286   02 DFHEIV13                                               2 (000000086)           Binary
+*>      286   02 DFHEIV14                                               2 (000000088)           Binary
+*>      286   02 DFHEIV15                                               2 (000000090)           Binary
+*>      286   02 DFHEIV16                                               4 (000000092)           Binary
+*>      286   02 DFHEIV17                                               4 (000000096)           Display
+*>      286   02 DFHEIV18                                               4 (000000100)           Display
+*>      286   02 DFHEIV19                                               4 (000000104)           Display
+*>      286   02 DFHEIV20                                               4 (000000108)           Pointer
+*>      286   02 DFHEIV21                                               4 (000000112)           Pointer
+*>      286   02 DFHEIV22                                               4 (000000116)           Pointer
+*>      286   02 DFHEIV23                                               4 (000000120)           Pointer
+*>      286   02 DFHEIV24                                               4 (000000124)           Pointer
+*>      286   02 DFHEIV25                                               4 (000000128)           Binary
+*>      286   02 DFHEIV26                                               4 (000000132)           Binary
+*>      286   02 DFHEIV27                                               4 (000000136)           Binary
+*>      286   02 DFHEIV28                                               4 (000000140)           Binary
+*>      286   02 DFHEIV29                                               4 (000000144)           Binary
+*>      286   02 DFHEIV30                                               4 (000000148)           Binary
+*>      286   02 DFHEIV31                                               4 (000000152)           Binary
+*>      286   02 DFHEIV32                                               2 (000000156)           Binary
+*>      286   02 DFHEIV33                                               2 (000000158)           Binary
+*>      286   02 DFHEIV34                                               2 (000000160)           Binary
+*>      286   02 DFHEIV35                                               2 (000000162)           Binary
+*>      286   02 DFHEIV97                                               4 (000000164)           Packed Decimal
+*>      286   02 DFHEIV98                                               2 (000000168)           Binary
+*>      286   02 FILLER                                                 2 (000000170)           Display
+*>      286   02 DFHEIV99                                               8 (000000172)           Display
+*>      286   02 DFHEIVL0                                              48 (000000180)           Display
+*>      286   02 DFHEIVL1                                              48 (000000228)           Display
+*>      286   02 DFHEIVL2                                              48 (000000276)           Display
+*>      286   02 DFHEIVL3                                              48 (000000324)           Display
+*>      286   02 DFHEIVL4                                             255 (000000372)           Display
+*>      286   02 DFHEIVL5                                             255 (000000627)           Display
+*>      286 01 DFHEIBLK                                                96             Lin       Group
+*>      286   02 EIBTIME                                                4 (000000000)           Packed Decimal
+*>      286   02 EIBDATE                                                4 (000000004)           Packed Decimal
+*>      286   02 EIBTRNID                                               4 (000000008)           Display
+*>      286   02 EIBTASKN                                               4 (000000012)           Packed Decimal
+*>      286   02 EIBTRMID                                               4 (000000016)           Display
+*>      286   02 DFHEIGDI                                               2 (000000020)           Binary
+*>      286   02 EIBCPOSN                                               2 (000000022)           Binary
+*>      286   02 EIBCALEN                                               2 (000000024)           Binary
+*>      286   02 EIBAID                                                 1 (000000026)           Display
+*>      286   02 EIBFILLER1                                             1 (000000027)           Display
+*>      286   02 EIBFN                                                  2 (000000028)           Display
+*>      286   02 EIBFILLER2                                             2 (000000030)           Display
+*>      286   02 EIBRCODE                                               6 (000000032)           Display
+*>      286   02 EIBFILLER3                                             2 (000000038)           Display
+*>      286   02 EIBDS                                                  8 (000000040)           Display
+*>      286   02 EIBREQID                                               8 (000000048)           Display
+*>      286   02 EIBRSRCE                                               8 (000000056)           Display
+*>      286   02 EIBSYNC                                                1 (000000064)           Display
+*>      286   02 EIBFREE                                                1 (000000065)           Display
+*>      286   02 EIBRECV                                                1 (000000066)           Display
+*>      286   02 EIBSEND                                                1 (000000067)           Display
+*>      286   02 EIBATT                                                 1 (000000068)           Display
+*>      286   02 EIBEOC                                                 1 (000000069)           Display
+*>      286   02 EIBFMH                                                 1 (000000070)           Display
+*>      286   02 EIBCOMPL                                               1 (000000071)           Display
+*>      286   02 EIBSIG                                                 1 (000000072)           Display
+*>      286   02 EIBCONF                                                1 (000000073)           Display
+*>      286   02 EIBERR                                                 1 (000000074)           Display
+*>      286   02 EIBRLDBK                                               1 (000000075)           Display
+*>      286   02 EIBERRCD                                               4 (000000076)           Display
+*>      286   02 EIBSYNRB                                               1 (000000080)           Display
+*>      286   02 EIBNODAT                                               1 (000000081)           Display
+*>      286   02 EIBFILLER5                                             2 (000000082)           Display
+*>      286   02 EIBRESP                                                4 (000000084)           Binary
+*>      286   02 EIBRESP2                                               4 (000000088)           Binary
+*>      286   02 DFHEIGDJ                                               2 (000000092)           Binary
+*>      286   02 DFHEIGDK                                               2 (000000094)           Binary
+*>      288 01 DFHCOMMAREA                                              1             Lin       Display
+*>      289 01 VAR                                                     30             Lin       Display
+*> ------------------------------------------------------------------------------------------------------------------
+*> --I: #14 Compiling NSREQLTR.cbl

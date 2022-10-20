@@ -1,0 +1,114 @@
+################################################################################
+#                                                                              #
+#     JOB: ahlgm40                                                             #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+#*******************************************************************************
+#*****
+#* This job is submitted via a job script <ahlmth...> that may also submit other
+#* jobs. Files beginning with AH.DL.CIADM... are ftp'd at the start of the next
+#* job script.  Other files being transferred should be noted below.
+#*****
+#*******************************************************************************
+
+################################################################################
+LABEL name=ECSDISK 
+################################################################################
+ASSGNDD ddname='IN1' filename='$SEQFILES/AH.DD.FICH082' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='OUT1' filename='$SEQFILES/AH.EX.FICH082' recsize='133' recfmt='F' disp='o' normal='k' abend='d' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO -
+    IFILE(IN1) -
+    OFILE(OUT1)
+  SET MAXCC=0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='ECSDISK' 
+
+################################################################################
+LABEL name=CIDLSA
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.DD.FICH082' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.EX.FICH082_00' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+
+EXECPGM pgmname='CIDLS' stepname='CIDLSA'
+
+################################################################################
+LABEL name=ACTUR082 
+################################################################################
+#  ******************************************************************    
+#  **    GAAP REPORTING - "TOTALS ONLY" REPORT FOR ACTUARIAL DEPT.       
+#  **                                                                    
+#  **            UNEARNED PREMIUM AND COMMISSION EXTRACT                 
+#  **            RESTART AT THIS STEP                                    
+#  **                                                                    
+#  ******************************************************************    
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+#  ************************************************      INPUT FILES     
+ASSGNDD ddname='SYS011' dataset='AH.XX.GAAP' gdg='0' filename='$SEQFILES/AH.XX.GAAP' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTA' disp='i-o' 
+ASSGNDD ddname='ERRTBLT' dataset='CI.WW.LG.ERREIN' type='VS' filename='ERRTBLA' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.TOTONLY.DATECARD' disp='i-o' 
+#  *************************************************    OUTPUT FILES     
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='SYS022' type='DUMMY' 
+ASSGNDD ddname='SYS024' type='DUMMY' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'  
+
+EXECPGM pgmname='ECS082' stepname='ACTUR082' 
+
+################################################################################
+LABEL name=ECS082B
+################################################################################
+#  ******************************************************************    
+#  **                   GAAP REPORTING                                   
+#  ******************************************************************    
+#  **                                                                    
+#  **            UNEARNED PREMIUM AND COMMISSION EXTRACT                 
+#  **          SEE RESTART INSTRUCTIONS BEFORE RESTARTING                
+#  **   THIS STEP USES PGM OPTION 7                                      
+#  ******************************************************************    
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+#  ************************************************      INPUT FILES     
+ASSGNDD ddname='SYS011' dataset='AH.XX.GAAP' gdg='0' filename='$SEQFILES/AH.XX.GAAP' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTA' disp='i-o' 
+ASSGNDD ddname='ERRTBLT' dataset='CI.WW.LG.ERREIN' type='VS' filename='ERRTBLA' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.EL582.DATECARD' disp='i-o' 
+#  *************************************************    OUTPUT FILES     
+ASSGNDD ddname='SYS020' filename='$SEQFILES/AH.DD.OPT7.FICH082' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS022' type='DUMMY' 
+ASSGNDD ddname='SYS024' type='DUMMY' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A'  
+
+EXECPGM pgmname='ECS082' stepname='ECS082B'
+
+################################################################################
+LABEL name=CPY082B
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/ECS082B/SYS008_$JON' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.PRINT.ECS082B' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY082B' parm='ALL' 
+
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+     "ftp -n ntis1.cso.local < $JCLLIB/ftp-ahlgm40-ntfree2"
+else
+	echo " Job aborted, print not released"
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOB

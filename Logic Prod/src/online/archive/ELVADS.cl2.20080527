@@ -1,0 +1,693 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID.                 ELVADS.
+      *AUTHOR.  PABLO.
+      *         OMAHA, NEBRASKA.
+      *SECURITY.   *****************************************************
+      *            *                                                   *
+      *            *   THIS PROGRAM IS THE PROPERTY OF CENTRAL STATES  *
+      *            *   HEALTH AND LIFE CO. OF OMAHA                    *
+      *            *                                                   *
+      *            *   USE OF THIS PROGRAM BY OTHER THAN THE EMPLOYEES *
+      *            *   OF CSO         IS EXPRESSLY PROHIBITED WITHOUT  *
+      *            *   THE PRIOR WRITTEN PERMISSION OF CSO.            *
+      *            *                                                   *
+      *            *****************************************************
+      *REMARKS. TRANSACTION VADS - VA DISCLOSURE PRINT TEST
+
+      *                        C H A N G E   L O G
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST  PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+      * 103107    2007092500001   PEMA  NEW PROGRAM
+      ******************************************************************
+      *
+       ENVIRONMENT DIVISION.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       77  FILLER  PIC  X(32) VALUE '********************************'.
+       77  FILLER  PIC  X(32) VALUE '*   ELVADS WORKING STORAGE     *'.
+       77  FILLER  PIC  X(32) VALUE '********* V/M 2.001 ************'.
+       77  VA-RATE-SW                  PIC X  VALUE ' '.
+           88  FOUND-VA-RATE               VALUE 'F'.
+           88  NO-VA-RATE-FOUND            VALUE 'N'.
+
+       01  WS-CALC-SWITCHES.
+           05  WS-TYPE-OF-CERT         PIC X.
+               88  GROSS-CERT              VALUE 'G'.
+               88  NET-CERT                VALUE 'N'.
+               88  LEVEL-CERT              VALUE 'L'.
+           05  WS-CALC-LF-GROSS        PIC X.
+               88  CALC-LF-GROSS           VALUE 'Y'.
+           05  WS-CALC-LF-NET          PIC X.
+               88  CALC-LF-NET             VALUE 'Y'.
+           05  WS-CALC-LF-LEVEL        PIC X.
+               88  CALC-LF-LEVEL           VALUE 'Y'.
+           05  WS-CALC-AH              PIC X.
+               88  CALC-AH                 VALUE 'Y'.
+
+       01  WS-CALC-AREA.
+           05  WS-NET-PMT-1            PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-NET-PMT-2            PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-NET-PMT-3            PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-NET-PMT-4            PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-GROSS-PMT-1          PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-GROSS-PMT-2          PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-GROSS-PMT-3          PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-GROSS-PMT-4          PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-LEVEL-PMT-1          PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-LEVEL-PMT-2          PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-LEVEL-PMT-3          PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-LEVEL-PMT-4          PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-NET-PREM-1           PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-NET-PREM-2           PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-NET-PREM-3           PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-NET-PREM-4           PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-GROSS-PREM-1         PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-GROSS-PREM-2         PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-GROSS-PREM-3         PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-GROSS-PREM-4         PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-LEVEL-PREM-1         PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-LEVEL-PREM-2         PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-LEVEL-PREM-3         PIC S9(7)V99 COMP-3 VALUE +0.
+           05  WS-LEVEL-PREM-4         PIC S9(7)V99 COMP-3 VALUE +0.
+           05  ANNUAL-DISCOUNT         PIC S99V999  COMP-3 VALUE +0.
+           05  CUR-PMT                 PIC S9(7)V99 COMP-3 VALUE +0.
+           05  AMT-FINANCED            PIC S9(9)V99 COMP-3 VALUE +0.
+           05  PRINC-AMT               PIC S9(9)V99 COMP-3 VALUE +0.
+           05  LFPREM                  PIC S9(7)V99 COMP-3 VALUE +0.
+           05  AHPREM                  PIC S9(7)V99 COMP-3 VALUE +0.
+           05  LFAMT                   PIC S9(9)V99 COMP-3 VALUE +0.
+           05  AHRATE                  PIC S99V9(5) COMP-3 VALUE +0.
+           05  LF-RATE                 PIC S99V9(5) COMP-3 VALUE +0.
+           05  OBRATE                  PIC S99V9(5) COMP-3 VALUE +0.
+           05  FILLER PIC X(18) VALUE ' LITTLE I IS NEXT '.
+           05  I                       PIC SV9(9)   COMP-3 VALUE +0.
+           05  Z                       PIC S999     COMP-3 VALUE +0.
+           05  D                       PIC S9(5)    COMP-3 VALUE +0.
+           05  T                       PIC S9(5)    COMP-3 VALUE +0.
+           05  DISC                    PIC SV9(9)   COMP-3 VALUE +0.
+           05  V-M                     PIC S99V9(9) COMP-3 VALUE +0.
+           05  VM-N                    PIC S99V9(9) COMP-3 VALUE +0.
+           05  VM                      PIC S99V9(9) COMP-3 VALUE +0.
+           05  V                       PIC S99V9(9) COMP-3 VALUE +0.
+           05  X                       PIC S99V9(9) COMP-3 VALUE +0.
+           05  Y                       PIC S99V9(9) COMP-3 VALUE +0.
+           05  N                       PIC S999     COMP-3 VALUE +0.
+           05  M                       PIC S999     COMP-3 VALUE +0.
+           05  R                       PIC S9(7)V99 COMP-3 VALUE +0.
+           05  SP                      PIC S99V9(9) COMP-3 VALUE +0.
+           05  ANGLEN                  PIC S999V9(9) COMP-3 VALUE +0.
+           05  ANGLENY                 PIC S999V9(9) COMP-3 VALUE +0.
+           05  ANGLEN-LEVEL            PIC S999V9(9) COMP-3 VALUE +0.
+           05  ANGLENY-LEVEL           PIC S999V9(9) COMP-3 VALUE +0.
+           05  LDPN                    PIC S9(5)V99  COMP-3 VALUE +0.
+           05  AHPN                    PIC S9(5)V99  COMP-3 VALUE +0.
+           05  LF                      PIC S99V9(9) COMP-3 VALUE +0.
+           05  PPY                     PIC S999V9(7) COMP-3 VALUE +0.
+
+       01  WS-HOLD-RATE-EXP.
+           05  WS-HOLD-RATE-EXP-AL     PIC X(11).
+           05  WS-HOLD-RATE-EXP-DT REDEFINES
+               WS-HOLD-RATE-EXP-AL     PIC 9(11).
+
+       01  ERRATE-KEY.
+           05  RATE-COMPANY-CD         PIC X       VALUE SPACE.
+           05  RATE-STATE-CODE.
+               10  RATE-ST-CODE        PIC XX      VALUE SPACES.
+               10  RATE-ST-CLASS       PIC XX      VALUE SPACES.
+               10  RATE-ST-DEV         PIC XXX     VALUE SPACES.
+           05  RATE-L-AH-CODE.         
+               10  RATE-L-AH           PIC X       VALUE SPACE.
+               10  RATE-LAH-NUM        PIC XX      VALUE ZEROS.
+           05  RATE-LIMITS.            
+               10  RATE-HIGH-AGE       PIC 99      VALUE ZEROS.
+               10  RATE-HIGH-AMT       PIC 9(6)    VALUE ZEROS.
+               10  RATE-FUTURE         PIC XX      VALUE SPACES.
+               10  RATE-SEX            PIC X       VALUE '9'.
+           05  RATE-EXPIRY-DATE        PIC 9(11)   COMP-3.
+                                       
+       01  SAVE-ERRATE-KEY.            
+           05  SVRT-COMPANY-CD         PIC X       VALUE SPACE.
+           05  SVRT-STATE-CODE.        
+               10  SVRT-ST-CODE        PIC XX      VALUE SPACES.
+               10  SVRT-ST-CLASS       PIC XX      VALUE SPACES.
+               10  SVRT-ST-DEV         PIC XXX     VALUE SPACES.
+           05  SVRT-L-AH-CODE.         
+               10  SVRT-L-AH           PIC X       VALUE SPACE.
+               10  SVRT-LAH-NUM        PIC XX      VALUE ZEROS.
+           05  SVRT-LIMITS.            
+               10  SVRT-HIGH-AGE       PIC 99      VALUE ZEROS.
+               10  SVRT-HIGH-AMT       PIC 9(6)    VALUE ZEROS.
+               10  SVRT-FUTURE         PIC XX      VALUE SPACES.
+               10  SVRT-SEX            PIC X       VALUE '9'.
+           05  SVRT-EXPIRY-DATE        PIC 9(11)   COMP-3.
+
+
+
+       01  WORK-AREA.
+           05  LINK-ELDATCV            PIC X(8)    VALUE 'ELDATCV'.
+           05  PGM-NAME                PIC X(8).
+           05  WS-RESPONSE             PIC S9(8)   COMP.
+               88  RESP-NORMAL                  VALUE +00.
+               88  RESP-NOTFND                  VALUE +13.
+               88  RESP-DUPREC                  VALUE +14.
+               88  RESP-DUPKEY                  VALUE +15.
+               88  RESP-NOTOPEN                 VALUE +19.
+               88  RESP-ENDFILE                 VALUE +20.
+
+       01  PRINT-LENGTH                PIC S9(4) COMP VALUE +473.
+       01  PRINT-LINE.
+           05  VA-CONST                PIC X(13)  VALUE 'VA DISCLOSURE'.
+           05  VA-DATE                 PIC X(10).
+           05  VA-BORROWER             PIC X(30).
+           05  VA-CERT-NO              PIC X(11).
+           05  VA-BENE                 PIC X(30).
+           05  VA-ACCT-NAME            PIC X(30).
+           05  VA-SL                   PIC X.
+           05  VA-JL                   PIC X.
+           05  VA-SA                   PIC X.
+           05  VA-JA                   PIC X.
+           05  VA-GD                   PIC X.
+           05  VA-NP                   PIC X.
+           05  VA-7R                   PIC X.
+           05  VA-LL                   PIC X.
+           05  VA-TN                   PIC X.
+           05  VA-14R                  PIC X.
+           05  VA-14E                  PIC X.
+           05  VA-30R                  PIC X.
+           05  VA-30E                  PIC X.
+           05  VA-CL-NET-AMT           PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-CL-GRS-AMT           PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-CL-LEV-AMT           PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-CL-NET-PMT           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CL-GRS-PMT           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CL-LEV-PMT           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CL-NET-PRM           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CL-GRS-PRM           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CL-LEV-PRM           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CD-NET-AMT           PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-CD-GRS-AMT           PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-CD-LEV-AMT           PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-CD-NET-PMT           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CD-GRS-PMT           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CD-LEV-PMT           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CD-NET-PRM           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CD-GRS-PRM           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CD-LEV-PRM           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CLD-NET-AMT          PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-CLD-GRS-AMT          PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-CLD-LEV-AMT          PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-CLD-NET-PMT          PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CLD-GRS-PMT          PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CLD-LEV-PMT          PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CLD-NET-PRM          PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CLD-GRS-PRM          PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-CLD-LEV-PRM          PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-NO-NET-AMT           PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-NO-GRS-AMT           PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-NO-LEV-AMT           PIC ZZZ,ZZZ.99 BLANK WHEN ZERO.
+           05  VA-NO-NET-PMT           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-NO-GRS-PMT           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-NO-LEV-PMT           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-NO-NET-PRM           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-NO-GRS-PRM           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+           05  VA-NO-LEV-PRM           PIC ZZ,ZZZ.99  BLANK WHEN ZERO.
+
+                                       COPY ERCRATE.
+                                       COPY ERCPNDB.
+                                       COPY ELCDATE.
+
+           01  WS-PASS-AREA.
+               05  WS-PASS-AREA-LENGTH PIC S9(4) COMP VALUE +585.
+               05  WS-PENDING-REC        PIC X(585).
+
+       PROCEDURE DIVISION.
+
+           EXEC CICS RETRIEVE
+              INTO   (WS-PASS-AREA)
+              LENGTH (WS-PASS-AREA-LENGTH)
+              RESP   (WS-RESPONSE)
+           END-EXEC
+
+           IF NOT RESP-NORMAL
+              GO TO 8000-RETURN
+           END-IF
+
+           MOVE WS-PENDING-REC         TO PENDING-BUSINESS
+           MOVE SPACES                 TO WS-CALC-SWITCHES
+
+           IF PB-I-LF-BENEFIT-CD = '01' OR '03'
+              SET GROSS-CERT           TO TRUE
+              SET CALC-LF-GROSS        TO TRUE
+              SET CALC-LF-NET          TO TRUE
+           END-IF
+
+           IF PB-I-LF-BENEFIT-CD = '05' OR '06'
+              SET NET-CERT             TO TRUE
+              SET CALC-LF-NET          TO TRUE
+           END-IF
+
+           IF PB-I-LF-BENEFIT-CD = '02' OR '04'
+              SET CALC-LF-LEVEL        TO TRUE
+              SET LEVEL-CERT           TO TRUE
+           END-IF
+
+           IF PB-I-AH-BENEFIT-CD NOT = '00' AND '  '
+              SET CALC-AH              TO TRUE
+           END-IF
+
+           MOVE PB-I-LF-PREMIUM-AMT    TO LFPREM
+           MOVE PB-I-AH-PREMIUM-AMT    TO AHPREM
+           MOVE PB-I-LF-BENEFIT-AMT    TO LFAMT
+           IF PB-I-LF-BENEFIT-CD NOT = '00' AND '  '
+              MOVE PB-I-LF-TERM        TO N
+           ELSE
+              MOVE PB-I-AH-TERM        TO N
+           END-IF
+           MOVE PB-I-LOAN-TERM         TO M
+           IF M = 0
+              MOVE N                   TO M
+           END-IF
+           COMPUTE I = PB-I-LOAN-APR / +1200
+           MOVE ZEROS                  TO Z
+           MOVE +30                    TO T
+           MOVE +3.63                  TO ANNUAL-DISCOUNT
+           MOVE PB-CERT-EFF-DT         TO DC-BIN-DATE-1
+           MOVE PB-I-1ST-PMT-DT        TO DC-BIN-DATE-2
+           MOVE '1'                    TO DC-OPTION-CODE
+           PERFORM 9700-DATE-LINK      THRU 9700-EXIT
+           IF NO-CONVERSION-ERROR
+              COMPUTE D = (DC-ELAPSED-MONTHS * 30) + DC-ODD-DAYS-OVER
+           END-IF
+
+           IF PB-I-AH-BENEFIT-CD NOT = '  ' AND '00'
+              MOVE PB-I-AH-RATE        TO AHRATE
+           END-IF
+
+           IF GROSS-CERT OR LEVEL-CERT
+              COMPUTE LF-RATE = PB-I-LF-RATE / (N / 12)
+           END-IF
+
+           IF NET-CERT
+              MOVE PB-I-LF-RATE        TO OBRATE
+           END-IF
+
+           IF GROSS-CERT
+              PERFORM 1000-GET-ERRATE  THRU 1000-EXIT
+           END-IF
+
+           COMPUTE ANGLEN = (1 - (1 / (1 + I)) ** N) / I
+           COMPUTE DISC = ANNUAL-DISCOUNT / 1200
+
+           COMPUTE V-M = (1 / (1 + I)) ** N
+           COMPUTE VM = (1 / (1 + I)) ** M
+           COMPUTE VM-N = (1 / (1 + I)) ** (M - N)
+           COMPUTE V = 1 / (1 + I)
+           COMPUTE X = 1 / (1 + DISC)
+           COMPUTE Y = (1 + (D * I / T)) / (1 + I)
+           COMPUTE ANGLENY = ANGLEN / Y
+           COMPUTE LF = ((1 + (Z * I)) / I)
+              * (((X ** N - 1) / (X - 1))
+              - ((X ** N * VM-N - VM) / (X * (1 + I) - 1)))
+              * (OBRATE / 1000)
+
+
+      *    COMPUTE LFA = (1 + (Z * I)) / I
+      *    COMPUTE LFB = X ** N - 1
+      *    COMPUTE LFC = X - 1
+      *    COMPUTE LFD = LFB / LFC
+      *    COMPUTE LFE = (((X ** N) * (V ** (M - N))) - (V ** M)) /
+      *       ((X * (1 + I)) - 1)
+      *    COMPUTE LF = LFA * (LFD - LFE) * (OBRATE / 1000)
+
+
+           COMPUTE R = LFAMT / (ANGLENY - LF - N * AHRATE / 100)
+           COMPUTE SP = (LF * 100) / (ANGLENY * (1 + (Z * I)))
+           COMPUTE LDPN = SP * R * ANGLENY * (1 + (Z * I)) / 100
+           COMPUTE AHPN = R * N * AHRATE / 100
+           COMPUTE Y = (1 + (D * I / T)) / (1 + I)
+           COMPUTE ANGLENY = ANGLEN / Y
+
+           IF GROSS-CERT
+              COMPUTE CUR-PMT = LFAMT / PB-I-LF-TERM
+              COMPUTE AMT-FINANCED = CUR-PMT * ANGLEN
+              COMPUTE PRINC-AMT = AMT-FINANCED - LFPREM - AHPREM
+           ELSE
+              IF NET-CERT
+                 COMPUTE PRINC-AMT = LFAMT - LFPREM - AHPREM
+                 MOVE LFAMT TO AMT-FINANCED
+              END-IF
+           END-IF
+
+           MOVE 000000.00              TO VA-CL-NET-AMT
+                                          VA-CL-GRS-AMT
+                                          VA-CL-LEV-AMT
+                                          VA-CD-NET-AMT
+                                          VA-CD-GRS-AMT
+                                          VA-CD-LEV-AMT
+                                          VA-CLD-NET-AMT
+                                          VA-CLD-GRS-AMT
+                                          VA-CLD-LEV-AMT
+                                          VA-NO-NET-AMT
+                                          VA-NO-GRS-AMT
+                                          VA-NO-LEV-AMT
+           MOVE 00000.00               TO VA-CL-NET-PMT
+                                          VA-CL-GRS-PMT
+                                          VA-CL-LEV-PMT
+                                          VA-CD-NET-PMT
+                                          VA-CD-GRS-PMT
+                                          VA-CD-LEV-PMT
+                                          VA-CLD-NET-PMT
+                                          VA-CLD-GRS-PMT
+                                          VA-CLD-LEV-PMT
+                                          VA-NO-NET-PMT
+                                          VA-NO-GRS-PMT
+                                          VA-NO-LEV-PMT
+           MOVE 00000.00               TO VA-CL-NET-PRM
+                                          VA-CL-GRS-PRM
+                                          VA-CL-LEV-PRM
+                                          VA-CD-NET-PRM
+                                          VA-CD-GRS-PRM
+                                          VA-CD-LEV-PRM
+                                          VA-CLD-NET-PRM
+                                          VA-CLD-GRS-PRM
+                                          VA-CLD-LEV-PRM
+                                          VA-NO-NET-PRM
+                                          VA-NO-GRS-PRM
+                                          VA-NO-LEV-PRM
+
+
+           IF NET-CERT
+              PERFORM 2000-BUILD-NET-AMTS
+                                       THRU 2000-EXIT
+           END-IF
+
+           IF GROSS-CERT
+              PERFORM 2000-BUILD-NET-AMTS
+                                       THRU 2000-EXIT
+              PERFORM 3000-BUILD-GROSS-AMTS
+                                       THRU 3000-EXIT
+           END-IF
+
+           IF LEVEL-CERT
+              PERFORM 4000-BUILD-LEVEL-AMTS
+                                       THRU 4000-EXIT
+           END-IF
+
+           MOVE '01/31/2008'           TO VA-DATE
+           STRING PB-I-INSURED-FIRST-NAME ' '
+              PB-I-INSURED-LAST-NAME DELIMITED BY '  '
+              INTO VA-BORROWER
+           END-STRING
+      *    MOVE 'PAUL MCGRATH'         TO VA-BORROWER
+           MOVE PB-CERT-NO             TO VA-CERT-NO
+           MOVE 'TEST BENE'            TO VA-BENE
+           MOVE 'TEST ACCT NAME'       TO VA-ACCT-NAME
+           MOVE PB-RECORD-STATUS (1:30) TO VA-ACCT-NAME
+           MOVE PB-I-BENEFICIARY-NAME  TO VA-BENE
+           IF PB-I-LF-BENEFIT-CD = '03' OR '04' OR '06'
+              MOVE 'X'                 TO VA-JL
+           ELSE
+              MOVE 'X'                 TO VA-SL
+           END-IF
+           IF GROSS-CERT
+              MOVE 'X'                 TO VA-GD
+           ELSE
+              IF LEVEL-CERT
+                 MOVE 'X'              TO VA-LL
+              ELSE
+                 MOVE 'X'              TO VA-NP
+              END-IF
+           END-IF
+
+           IF CALC-AH
+              MOVE 'X'                 TO VA-SA
+              EVALUATE TRUE
+               WHEN PB-I-AH-BENEFIT-CD = '53' OR '54' OR
+                 '55' OR '56' OR '57'
+                 MOVE 'X'              TO VA-JA
+                 MOVE ' '              TO VA-SA
+               WHEN PB-I-AH-BENEFIT-CD = '03' OR '53'
+                 MOVE 'X'              TO VA-7R
+               WHEN PB-I-AH-BENEFIT-CD = '01' OR '54'
+                 MOVE 'X'              TO VA-14R
+               WHEN PB-I-AH-BENEFIT-CD = '05' OR '56'
+                 MOVE 'X'              TO VA-14E
+               WHEN PB-I-AH-BENEFIT-CD = '04' OR '55'
+                 MOVE 'X'              TO VA-30R
+               WHEN PB-I-AH-BENEFIT-CD = '02' OR '57'
+                 MOVE 'X'              TO VA-30E
+              END-EVALUATE
+           END-IF
+
+      *    MOVE 'X'                    TO VA-SL VA-JL VA-SA VA-JA VA-GD
+      *       VA-NP VA-7R VA-LL VA-TN VA-14R VA-14E VA-30R VA-30E
+
+           EXEC CICS SEND
+               FROM    (PRINT-LINE)
+               LENGTH  (PRINT-LENGTH)
+               CTLCHAR ('H')
+               ERASE
+           END-EXEC
+
+           GO TO 8000-RETURN
+
+           .
+       1000-GET-ERRATE.
+
+           MOVE ALL '9'                TO ERRATE-KEY
+           MOVE PB-COMPANY-CD          TO RATE-COMPANY-CD
+           MOVE ZEROS                  TO RATE-STATE-CODE
+           MOVE PB-STATE               TO RATE-ST-CODE
+           MOVE 'L'                    TO RATE-L-AH
+
+           IF GROSS-CERT
+              IF PB-I-LF-BENEFIT-CD = '01'
+                 MOVE '05'             TO RATE-LAH-NUM
+              ELSE
+                 MOVE '06'             TO RATE-LAH-NUM
+              END-IF
+           END-IF
+
+           IF NET-CERT
+              IF PB-I-LF-BENEFIT-CD = '05'
+                 MOVE '01'             TO RATE-LAH-NUM
+              ELSE
+                 MOVE '03'             TO RATE-LAH-NUM
+              END-IF
+           END-IF
+
+           MOVE 99                     TO RATE-HIGH-AGE
+           MOVE PB-I-LF-BENEFIT-AMT    TO RATE-HIGH-AMT
+
+           MOVE PB-CERT-EFF-DT         TO DC-BIN-DATE-1
+           MOVE SPACE                  TO DC-OPTION-CODE
+           PERFORM 9700-DATE-LINK      THRU 9700-EXIT
+
+           IF NO-CONVERSION-ERROR
+              MOVE ZEROS               TO RATE-EXPIRY-DATE
+                                          WS-HOLD-RATE-EXP-DT
+              MOVE DC-GREG-DATE-CYMD   TO WS-HOLD-RATE-EXP-AL(4:8)
+              MOVE WS-HOLD-RATE-EXP-DT TO RATE-EXPIRY-DATE
+              MOVE ERRATE-KEY          TO SAVE-ERRATE-KEY
+           ELSE
+              MOVE 00099999999         TO RATE-EXPIRY-DATE
+           END-IF
+
+           PERFORM 1010-STARTBR-ERRATE THRU 1010-EXIT
+
+           IF RESP-NORMAL
+             PERFORM UNTIL
+              (FOUND-VA-RATE)
+              OR (NO-VA-RATE-FOUND)
+              OR (NOT RESP-NORMAL)
+              PERFORM 1020-READNEXT-ERRATE
+                                       THRU 1020-EXIT
+              IF (RT-STATE-CODE = SVRT-STATE-CODE)
+                 AND (RT-L-AH-CODE = SVRT-L-AH-CODE)
+                 IF (RT-HIGH-AMT > SVRT-HIGH-AMT)
+                    AND (RT-EXPIRY-DATE > SVRT-EXPIRY-DATE)
+                    SET FOUND-VA-RATE     TO TRUE
+                    IF SVRT-LAH-NUM = '05' OR '06'
+                       MOVE RT-DISCOUNT-OB-RATE
+                                       TO OBRATE
+                    ELSE
+                       COMPUTE LF-RATE = RT-L-RATE (N) / (N / 12)
+                    END-IF
+                 END-IF
+              ELSE
+                 SET NO-VA-RATE-FOUND  TO TRUE
+              END-IF
+             END-PERFORM
+           END-IF
+
+           .
+       1000-EXIT.
+           EXIT.
+
+       1010-STARTBR-ERRATE.
+
+           EXEC CICS STARTBR
+              DATASET    ('ERRATE')
+              RIDFLD     (ERRATE-KEY)
+              RESP       (WS-RESPONSE)
+           END-EXEC
+
+           .
+       1010-EXIT.
+           EXIT.
+
+       1020-READNEXT-ERRATE.
+
+           EXEC CICS READNEXT
+              DATASET    ('ERRATE')
+              RIDFLD     (ERRATE-KEY)
+              INTO       (RATE-RECORD)
+              RESP       (WS-RESPONSE)
+           END-EXEC
+
+           .
+       1020-EXIT.
+           EXIT.
+
+       2000-BUILD-NET-AMTS.
+
+           COMPUTE WS-NET-PMT-1 = PRINC-AMT / (ANGLEN - LF)
+
+           IF AHRATE NOT = ZEROS
+              COMPUTE WS-NET-PMT-2 = PRINC-AMT /
+               (ANGLEN - (N * AHRATE / 100))
+           END-IF
+
+           COMPUTE WS-NET-PMT-3 = PRINC-AMT /
+             (ANGLEN - LF - (N * AHRATE / 100))
+
+           COMPUTE WS-NET-PMT-4 = PRINC-AMT / ANGLEN
+
+           COMPUTE WS-NET-PREM-1 = SP * WS-NET-PMT-1 * ANGLEN *
+             (1 + (Z * I)) / 100
+
+           COMPUTE WS-NET-PREM-2 = WS-NET-PMT-2 * N * AHRATE / 100
+
+           COMPUTE WS-NET-PREM-3 = (SP * WS-NET-PMT-3 * ANGLEN *
+             (1 + (Z * I)) / 100) + (WS-NET-PMT-3 * N * AHRATE / 100)
+
+           COMPUTE VA-CL-NET-AMT = PRINC-AMT + WS-NET-PREM-1
+           IF WS-NET-PREM-2 NOT = ZEROS
+              COMPUTE VA-CD-NET-AMT = PRINC-AMT + WS-NET-PREM-2
+           END-IF
+
+           COMPUTE VA-CLD-NET-AMT = PRINC-AMT + WS-NET-PREM-3
+           MOVE PRINC-AMT              TO VA-NO-NET-AMT
+
+           MOVE WS-NET-PMT-1           TO VA-CL-NET-PMT
+           MOVE WS-NET-PMT-2           TO VA-CD-NET-PMT
+           MOVE WS-NET-PMT-3           TO VA-CLD-NET-PMT
+           MOVE WS-NET-PMT-4           TO VA-NO-NET-PMT
+
+           MOVE WS-NET-PREM-1           TO VA-CL-NET-PRM
+           MOVE WS-NET-PREM-2           TO VA-CD-NET-PRM
+           MOVE WS-NET-PREM-3           TO VA-CLD-NET-PRM
+           MOVE WS-NET-PREM-4           TO VA-NO-NET-PRM
+
+
+
+           .
+       2000-EXIT.
+           EXIT.
+
+       3000-BUILD-GROSS-AMTS.
+
+           COMPUTE WS-GROSS-PMT-1 = PRINC-AMT /
+             (ANGLENY - (N * (N + ((D - T) / T)) / 12 * LF-RATE / 100))
+
+           COMPUTE WS-GROSS-PMT-2 = PRINC-AMT /
+             (ANGLENY - (N * AHRATE / 100))
+
+           COMPUTE WS-GROSS-PMT-3 = PRINC-AMT /
+             (ANGLENY - ((N * (N + ((D - T) / T)) /
+             12 * LF-RATE / 100) + (N * AHRATE / 100)))
+
+           COMPUTE WS-GROSS-PMT-4 = PRINC-AMT / ANGLENY
+
+           COMPUTE WS-GROSS-PREM-1 = WS-GROSS-PMT-1 *
+             N * (N + ((D - T) / T)) / 12 * LF-RATE / 100
+
+           COMPUTE WS-GROSS-PREM-2 = WS-GROSS-PMT-2 * N * AHRATE / 100
+
+           COMPUTE WS-GROSS-PREM-3 = (WS-GROSS-PMT-3 * N *
+             (N + ((D - T) / T)) / 12 * LF-RATE / 100) +
+             (WS-GROSS-PMT-3 * N * AHRATE / 100)
+
+           MOVE ZEROS                  TO WS-GROSS-PREM-4
+
+           COMPUTE VA-CL-GRS-AMT = PRINC-AMT + WS-GROSS-PREM-1
+           COMPUTE VA-CD-GRS-AMT = PRINC-AMT + WS-GROSS-PREM-2
+           COMPUTE VA-CLD-GRS-AMT = PRINC-AMT + WS-GROSS-PREM-3
+           COMPUTE VA-NO-GRS-AMT = PRINC-AMT
+
+           MOVE WS-GROSS-PMT-1           TO VA-CL-GRS-PMT
+           MOVE WS-GROSS-PMT-2           TO VA-CD-GRS-PMT
+           MOVE WS-GROSS-PMT-3           TO VA-CLD-GRS-PMT
+           MOVE WS-GROSS-PMT-4           TO VA-NO-GRS-PMT
+
+           MOVE WS-GROSS-PREM-1           TO VA-CL-GRS-PRM
+           MOVE WS-GROSS-PREM-2           TO VA-CD-GRS-PRM
+           MOVE WS-GROSS-PREM-3           TO VA-CLD-GRS-PRM
+           MOVE WS-GROSS-PREM-4           TO VA-NO-GRS-PRM
+
+           .
+       3000-EXIT.
+           EXIT.
+
+       4000-BUILD-LEVEL-AMTS.
+
+           MOVE 1                      TO N
+           COMPUTE PPY = 1 / M * 12
+           COMPUTE T = 360 * M / 12
+           COMPUTE D = D + T
+           COMPUTE I = PB-I-LOAN-APR / PPY / 100
+           COMPUTE Y = (1 + (D * I / T)) / (1 + I)
+           COMPUTE ANGLEN = (1 - (1 / (1 + I)) ** 1) / I
+           COMPUTE ANGLENY = ANGLEN / Y
+           COMPUTE PRINC-AMT = (LFAMT * ANGLENY) - LFPREM
+           COMPUTE WS-LEVEL-PMT-1 = PRINC-AMT / (ANGLENY -
+              (1 * ((1 + (D - T) / T) / PPY) * (LF-RATE / 100)))
+           COMPUTE WS-LEVEL-PMT-4 = PRINC-AMT / ANGLENY
+           COMPUTE WS-LEVEL-PREM-1 = WS-LEVEL-PMT-1 *
+              (1 * ((1 + (D - T) / T) / PPY) * (LF-RATE / 100))
+           MOVE ZEROS                  TO WS-LEVEL-PREM-4
+
+           MOVE WS-LEVEL-PMT-1           TO VA-CL-LEV-PMT
+           MOVE WS-LEVEL-PMT-4           TO VA-NO-LEV-PMT
+
+           MOVE WS-LEVEL-PREM-1           TO VA-CL-LEV-PRM
+           MOVE WS-LEVEL-PREM-4           TO VA-NO-LEV-PRM
+
+           COMPUTE VA-CL-LEV-AMT = PRINC-AMT + WS-LEVEL-PREM-1
+           MOVE PRINC-AMT              TO VA-NO-LEV-AMT
+
+           .
+       4000-EXIT.
+           EXIT.
+
+       8000-RETURN.
+
+           EXEC CICS RETURN
+           END-EXEC
+
+           GOBACK
+
+           .
+       9700-DATE-LINK.                                                  
+
+           MOVE LINK-ELDATCV           TO PGM-NAME
+           EXEC CICS LINK
+              PROGRAM    (PGM-NAME)
+              COMMAREA   (DATE-CONVERSION-DATA)
+              LENGTH     (DC-COMM-LENGTH)
+           END-EXEC
+           .
+       9700-EXIT.
+           EXIT.

@@ -1,0 +1,213 @@
+       IDENTIFICATION DIVISION.
+022618 PROGRAM-ID.    CIB003.
+      *AUTHOR.        PABLO.
+      *               COLLEYVILLE, TX
+      *SECURITY.   *****************************************************
+      *            *                                                   *
+      *            *   THIS PROGRAM IS THE PROPERTY OF CSO.            *
+      *            *                                                   *
+      *            *   USE OF THIS PROGRAM BY OTHER THAN THE EMPLOYEES *
+      *            *   OF    CSO      IS EXPRESSLY PROHIBITED WITHOUT  *
+      *            *   THE PRIOR WRITTEN PERMISSION OF CSO.            *
+      *            *                                                   *
+      *            *****************************************************
+                                                                        
+      *REMARKS
+      *                                                               * 
+      *  THIS PROGRAM READS THE EL515 REPORT FILE AND CREATES A FILE  * 
+      *  WITH THE CSR CODE AND SEQ NUMBER TO BE SORTED AND DIVIDED    * 
+      *  BY CSR IN THE NEXT STEPS                                     * 
+      *                                                               * 
+      ***************************************************************** 
+060506******************************************************************
+060506*                   C H A N G E   L O G
+060506*
+060506* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+060506*-----------------------------------------------------------------
+060506*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+060506* EFFECTIVE    NUMBER
+060506*-----------------------------------------------------------------
+052908* 052908  CR2008021200003  PEMA  NEW PROGRAM
+022618* 022618  CR2017112900002  PEMA  REMOVE JLMC HARDCODING
+101101******************************************************************
+                                                                        
+       ENVIRONMENT DIVISION.                                            
+
+       INPUT-OUTPUT SECTION.                                            
+
+       FILE-CONTROL.                                                    
+
+           SELECT EL515-REPORT
+                  ASSIGN TO SYS010
+                  FILE STATUS IS SYS010-STATUS.
+
+           SELECT DISK-DATE                                             
+                  ASSIGN TO SYS019.                                     
+                                                                        
+           SELECT CSR-REPORT
+                  ASSIGN TO SYS011.
+
+       DATA DIVISION.                                                   
+
+       FILE SECTION.                                                    
+
+       FD  EL515-REPORT
+           LABEL RECORDS ARE STANDARD                                   
+           RECORDING MODE IS F                                          
+           BLOCK CONTAINS 0 RECORDS.                                    
+
+       01  EL515-RECORD                PIC X(133).
+
+       FD  DISK-DATE                                                    
+           COPY ELCDTEFD.                                               
+
+       FD  CSR-REPORT
+           LABEL RECORDS ARE STANDARD
+           RECORDING MODE IS F
+           BLOCK CONTAINS 0 RECORDS.
+       01  CSR-RECORD                  PIC X(146).
+
+       WORKING-STORAGE SECTION.                                         
+
+       01  WS-NEW-CSR-RECORD.
+           05  WS-CSR-CODE             PIC X(4).
+           05  WS-CSR-SEQ-NO           PIC 9(9)   VALUE ZEROS.
+           05  WS-REST-REC             PIC X(133) VALUE SPACES.
+
+       01  HEADINGS.
+           05  HEADS OCCURS 5          PIC X(133).
+
+       01  FILLER.
+092903     05  WS-RETURN-CODE          PIC S9(4)  COMP  VALUE ZEROS.    
+092903     05  WS-ZERO                 PIC S9     VALUE +0  COMP-3.
+092903     05  WS-ABEND-MESSAGE        PIC X(80)  VALUE SPACES.         
+092903     05  WS-ABEND-FILE-STATUS    PIC XX     VALUE ZEROS.          
+092903     05  PGM-SUB             PIC S999   COMP-3  VALUE +061.   
+           05  S0C7                PIC X       VALUE SPACE.             
+           05  FORCE-DUMP REDEFINES S0C7 PIC S9 COMP-3.                 
+           05  SYS010-STATUS       PIC X(2)    VALUE SPACE.             
+               88  EOF                         VALUE '10'.              
+           05  WS-DATE             PIC 9(8)    VALUE ZERO.              
+                                                                        
+
+       01  FILLER               COMP-3.                                 
+           05  STRT             PIC S9(3)   VALUE +0.                   
+           05  SUB              PIC S9(3)   VALUE +0.                   
+           05  WK1              PIC S9(7)   VALUE +0.                   
+           05  WK2              PIC S9(7)   VALUE +0.                   
+                                                                        
+092903                                 COPY ELCDTECX.
+
+092903                                 COPY ELCDTEVR.
+
+       PROCEDURE DIVISION.                                              
+
+092903                                 COPY ELCDTERX.
+
+           PERFORM 0000-INIT-ROUTINE   THRU 0000-EXIT                     
+           PERFORM 1000-PROCESS-FILE   THRU 1000-EXIT UNTIL EOF           
+           PERFORM 9000-END-OF-JOB     THRU 9000-EXIT                     
+           GOBACK.
+
+       0000-INIT-ROUTINE.                                               
+
+           OPEN INPUT EL515-REPORT
+
+           IF SYS010-STATUS NOT = '00'
+              DISPLAY 'OPEN ERROR ' SYS010-STATUS ' ON SYS010'
+              MOVE +16                 TO RETURN-CODE
+              ADD +1                   TO FORCE-DUMP
+           END-IF
+
+           OPEN OUTPUT CSR-REPORT
+
+           MOVE ZEROS                  TO WS-CSR-SEQ-NO
+
+           .                                                            
+       0000-EXIT.                                                       
+           EXIT.                                                        
+
+       1000-PROCESS-FILE.                                               
+
+           PERFORM 1010-READ-INPUT     THRU 1010-EXIT
+           IF EOF
+              GO TO 1000-EXIT
+           END-IF
+           IF EL515-RECORD(1:1) = '1'                                    
+              PERFORM 2000-NEW-PAGE    THRU 2000-EXIT
+022618        IF EOF
+022618           GO TO 1000-EXIT
+022618        END-IF
+           END-IF
+
+           ADD 1                       TO WS-CSR-SEQ-NO
+           MOVE EL515-RECORD           TO WS-REST-REC
+
+           WRITE CSR-RECORD            FROM WS-NEW-CSR-RECORD
+
+           .                                                            
+       1000-EXIT.                                                       
+           EXIT.                                                        
+
+       1010-READ-INPUT.
+
+           READ EL515-REPORT AT END
+              GO TO 1010-EXIT
+           END-READ
+
+           .
+       1010-EXIT.
+           EXIT.
+
+       2000-NEW-PAGE.                                                   
+
+           MOVE EL515-RECORD           TO HEADS (1)
+           PERFORM 1010-READ-INPUT     THRU 1010-EXIT
+           MOVE EL515-RECORD           TO HEADS (2)
+           PERFORM 1010-READ-INPUT     THRU 1010-EXIT
+           MOVE EL515-RECORD           TO HEADS (3)
+           PERFORM 1010-READ-INPUT     THRU 1010-EXIT
+           MOVE EL515-RECORD           TO HEADS (4)
+           PERFORM 1010-READ-INPUT     THRU 1010-EXIT
+           MOVE EL515-RECORD (31:4)    TO WS-CSR-CODE
+           IF (HEADS (4) (7:14) = 'SUMMARY TOTALS')
+              OR (HEADS (4) (6:14) = 'SUMMARY TOTALS')
+              OR (HEADS (4) (6:14) = 'CLAIM PAYMENTS')
+              DISPLAY ' FOUND SUMMARY OR CLAIMS'
+022618*       MOVE 'JLMC'              TO WS-CSR-CODE
+022618        set eof to true
+022618        go to 2000-exit
+           END-IF
+           IF WS-CSR-CODE = SPACES OR LOW-VALUES
+              DISPLAY ' BAD CSR CODE '
+              MOVE 'JJVA'              TO WS-CSR-CODE
+           END-IF
+           ADD 1                       TO WS-CSR-SEQ-NO
+           MOVE HEADS (1)              TO WS-REST-REC
+           WRITE CSR-RECORD            FROM WS-NEW-CSR-RECORD
+           ADD 1                       TO WS-CSR-SEQ-NO
+           MOVE HEADS (2)              TO WS-REST-REC
+           WRITE CSR-RECORD            FROM WS-NEW-CSR-RECORD
+           ADD 1                       TO WS-CSR-SEQ-NO
+           MOVE HEADS (3)              TO WS-REST-REC
+           WRITE CSR-RECORD            FROM WS-NEW-CSR-RECORD
+           ADD 1                       TO WS-CSR-SEQ-NO
+           MOVE HEADS (4)              TO WS-REST-REC
+           WRITE CSR-RECORD            FROM WS-NEW-CSR-RECORD
+
+           .                                                            
+       2000-EXIT.                                                       
+           EXIT.                                                        
+
+       9000-END-OF-JOB.                                                 
+
+           DISPLAY 'EOJ - EL515 REPORT PRINT JOB '
+                                                                        
+           CLOSE EL515-REPORT
+                 CSR-REPORT
+
+           .
+       9000-EXIT.                                                       
+           EXIT.                                                        
+       ABEND-PGM.
+                           COPY ELCABEND.

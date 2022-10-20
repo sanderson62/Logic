@@ -1,0 +1,85 @@
+BEGINJOB mode='MVS' jobclass='M' 
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job aborted, not mdoff"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=REMOVE
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/csrstatechgs.xls
+!
+EXECPGM pgmname='BPXBATCH' stepname='REMOVE' parm='SH'
+
+################################################################################
+LABEL name=FTP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntcso1 < $JCLLIB/ftp-cpsamfcsr
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP1' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/readamcsr.pl $SEQFILES/csrstatechgs.xls $SEQFILES/csrout.txt
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=BKPACCT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERACCT -s $SEQFILES/eracct.csr.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPACCT' parm='SH'
+
+################################################################################
+LABEL name=BKPCOMP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERCOMP -s $SEQFILES/ercomp.csr.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPCOMP' parm='SH'
+
+################################################################################
+LABEL name=SORT1
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/csrout.txt' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/csrout.srtd.txt' disp='o' normal='k' abend='d' recfmt='F' recsize='56' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 1 CHAR) (14 2 CHAR) (27 10 CHAR)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT1'
+
+################################################################################
+LABEL name=CPSAMFCS
+################################################################################
+ASSGNDD ddname='ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ERCOMP' type='VS' filename='ERCOMP' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o'
+ASSGNDD ddname='SYS007' filename='$SEQFILES/csrout.srtd.txt' disp='i-o'
+
+EXECPGM pgmname='CPSAMFCSR' stepname='CPSAMFCS' 
+
+if ($JOBSTATUS == 0) then
+   "echo  | mutt -s 'CSR Update successful' pema@cso.com,jjva@cso.com,djwb@cso.com"
+else
+   "echo  | mutt -s 'CSR Update F A I L E D ' pema@cso.com,jjva@cso.com,djwb@cso.com"
+  echo " Job aborted, print not released"
+endif
+
+
+
+ENDJOB 

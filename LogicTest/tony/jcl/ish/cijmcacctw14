@@ -1,0 +1,83 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+#
+################################################################################
+
+if ($EBMSYS != "cid1t") then
+   echo "Job Aborted, Not CID1T"
+   exit 1
+endif
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+tr -d '\012' < $SEQFILES/jmicacctsw14 > $SEQFILES/jmcwrk1w14
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=SORT01
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/jmcwrk1w14' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/jmcwrk2w14' disp='o' normal='k' abend='d' recfmt='F' recsize='604'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(268 1 CHAR RV)(250 10)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT01'
+
+################################################################################
+LABEL name=JMCFIXAGT
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/jmcwrk2w14' disp='i' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/jmcwrk3w14' disp='o' normal='k' abend='d' recfmt='F' recsize='604' 
+
+EXECPGM pgmname='JMCFIXAGTB' stepname='JMCFIXAGT'
+
+################################################################################
+LABEL name=SORT02
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/jmcwrk3w14' disp='i-o' 
+ASSGNDD ddname='SORTOUT' filename='$SEQFILES/jmcwrk4w14' disp='o' normal='k' abend='d' recfmt='F' recsize='604'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(215 5 CHAR)(1 10 CHAR) (268 1 CHAR)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT02'
+
+################################################################################
+LABEL name=JMCACCT
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS019' filename='/data/seqfiles/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS007' filename='$SEQFILES/jmic_acct.prn' disp='i-o' 
+ASSGNDD ddname='SYS014' filename='$SEQFILES/jmic_grp_ext_b.prn' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/jmcwrk4w14' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/jmc_new_acctw14' disp='o' normal='k' abend='d' recsize='2000' recfmt='F' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/jmc_new_acct_notew' disp='o' normal='k' abend='d' recsize='120' recfmt='F' 
+ASSGNDD ddname='SYS013' filename='$SEQFILES/jmc_new_compw14' disp='o' normal='k' abend='d' recsize='700' recfmt='F' 
+ASSGNDD ddname='SYS015' filename='$SEQFILES/jmc_new_planw14' disp='o' normal='k' abend='d' recsize='420' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='JMCACCTW14' stepname='JMCACCT' 
+
+ENDJOB 
+################################################################################

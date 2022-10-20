@@ -1,0 +1,93 @@
+################################################################################
+#                                                                              #
+#                                                                              #
+#     JOB: flfrm52                                                             #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+
+################################################################################
+#  *-------------------------------------------------------------------  
+#  *           FREEDOM INTERFACE FOR CID RETRO PAYMENTS                  
+#  *-------------------------------------------------------------------  
+#  *                                                                     
+################################################################################
+LABEL name=FNB184 
+################################################################################
+#  DATE: MMDDYYYY 
+#  FROM: CICRMBK 
+ASSGNDD ddname='SYS010' dataset='FL.ME.LG.ERREPY' gdg='0' filename='$SEQFILES/FL.ME.LG.ERREPY' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/FL.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/FL.DL.FX.FNLRET' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+EXECPGM pgmname='FNB184' stepname='FNB184' parm='11302021' 
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *                                                                     
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' dataset='FL.DD.PRINT.DATA' member='FLFRM52' filename='$SEQFILES/FLFRM52' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/FL.DL.FX.FNLRET' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='FNLRET'
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+#  ***                                                                   
+ASSGNDD ddname='SYSUT1' dataset='FL.DD.PRINT.DATA' member='FLFRM52' filename='$SEQFILES/FLFRM52' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=CPYFRM52
+################################################################################
+ASSGNDD ddname='SYS010' dataset='FL.DD.PRINT.DATA' member='FLFRM52' filename='$SEQFILES/FLFRM52' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/FL.DL.PRINT.FLFRM52' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPYFRM52' parm='ALL' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID CLAIMS 
+#  *------------------------------------------------------------------- 
+#  * 
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/FL.DL.FX.FNLRET' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/FNLRETRO_11-30-21_20211130000000.FPR' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+
+################################################################################
+LABEL name=FTPM52
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntis1.cso.local < $JCLLIB/ftp-flfrm52
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTPM52' parm='SH'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+  echo " Job completed successfully "
+else
+  echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOB

@@ -1,0 +1,76 @@
+################################################################################
+BEGINJOB mode='MVS' 
+
+################################################################################
+LABEL name=INTFCE 
+################################################################################
+ONRETCODE MAXRC GT '11' BYPASS scope='STEP'  
+ONRETCODE CLEXT NE 0 BYPASS scope='STEP'  
+
+ASSGNDD ddname='SYS015' filename='\${SEQFILES}/DC.WW.CIEXTRS_NOV01' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='CLMACT' filename='\${SEQFILES}/ZC.WW.LG.CLMACT' disp='o' normal='k' abend='d' recfmt='F' recsize='648' 
+ASSGNDD ddname='DFTACT' filename='\${SEQFILES}/ZC.WW.LG.DFTACT' disp='o' normal='k' abend='d' recfmt='F' recsize='1138' 
+ASSGNDD ddname='ELBENE' dataset='CI.DD.LG.ELBENE' type='VS' filename='ELBENE' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+INTERFACE DATES 1029200411012004
+!
+
+EXECPGM pgmname='LGCIFCE' stepname='INTFCE' parm='11-01-04' 
+
+################################################################################
+LABEL name=FNB164 
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+#  DATE MMDDYYYY 
+#  FROM CILGEXTR
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZC.WW.LG.DFTACT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+
+#  DOWNLOAD
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZN.DL.FX.DCCCLMS' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='FNB164T' stepname='FNB164' parm='11012004' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                     PRINT SUMMARY REPORT 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYS007' filename='\${SEQFILES}/ZNDCFRD50' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZN.DL.FX.DCCCLMS' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='DCCCLAIMS' 
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/ZNDCFRD50' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID CLAIMS 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/ZN.DL.FX.DCCCLMS' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/ZLPACCLMS_11-01-04.DAT' disp='o' abend='d' normal='k' recsize='250' recfmt='F'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+
+################################################################################
+
+ENDJOB 
+################################################################################

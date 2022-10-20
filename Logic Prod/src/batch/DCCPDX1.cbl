@@ -1,0 +1,583 @@
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2021 by Central States Health and Life          *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. DCCPDX1.
+       AUTHOR.   Cowtown.
+
+      ******************************************************************
+      *                   C H A N G E   L O G
+      *
+      * CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+      *-----------------------------------------------------------------
+      *  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+      * EFFECTIVE    NUMBER
+      *-----------------------------------------------------------------
+011422* 011422 CR2021120200001   PEMA  New Program
+022122* 022122  CR2021100800003  PEMA  Increase data occurences
+081122* 081122  IR2022081100002  PEMA  Initialize 2 fields no longer used
+      ******************************************************************
+       ENVIRONMENT DIVISION.
+       CONFIGURATION SECTION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT ERPDEF           ASSIGN TO ERPDEF
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS DYNAMIC
+                                   RECORD KEY IS PD-CONTROL-primary
+                                   FILE STATUS IS ERPDEF-FILE-STATUS.
+
+           SELECT EXTR1-OUT        ASSIGN TO SYS011
+              ORGANIZATION IS LINE SEQUENTIAL.
+
+           SELECT EXTR2-OUT        ASSIGN TO SYS012
+              ORGANIZATION IS LINE SEQUENTIAL.
+
+           SELECT EXTR3-OUT        ASSIGN TO SYS013
+              ORGANIZATION IS LINE SEQUENTIAL.
+
+           SELECT DISK-DATE        ASSIGN TO SYS019.
+
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  ERPDEF.
+
+                                       copy ERCPDEF.
+
+       FD  EXTR1-OUT
+           RECORDING MODE F
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+
+       01  EXTR1-OUT-REC               PIC X(250).
+
+       FD  EXTR2-OUT
+           RECORDING MODE F
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+
+       01  EXTR2-OUT-REC               PIC X(250).
+
+       FD  EXTR3-OUT
+           RECORDING MODE F
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+
+       01  EXTR3-OUT-REC               PIC X(250).
+
+       FD  DISK-DATE
+                                       COPY ELCDTEFD.
+
+       working-storage section.
+
+       77  p1                          pic s999 comp-3 value +0.
+       77  s1                          pic s999 comp-3 value +0.
+       77  rec-cnt                     pic 9(9) value zeros.
+       77  ws-recs-in                  pic 9(7) value zeros.
+       77  erpdef-file-status          pic xx value low-values.
+       77  ws-prod-seq-no              pic 9(7) value zeros.
+       77  eof-sw                      pic x value ' '.
+           88  end-of-input               value 'Y'.
+
+       01  P pointer.
+       01  KIXSYS                      pic X(7)  VALUE Z"KIXSYS".
+       01  var-ptr pointer.
+       01  env-var-len                 pic 9(4)  binary.
+       01  rc                          pic 9(9)  binary.
+      
+       01  WS-KIXSYS.
+           05  WS-KIX-FIL1             PIC X(10).
+           05  WS-KIX-APPS             PIC X(10).
+           05  WS-KIX-ENV              PIC X(10).
+           05  WS-KIX-MYENV            PIC X(10).
+           05  WS-KIX-SYS              PIC X(10).
+
+       01  WS-MOE-DATE                 pic x(10).
+
+       01  EXTR-HEAD-PDEF.
+           05  filler                  pic x(9)  value '01;State;'.
+           05  filler                  pic x(9)  value 'ProdCode;'.
+           05  filler                  pic x(12) value 'BenefitType;'.
+           05  filler                  pic x(12) value 'BenefitCode;'.
+           05  filler                  pic x(11) value 'ExpireDate;'.
+           05  filler                  pic x(12) value 'Description;'.
+           05  filler                  pic x(10) value 'Truncated;'.
+           05  filler                  pic x(22) value
+                     'FirstYrAdminAllowance;'.
+           05  filler                  pic x(12) value 'LastMaintBy;'.
+           05  filler                  pic x(14) value 'LastMaintDate;'.
+           05  filler                  pic x(14) value 'LastMaintTime;'.
+           05  filler                  pic x(11) value 'ProductPntr'.
+
+       01  EXTR-HEAD-PDEF-DATA.
+           05  filler                  pic x(15) value
+               '02;ProductPntr;'.
+           05  filler                  pic x(13) value 'CoverageCode;'.
+           05  filler                  pic x(10) value 'MaxAttAge;'.
+           05  filler                  pic x(12) value 'MinIssueAge;'.
+           05  filler                  pic x(12) value 'MaxIssueAge;'.
+           05  filler                  pic x(08) value 'MaxTerm;'.
+           05  filler                  pic x(10) value 'MaxAmount;'.
+           05  filler                  pic x(17) value
+               'PreExistExclType;'.
+           05  filler                  pic x(12) value 'ExclPerDays;'.
+           05  filler                  pic x(10) value 'CovEndMos;'.
+           05  filler                  pic x(11) value 'AccOnlyMos;'.
+           05  filler                  pic x(12) value 'MaxBenefits;'.
+           05  filler                  pic x(10) value 'Recurring;'.
+           05  filler                  pic x(07) value 'RTWMos;'.
+           05  filler                  pic x(14) value 'MaxExtensions;'.
+           05  filler                  pic x(10) value 'BenefitPct'.
+
+       01  EXTR-HEAD-PDEF-LIMITS.
+           05  filler                  pic x(15) value
+               '03;ProductPntr;'.
+           05  filler                  pic x(08) value 'LowTerm;'.
+           05  filler                  pic x(07) value 'HiTerm;'.
+           05  filler                  pic x(10) value 'LowAmount;'.
+           05  filler                  pic x(09) value 'HiAmount;'.
+           05  filler                  pic x(11) value 'Year01Fact;'.
+           05  filler                  pic x(11) value 'Year02Fact;'.
+           05  filler                  pic x(11) value 'Year03Fact;'.
+           05  filler                  pic x(11) value 'Year04Fact;'.
+           05  filler                  pic x(11) value 'Year05Fact;'.
+           05  filler                  pic x(11) value 'Year06Fact;'.
+           05  filler                  pic x(11) value 'Year07Fact;'.
+           05  filler                  pic x(11) value 'Year08Fact;'.
+           05  filler                  pic x(11) value 'Year09Fact;'.
+           05  filler                  pic x(11) value 'Year10Fact;'.
+           05  filler                  pic x(11) value 'Year11Fact;'.
+           05  filler                  pic x(11) value 'Year12Fact;'.
+           05  filler                  pic x(11) value 'Year13Fact;'.
+           05  filler                  pic x(11) value 'Year14Fact;'.
+           05  filler                  pic x(10) value 'Year15Fact'.
+
+
+       01  EXTR-PDEF.
+           05  tb1-rec-type            pic xx value '01'.
+           05  TB1-STATE               PIC XX.
+           05  TB1-PROD-CODE           PIC XXX.
+           05  TB1-BEN-TYPE            PIC X.
+           05  TB1-BEN-CODE            PIC XX.
+           05  TB1-EXP-DATE            PIC X(10).
+           05  tb1-description         pic x(80).
+           05  tb1-truncated           pic x.
+           05  tb1-1st-yr-admin-allow  pic 999.99.
+           05  tb1-last-maint-by       pic x(4).
+           05  tb1-last-maint-date     pic x(10).
+           05  tb1-last-maint-time     pic x(8).
+           05  TB1-SEQ-NO              pic 9(7) value zeros.
+
+       01  EXTR-PDEF-DATA.
+           05  tb2-rec-type            pic xx value '02'.
+           05  tb2-seq-no              pic 9(7) value zeros.
+           05  tb2-cov-code            pic x.
+           05  tb2-max-att-age         pic 999.
+           05  tb2-min-iss-age         pic 999.
+           05  tb2-max-iss-age         pic 999.
+           05  tb2-max-term            pic 999.
+           05  tb2-max-amt             pic 9(7).
+           05  tb2-pre-exis-excl-type  pic 99.
+           05  tb2-excl-per-days       pic 999.
+           05  tb2-cov-ends-mos        pic 999.
+           05  tb2-acc-only-mos        pic 999.
+           05  tb2-max-bens            pic 999.
+           05  tb2-recurring           pic xx.
+           05  tb2-rtw-mos             pic 999.
+           05  tb2-max-extension       pic 999.
+           05  tb2-ben-pct             pic .999.
+           
+       01  EXTR-PDEF-LIMITS.
+           05  tb3-rec-type            pic xx value '03'.
+           05  tb3-seq-no              pic 9(7) value zeros.
+           05  tb3-low-term            pic 999.
+           05  tb3-hi-term             pic 999.
+           05  tb3-low-amt             pic 9(7).
+           05  tb3-hi-amt              pic 9(7).
+           05  tb3-yr01-fact           pic 9.999.
+           05  tb3-yr02-fact           pic 9.999.
+           05  tb3-yr03-fact           pic 9.999.
+           05  tb3-yr04-fact           pic 9.999.
+           05  tb3-yr05-fact           pic 9.999.
+           05  tb3-yr06-fact           pic 9.999.
+           05  tb3-yr07-fact           pic 9.999.
+           05  tb3-yr08-fact           pic 9.999.
+           05  tb3-yr09-fact           pic 9.999.
+           05  tb3-yr10-fact           pic 9.999.
+           05  tb3-yr11-fact           pic 9.999.
+           05  tb3-yr12-fact           pic 9.999.
+           05  tb3-yr13-fact           pic 9.999.
+           05  tb3-yr14-fact           pic 9.999.
+           05  tb3-yr15-fact           pic 9.999.
+
+       01  FILLER.
+           05  ws-work-time            pic 9(7).
+           05  filler redefines ws-work-time.
+               10  filler              pic x.
+               10  ws-hh               pic 99.
+               10  ws-mm               pic 99.
+               10  ws-ss               pic 99.
+           05  ABEND-CODE              PIC X(4)  VALUE SPACES.
+           05  ABEND-OPTION            PIC X     VALUE 'Y'.
+           05  WS-ABEND-MESSAGE        PIC X(80) VALUE SPACES.
+           05  WS-ABEND-FILE-STATUS    PIC XX    VALUE ZERO.
+           05  WS-RETURN-CODE          PIC S9(3) VALUE ZERO COMP-3.
+           05  PGM-SUB                 PIC S999  VALUE +344 COMP-3.
+
+                                       COPY ELCDTECX.
+                                       copy ELCDTEVR.
+                                       COPY ELCDATE.
+
+       LINKAGE SECTION.                                                 
+
+       01  var  pic x(30).
+
+       procedure division.
+                                       COPY ELCDTERX.
+       0000-begin.
+
+           display ' Begin Program DCCPDX1 '
+
+           set P to address of KIXSYS
+           CALL "getenv" using by value P returning var-ptr
+           if var-ptr = null then
+              display ' kixsys not set '
+           else
+              set address of var to var-ptr
+              move 0 to env-var-len
+              inspect var tallying env-var-len
+                for characters before X'00' 
+              unstring var (1:env-var-len) delimited by '/'
+                 into WS-KIX-FIL1 WS-KIX-APPS WS-KIX-ENV WS-KIX-MYENV
+                    WS-KIX-SYS
+              end-unstring
+           end-if
+
+           display ' KIXSYS  ' ws-kix-myenv
+
+           perform 0010-init           thru 0010-exit
+
+           perform 0050-process-input  thru 0050-exit until
+              end-of-input
+      *      or ws-recs-in > 10000
+
+           perform 0090-finish-up      thru 0090-exit
+           goback
+
+           .
+       0010-init.
+
+           MOVE BIN-RUN-DATE           TO DC-BIN-DATE-1
+           MOVE ' '                    TO DC-OPTION-CODE
+           PERFORM 8500-DATE-CONVERT   THRU 8590-EXIT
+           move dc-greg-date-a-edit    to ws-moe-date
+
+           perform 0020-open-files     thru 0020-exit
+           perform 0025-write-heads    thru 0025-exit
+           perform 0030-start-input    thru 0030-exit
+           perform 0040-read-input     thru 0040-exit
+
+           .
+       0010-exit.
+           exit.
+
+       0020-open-files.
+
+           open input ERPDEF
+
+           if erpdef-file-status not = '00'
+              display ' error-erpdef-open ' erpdef-file-status
+              perform abend-pgm
+           end-if
+
+           OPEN output EXTR1-OUT EXTR2-OUT EXTR3-OUT
+
+           .
+       0020-exit.
+           exit.
+
+       0025-write-heads.
+
+           write EXTR1-OUT-REC from EXTR-HEAD-PDEF
+           write EXTR2-OUT-REC from EXTR-HEAD-PDEF-DATA
+           write EXTR3-OUT-REC from EXTR-HEAD-PDEF-limits
+
+           .
+       0025-exit.
+           exit.
+
+       0030-start-input.
+
+           move dte-clasic-company-cd  to pd-control-primary
+           start erpdef key >= pd-control-primary
+           if erpdef-file-status = '10' or '23'
+              set end-of-input to true
+           else
+              if erpdef-file-status not = '00'
+                 display ' error-erpdef-start ' erpdef-file-status
+                 perform abend-pgm
+              end-if
+           end-if
+
+           .
+       0030-exit.
+           exit.
+
+       0040-read-input.
+
+           read erpdef next record
+           
+           evaluate true
+              when (erpdef-file-status = '10' or '23')
+                 or (pd-company-cd not = dte-clasic-company-cd)
+                 set end-of-input      to true
+              when erpdef-file-status not = '00'
+                 display ' error-erpdef-read ' erpdef-file-status
+                 perform abend-pgm
+              when other
+                 add 1 to ws-recs-in
+           end-evaluate
+
+           .
+       0040-exit.
+           exit.
+
+       0050-process-input.
+
+           add 1 to ws-prod-seq-no
+
+           perform 0060-extr1          thru 0060-exit
+           perform 0070-extr2          thru 0070-exit
+           perform 0080-extr3          thru 0080-exit
+
+           perform 0040-read-input     thru 0040-exit
+
+           .
+       0050-exit.
+           exit.
+
+       0060-extr1.
+
+           move '01'                   to tb1-rec-type
+           move pd-state               to TB1-STATE
+           move pd-product-cd          to TB1-PROD-CODE
+           move pd-ben-type            to TB1-BEN-TYPE
+           move pd-ben-code            to TB1-BEN-CODE
+           if pd-prod-exp-dt = high-values
+              move '12/31/9999'        to tb1-exp-date
+           else
+              move pd-prod-exp-dt      to dc-bin-date-1
+              move ' '                 to dc-option-code
+              perform 8500-date-convert thru 8590-exit
+              if no-conversion-error
+                 move dc-greg-date-a-edit
+                                       to tb1-exp-date
+              else
+                 display ' Invalid EXP Date ' pd-state ' '
+                    pd-product-cd ' ' pd-ben-type ' ' pd-ben-code
+                 perform abend-pgm
+              end-if
+           end-if
+
+           move pd-product-desc        to tb1-description
+           move pd-truncated           to tb1-truncated
+           move pd-1st-yr-admin-allow  to tb1-1st-yr-admin-allow
+           move pd-last-maint-by       to tb1-last-maint-by
+
+           if pd-last-maint-dt = high-values or low-values
+              move '12/31/9999'        to tb1-last-maint-date
+           else
+              move pd-last-maint-dt    to dc-bin-date-1
+              move ' '                 to dc-option-code
+              perform 8500-date-convert thru 8590-exit
+              if no-conversion-error
+                 move dc-greg-date-a-edit
+                                       to tb1-last-maint-date
+              else
+                 move '12/31/9999'     to tb1-last-maint-date
+              end-if
+           end-if
+           move pd-last-maint-hhmmss   to ws-work-time
+           string
+              ws-hh   ':'
+              ws-mm   ':'
+              ws-ss delimited by size into tb1-last-maint-time
+           end-string
+
+           move ws-prod-seq-no         to TB1-SEQ-NO
+
+           move spaces                 to extr1-out-rec
+           string
+              tb1-rec-type           ';'
+              TB1-STATE              ';'
+              TB1-PROD-CODE          ';'
+              TB1-BEN-TYPE           ';'
+              TB1-BEN-CODE           ';'
+              TB1-EXP-DATE           ';'
+              tb1-description        ';'
+              tb1-truncated          ';'
+              tb1-1st-yr-admin-allow ';'
+              tb1-last-maint-by      ';'
+              tb1-last-maint-date    ';'
+              tb1-last-maint-time    ';'
+              TB1-SEQ-NO
+              delimited by size into extr1-out-rec
+           end-string
+
+           write EXTR1-OUT-REC
+
+           .
+       0060-exit.
+           exit.
+
+       0070-extr2.
+
+           move '02'                   to tb2-rec-type
+           move ws-prod-seq-no         to tb2-seq-no
+           perform varying s1 from +1 by +1 until
+022122        (s1 > +11)
+              or (pd-prod-code(s1) = spaces)
+              move pd-prod-code(s1)       to tb2-cov-code
+              move pd-max-att-age(s1)     to tb2-max-att-age
+              move zeros                  to tb2-min-iss-age
+                                             tb2-max-iss-age
+022122*       move pd-min-issue-age(s1)   to tb2-min-iss-age
+022122*       move pd-max-issue-age(s1)   to tb2-max-iss-age
+              move pd-max-term(s1)        to tb2-max-term
+              move pd-max-amt(s1)         to tb2-max-amt
+              move pd-pre-exist-excl-type(s1)
+                                          to tb2-pre-exis-excl-type
+              move pd-exclusion-period-days(s1)
+                                          to tb2-excl-per-days
+              move pd-coverage-ends-mos(s1)
+                                          to tb2-cov-ends-mos
+              move pd-accident-only-mos(s1)
+                                          to tb2-acc-only-mos
+              move pd-crit-period(s1)     to tb2-max-bens
+              move pd-rec-cp-alpha(s1)    to tb2-recurring
+              move pd-rtw-mos(s1)         to tb2-rtw-mos
+              move pd-max-extension(s1)   to tb2-max-extension
+              if pd-ben-pct(s1) not numeric
+                 move zeros to pd-ben-pct(s1)
+              end-if
+              move pd-ben-pct(s1)         to tb2-ben-pct
+              
+              move spaces                 to extr2-out-rec
+              string
+                 tb2-rec-type           ';'
+                 tb2-seq-no             ';'
+                 tb2-cov-code           ';'
+                 tb2-max-att-age        ';'
+                 tb2-min-iss-age        ';'
+                 tb2-max-iss-age        ';'
+                 tb2-max-term           ';'
+                 tb2-max-amt            ';'
+                 tb2-pre-exis-excl-type ';'
+                 tb2-excl-per-days      ';'
+                 tb2-cov-ends-mos       ';'
+                 tb2-acc-only-mos       ';'
+                 tb2-max-bens           ';'
+                 tb2-recurring          ';'
+                 tb2-rtw-mos            ';'
+                 tb2-max-extension      ';'
+                 tb2-ben-pct
+                 delimited by size into extr2-out-rec
+              end-string
+              write EXTR2-OUT-REC
+           end-perform
+
+           .
+       0070-exit.
+           exit.
+
+       0080-extr3.
+
+           move '03'                   to tb3-rec-type
+           move ws-prod-seq-no         to tb3-seq-no
+           perform varying s1 from +1 by +1 until
+              (s1 > +15)
+              or (pd-low-term(s1) = zeros
+                 and pd-hi-term(s1) = zeros
+                 and pd-low-amt(s1) = zeros
+                 and pd-hi-amt(s1) = zeros)
+              move pd-low-term(s1)     to tb3-low-term
+              move pd-hi-term(s1)      to tb3-hi-term
+              move pd-low-amt(s1)      to tb3-low-amt
+              move pd-hi-amt(s1)       to tb3-hi-amt
+              move pd-uep-factor(s1 1) to tb3-yr01-fact
+              move pd-uep-factor(s1 2) to tb3-yr02-fact
+              move pd-uep-factor(s1 3) to tb3-yr03-fact
+              move pd-uep-factor(s1 4) to tb3-yr04-fact
+              move pd-uep-factor(s1 5) to tb3-yr05-fact
+              move pd-uep-factor(s1 6) to tb3-yr06-fact
+              move pd-uep-factor(s1 7) to tb3-yr07-fact
+              move pd-uep-factor(s1 8) to tb3-yr08-fact
+              move pd-uep-factor(s1 9) to tb3-yr09-fact
+              move pd-uep-factor(s1 10) to tb3-yr10-fact
+              move pd-uep-factor(s1 11) to tb3-yr11-fact
+              move pd-uep-factor(s1 12) to tb3-yr12-fact
+              move pd-uep-factor(s1 13) to tb3-yr13-fact
+              move pd-uep-factor(s1 14) to tb3-yr14-fact
+              move pd-uep-factor(s1 15) to tb3-yr15-fact
+              move spaces              to extr3-out-rec
+              string
+                 tb3-rec-type  ';'
+                 tb3-seq-no    ';'
+                 tb3-low-term  ';'
+                 tb3-hi-term   ';'
+                 tb3-low-amt   ';'
+                 tb3-hi-amt    ';'
+                 tb3-yr01-fact ';'
+                 tb3-yr02-fact ';'
+                 tb3-yr03-fact ';'
+                 tb3-yr04-fact ';'
+                 tb3-yr05-fact ';'
+                 tb3-yr06-fact ';'
+                 tb3-yr07-fact ';'
+                 tb3-yr08-fact ';'
+                 tb3-yr09-fact ';'
+                 tb3-yr10-fact ';'
+                 tb3-yr11-fact ';'
+                 tb3-yr12-fact ';'
+                 tb3-yr13-fact ';'
+                 tb3-yr14-fact ';'
+                 tb3-yr15-fact
+                 delimited by size into extr3-out-rec
+              end-string
+
+              write EXTR3-OUT-REC
+           end-perform
+
+           .
+       0080-exit.
+           exit.
+
+       0090-finish-up.
+
+           close
+              ERPDEF
+              EXTR1-OUT
+              EXTR2-OUT
+              EXTR3-OUT
+
+           display ' End Program DCCPDX1 '
+           display ' rows inserted ' rec-cnt
+           display ' records read  ' ws-recs-in
+
+           .
+       0090-exit.
+           exit.
+
+       8500-DATE-CONVERT.              
+                                       COPY ELCDCS.
+
+       abend-pgm.
+
+            call 'ABORTME'.
+            
+            goback.

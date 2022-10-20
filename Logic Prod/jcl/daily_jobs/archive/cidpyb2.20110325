@@ -1,0 +1,60 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job aborted, not CID1T"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=BKPPYAJ
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERPYAJ -s $SEQFILES/erpyaj_gajv.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPPYAJ' parm='SH'
+
+################################################################################
+LABEL name=GETGAJV
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/cidgajvtmpin $SEQFILES/cidgajvin $SEQFILES/cidgafile
+rm -f $SEQFILES/*_CID_GA_EXTRACT.Logic
+touch $SEQFILES/cidgafile
+ftp -n ntheat < $JCLLIB/ftp-getcidgajv
+cat -s $SEQFILES/*_CID_GA_EXTRACT.Logic > $SEQFILES/cidgajvtmpin
+if [ -a /data/seqfiles/cidgajvtmpin ] ; then
+   echo "we got a file " ;
+else
+   echo "No file today "
+   exit 1
+fi
+tr -d '\015' < $SEQFILES/cidgajvtmpin > $SEQFILES/cidgajvin
+perl $HOME/bin/cidjvfix.pl $SEQFILES/cidgajvin $SEQFILES/cidgafile
+!
+EXECPGM pgmname='BPXBATCH' stepname='GETGAJV' parm='SH'
+
+if ($JOBSTATUS == 0) then
+else
+  exit 0
+endif
+
+################################################################################
+LABEL name=CIDPYB2
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/cidgafile' disp='i'
+ASSGNDD ddname='ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD.DBLD' disp='i'
+#  ************************************************** OUTPUT FILES ***   
+
+EXECPGM pgmname='CIDPYB2T' stepname='CIDPYB2'
+
+if ($JOBSTATUS == 0) then
+        echo " Nothing to print "
+else
+        echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

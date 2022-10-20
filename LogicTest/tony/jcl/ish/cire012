@@ -1,0 +1,58 @@
+###############################################################################
+#                                                                              #
+#     MVS JCL Translator       BATCH Version : 9.1-07/17/2000                  #
+#                                                                              #
+#     JOB: cilgm17               Translated  : Wed Aug 23 12:31:30 2000        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 8 GOTO END_JOB 
+
+if ($EBMSYS != "tony") then
+   echo "Job Aborting, not Tony"
+   exit 1
+endif
+
+
+################################################################################
+# This step pulls ECS045E rpt lines for specific reinsurance companies#    into PRINT.WORK w/ a 45-char srt key
+################################################################################
+LABEL name=CIRE012 
+################################################################################
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+ASSGNDD ddname='SYS010' dataset='CI.EX.FICH045' filename='\${SEQFILES}/CI.EX.FICH045' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS014' dataset='CI.DD.LG.ERREIN' type='VS' filename='ERREIN' disp='i-o' 
+ASSGNDD ddname='SYS015' dataset='CI.WW.PRINT.WORKE' filename='\${SEQFILES}/CI.WW.PRINT.WORKE' disp='o' normal='k' abend='d' recfmt='F' recsize='179' 
+
+EXECPGM pgmname='CIRE012' stepname='CIRE012' 
+
+################################################################################
+# This step takes the output - PRINT.WORKE from CIRE012 and sorts it
+#   This report consists of ECS045E 
+################################################################################
+LABEL name=PRT45E 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.WW.PRINT.WORKE' filename='\${SEQFILES}/CI.WW.PRINT.WORKE' disp='i-o' normal='k' abend='k' 
+ASSGNDD  ddname='SYS011' type='SYSOUT' class='A' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS221' stepname='PRT45E' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+	echo " test job, dont want to print "
+#     "exelpr.sh l132std.parms '-oti=SYS012 -ode=AT' $SYSOUTDIR/$JOBNAME/ECS083/SYS012_$JON"
+#     "exelpr.sh l132std.parms '-oti=SYS013 -ode=AP' $SYSOUTDIR/$JOBNAME/ECS083/SYS013_$JON"
+#     "exelpr.sh p60w1s.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/ECS045/SYS008_$JON"
+#     "exelpr.sh p60w1s.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/PRT45E/SYS011_$JON"
+#     "exelpr.sh p60w1s.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/PRT45/SYS011_$JON"
+#     "exelpr.sh p60w1s.parms '-ode=CO' $SYSOUTDIR/$JOBNAME/PRTWORK2/SYS011_$JON"
+else
+	echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################

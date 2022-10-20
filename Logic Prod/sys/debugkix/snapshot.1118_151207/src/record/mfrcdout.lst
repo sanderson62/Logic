@@ -1,0 +1,177 @@
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   1
+* /apps/mtp/mtp/src/record/mfrcdout.cbl
+     1$SET OSVS
+     2 IDENTIFICATION DIVISION.
+     3 PROGRAM-ID.    MFRECORDOUT.
+     4***             ================
+     5 AUTHOR.        CLERITY.
+     6 DATE-WRITTEN.  JUNE 1991.
+     7 DATE-COMPILED. 25-Sep-12 12:03.
+     9 REMARKS.
+    10*****************************************************************
+    11*                                                               *
+    12* Copyright (c) 2007 by Clerity Solutions, Inc.                 *
+    13* All rights reserved.                                          *
+    14*                                                               *
+    15* If 'Large File' (>2G) is anticipated be sure to consult the   *
+    16* Merant (MicroFocus) COBOL documentation on File Handling      *
+    17* For Server Express.                                           *
+    18* Especially the discussion of the:                             *
+    19*            EXTFH environment variable                         *
+    20*            FILEMAXSIZE=8 argument                             *
+    21*                                                               *
+    22*                                                               *
+    23*****************************************************************
+    24* $Workfile:   mfrcdout.cbl  $ $Revision:   1.0  $
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   2
+* /apps/mtp/mtp/src/record/mfrcdout.cbl
+    25/
+    26 ENVIRONMENT DIVISION.
+    27 CONFIGURATION SECTION.
+    28 SOURCE-COMPUTER.                CLERITY.
+    29 OBJECT-COMPUTER.                CLERITY.
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   3
+* /apps/mtp/mtp/src/record/mfrcdout.cbl
+    30/
+    31 INPUT-OUTPUT SECTION.
+    32******************************************************************
+    33******************************************************************
+    34***                                                            ***
+    35***                F I L E   C O N T R O L                     ***
+    36***                                                            ***
+    37******************************************************************
+    38******************************************************************
+    39 FILE-CONTROL.
+    40
+    41     SELECT  OUTREC   ASSIGN TO DYNAMIC  MFOUT
+    42         ORGANIZATION IS RECORD SEQUENTIAL
+    43         FILE STATUS IS CHK.
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   4
+* /apps/mtp/mtp/src/record/mfrcdout.cbl
+    44/
+    45 DATA DIVISION.
+    46******************************************************************
+    47******************************************************************
+    48***                                                            ***
+    49***                 F I L E   S E C T I O N                    ***
+    50***                                                            ***
+    51******************************************************************
+    52******************************************************************
+    53 FILE SECTION.
+    54
+    55 FD  OUTREC
+    56     LABEL RECORDS ARE STANDARD
+    57     RECORD IS VARYING IN SIZE FROM 4 TO 32767 CHARACTERS
+    58                   DEPENDING ON LEN
+    59     DATA RECORD IS OUTMASTER.
+    60
+    61 01  OUTMASTER.
+    62     05  VARLRCD   PIC X OCCURS 4 TO 32767 DEPENDING ON LEN.
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   5
+* /apps/mtp/mtp/src/record/mfrcdout.cbl
+    63/
+    64******************************************************************
+    65******************************************************************
+    66***                                                            ***
+    67***             W O R K I N G  -  S T O R A G E                ***
+    68***                                                            ***
+    69******************************************************************
+    70******************************************************************
+    71 WORKING-STORAGE SECTION.
+    72
+    73 01  CHK                    PIC 9(02) VALUE ZEROES.
+    74 01  CHK2 REDEFINES CHK.
+    75     05  CHK2-BYTE1         PIC 9(01).
+    76     05  CHK2-BYTE2         PIC 9(01).
+    77 01  CHK2-9                 PIC 9(04) COMP VALUE ZERO.
+    78 01  CHK2-9R REDEFINES CHK2-9.
+    79     05  FILLER             PIC X.
+    80     05  CHK2-9X            PIC 9.
+    81 01  LEN                    PIC 9(9) COMP VALUE 4.
+    82 01  MFOUT                  PIC X(256).
+    83
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   6
+* /apps/mtp/mtp/src/record/mfrcdout.cbl
+    84/
+    85******************************************************************
+    86******************************************************************
+    87***                                                            ***
+    88***           P R O C E D U R E   D I V I S I O N              ***
+    89***                                                            ***
+    90******************************************************************
+    91******************************************************************
+    92 PROCEDURE DIVISION.
+    93
+    94 0000-PROGRAM-ENTRY.
+    95*------------------*
+    96
+    97*** THE FOLLOWING STATEMENT IS TO GET THE NAME OF THE OUTPUT ***
+    98***                  SEQUENTIAL FILE.                        ***
+    99     CALL "kxread" USING
+   100         BY REFERENCE LEN,
+   101         BY REFERENCE OUTMASTER.
+   102     IF VARLRCD (LEN) < '0' THEN
+   103         MOVE ' ' TO VARLRCD (LEN)
+   104         SUBTRACT 1 FROM LEN.
+   105     MOVE OUTMASTER TO MFOUT.
+   106
+   107     OPEN OUTPUT OUTREC.
+   108     IF CHK NOT = ZERO GO TO CHKRTN.
+   109     PERFORM READ-RECORD UNTIL RETURN-CODE NOT = ZERO.
+   110     MOVE 0 TO RETURN-CODE.
+   111     STOP RUN.
+   112
+   113**** CALL C ROUTINE TO READ A VAR LEN RECORD FROM PIPE ****
+   114
+   115 READ-RECORD.
+   116     CALL "kxread" USING
+   117         BY REFERENCE LEN,
+   118         BY REFERENCE OUTMASTER.
+   119
+   120     IF RETURN-CODE = ZERO
+   121         PERFORM WRITE-RECORD
+   122     ELSE
+   123     IF RETURN-CODE = -1
+   124         PERFORM EOF-CLOSE
+   125     ELSE
+   126         MOVE -3 TO CHK
+   127         PERFORM CHKRTN.
+   128
+   129**** READ SUCCESSFUL, WRITE TO FILE, IF ERROR CHECK RETURN CODE **
+   130
+   131 WRITE-RECORD.
+   132     MOVE LEN TO LEN.
+   133     IF LEN = 0
+   134         PERFORM EOF-CLOSE
+   135     ELSE
+   136         WRITE OUTMASTER
+   137         IF CHK NOT = 00
+   138             PERFORM CHKRTN.
+   139
+   140**** EOF ENCOUNTERED, CLOSE OUTPUT FILE ****
+   141
+* Micro Focus Server Express         V5.1 revision 000 25-Sep-12 12:03 Page   7
+* /apps/mtp/mtp/src/record/mfrcdout.cbl
+   142 EOF-CLOSE.
+   143     CLOSE OUTREC
+   144     IF CHK NOT = 00
+   145         PERFORM CHKRTN
+   146     ELSE
+   147         MOVE ZERO TO RETURN-CODE
+   148         STOP RUN.
+   149
+   150**** I/O ERROR OCCURED, RETURN ERROR CODE AND ABORT ****
+   151
+   152 CHKRTN.
+   153     MOVE CHK2-BYTE2 TO CHK2-9X.
+   154     MOVE CHK2-9 TO RETURN-CODE.
+   155     STOP RUN.
+   156
+   157******************************************************************
+   158***               E N D   O F   P R O G R A M                  ***
+   159******************************************************************
+* Micro Focus Server Express         V5.1 revision 000 Compiler
+* Copyright (C) Micro Focus IP Development Limited 1984-2012.
+*                                                        REF GNR-008065005AF
+* Total Messages:     0
+* Data:       34020     Code:         493

@@ -1,0 +1,80 @@
+################################################################################
+#                                                                              #
+#     JOB: ahlg309                                                             #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+
+#*******************************************************************************
+#*****
+#* This job is submitted via a job script <ahlmth...> that may also submit other
+#* jobs. Files beginning with AH.DL.CIADM... are ftp'd at the start of the next
+#* job script.  Other files being transferred should be noted below.
+#*****
+#*******************************************************************************
+
+################################################################################
+LABEL name=MSTRBKP1 
+################################################################################
+#  * ******************************************************************* 
+#  *       THIS IS THE MONTHLY CLAIMS HISTORY ARCHIVE JOBSTREAM     **** 
+#  *      WHICH CREATES A HISTORY TAPE OF THE LOGIC CLAIMS FILES.   **** 
+#  *      NOTE: - -  CICS MUST BE DOWN WHEN THIS JOB RUNS, OR THE   **** 
+#  *                 ONLINE CLAIM FILES MUST BE CLOSED.             **** 
+#  ********************************************************************* 
+ASSGNDD ddname='OUTPUT' dataset='AH.XX.ELMSTR.BKPONLY' gdg='+1' filename='$SEQFILES/AH.XX.ELMSTR.BKPONLY' disp='o' normal='k' abend='d' recfmt='F' recsize='350' 
+ASSGNDD ddname='ELMSTR' dataset='CI.DD.LG.ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+    REPRO IFILE(ELMSTR)   -
+          OFILE(OUTPUT)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='MSTRBKP1' 
+
+################################################################################
+LABEL name=EL309 
+################################################################################
+#  *-------------------------------------------------------------------- 
+#  * HIST TAPE IS CREATED IN THIS STEP AND USED AS INPUT TO THE NEXT --- 
+#  * MONTH END PROCESSING.                                          ---- 
+#  *-------------------------------------------------------------------- 
+ASSGNDD ddname='SYS011' dataset='AH.XX.CL.HIST' gdg='0' filename='$SEQFILES/AH.XX.CL.HIST' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS012' dataset='AH.XX.CL.HIST' gdg='+1' filename='$SEQFILES/AH.XX.CL.HIST' disp='o' normal='k' abend='d' recfmt='V' recsize='480' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELCERT' dataset='CI.DD.LG.ELCERT' type='VS' filename='ELCERT' disp='i-o' 
+ASSGNDD ddname='ELMSTR' dataset='CI.DD.LG.ELMSTR' type='VS' filename='ELMSTR' disp='i-o' 
+ASSGNDD ddname='ELTRLR' dataset='CI.DD.LG.ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ELPGMS' dataset='CI.DD.LG.ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='ELARCH' dataset='CI.DD.LG.ELARCH' type='VS' filename='ELARCH' disp='i-o' 
+ASSGNDD ddname='ELRETR' dataset='CI.DD.LG.ELRETR' type='VS' filename='ELRETR' disp='i-o' 
+ASSGNDD ddname='MPPLCY' type='DUMMY' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A'  
+ASSGNDD ddname='SYS020' filename='$SEQFILES/AH.EX.FICH309' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='EL309AHL' stepname='EL309' 
+
+################################################################################
+LABEL name=CPY309
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL309/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.CIADM.AHL309.09302022' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY309' parm='ALL'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "ftp -n ntcso1 < $JCLLIB/ftp-ahlg309"
+     echo " There are no hardcopy reports in this job "
+else
+     echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+#                        PEMA   NEW JOB

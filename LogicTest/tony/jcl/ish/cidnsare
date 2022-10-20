@@ -1,0 +1,64 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+if ($EBMSYS != "tony") then
+   echo "Job Aborted, Not tony"
+   exit 1
+endif
+
+################################################################################
+LABEL name=BACKUP1 
+################################################################################
+ASSGNDD ddname='SYSUT1' type='VS' filename='ERARCH' disp='i-o' 
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/ZI.TEMP.ERARCH.BACKUP' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='BACKUP1' 
+
+
+################################################################################
+LABEL name=CIDNSARE
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1t/src/batch'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.TEMP.ERARCH.BACKUP' disp='i' normal='k' abend='k' recfmt='F'
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERARCH' type='VS' filename='ERARCH' disp='i-o' 
+ASSGNDD ddname='ELCERT' type='VS' filename='ELCERT' disp='i-o'
+ASSGNDD ddname='ERARCT' type='VS' filename='ERARCT' disp='i-o' 
+ASSGNDD ddname='NSASEXTR' type='VS' filename='NSASEXTR' disp='i-o' 
+ASSGNDD ddname='ELLETR' type='VS' filename='ELLETR' disp='i' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.RESEND.REPORT' disp='o' normal='k' abend='d' recsize='132' recfmt='F' 
+ASSGNDD ddname='SYS019' filename='/slunikix/data/seqfiles/CI.DD.ER.DATECARD' disp='i' normal='k' abend='k'
+
+EXECPGM pgmname='CIDNSARE' stepname='CIDNSARE' parm='20131008'
+
+################################################################################
+LABEL name=PERL2
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/cidrpt2pdf $SEQFILES/ZI.DL.RESEND.REPORT $SEQFILES/CID_RESEND_REPORT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL2' parm='SH'
+
+################################################################################
+################################################################################
+
+ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-cidnsare
+
+   "uuencode $SEQFILES/CID_RESEND_REPORT.pdf CID_RESEND_REPORT.pdf|mailx -s 'CID Resend Letter Report Attached' -r 'slunikix@cso.com' ajra@cso.com"
+
+
+if ($JOBSTATUS == 0) then
+        echo " Job successful, print not released "
+else
+        echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+

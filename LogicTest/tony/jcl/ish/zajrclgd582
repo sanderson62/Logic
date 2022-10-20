@@ -1,0 +1,84 @@
+################################################################################
+#
+#  Job:  cidclgd582
+#
+################################################################################
+BEGINJOB mode='MVS' 
+
+if ($EBMSYS != "tony") then
+   echo "Job aborting, not Tony"
+   exit 1
+endif
+
+
+################################################################################
+LABEL name=UNCATL 
+################################################################################
+#ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+#  DELETE DC.DD.PRNT582
+#!
+#EXECPGM pgmname='IDCAMS' stepname='UNCATL' 
+
+################################################################################
+LABEL name=EL582 
+################################################################################
+#  ********************************************************************  
+#  ******--                                                    --******  
+#  ***--        BATCH PAYMENT AND ADJUSTMENT SUMMARY              --***  
+#  ***--        BATCH VERSION OF ONLINE PROGRAM EL682             --***  
+#  ******--                                                    --******  
+#  ********************************************************************  
+LIBDEF scope='STEP' type='PGM' lib='/apps/test/tony/src/batch'
+#  ****************************************************  INPUT FILES     
+ASSGNDD ddname='ERPYAJ' dataset='CI.DD.LG.ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+
+#  **************************************************** OUTPUT FILES     
+ASSGNDD ddname='SYS008' filename='\${SEQFILES}/ZC.DD.PRNT582' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SYS022' filename='$SEQFILES/EL682_DCC.TXT' disp='o' normal='k' abend='d' recfmt='F' recsize='101' 
+
+EXECPGM pgmname='EL582' stepname='EL582' parm='090908091008' 
+
+################################################################################
+LABEL name=CIDCPY 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/ZC.DD.PRNT582' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYSIN' type='DUMMY'
+
+EXECPGM pgmname='IEBGENER' stepname='CIDCPY' 
+
+################################################################################
+LABEL name=CORPCPY 
+################################################################################
+ASSGNDD ddname='SYSUT1' filename='\${SEQFILES}/ZC.DD.PRNT582' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYSIN' type='DUMMY'
+
+EXECPGM pgmname='IEBGENER' stepname='CORPCPY' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+      ftp -n ntcso1 < $JCLLIB/ftp-zajrclgd582
+#      "exelpr.sh l133std.parms '-ode=DCCI' $SYSOUTDIR/$JOBNAME/CIDCPY/SYSUT2_$JON"
+#      "exelpr.sh l133std.parms '-ode=DCCO' $SYSOUTDIR/$JOBNAME/CORPCPY/SYSUT2_$JON"
+#      "exelpr.sh l133std.parms '-ode=DCCO' $SYSOUTDIR/$JOBNAME/CORPCPY/SYSUT2_$JON"
+else
+        echo " Job aborted, print not released "
+endif
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 052004  2004052000003  SMVA   CHG IDCAMS TO IEBGENER IN STEPS CIDCPY & CORPCPY
+#                               ADD EXTRA COPY OF CORPCPY/SYSUT2 
+# 051106  2006051100001  AJRA   REMOVED EXTRA COPY OF CORPCPY/SYSUT2
+# 051508  2008050900001  AJRA   REMOVE PRINT CIDCPY-SYSUT2

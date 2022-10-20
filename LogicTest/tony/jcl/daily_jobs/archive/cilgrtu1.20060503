@@ -1,0 +1,56 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job aborting, not TEST"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERRATE -s $SEQFILES/cilgrtu1.errate.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl /export/home/mtpadmin/bin/cps_convert_rates.pl $SEQFILES/ARKVALLEY_UPT.csv $SEQFILES/Logic_Rates1
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+LABEL name=CIDRTU1 
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/Logic_Rates1' disp='i-o' 
+#ASSGNDD                 filename='$SEQFILES/Logic_Rates2' disp='i-o' 
+#ASSGNDD                 filename='$SEQFILES/Logic_Rates3' disp='i-o' 
+#ASSGNDD                 filename='$SEQFILES/Logic_Rates4' disp='i-o' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A'
+ASSGNDD ddname='ERRATE' type='VS' filename='ERRATE' disp='i-o'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o'
+
+EXECPGM pgmname='CPSRTU1' stepname='CIDRTU1' 
+
+################################################################################
+LABEL name=CPYFILE
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M'
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/CIDRTU1/SYS008_$JON' disp='i'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICHRTU1' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+EXECPGM pgmname='CIB009L' stepname='CPYFILE' parm='ALL'
+
+if ($JOBSTATUS == 0) then
+   "exelpr.sh l133std.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/CIDRTU1/SYS008_$JON"
+   "smtp -f slunikix -t pema,jjva,prva -s 'CID Rate File Load Complete' -mf /apps/prod/cid1p/emails/$JOBNAME.txt"
+else
+  echo " Job aborted, print not released"
+endif
+
+ENDJOB 

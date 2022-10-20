@@ -1,0 +1,61 @@
+################################################################################
+BEGINJOB mode='MVS' jobclass='Y' 
+
+if ($EBMSYS != "mdoff") then
+   echo "Job Aborted, Not MDOFF"
+   exit 1
+endif
+
+setenv ODBCINI /usr/local/etc/odbc.ini
+setenv ODBCSYSINI /usr/local/etc
+
+echo $ODBCINI
+echo $ODBCSYSINI
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/balance_eom.pl @PMEYYYYMMDD @MEMMDDYYYY DCC $SEQFILES/
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+#
+#  The value in DCCbalstat.txt will be 0 if everything balanced okay
+#  If it's not, then we don't want to initiate submission of day 2
+#  The users will deal with it in the morning and we will go from there
+#
+################################################################################
+
+if (`cat $SEQFILES/DCCbalstat.txt` != 0) then
+   GOTO STEP2
+endif
+
+################################################################################
+LABEL name=STEP1
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+mutt -s 'Looks like we balanced - would have built DCC trigger file ' -a $SEQFILES/DCCMebal.xlsx pema@cso.com  < /dev/null
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP1' parm='SH'
+
+GOTO STEP3
+
+################################################################################
+LABEL name=STEP2
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+mutt -s 'Looks like we DID NOT balance - no DCC trigger file ' -a $SEQFILES/DCCMebal.xlsx pema@cso.com  < /dev/null
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP2' parm='SH'
+
+################################################################################
+LABEL name=STEP3
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+mutt -s 'Looks like we MADE STEP 3 DCC ' pema@cso.com  < /dev/null
+!
+EXECPGM pgmname='BPXBATCH' stepname='STEP3' parm='SH'
+
+ENDJOB 

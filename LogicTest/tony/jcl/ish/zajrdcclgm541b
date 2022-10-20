@@ -1,0 +1,53 @@
+################################################################################
+#     Job: cidclgm541b 
+################################################################################
+BEGINJOB mode='MVS' 
+
+if ($EBMSYS != 'tony') then
+   echo "Job Aborting, not Tony"
+   exit 1
+endif
+
+
+################################################################################
+LABEL name=EL541B 
+################################################################################
+#  ***                                                                   
+#  ***         REPORT MONTH-END BALANCES AND DISCREPANCIES                      
+#  ***
+ASSGNDD ddname='SYS019' dataset='DC.DD.ER.DATECARD' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELREPT' type='DUMMY'
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+
+EXECPGM pgmname='EL541' stepname='EL541B' 
+
+################################################################################
+LABEL name=CPY541B
+################################################################################
+ASSGNDD ddname='SYS010' filename='\$SYSOUTDIR/$JOBNAME/EL541B/SYS008_\${JON}' disp='i'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZC.DL.CIADM.FICH541B' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+
+EXECPGM pgmname='CIB009L' stepname='CPY541B' parm='ALL'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+    "cp ${SEQFILES}/ZC.DL.CIADM.FICH541B /data/test/tony/convertin"
+    "perl /export/home/mtpadmin/bin/dcc_new_dl_tony.pl /export/home/mtpadmin/bin/dcc_rpt_hash_file"
+    "cp /data/test/tony/converfin/*.CVT /data/test/tony/convertout"
+    "rm /data/test/tony/convertin/*"
+    "ftp -n ntcso1 < /apps/test/tony/jcl/ish/ftp-zajrdcclgm541b"
+#    "smtp -f slunikix -t saca,tpta,tmja,pema -s 'Post-cidclgm50 balancing file is ready' -mf /apps/prod/cid1p/emails/$JOBNAME.txt"
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 042503                 SMVA   NEW JOB FOR DCC, MODELED AFTER CID JOB

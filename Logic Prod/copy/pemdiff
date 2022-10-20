@@ -1,0 +1,234 @@
+21a22
+> 033104* 033104    2003080800002  PEMA  ADD GAP NON REFUNDABLE OPTION
+291a293,295
+> 040504*    IF AM-DEALER-INCENTIVE NOT NUMERIC
+> 040504*       MOVE +0                  TO AM-DEALER-INCENTIVE
+> 040504*    END-IF
+312a317,337
+> 
+>            IF PB-COMPANY-ID = 'DCC'
+>               MOVE +0                  TO WS-ACCT-ADDL-CLP
+>               PERFORM VARYING SUB5 FROM +1 BY +1 UNTIL
+>                  (SUB5 > +10)
+>                  IF (AM-COM-TYP (SUB5) = 'I' OR 'J')
+>                     AND (AM-A-COM (SUB5) NUMERIC)
+>                     COMPUTE WS-ACCT-ADDL-CLP = WS-ACCT-ADDL-CLP
+>                        + (AM-A-COM (SUB5) * 1000)
+>                  END-IF
+>               END-PERFORM
+>            END-IF
+> 
+> 
+> 
+> 
+> 
+> 
+> 040504*    IF AM-DEALER-INCENTIVE NOT = ZEROS
+> 040504*       MOVE AM-DEALER-INCENTIVE TO WS-ACCT-ADDL-CLP
+> 040504*    END-IF
+559c584,589
+< 00463          MOVE CM-BENEFICIARY       TO PB-CI-BENEFICIARY-NAME.     ELC50PD
+---
+> 00463         MOVE CM-BENEFICIARY      TO PB-CI-BENEFICIARY-NAME
+> 040504        IF CM-ADDL-CLP NOT NUMERIC
+> 040504           MOVE +0               TO CM-ADDL-CLP
+> 040504        END-IF
+> 040504        MOVE CM-ADDL-CLP         TO PB-CI-ADDL-CLP
+> 040504     END-IF
+608c638,639
+< 00512                                     PB-CI-AH-CRIT-PER.            ELC50PD
+---
+> 00512                                     PB-CI-AH-CRIT-PER
+> 040504                                    PB-CI-ADDL-CLP.
+686,693d716
+< 082203
+< 082203     IF PB-COMPANY-ID = 'CID' OR 'DCC'
+< 082203        IF PB-CERT-PRIME NOT NUMERIC
+< 082203           MOVE ER-2722          TO WS-ERROR
+< 082203           PERFORM 9900-ERROR-FORMAT
+< 082203                                 THRU 9900-EXIT
+< 082203        END-IF
+< 082203     END-IF
+1101,1102d1123
+< 100703*    IF CF-BENEFIT-CATEGORY (SUB3) NOT = ' ' AND '0' AND 
+< 100703*                                        LOW-VALUES
+1104d1124
+< 100703*    END-IF
+1655a1676,1686
+> 082203
+> 082203     IF PB-COMPANY-ID = 'CID' OR 'DCC'
+> 082203        IF PB-CERT-PRIME NOT NUMERIC
+>                  AND (WS-LF-SPECIAL-CALC-CD NOT = 'E')
+>                  AND (WS-AH-SPECIAL-CALC-CD NOT = 'E')
+> 082203           MOVE ER-2722          TO WS-ERROR
+> 082203           PERFORM 9900-ERROR-FORMAT
+> 082203                                 THRU 9900-EXIT
+> 082203        END-IF
+> 082203     END-IF
+> 082203
+2254c2285
+< 02017      GO TO 0560-EDIT-CONTINUE.                                    ELC50PD
+---
+> 02017 *    GO TO 0560-EDIT-CONTINUE.                                    ELC50PD
+2256a2288,2413
+> 
+>       *****   THIS ROUTINE VALIDATES THE EXISTENCE OF A COMMISSION
+>       *****   TABLE FOR THE 'O', 'P' AND 'K' AGENT TYPES
+> 
+>            PERFORM VARYING SUB1 FROM +1 BY +1 UNTIL
+>               (SUB1 > +10)
+>               IF AM-COM-TYP (SUB1) = 'O' OR 'P' OR 'K'
+>                  MOVE WS-AH-BENEFIT-CD TO WS-AH-COMP-CD
+>                  MOVE '0530'           TO CTBL-SW
+>                  MOVE ' '              TO WS-CTBL-READ-SW
+>                  PERFORM 0561-CHECK-AH THRU 0561-EXIT
+>                  MOVE WS-LF-BENEFIT-CD TO WS-LF-COMP-CD
+>                  MOVE '0540'           TO CTBL-SW
+>                  MOVE ' '              TO WS-CTBL-READ-SW
+>                  PERFORM 0563-CHECK-LF THRU 0563-EXIT
+>               END-IF
+>            END-PERFORM
+> 
+>            GO TO 0564-EDIT-CONTINUE
+> 
+>            .
+>        0561-CHECK-AH.
+> 
+>            IF (NO-AH-COVERAGE)
+>               OR (NO-AH-BENEFIT-MATCH)
+>               CONTINUE
+>            ELSE
+>               IF (AM-A-COM (SUB1) NUMERIC)
+>                  AND (AM-A-COMA (SUB1) (3:1) NOT = 'L' AND 'M')
+>                  CONTINUE
+>               ELSE
+>                  MOVE WS-AH-COMP-CD    TO CTBL-BEN-CODE
+>                  MOVE PB-I-AH-TERM     TO WS-WORK-TERM
+>                  MOVE PB-AH-OVERRIDE-L1
+>                                        TO CTBL-BEN-TYPE
+>                  MOVE ZEROS            TO WS-SUB1
+>                                           WS-COMMISSION
+>                  MOVE AM-A-COMA (SUB1) TO CTBL-TABLE
+>                  PERFORM 8300-READ-CTBL-TABLE
+>                                        THRU 8300-EXIT
+>                  IF CTBL-TABLE-FOUND
+>                     CONTINUE
+>                  ELSE
+>                     IF FIRST-TIME-THROUGH
+>                        GO TO 0561-CHECK-AH
+>                     ELSE
+>                        MOVE ER-2609    TO WS-ERROR
+>                        PERFORM 9900-ERROR-FORMAT THRU 9900-EXIT
+>                     END-IF
+>                  END-IF
+>               END-IF
+>            END-IF
+> 
+>            .
+>        0561-EXIT.
+>            EXIT.
+>            
+>        0563-CHECK-LF.
+>        
+>            IF (NO-LIFE-COVERAGE)
+>               OR (NO-LF-BENEFIT-MATCH)
+>               CONTINUE
+>            ELSE
+>               IF WS-LF-JOINT-INDICATOR = 'J'
+>                  IF (AM-J-COM (SUB1) NUMERIC)
+>                     AND (AM-J-COM (SUB1) (3:1) NOT = 'L' AND 'M')
+>                     CONTINUE
+>                  ELSE
+>                     MOVE WS-LF-COMP-CD TO CTBL-BEN-CODE
+>                     MOVE PB-I-LF-TERM  TO WS-WORK-TERM
+>                     MOVE PB-LIFE-OVERRIDE-L1
+>                                        TO CTBL-BEN-TYPE
+>                     MOVE ZEROS         TO WS-SUB1
+>                                           WS-COMMISSION
+>                     MOVE AM-J-COMA (SUB1)
+>                                        TO CTBL-TABLE
+>                     PERFORM 8300-READ-CTBL-TABLE
+>                                        THRU 8300-EXIT
+>                     IF CTBL-TABLE-FOUND
+>                        CONTINUE
+>                     ELSE
+>                        IF FIRST-TIME-THROUGH
+>                           GO TO 0563-CHECK-LF
+>                        ELSE
+>                           MOVE ER-2609 TO WS-ERROR
+>                           PERFORM 9900-ERROR-FORMAT
+>                                        THRU 9900-EXIT
+>                           GO TO 0560-EDIT-CONTINUE
+>                        END-IF
+>                     END-IF
+>                  END-IF
+>               ELSE
+>                  IF (AM-L-COM (SUB1) NUMERIC)
+>                     AND (AM-L-COM (SUB1) (3:1) NOT = 'L' AND 'M')
+>                     CONTINUE
+>                  ELSE
+>                     MOVE WS-LF-COMP-CD TO CTBL-BEN-CODE
+>                     MOVE PB-I-LF-TERM  TO WS-WORK-TERM
+>                     MOVE PB-LIFE-OVERRIDE-L1
+>                                        TO CTBL-BEN-TYPE
+>                     MOVE ZEROS         TO WS-SUB1
+>                                           WS-COMMISSION
+>                     MOVE AM-L-COMA (SUB1)
+>                                        TO CTBL-TABLE
+>                     PERFORM 8300-READ-CTBL-TABLE
+>                                        THRU 8300-EXIT
+>                     IF CTBL-TABLE-FOUND
+>                        CONTINUE
+>                     ELSE
+>                        IF FIRST-TIME-THROUGH
+>                           GO TO 0563-CHECK-LF
+>                        ELSE
+>                           MOVE ER-2609 TO WS-ERROR
+>                           PERFORM 9900-ERROR-FORMAT
+>                                        THRU 9900-EXIT
+>                        END-IF
+>                     END-IF
+>                  END-IF
+>               END-IF
+>            END-IF
+>                         
+>            .
+>        0563-EXIT.
+>            EXIT.
+> 
+>        0564-EDIT-CONTINUE.
+2856c3013,3015
+< 02569          MOVE WS-ACCT-REIN-TABLE    TO PB-I-REIN-TABLE.           ELC50PD
+---
+> 02569          MOVE WS-ACCT-REIN-TABLE    TO PB-I-REIN-TABLE
+> 040504         MOVE WS-ACCT-ADDL-CLP      TO PB-I-ADDL-CLP
+> 040504     END-IF
+5249c5408,5409
+< 100703        COMPUTE WS-TOL-LF-HIGH-PREM-AMT = PB-I-CLP-AMOUNT
+---
+> 100703        COMPUTE WS-TOL-LF-HIGH-PREM-AMT = (PB-I-CLP-AMOUNT
+> 040504           + PB-I-ADDL-CLP)
+6696c6856
+< 06120                             OR '9'                                ELC50PD
+---
+> 033104                            OR '9' OR 'G'
+6861a7022,7028
+> 033104     IF PB-COMPANY-ID = 'DCC'
+> 033104        IF (WS-AH-BEN-CATEGORY = 'G')
+>                   AND (CP-EARNING-METHOD NOT = 'G')
+> 033104           MOVE 'S'              TO CP-EARNING-METHOD
+> 033104        END-IF
+> 033104     END-IF
+> 
+6864c7031
+< 06275                             OR '9'                                ELC50PD
+---
+> 033104                            OR '9' OR 'G' OR 'S'
+6884c7051
+< CIDMOD                                AND 'CID')
+---
+> CIDMOD                                AND 'CID' AND 'DCC')
+6936a7104
+> 
+8011a8180
+> 040504     MOVE PB-I-ADDL-CLP          TO CM-ADDL-CLP

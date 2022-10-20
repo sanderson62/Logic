@@ -1,0 +1,97 @@
+cd /apps/prod/cid1p/jcl
+
+echo "Begin Cycle Date Test "
+if (`date +%Y%m%d` != @CCYYYYMMDD) then
+   echo "Cycle Date NOT equal Current date, aborting "
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'Bad cycle date'"
+   exit 1
+endif
+echo "Cycle Date Test Complete"
+
+
+################################################################################
+rm -f /apps/prod/cid1p/emails/printemail.txt /apps/prod/cid1p/reprints/dailycycle
+cp /apps/prod/cid1p/emails/emailinit.txt /apps/prod/cid1p/emails/printemail.txt
+touch /apps/prod/cid1p/reprints/dailycycle
+################################################################################
+
+
+echo "clsvsam is about to start"
+unikixjob clsvsam -w -ca
+if ($status != 0) then
+    echo "clsvsam aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'CLSVSAM'"
+    exit 1
+endif
+echo "clsvsam terminated successfully"
+
+
+echo "ciddaily1 is about to start"
+unikixjob ciddaily1 -w -ca
+if ($status != 0) then
+    echo "ciddaily1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'In CIDDAILY1'"
+    exit 1
+endif
+echo "ciddaily1 terminated successfully"
+
+
+echo "dccdaily1 is about to start"
+unikixjob dccdaily1 -w -ca
+if ($status != 0) then
+    echo "dccdaily1 aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'In DCCDAILY1'"
+    exit 1
+endif
+echo "dccdaily1 terminated successfully"
+
+
+echo "opnvsam is about to start"
+unikixjob opnvsam -w -ca
+if ($status != 0) then
+    echo "opnvsam aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'OPNVSAM'"
+    exit 1
+endif
+echo "opnvsam terminated successfully"
+
+rm /apps/prod/cid1p/jcl/ish/date_hash
+
+setenv cdte `date +%Y%m%d%H%M`
+"smtp -f slunikix -t jwfa,jlhb,info,pema,sdga,jjhc -s 'Todays print list' -mf /apps/prod/cid1p/emails/printemail.txt"
+"smtp -f slunikix -t pager.pema,cycle,pager.sdga -s 'Cycle COMPLETE' -ml 'Logic cycle complete'"
+cp /apps/prod/cid1p/reprints/dailycycle /apps/prod/cid1p/reprints/dailycycle.$cdte
+
+echo "cilgbkp4mo is about to start"
+unikixjob cilgbkp4mo -w -ca
+if ($status != 0) then
+    echo "cilgbkp4mo aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'CILGBKP4MO'"
+    exit 1
+endif
+echo "cilgbkp4mo terminated successfully"
+
+echo "cimolgbld is about to start"
+unikixjob cimolgbld -k mdoff -w -ca
+if ($status != 0) then
+    echo "cimolgbld aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'CIMOLGBLD'"
+    exit 1
+endif
+echo "cimolgbld terminated successfully"
+
+/export/home/mtpadmin/bin/gdgcomp
+echo "File compression has been started"
+
+echo "daily backup is about to start"
+unikixjob dayunibkp -w -ca
+if ($status != 0) then
+    echo "dayunibkp aborted"
+   "smtp -f slunikix -t pager.pema,cycle -s 'Cycle Aborted' -ml 'dayunibkp'"
+    exit 1
+endif
+echo "daily backup terminated successfully"
+"smtp -f slunikix -t pager.pema,cycle -s 'Backup Started' -ml 'Daily backup submitted'"
+
+echo "@ccyyyymmdd" > /data/seqfiles/Logic.daily.postcycle.done
+ftp -n ntcso1 < $JCLLIB/ftp-postcycle

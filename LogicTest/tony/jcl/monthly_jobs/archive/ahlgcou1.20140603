@@ -1,0 +1,37 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+#if ($EBMSYS != "mdoff") then
+#   echo "Job aborting, not MDOFF"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=BKPCOMP
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERCOMP -s $SEQFILES/$JOBNAME.ercomp.bkp
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPCOMP' parm='SH'
+
+################################################################################
+LABEL name=CPSCOU1 
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='J' 
+ASSGNDD ddname='SYS010' dataset='AH.XX.PEND.STMT.KEYS' gdg='0' filename='$SEQFILES/AH.XX.PEND.STMT.KEYS' disp='i' 
+ASSGNDD                 dataset='AH.XX.REF1.STMT.KEYS' gdg='0' filename='$SEQFILES/AH.XX.REF1.STMT.KEYS' disp='i'
+ASSGNDD                 dataset='AH.XX.REF4.STMT.KEYS' gdg='0' filename='$SEQFILES/AH.XX.REF4.STMT.KEYS' disp='i'
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A'
+ASSGNDD ddname='ERCOMP' type='VS' filename='ERCOMP' disp='i-o'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i-o'
+
+EXECPGM pgmname='CPSCOU1' stepname='CPSCOU1' 
+
+
+if ($JOBSTATUS == 0) then
+   "smtp -f slunikix -t pema,jjva -s 'auto balance update Complete' -ml 'ERCOMP UPDATED'"
+else
+  echo " Job aborted, print not released"
+endif
+
+ENDJOB 

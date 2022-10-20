@@ -1,0 +1,112 @@
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' jobclass='M' 
+
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *               FREEDOM INTERFACE FOR CID RESERVES 
+#  *------------------------------------------------------------------- 
+################################################################################
+LABEL name=FNB167 
+################################################################################
+#  DATE: MMDDYYYY   
+#  FROM: CILGM17    
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.XX.GAAP_00' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ERACCT' dataset='CI.DD.LG.ERACCT' type='VS' filename='ERACCT' disp='i-o' 
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+#  ** DOWNLOAD LIFE **    
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.FN.FX.LFCOMM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+#  ** DOWNLOAD A & H **   
+ASSGNDD ddname='SYS012' filename='$SEQFILES/AH.FN.FX.AHCOMM' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+
+EXECPGM pgmname='FNB167AHL' stepname='FNB167' parm='11302021_XC' 
+
+################################################################################
+LABEL name=FNB170L 
+################################################################################
+#  *                                                                     
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='$SEQFILES/AH.FN.LFCOMM.SUMM' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.FN.FX.LFCOMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170L' parm='CIDLFRS'
+
+################################################################################
+LABEL name=FNB170A 
+################################################################################
+#  *                                                                     
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='$SEQFILES/AH.FN.AHCOMM.SUMM' disp='i-o' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.FN.FX.AHCOMM' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170A' parm='CIDAHRS' 
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+#  ***                                                                   
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/AH.FN.LFCOMM.SUMM' disp='i-o' 
+ASSGNDD                 filename='$SEQFILES/AH.FN.AHCOMM.SUMM' disp='i-o' 
+ASSGNDD  ddname='SYSUT2' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSIN' type='DUMMY' 
+
+EXECPGM pgmname='IEBGENER' stepname='PRINT1' 
+
+################################################################################
+LABEL name=CPYFRM54
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.FN.LFCOMM.SUMM' disp='i-o' 
+ASSGNDD                 filename='$SEQFILES/AH.FN.AHCOMM.SUMM' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.PRINT.FN.COMM' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPYFRM54' parm='ALL' 
+
+################################################################################
+LABEL name=COPY1   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID 
+#  *------------------------------------------------------------------- 
+#  * 
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/AH.FN.FX.LFCOMM' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/AHL.LFCOMM_11-30-21.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+EXECPGM pgmname='IDCAMS' stepname='COPY1'   
+################################################################################
+LABEL name=COPY2   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID 
+#  *------------------------------------------------------------------- 
+#  * 
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/AH.FN.FX.AHCOMM' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/AHL.AHCOMM_11-30-21.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY2'   
+
+################################################################################
+LABEL name=FTPM54
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntis1.cso.local < $JCLLIB/ftp-ahfrm54com
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTPM54' parm='SH'
+
+ENDJOB 
+################################################################################

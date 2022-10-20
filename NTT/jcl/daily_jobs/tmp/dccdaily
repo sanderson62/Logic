@@ -1,0 +1,60 @@
+cd $PROJECT_ROOT/jcl
+
+#########################  B E G I N  S T E P  01   #########################
+echo "Begin Cycle Date Tests "
+
+setenv prevcydte `cat $SEQFILES/PrevCycleDate`
+setenv curcydte `cat $SEQFILES/CurCycleDate`
+
+if (`date +%Y%m%d` != @CCYYYYMMDD) then
+   echo "Cycle Date NOT equal Current date, aborting "
+   "echo 'Bad Current cycle date ' | mutt -s 'DCC Cycle Aborted' pager.pema,cycle"
+   exit 1
+endif
+
+if (`cat $SEQFILES/PrevCycleDate` != @PCYYYYMMDD) then
+   echo " Previous cycle date not = last cycle date "
+   "echo 'Bad Prev cycle date ' | mutt -s 'DCC Cycle Aborted' pager.pema,cycle"
+   exit 1
+endif
+
+if (`cat $SEQFILES/CurCycleDate` == @CCYYYYMMDD) then
+   echo " Current cycle already ran "
+   "echo 'Cycle already ran for today' | mutt -s 'DCC Cycle Aborted' pager.pema,cycle"
+   exit 1
+endif
+
+echo "Cycle Date Tests Complete"
+
+#########################    E N D    S T E P  01   #########################
+
+echo "dccdaily1 is about to start"
+unikixjob dccdaily1 -w -ca -k $EBMSYS
+if ($status != 0) then
+    echo "dccdaily1 aborted"
+   "echo 'In DCCDAILY1' | mutt -s 'DCC Cycle Aborted' pager.pema,cycle"
+    exit 1
+endif
+echo "dccdaily1 terminated successfully"
+
+if (`date +%Y%m%d` == @cpsedtyyyymmdd || `date +%Y%m%d` == @cpsnedtyyyymmdd) then
+   echo "cidclgedit is about to start"
+   unikixjob cidclgedit -w -ca -k $EBMSYS
+   if ($status != 0) then
+       echo "cidclgedit aborted"
+      "echo 'In CIDCLGEDIT' | mutt -s 'DCC Cycle Aborted' pager.pema,cycle"
+       exit 1
+   endif
+   echo "cidclgedit terminated successfully"
+endif
+
+"echo 'DCC Daily Cycle Complete' | mutt -s 'DCC Daily Cycle Complete' pager.pema,cycle,pager.sdga"
+
+#########################    E N D    S T E P  05   #########################
+
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 071516 CR2016030300001 PEMA   NEW JOB Designed for Active Batch

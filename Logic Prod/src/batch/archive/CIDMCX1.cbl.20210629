@@ -1,0 +1,640 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CIDMCX1.
+       AUTHOR.     PABLO.
+       DATE-COMPILED.
+103002******************************************************************
+103002*                   C H A N G E   L O G
+103002*
+103002* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+103002*-----------------------------------------------------------------
+103002*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+103002* EFFECTIVE    NUMBER
+103002*-----------------------------------------------------------------
+103002* 103002                   PEMA  ADD DCC PROCESSING           
+121903* 121903    2002100700001  SMVA  ADD ACCT STATE AND CLM TYPE TO MICR 
+121903*                                FILES FOR PRINTING STATE SPEC PROG RPTS
+011105* 011105    2004071200002  PEMA  ADD ONE COMMENT LINE
+112805* 112805    2005033100001  PEMA  ADD PROCESSING FOR FORM DCC2
+062006* 062006    2006050100003  PEMA  ADD CSO FAMILY OF COMPANIES
+092007* 092007                   AJRA  INCLUDE MESSAGES FOR DCC
+092607* 092607                   AJRA  MOVE ADDRESS LINES DOWN FOR P2P
+101807* 101807                   AJRA  MOVE MEMBER(INSURED) ADDRESS FOR P2P
+102207* 102207    2007010300001  PEMA  MODIFIED ROUTINE TO COMPRESS ADDRS
+091808* 091808		2008022800002  AJRA  ADD ALASKA CHECK FILE
+101708* 101708    2008050500001  AJRA  ADD PROCESSING FOR FORM DCC4 (CCC)
+040909* 040909                   AJRA  FIX OUTPUT REC LENGTH - 1254 TO 1275
+072110* 072110    2009122800001  AJRA  MAKE SEPARATE DRAFT COPY FILES
+030612* 030612  CR2011120900003  AJRA  ADD AHL COMPANY CODE
+051412* 051412  IR2012050700001  AJRA  FIX DRAFT COPY FOR AHL
+111714* 111714  CR2014073000001  PEMA  DRAFTS TO CHECKS
+013017* 013017  CR2016053100001  PEMA  ACH PROCESSING
+071420* 071420  IR2020071400001  PEMA  Correct VPP processing
+090120* 090120  IR2020083100001  PEMA  Correct VPP processing
+040902******************************************************************
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT MCRDFT           ASSIGN TO MCRDFT
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS DYNAMIC
+                                   RECORD KEY IS MC-CONTROL-PRIMARY
+                                   FILE STATUS IS MCRDFT-FILE-STATUS.
+
+           SELECT MICR-OUT         ASSIGN TO MICROUT
+                                   ORGANIZATION IS LINE SEQUENTIAL.
+
+112805     SELECT MICR-OUT-DCC2    ASSIGN TO MICROUT2
+112505                             ORGANIZATION IS LINE SEQUENTIAL.
+
+101708     SELECT MICR-OUT-DCC4    ASSIGN TO MICROUT4
+101708                             ORGANIZATION IS LINE SEQUENTIAL.
+072110
+072110     SELECT COPY-OUT         ASSIGN TO COPYOUT
+072110                             ORGANIZATION IS LINE SEQUENTIAL.
+072110
+072110     SELECT COPY-OUT-DCC2    ASSIGN TO COPYOUT2
+072110                             ORGANIZATION IS LINE SEQUENTIAL.
+072110
+072110     SELECT COPY-OUT-DCC4    ASSIGN TO COPYOUT4
+072110                             ORGANIZATION IS LINE SEQUENTIAL.
+
+103002     SELECT DISK-DATE        ASSIGN TO SYS019-UT-FBA1-S-SYS019.   
+
+           EJECT
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  MCRDFT.
+       01  MICR-REC-IN.
+           10  MC-CONTROL-PRIMARY.
+               16  M420C-FORM          PIC X(4).
+               16  M420C-DRAFT-ORDER   PIC 9(5).
+               16  M420C-DRAFT         PIC X(10).
+           10  M420C-PRINT-COUNT       PIC S9(4) COMP.
+           10  M420C-SEQ-NUMBER        PIC S9(4) COMP.
+           10  M420C-AMOUNT-PAID       PIC S9(9)V9(2) COMP-3.
+           10  M420C-COMPANY-NAME      PIC X(43).
+           10  M420C-CSO-ADDRESS       PIC X(33).
+           10  M420C-CLAIM-NO          PIC X(7).
+           10  M420C-CERT-NO           PIC X(11).
+           10  M420C-ACCT-NO           PIC X(10).
+           10  M420C-PLAN-CODE         PIC X(4).
+           10  M420C-PAID-FROM-DATE    PIC X(8).
+           10  M420C-PAID-THRU-DATE    PIC X(8).
+           10  M420C-PAYMENT-TYPE      PIC X.
+           10  M420C-CC-ACCT           PIC X(7).
+           10  M420C-CC-ACCT-NUMBER    PIC X(18).
+           10  M420C-TYPE-MESSAGE      PIC X(15).
+           10  M420C-FINAL-MESS9       PIC X(17).
+           10  M420C-FINAL-MESS10      PIC X(17).
+           10  M420C-FINAL-MESS11      PIC X(17).
+           10  M420C-MEMBER-NAME       PIC X(30).
+           10  M420C-MEMBER-ADDRESS1   PIC X(30).
+           10  M420C-MEMBER-ADDRESS2   PIC X(30).
+           10  M420C-MEMBER-ADDRESS3   PIC X(30).
+           10  M420C-MEMBER-ADDRESS4   PIC X(30).
+           10  M420C-MEMBER-ZIP-CODE   PIC X(9).
+           10  M420C-3RDADD-NAME       PIC X(30).
+           10  M420C-3RDADD-LINE1      PIC X(30).
+           10  M420C-3RDADD-LINE2      PIC X(40).
+           10  M420C-3RDADD-LINE3      PIC X(40).
+           10  M420C-3RDADD-ZIP        PIC X(9).
+           10  M420C-CHECK-DATE        PIC X(8).
+           10  M420C-DFT-NOTES1        PIC X(40).
+013017     10  M420C-DFT-NOTES2        PIC X(39).
+013017     10  M420C-ACH-PAYMENT       PIC X.
+           10  M420C-PAYEE-NAME        PIC X(30).
+           10  M420C-PAYEE-ADDRESS1    PIC X(30).
+           10  M420C-PAYEE-ADDRESS2    PIC X(30).
+           10  M420C-PAYEE-ADDRESS3    PIC X(30).
+           10  M420C-PAYEE-ADDRESS4    PIC X(30).
+           10  M420C-PAYEE-ZIP-CODE    PIC X(9).
+           10  M420C-REPLY-DATE        PIC X(5).
+           10  M420C-SIGNATURE         PIC X.
+           10  M420C-LOAN-NUMBER       PIC X(25).
+           10  M420C-DRAFT-MESSAGES.
+011105         16  M420C-DRAFT-MESSAGE OCCURS 6 TIMES PIC X(70).
+121903     10  M420C-ACCT-STATE        PIC X(02).
+121903     10  M420C-CLAIM-TYPE        PIC X(01).
+      
+
+       FD  MICR-OUT
+           RECORDING MODE F
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+
+040909 01  MICR-OUT-REC                PIC X(1275).
+
+112805 FD  MICR-OUT-DCC2
+112805     RECORDING MODE F
+112805     LABEL RECORDS STANDARD
+112805     BLOCK CONTAINS 0 RECORDS.
+112805
+040909 01  MICR-OUT-REC2               PIC X(1275).
+
+101708 FD  MICR-OUT-DCC4
+101708     RECORDING MODE F
+101708     LABEL RECORDS STANDARD
+101708     BLOCK CONTAINS 0 RECORDS.
+101708
+040909 01  MICR-OUT-REC4               PIC X(1275).
+072110
+072110 FD  COPY-OUT
+072110     RECORDING MODE F
+072110     LABEL RECORDS STANDARD
+072110     BLOCK CONTAINS 0 RECORDS.
+072110
+072110 01  COPY-OUT-REC                PIC X(1275).
+072110
+072110 FD  COPY-OUT-DCC2
+072110     RECORDING MODE F
+072110     LABEL RECORDS STANDARD
+072110     BLOCK CONTAINS 0 RECORDS.
+072110
+072110 01  COPY-OUT-REC2               PIC X(1275).
+072110
+072110 FD  COPY-OUT-DCC4
+072110     RECORDING MODE F
+072110     LABEL RECORDS STANDARD
+072110     BLOCK CONTAINS 0 RECORDS.
+072110
+072110 01  COPY-OUT-REC4               PIC X(1275).
+
+103002 FD  DISK-DATE                                                    
+103002     COPY ELCDTEFD.                                               
+103002                                                                  
+
+       WORKING-STORAGE SECTION.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  FILLER  PIC X(32) VALUE '   CIDMCX1 WORKING STORAGE      '.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+
+       77  WS-EOF-SW               PIC X VALUE SPACES.
+           88  END-OF-MCRDFT             VALUE 'Y'.
+           88  MORE-MCRDFT               VALUE ' '.
+       77  MICR-RECS-IN             PIC 9(9) VALUE ZEROS.
+       77  MICR-RECS-OUT            PIC 9(9) VALUE ZEROS.
+072110 77  COPY-RECS-OUT            PIC 9(9) VALUE ZEROS.
+       77  SUB1                    PIC S9(5) VALUE +0 COMP-3.
+      /
+
+       01  MICR-DETAIL-RECORD.
+           12  MICR-FORM               PIC X(4).
+           12  MICR-DRAFT-ORDER        PIC 99999.
+           12  MICR-DRAFT              PIC X(10).
+           12  MICR-PRINT-COUNT        PIC -99999999.
+           12  MICR-SEQ-NUMBER         PIC -99999999.
+           12  MICR-AMOUNT-PAID        PIC -zzzzzzzz9.99.
+           12  MICR-COMPANY-NAME       PIC X(43).
+           12  MICR-CSO-ADDRESS        PIC X(33).
+           12  MICR-CLAIM-NO           PIC X(7).
+           12  MICR-CERT-NO            PIC X(11).
+           12  MICR-ACCT-NO            PIC X(10).
+           12  MICR-PLAN-CODE          PIC X(4).
+           12  MICR-PAID-FROM-DATE     PIC X(8).
+           12  MICR-PAID-THRU-DATE     PIC X(8).
+           12  MICR-PAYMENT-TYPE       PIC X.
+           12  MICR-CC-ACCT            PIC X(7).
+           12  MICR-CC-ACCT-NUMBER     PIC X(18).
+           12  MICR-TYPE-MESSAGE       PIC X(15).
+           12  MICR-FINAL-MESS9        PIC X(17).
+           12  MICR-FINAL-MESS10       PIC X(17).
+           12  MICR-FINAL-MESS11       PIC X(17).
+           12  MICR-MEMBER-NAME        PIC X(30).
+           12  MICR-MEMBER-ADDRESS1    PIC X(30).
+           12  MICR-MEMBER-ADDRESS2    PIC X(30).
+           12  MICR-MEMBER-ADDRESS3    PIC X(30).
+           12  MICR-MEMBER-ADDRESS4    PIC X(30).
+           12  MICR-MEMBER-ZIP-CODE    PIC X(9).
+           12  MICR-3RDADD-NAME        PIC X(30).
+           12  MICR-3RDADD-LINE1       PIC X(30).
+           12  MICR-3RDADD-LINE2       PIC X(40).
+           12  MICR-3RDADD-LINE3       PIC X(40).
+           12  MICR-3RDADD-ZIP         PIC X(9).
+           12  MICR-CHECK-DATE         PIC X(8).
+           12  MICR-DFT-NOTES1         PIC X(40).
+013017     12  MICR-DFT-NOTES2         PIC X(39).
+013017     12  MICR-ACH-PAYMENT        PIC X.
+           12  MICR-PAYEE-NAME         PIC X(30).
+           12  MICR-PAYEE-ADDRESS1     PIC X(30).
+           12  MICR-PAYEE-ADDRESS2     PIC X(30).
+           12  MICR-PAYEE-ADDRESS3     PIC X(30).
+           12  MICR-PAYEE-ADDRESS4     PIC X(30).
+           12  MICR-PAYEE-ZIP-CODE     PIC X(9).
+           12  MICR-REPLY-DATE         PIC X(5).
+           12  MICR-SIGNATURE          PIC X.
+           12  MICR-LOAN-NUMBER        PIC X(25).
+           12  MICR-DRAFT-MESSAGES.
+011105         16  MICR-DRAFT-MESSAGE OCCURS 6 TIMES   PIC X(70).
+121903     12  MICR-ACCT-STATE         PIC X(02).
+121903     12  MICR-CLAIM-TYPE         PIC X(01).
+
+
+      /
+       01  WS-MISC.
+103002     05  PGM-SUB                     PIC S9(4) COMP VALUE +310.
+00360      05  WS-RETURN-CODE        PIC S9(4)   COMP   VALUE +0.       
+00361      05  WS-ABEND-MESSAGE      PIC X(80)          VALUE SPACES.   
+00362      05  WS-ABEND-FILE-STATUS  PIC XX             VALUE ZEROS.    
+00363      05  WS-ZERO               PIC S9      COMP-3 VALUE +0.       
+00364                                                                   
+00365      05  WS-ABEND-CODE         PIC 9(4).                          
+00366      05  ABEND-CODE  REDEFINES  WS-ABEND-CODE.                    
+00367          10  ABEND-CODE-1    PIC XX.                              
+00368          10  ABEND-CODE-2.                                        
+00369              15  AC2-ONE     PIC X.                               
+00370              15  AC2-TWO     PIC X.                               
+           05  WS-SAVE-MCRFFT          PIC X(1507) VALUE LOW-VALUES.
+           05  MCRDFT-FILE-STATUS      PIC XX    VALUE ZEROS.
+           05  WS-DATE                 PIC 9(11) VALUE ZEROS.
+
+                                       COPY ELCDATE.
+103002                                 COPY ELCDTECX.
+103002                                 COPY ELCDTEVR.                                               
+
+           EJECT
+       PROCEDURE DIVISION.
+
+103002*************************************************************     
+103002                                 COPY ELCDTERX.                   
+103002*************************************************************     
+           PERFORM 0400-OPEN-FILES     THRU 0400-EXIT
+
+           PERFORM 0600-INITIALIZE     THRU 0600-EXIT
+
+           PERFORM 0100-PROCESS-MICR   THRU 0100-EXIT UNTIL
+                 END-OF-MCRDFT
+
+           PERFORM 0500-CLOSE-FILES    THRU 0500-EXIT
+
+           DISPLAY ' MICR RECORDS READ    '  MICR-RECS-IN
+           DISPLAY ' MICR RECORDS WRITTEN '  MICR-RECS-OUT
+072110     DISPLAY ' COPY RECORDS WRITTEN '  COPY-RECS-OUT           
+           GOBACK
+           .
+
+       0100-PROCESS-MICR.
+
+           if m420c-ach-payment = 'Y'
+      *       if M420c-FORM = '420C' OR '420P'
+              display ' Bypassing, ACH Payment ' m420c-draft ' '
+                 m420c-claim-no ' ' m420c-cert-no
+              go to 0100-continue
+      *       end-if
+           end-if
+           MOVE M420C-FORM             TO MICR-FORM
+
+           MOVE M420C-FORM             TO MICR-FORM
+           MOVE M420C-DRAFT-ORDER      TO MICR-DRAFT-ORDER
+           MOVE M420C-DRAFT            TO MICR-DRAFT
+           MOVE M420C-PRINT-COUNT      TO MICR-PRINT-COUNT
+           MOVE M420C-SEQ-NUMBER       TO MICR-SEQ-NUMBER
+           MOVE M420C-AMOUNT-PAID      TO MICR-AMOUNT-PAID
+           MOVE M420C-COMPANY-NAME     TO MICR-COMPANY-NAME
+           MOVE M420C-CSO-ADDRESS      TO MICR-CSO-ADDRESS
+           MOVE M420C-CLAIM-NO         TO MICR-CLAIM-NO
+           MOVE M420C-CERT-NO          TO MICR-CERT-NO
+           MOVE M420C-ACCT-NO          TO MICR-ACCT-NO
+           MOVE M420C-PLAN-CODE        TO MICR-PLAN-CODE
+           MOVE M420C-PAID-FROM-DATE   TO MICR-PAID-FROM-DATE
+           MOVE M420C-PAID-THRU-DATE   TO MICR-PAID-THRU-DATE
+           MOVE M420C-PAYMENT-TYPE     TO MICR-PAYMENT-TYPE
+           MOVE M420C-CC-ACCT          TO MICR-CC-ACCT
+           MOVE M420C-CC-ACCT-NUMBER   TO MICR-CC-ACCT-NUMBER
+           MOVE M420C-TYPE-MESSAGE     TO MICR-TYPE-MESSAGE
+
+092007*080305     IF DTE-CLIENT NOT = 'DCC'
+080305        MOVE M420C-FINAL-MESS9   TO MICR-FINAL-MESS9
+092007*080305     END-IF
+
+           MOVE M420C-FINAL-MESS10     TO MICR-FINAL-MESS10
+072110*    MOVE M420C-FINAL-MESS11     TO MICR-FINAL-MESS11
+072110     MOVE SPACES                 TO MICR-FINAL-MESS11
+           MOVE M420C-MEMBER-NAME      TO MICR-MEMBER-NAME
+           MOVE M420C-MEMBER-ADDRESS1  TO MICR-MEMBER-ADDRESS1
+           MOVE M420C-MEMBER-ADDRESS2  TO MICR-MEMBER-ADDRESS2
+           MOVE M420C-MEMBER-ADDRESS3  TO MICR-MEMBER-ADDRESS3
+           MOVE M420C-MEMBER-ADDRESS4  TO MICR-MEMBER-ADDRESS4
+           MOVE M420C-MEMBER-ZIP-CODE  TO MICR-MEMBER-ZIP-CODE
+
+102207     IF MICR-MEMBER-ADDRESS1 = SPACES
+102207        MOVE MICR-MEMBER-ADDRESS2
+102207                                 TO MICR-MEMBER-ADDRESS1
+102207        MOVE MICR-MEMBER-ADDRESS3
+102207                                 TO MICR-MEMBER-ADDRESS2
+102207        MOVE MICR-MEMBER-ADDRESS4
+102207                                 TO MICR-MEMBER-ADDRESS3
+102207        MOVE SPACES              TO MICR-MEMBER-ADDRESS4
+102207     END-IF
+102207     IF MICR-MEMBER-ADDRESS2 = SPACES
+102207        MOVE MICR-MEMBER-ADDRESS3
+102207                                 TO MICR-MEMBER-ADDRESS2
+102207        MOVE MICR-MEMBER-ADDRESS4
+102207                                 TO MICR-MEMBER-ADDRESS3
+102207        MOVE SPACES              TO MICR-MEMBER-ADDRESS4
+102207     END-IF
+102207     IF MICR-MEMBER-ADDRESS3 = SPACES
+102207        MOVE MICR-MEMBER-ADDRESS4
+102207                                 TO MICR-MEMBER-ADDRESS3
+102207        MOVE SPACES              TO MICR-MEMBER-ADDRESS4
+102207     END-IF
+
+102207     IF MICR-MEMBER-ADDRESS4 NOT = SPACES
+102207        MOVE MICR-MEMBER-ZIP-CODE
+102207                                 TO MICR-MEMBER-ADDRESS4 (26:5)
+102207     ELSE
+102207      IF MICR-MEMBER-ADDRESS3 NOT = SPACES
+102207         MOVE MICR-MEMBER-ZIP-CODE
+102207                                 TO MICR-MEMBER-ADDRESS3 (26:5)
+102207      ELSE
+102207       IF MICR-MEMBER-ADDRESS2 NOT = SPACES
+102207          MOVE MICR-MEMBER-ZIP-CODE
+102207                                 TO MICR-MEMBER-ADDRESS2 (26:5)
+102207       ELSE
+102207        IF MICR-MEMBER-ADDRESS1 NOT = SPACES
+102207           MOVE MICR-MEMBER-ZIP-CODE
+102207                                 TO MICR-MEMBER-ADDRESS1 (26:5)
+102207        END-IF
+102207       END-IF
+102207      END-IF
+102207     END-IF
+102207     MOVE SPACES                 TO MICR-MEMBER-ZIP-CODE
+
+           MOVE M420C-3RDADD-NAME      TO MICR-3RDADD-NAME
+           MOVE M420C-3RDADD-LINE1     TO MICR-3RDADD-LINE1
+           MOVE M420C-3RDADD-LINE2     TO MICR-3RDADD-LINE2
+           MOVE M420C-3RDADD-LINE3     TO MICR-3RDADD-LINE3
+           MOVE M420C-3RDADD-ZIP       TO MICR-3RDADD-ZIP
+           IF MICR-3RDADD-LINE3 = SPACES
+              MOVE MICR-3RDADD-ZIP      TO MICR-3RDADD-LINE3
+              MOVE SPACES               TO MICR-3RDADD-ZIP
+           END-IF
+           IF MICR-3RDADD-LINE2 = SPACES
+              MOVE MICR-3RDADD-LINE3    TO MICR-3RDADD-LINE2
+              MOVE MICR-3RDADD-ZIP      TO MICR-3RDADD-LINE3
+              MOVE SPACES               TO MICR-3RDADD-ZIP
+           END-IF
+           IF MICR-3RDADD-LINE1 = SPACES
+              MOVE MICR-3RDADD-LINE2    TO MICR-3RDADD-LINE1
+              MOVE MICR-3RDADD-LINE3    TO MICR-3RDADD-LINE2
+              MOVE MICR-3RDADD-ZIP      TO MICR-3RDADD-LINE3
+              MOVE SPACES               TO MICR-3RDADD-ZIP
+           END-IF
+           IF MICR-3RDADD-NAME     = SPACES
+              MOVE MICR-3RDADD-LINE1    TO MICR-3RDADD-NAME
+              MOVE MICR-3RDADD-LINE2    TO MICR-3RDADD-LINE1
+              MOVE MICR-3RDADD-LINE3    TO MICR-3RDADD-LINE2
+              MOVE MICR-3RDADD-ZIP      TO MICR-3RDADD-LINE3
+              MOVE SPACES               TO MICR-3RDADD-ZIP
+           END-IF
+           MOVE M420C-CHECK-DATE       TO MICR-CHECK-DATE
+           MOVE M420C-DFT-NOTES1       TO MICR-DFT-NOTES1
+           MOVE M420C-DFT-NOTES2       TO MICR-DFT-NOTES2
+           MOVE M420C-PAYEE-NAME       TO MICR-PAYEE-NAME
+           MOVE M420C-PAYEE-ADDRESS1   TO MICR-PAYEE-ADDRESS1
+           MOVE M420C-PAYEE-ADDRESS2   TO MICR-PAYEE-ADDRESS2
+           MOVE M420C-PAYEE-ADDRESS3   TO MICR-PAYEE-ADDRESS3
+           MOVE M420C-PAYEE-ADDRESS4   TO MICR-PAYEE-ADDRESS4
+           MOVE M420C-PAYEE-ZIP-CODE   TO MICR-PAYEE-ZIP-CODE
+
+092607***FIRST WE HAVE TO MOVE THINGS UP TO GET ADDRESS4 EMPTY SO WE            
+092607***CAN PUT ZIPCODE INTO ADDRESS4. THEN MOVE THE NAME AND 
+092607***ADDRESSES DOWN SO CITY/STATE ARE IN ADDR3           
+092607     IF MICR-PAYEE-ADDRESS4 > SPACES
+092607        IF MICR-PAYEE-ADDRESS3 = SPACES
+092607           MOVE MICR-PAYEE-ADDRESS4 TO MICR-PAYEE-ADDRESS3
+092607           MOVE SPACES              TO MICR-PAYEE-ADDRESS4
+092607        ELSE
+092607           IF MICR-PAYEE-ADDRESS2 = SPACES
+092607              MOVE MICR-PAYEE-ADDRESS3 TO MICR-PAYEE-ADDRESS2
+092607              MOVE MICR-PAYEE-ADDRESS4 TO MICR-PAYEE-ADDRESS3
+092607              MOVE SPACES              TO MICR-PAYEE-ADDRESS4
+092607           ELSE
+092607              IF MICR-PAYEE-ADDRESS1 = SPACES
+092607                 MOVE MICR-PAYEE-ADDRESS2 TO MICR-PAYEE-ADDRESS1
+092607                 MOVE MICR-PAYEE-ADDRESS3 TO MICR-PAYEE-ADDRESS2
+092607                 MOVE MICR-PAYEE-ADDRESS4 TO MICR-PAYEE-ADDRESS3
+092607                 MOVE SPACES              TO MICR-PAYEE-ADDRESS4
+092607              END-IF
+092607           END-IF
+092607        END-IF
+092607     END-IF
+092607     IF MICR-PAYEE-ADDRESS4 = SPACES
+092607        MOVE MICR-PAYEE-ZIP-CODE TO MICR-PAYEE-ADDRESS4
+092607        MOVE SPACES              TO MICR-PAYEE-ZIP-CODE
+092607     END-IF
+092607     IF MICR-PAYEE-ADDRESS1 = SPACES
+092607        MOVE MICR-PAYEE-NAME     TO MICR-PAYEE-ADDRESS1
+092607        MOVE SPACES              TO MICR-PAYEE-NAME
+092607     END-IF
+092607     IF MICR-PAYEE-ADDRESS2 = SPACES
+092607        MOVE MICR-PAYEE-ADDRESS1 TO MICR-PAYEE-ADDRESS2
+092607        MOVE MICR-PAYEE-NAME     TO MICR-PAYEE-ADDRESS1
+092607        MOVE SPACES              TO MICR-PAYEE-NAME
+092607     END-IF
+092607     IF MICR-PAYEE-ADDRESS3 = SPACES
+092607        MOVE MICR-PAYEE-ADDRESS2 TO MICR-PAYEE-ADDRESS3
+092607        MOVE MICR-PAYEE-ADDRESS1 TO MICR-PAYEE-ADDRESS2
+092607        MOVE MICR-PAYEE-NAME     TO MICR-PAYEE-ADDRESS1
+092607        MOVE SPACES              TO MICR-PAYEE-NAME 
+092607     END-IF
+           
+           MOVE M420C-REPLY-DATE       TO MICR-REPLY-DATE
+           MOVE M420C-SIGNATURE        TO MICR-SIGNATURE
+           MOVE M420C-LOAN-NUMBER      TO MICR-LOAN-NUMBER
+
+092007*080305     IF DTE-CLIENT NOT = 'DCC'
+080305        MOVE M420C-DRAFT-MESSAGES TO MICR-DRAFT-MESSAGES
+092007*080305     END-IF
+
+121903     MOVE M420C-ACCT-STATE       TO MICR-ACCT-STATE
+121903     MOVE M420C-CLAIM-TYPE       TO MICR-CLAIM-TYPE
+
+103002     IF ((DTE-CLIENT = 'CID')
+111714        AND (MICR-FORM = '420C' OR '420P'))
+103002                OR
+103002        ((DTE-CLIENT = 'DCC')
+101708        AND (MICR-FORM = 'DCC3' OR 'DCC2' OR 'DCC4' or 'DCCC'))
+030612                OR
+030612        ((DTE-CLIENT = 'AHL')
+111714        AND (MICR-FORM = '420A' OR '420H'))
+071420                or
+071420        ((DTE-CLIENT = 'VPP')
+090120        AND (MICR-FORM = 'VPPP'))
+103002        PERFORM 0300-WRITE-MICR  THRU 0300-EXIT
+           END-IF
+
+013017     .
+013017 0100-continue.
+
+           PERFORM 0200-READ-MICR      THRU 0200-EXIT
+
+           .
+       0100-EXIT.
+           EXIT.
+
+       0200-READ-MICR.
+
+           READ MCRDFT NEXT RECORD
+
+           IF MCRDFT-FILE-STATUS = '10' OR '23'
+              SET END-OF-MCRDFT        TO TRUE
+           ELSE
+              IF MCRDFT-FILE-STATUS NOT = '00'
+                 display ' MICRDRFT FILE IS CORRUPT READ NEXT'
+                 DISPLAY ' WERE THE CHECKS RELEASED PROPERLY ?'
+                 move ' MICRDRFT FILE IS CORRUPT ' to ws-abend-message
+                 move mcrdft-file-status     to ws-abend-file-status
+                 PERFORM ABEND-PGM
+                 SET END-OF-MCRDFT     TO TRUE
+              END-IF
+           END-IF
+
+           IF NOT END-OF-MCRDFT
+              ADD 1 TO MICR-RECS-IN
+           END-IF
+
+           .
+       0200-EXIT.
+           EXIT.
+
+       0300-WRITE-MICR.
+
+090120     if (dte-client = 'VPP')
+090120        and (micr-form = 'VPPP')
+090120        move 'DCCC'              to micr-form
+090120     end-if
+
+112805     IF MICR-FORM = 'DCC2'
+112805        WRITE MICR-OUT-REC2      FROM MICR-DETAIL-RECORD
+112805     ELSE
+101708        IF MICR-FORM = 'DCC4'
+101708          WRITE MICR-OUT-REC4      FROM MICR-DETAIL-RECORD
+101708        ELSE
+                WRITE MICR-OUT-REC       FROM MICR-DETAIL-RECORD
+101708        END-IF
+112805     END-IF
+
+           ADD 1 TO MICR-RECS-OUT
+072110
+072110     IF M420C-FINAL-MESS11 EQUAL 'DRAFT COPY'
+072110        IF MICR-FORM = 'DCC2'
+090910          MOVE 'CCC2'            TO MICR-FORM
+072110          WRITE COPY-OUT-REC2    FROM MICR-DETAIL-RECORD
+072110        ELSE
+072110           IF MICR-FORM = 'DCC4'
+090910              MOVE 'CCC4'        TO MICR-FORM
+072110              WRITE COPY-OUT-REC4 FROM MICR-DETAIL-RECORD
+072110           ELSE
+090910              IF MICR-FORM = 'DCC3'
+090910                 MOVE 'CCC3'     TO MICR-FORM
+090910              ELSE
+051412                 IF MICR-FORM = '420H' 
+051412                    MOVE 'H420'  TO MICR-FORM
+051412                 ELSE
+090910                    MOVE 'P420'  TO MICR-FORM
+051412                 END-IF
+090910              END-IF
+072110              WRITE COPY-OUT-REC FROM MICR-DETAIL-RECORD
+072110           END-IF
+072110        END-IF
+072110        ADD 1 TO COPY-RECS-OUT
+072110     END-IF           
+072110     
+           .
+
+       0300-EXIT.
+           EXIT.
+
+       0400-OPEN-FILES.
+
+           OPEN INPUT MCRDFT
+               OUTPUT MICR-OUT
+111714                COPY-OUT
+
+112805     IF DTE-CLIENT = 'DCC'
+112805        OPEN OUTPUT MICR-OUT-DCC2
+101708                    MICR-OUT-DCC4
+072110                    COPY-OUT-DCC2 COPY-OUT-DCC4
+112805     END-IF
+
+           .
+
+       0400-EXIT.
+           EXIT.
+
+       0500-CLOSE-FILES.
+
+           CLOSE MCRDFT MICR-OUT
+111714           COPY-OUT
+
+112805     IF DTE-CLIENT = 'DCC'
+112805        CLOSE MICR-OUT-DCC2
+101708              MICR-OUT-DCC4
+072110              COPY-OUT-DCC2 COPY-OUT-DCC4
+112805     END-IF
+
+           .
+
+       0500-EXIT.
+           EXIT.
+
+       0550-START-MICR.
+
+           MOVE LOW-VALUES             TO MC-CONTROL-PRIMARY
+
+           START MCRDFT KEY IS NOT < MC-CONTROL-PRIMARY
+
+           IF MCRDFT-FILE-STATUS = '10' OR '23'
+              display ' MICRDRFT FILE IS EMPTY '
+              DISPLAY ' WERE THE CHECKS RELEASED PROPERLY ?'
+              move ' MICRDRFT FILE IS EMPTY ' to ws-abend-message
+              move mcrdft-file-status     to ws-abend-file-status
+              PERFORM ABEND-PGM
+              SET END-OF-MCRDFT        TO TRUE
+           ELSE
+              IF MCRDFT-FILE-STATUS NOT = '00'
+                 display ' MICRDRFT FILE IS CORRUPT START'
+                 DISPLAY ' WERE THE CHECKS RELEASED PROPERLY ?'
+                 move ' MICRDRFT FILE IS CORRUPT ' to ws-abend-message
+                 move mcrdft-file-status     to ws-abend-file-status
+                 PERFORM ABEND-PGM
+                 SET END-OF-MCRDFT     TO TRUE
+              END-IF
+           END-IF
+
+           .
+
+       0550-EXIT.
+           EXIT.
+
+       0600-INITIALIZE.
+
+           MOVE SPACES                 TO MICR-DETAIL-RECORD
+
+           PERFORM 0550-START-MICR     THRU 0550-EXIT
+           PERFORM 0200-READ-MICR      THRU 0200-EXIT
+
+           .
+
+       0600-EXIT.
+           EXIT.
+
+       8510-DATE-CONVERSION.
+
+           CALL 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+
+       8590-EXIT.
+           EXIT.
+12500  ABEND-PGM.                                                       
+CIDMOD     DISPLAY '******************************'                     
+CIDMOD     DISPLAY '***** ABEND PGM **************'                     
+CIDMOD     DISPLAY '******************************'                     
+12501                              COPY ELCABEND.                       
+12502      EJECT                                                        
+
+
+

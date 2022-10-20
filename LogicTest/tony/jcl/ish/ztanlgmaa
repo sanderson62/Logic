@@ -1,0 +1,229 @@
+###############################################################################
+#                                                                              #
+#     JOB: cilgmaa                                                             #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+if ($EBMSYS != 'tony') then
+   echo "Job aborting, not tony"
+   exit 1
+endif
+
+#*******************************************************************************
+#*****
+#* This job is submitted via a job script <cidmth...> that may also submit other
+#* jobs. Files beginning with CI.DL.CIADM... are ftp'd at the start of the next 
+#* job script.  Other files being transferred should be noted below.
+#*****
+#*******************************************************************************
+
+################################################################################
+LABEL name=ECS035 
+################################################################################
+ASSGNDD ddname='SYS011' dataset='ZI.XX.EPEC.NEW' filename='\${SEQFILES}/ZI.XX.EPEC.NEW' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='ERACCTN' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='ZI.DD.ER.DATECARD' filename='\${SEQFILES}/ZI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT'
+ASSGNDD ddname='SYS012' dataset='ZI.WW.INPUT036' filename='\${SEQFILES}/ZI.WW.INPUT036' disp='o' normal='k' abend='d' recfmt='F' recsize='196' 
+ASSGNDD ddname='SYS014' dataset='ZI.WW.INPUT035DR' filename='\${SEQFILES}/ZI.WW.INPUT035DR' disp='o' normal='k' abend='d' recfmt='F' recsize='191' 
+ASSGNDD ddname='SYS020' dataset='ZI.EX.FICH035' filename='\${SEQFILES}/ZI.EX.FICH035' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS021' filename='\${SEQFILES}/ZI.EX.FICH035.TMP1' disp='o' normal='k' abend='d' recsize='171' recfmt='F' 
+ASSGNDD ddname='SYS025' filename='\${SEQFILES}/ZI.EX.GRAPH.TMP1' disp='o' normal='k' abend='d' recsize='90' recfmt='F' 
+ASSGNDD ddname='SYS027' filename='\${SEQFILES}/ZI.EX.FICH035OW' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD  ddname='SYS022' type='SYSOUT' class='A' recfmt='F' recsize='133'
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+
+EXECPGM pgmname='CSO035' stepname='ECS035' 
+
+################################################################################
+LABEL name=RDS035
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZI.EX.FICH035' disp='i-o'
+ASSGNDD ddname='SYS011' filename='/$RDSFILES/ZI.RDS.FICHE.ECS035' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='RDS035' parm='ALL'
+
+################################################################################
+LABEL name=CPY035A
+################################################################################
+ASSGNDD ddname='SYS010' dataset='ZI.EX.FICH035' filename='\${SEQFILES}/ZI.EX.FICH035' disp='i-o'
+ASSGNDD ddname='SYS011' dataset='ZI.DL.CIADM.FICH035' filename='\${SEQFILES}/ZI.DL.CIADM.FICH035' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY035A' parm='ALL'
+
+################################################################################
+LABEL name=CIDF035
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/prod/cid1p/src/batch'
+ASSGNDD ddname='EXTRIN' filename='\${SEQFILES}/ZI.EX.FICH035.TMP1' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='EXTROT' filename='\${SEQFILES}/ZI.EX.FICH035.TMP2' disp='o' normal='k' abend='d' recsize='171' recfmt='F' 
+
+EXECPGM pgmname='CIDF035' stepname='CIDF035'
+
+################################################################################
+LABEL name=SORT035
+################################################################################
+ASSGNDD ddname='SORTIN' filename='\${SEQFILES}/ZI.EX.FICH035.TMP2' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTOUT' filename='\${SEQFILES}/ZI.EX.FICH035.RPTCDE1' disp='o' normal='k' abend='d' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(1 38 CHAR)
+	 ARRANGE=(39,133)
+ENDSORT:
+!
+
+EXECPGM pgmname='SORT' stepname='SORT035'
+
+################################################################################
+LABEL name=COPY035B
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZI.EX.FICH035.RPTCDE1' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/ZI.DL.CIADM.FICH035.RPTCDE1' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='COPY035B' parm='ALL' 
+
+################################################################################
+LABEL name=RDS035RPT
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/ZI.EX.FICH035.RPTCDE1' disp='i-o'
+ASSGNDD ddname='SYS011' filename='/$RDSFILES/ZI.RDS.FICHE.ECS035_RPTCDE1' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='RDS035RPT' parm='ALL'
+
+################################################################################
+LABEL name=CIDFGRF
+################################################################################
+ASSGNDD ddname='EXTRIN' filename='\${SEQFILES}/ZI.EX.GRAPH.TMP1' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='EXTROT' filename='\${SEQFILES}/ZI.EX.GRAPH.DATA' disp='o' normal='k' abend='d' recsize='90' recfmt='F' 
+
+EXECPGM pgmname='CIDFGRF' stepname='CIDFGRF'
+
+################################################################################
+LABEL name=ECS035DR 
+################################################################################
+ASSGNDD ddname='SYS012' filename='\${SEQFILES}/ZI.WW.INPUT035DR' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/ZI.DD.ER.DATECARD' disp='i-o' 
+#ASSGNDD  ddname='SYS008' type='SYSOUT'
+ASSGNDD ddname='SYS008' filename='\${SEQFILES}/ECS035DR.PRT' disp='o' normal='k' abend='k' recsize='133' recfmt='F' 
+ASSGNDD  ddname='SYS050' type='SYSOUT'
+ASSGNDD ddname='SYS020' filename='\${SEQFILES}/ZI.EX.FICH035DR' disp='o' normal='k' abend='k' recsize='133' recfmt='F' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='CID035DR' stepname='ECS035DR' parm='NORMAL' 
+
+################################################################################
+LABEL name=CPY035DDR
+################################################################################
+ASSGNDD ddname='SYS010' dataset='ZI.EX.FICH035DR' filename='\${SEQFILES}/ZI.EX.FICH035DR' disp='i-o'
+ASSGNDD ddname='SYS011' dataset='ZI.DL.CIADM.FICH035.RPTCD1.DR' filename='\${SEQFILES}/ZI.DL.CIADM.FICH035.RPTCD1.DR' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY035DDR' parm='ECS035D' 
+
+################################################################################
+LABEL name=CPY035EDR
+################################################################################
+ASSGNDD ddname='SYS010' dataset='ZI.EX.FICH035DR' filename='\${SEQFILES}/ZI.EX.FICH035DR' disp='i-o'
+ASSGNDD ddname='SYS011' dataset='ZI.DL.CIADM.FICH035.RPTCD2.DR' filename='\${SEQFILES}/ZI.DL.CIADM.FICH035.RPTCD2.DR' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY035EDR' parm='ECS035E' 
+
+################################################################################
+LABEL name=CPY035FDR
+################################################################################
+ASSGNDD ddname='SYS010' dataset='ZI.EX.FICH035DR' filename='\${SEQFILES}/ZI.EX.FICH035DR' disp='i-o'
+ASSGNDD ddname='SYS011' dataset='ZI.DL.CIADM.FICH035.USRSEL2.DR' filename='\${SEQFILES}/ZI.DL.CIADM.FICH035.USRSEL2.DR' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY035FDR' parm='ECS035F' 
+
+################################################################################
+LABEL name=CPY035OW
+################################################################################
+ASSGNDD ddname='SYS010' dataset='ZI.EX.FICH035OW' filename='\${SEQFILES}/ZI.EX.FICH035OW' disp='i-o'
+ASSGNDD ddname='SYS011' dataset='ZI.DL.CIADM.FICH035OW' filename='\${SEQFILES}/ZI.DL.CIADM.FICH035OW' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY035OW' parm='ALL'
+
+################################################################################
+LABEL name=ECS035I
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='SYS011' dataset='ZI.XX.EPEC.NEW' filename='\${SEQFILES}/ZI.XX.EPEC.NEW' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='ZI.DD.ER.DATECARD' filename='\${SEQFILES}/ZI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT'
+ASSGNDD ddname='SYS012' type='DUMMY'
+ASSGNDD ddname='SYS014' type='DUMMY'
+ASSGNDD ddname='SYS020' filename='$SEQFILES/ZI.EX.FICH035I' disp='o' normal='k' abend='d' recsize='150' recfmt='F' 
+ASSGNDD ddname='SYS021' filename='$SEQFILES/ZI.EX.FICH035I.TMP1' disp='o' normal='k' abend='d' recsize='171' recfmt='F' 
+ASSGNDD ddname='SYS025' type='DUMMY'
+ASSGNDD ddname='SYS022' type='SYSOUT' class='A' recfmt='F' recsize='150'
+ASSGNDD ddname='SYS027' filename='$SEQFILES/ZI.EX.FICH035IOW' disp='o' normal='k' abend='d' recsize='150' recfmt='F'
+ASSGNDD ddname='ERMEBL' type='DUMMY'
+
+EXECPGM pgmname='CSO035I' stepname='ECS035I' 
+
+################################################################################
+LABEL name=CPY035I
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.EX.FICH035I' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.FICH035I' disp='o' normal='k' abend='d' recfmt='F' recsize='149' 
+
+EXECPGM pgmname='CIB009150' stepname='CPY035I' parm='ALL'
+
+################################################################################
+LABEL name=CPY35IOW
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.EX.FICH035IOW' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/ZI.DL.CIADM.FICH035IOW' disp='o' normal='k' abend='d' recfmt='F' recsize='149'
+
+EXECPGM pgmname='CIB009150' stepname='CPY35IOW' parm='ALL'
+
+################################################################################
+LABEL name=ECS035IS
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='SYS011' dataset='ZI.XX.EPEC.NEW' filename='\${SEQFILES}/ZI.XX.EPEC.NEW' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='ERACCTT' dataset='CI.WW.LG.ERACCT' type='VS' filename='ERACCTT' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='ZI.DD.ER.DATECARD' filename='\${SEQFILES}/ZI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS008' type='SYSOUT'
+ASSGNDD ddname='SYS012' type='DUMMY'
+ASSGNDD ddname='SYS014' type='DUMMY'
+ASSGNDD ddname='SYS020' filename='$SEQFILES/ZI.EX.FICH035IS' disp='o' normal='k' abend='d' recsize='150' recfmt='F' 
+ASSGNDD ddname='SYS021' filename='$SEQFILES/ZI.EX.FICH035IS.TMP1' disp='o' normal='k' abend='d' recsize='171' recfmt='F' 
+ASSGNDD ddname='SYS025' type='DUMMY'
+ASSGNDD ddname='SYS022' type='SYSOUT' class='A' recfmt='F' recsize='150'
+ASSGNDD ddname='SYS027' filename='$SEQFILES/ZI.EX.FICH035ISOW' disp='o' normal='k' abend='d' recsize='150' recfmt='F'
+ASSGNDD ddname='ERMEBL' type='DUMMY'
+
+EXECPGM pgmname='CSO035IS' stepname='ECS035IS' parm='SVCLIFE'
+
+################################################################################
+LABEL name=CPY035IS
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/ZI.EX.FICH035IS' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$RDSFILES/ZI.RDS.FICHE.ECS035I.SVCLIFE' disp='o' normal='k' abend='d' recfmt='F' recsize='149' 
+
+EXECPGM pgmname='CIB009150' stepname='CPY035IS' parm='ALL'
+
+ENDJOB 
+#put CI.DL.CIADM.FICH035
+#put CI.DL.CIADM.FICH035.RPTCDE1
+#put CI.DL.CIADM.FICH035.RPTCD1.DR
+#put CI.DL.CIADM.FICH035.RPTCD2.DR
+#put CI.DL.CIADM.FICH035.USRSEL2.DR
+#put CI.DL.CIADM.FICH035OW
+#put CI.DL.CIADM.FICH035I
+#put CI.DL.CIADM.FICH035IOW
+#put CI.RDS.FICHE.ECS035I.SVCLIFE CI.DL.CIADM.FICH035I.SVCLIFE
+###########################################################

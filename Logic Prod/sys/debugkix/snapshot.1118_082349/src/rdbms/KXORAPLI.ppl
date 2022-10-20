@@ -1,0 +1,162 @@
+ /******************************************************************/
+ /*                                                                */
+ /* Copyright (c) 2007-2013 Dell Inc.                              */
+ /* All rights reserved.                                           */
+ /*                                                                */
+ /******************************************************************/
+ /* --------------------------------------------------------------
+  *
+  *  Sample  PL/I  program containing entry points for interfacing
+  *  UniKix's user exits with ORACLE  software.
+  *
+  *  KXORALGN  connects to the ORACLE server.  It is called by the
+  *  UniKix transaction processors and batch vsam  processor  when
+  *  they are initiated by the UniKix system. 
+  *
+  *  KXORALGF logs off from the ORACLE server.  It's called by the
+  *  UniKix  transaction processors and batch vsam processors when
+  *  they terminate. 
+  *
+  *  KXORABTRN begins a transaction.
+  *
+  *  KXORAETRN ends a transaction.
+  *
+  *  KXORASAVE  executes  a  SQL  COMMIT statement. It's called at
+  *  UniKix sync point time.  If  the  user  programs  already  do
+  *  COMMITs this statement has no effect. 
+  *
+  *  KXORAUNDO  performs  a  SQL ROLLBACK statement.  KXORAUNDO is
+  *  called at UniKix rollback time.  If the user programs already
+  *  do ROLLBACKs this statement has no effect.
+  *
+  * -------------------------------------------------------------- */
+ 
+ %REPLACE OK         BY  0;
+ %REPLACE ERROR      BY  1;
+ %REPLACE ABORT      BY -1;
+ %REPLACE SPACE      BY ' ';
+ 
+ KXORALGN: PROCEDURE RETURNS(FIXED BIN(31));
+ 
+     EXEC SQL BEGIN DECLARE SECTION;
+ 
+     DCL LOW            BUILTIN;
+     DCL KXSYSINFO       ENTRY(1, 5 CHAR(8),
+                                  5 CHAR(12),
+                                  5 CHAR(12),
+                                  5 CHAR(8),
+                                  5 CHAR(30),
+                                  5 CHAR(3))
+                         EXTERNAL('kxsysinfo');
+     DCL KXTCTINFO       ENTRY(1, 5 CHAR(8),
+                                  5 CHAR(8),
+                                  5 CHAR(3),
+                                  5 CHAR(4),
+                                  5 CHAR(8),
+                                  5 CHAR(3),
+                                  5 CHAR(4))
+                         EXTERNAL('kxtctinfo');
+     DCL KXSETMSG        ENTRY(1, 5 CHAR(4),
+                                  5 CHAR(20),
+                                  5 CHAR(60),
+                                  5 CHAR(1))
+                         EXTERNAL('kxsetmsg');
+     DCL PASSWRD         CHAR(8);
+     DCL SQL_STRING      CHAR(40);
+     DCL USERID          CHAR(8);
+     DCL USERNAME        CHAR(8);
+     DCL DBNAME          CHAR(6) INIT (' ');
+     DCL SVRNAME         CHAR(8);
+ 
+     EXEC SQL END DECLARE SECTION;
+     EXEC SQL INCLUDE SQLCA;
+ 
+ /*  
+   Copy Book to have UniKix interface variables 
+ */
+ %INCLUDE KXINFO;
+ 
+     KIX_MSG_INFO.KIX_MSG_ROUTINE = 'KXORALGN';
+     EXEC SQL WHENEVER SQLERROR GOTO SQL_ABORT;
+ 
+     CALL KXSYSINFO(KIX_SYS_INFO);
+     USERID = KIX_SYS_INFO.KIX_SIT_USR_NAME;
+     PASSWRD = KIX_SYS_INFO.KIX_SIT_USR_PASS;
+     SVRNAME = KIX_SYS_INFO.KIX_SIT_SRV_NAME;
+
+     IF SVRNAME = SPACE THEN
+        EXEC SQL CONNECT       :USERID  
+		 IDENTIFIED BY :PASSWRD;
+     ELSE
+        EXEC SQL CONNECT       :USERID  
+                 IDENTIFIED BY :PASSWRD 
+                 USING         :SVRNAME;
+
+     RETURN(OK);
+ 
+ KXORALGF: ENTRY RETURNS(FIXED BIN(31));
+ 
+     KIX_MSG_INFO.KIX_MSG_ROUTINE = 'KXORALGF';
+     EXEC SQL WHENEVER SQLERROR GOTO SQL_ERROR;
+     EXEC SQL COMMIT WORK RELEASE;
+     RETURN(OK);
+ 
+ KXORABTRN: ENTRY RETURNS(FIXED BIN(31));
+ 
+     KIX_MSG_INFO.KIX_MSG_ROUTINE = 'KXORABTRN';
+     EXEC SQL WHENEVER SQLERROR GOTO SQL_ABORT;
+ 
+ /*
+  *  Oracle7 specific security features.
+  *  CALL KXTCTINFO(KIX_TCT_INFO);
+  *  USERNAME = KIX_TCT_INFO.KIX_USRNAM;
+  *  SQL_STRING = 'SET ROLE ' || USERNAME;
+  *  EXEC SQL EXECUTE IMMEDIATE :SQL_STRING;
+  *
+  */
+     EXEC SQL SAVEPOINT oracle_savepoint;
+     RETURN(OK);
+ 
+ KXORAETRN: ENTRY RETURNS(FIXED BIN(31));
+ 
+     KIX_MSG_INFO.KIX_MSG_ROUTINE = 'KXORAETRN';
+     EXEC SQL WHENEVER SQLERROR GOTO SQL_ERROR;
+     EXEC SQL COMMIT WORK;
+     RETURN(OK);
+ 
+ KXORASAVE: ENTRY RETURNS(FIXED BIN(31));
+ 
+     KIX_MSG_INFO.KIX_MSG_ROUTINE = 'KXORASAVE';
+     EXEC SQL WHENEVER SQLERROR GOTO SQL_ERROR;
+     EXEC SQL COMMIT WORK;
+     EXEC SQL SAVEPOINT oracle_savepoint;
+     RETURN(OK);
+ 
+ KXORAUNDO: ENTRY RETURNS(FIXED BIN(31));
+ 
+     KIX_MSG_INFO.KIX_MSG_ROUTINE = 'KXORAUNDO';
+     EXEC SQL WHENEVER SQLERROR GOTO SQL_ERROR;
+     EXEC SQL ROLLBACK  WORK;
+     RETURN(OK);
+ 
+ /* --------------------------------------------------------------
+  *
+  *  An  error  during allocation brings up the server without the
+  *  database connected.  Errors during other exits terminate  the
+  *  transaction.  Abort always aborts the transaction server.
+  *
+  * -------------------------------------------------------------- */
+ 
+ SQL_ERROR:
+     KIX_MSG_INFO.KIX_MSG_STR = 'DATABASE ERROR. SQLCODE = ' ||
+                                TRIM(CHAR(SQLCA.SQLCODE));
+     CALL KXSETMSG(KIX_MSG_INFO);
+     RETURN(ERROR);
+ 
+ SQL_ABORT:
+     KIX_MSG_INFO.KIX_MSG_STR = 'DATABASE ERROR. SQLCODE = ' ||
+                                TRIM(CHAR(SQLCA.SQLCODE));
+     CALL KXSETMSG(KIX_MSG_INFO);
+     RETURN(ABORT);
+ 
+ END;

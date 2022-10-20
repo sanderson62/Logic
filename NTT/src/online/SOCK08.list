@@ -1,0 +1,2234 @@
+*>Copyright (c) 2016-2021 NTT DATA, Inc. All rights reserved.
+*>compiler version:  6.0.28692
+*>source file name:  SOCK08.cbl
+*>date generated  :  Mon Oct 03 10:09:32 CDT 2022
+*>compiler options:  -cv -apost -dcmi -dz -ld -sp=/apps/test/mdoff/copy:/apps/prod/cid1p/copy:/apps/test/mdoff/maps:/apps/prod/cid1p/maps:/apps/mtp/mtp/copy -dv=0 -od=/apps/test/mdoff/exe/onl -cirp2 -pt2 -cax -sl2 -rw=FILE-ID
+*>source encoding :  ISO-8859-1
+*>target encoding :  ISO-8859-1
+*>((program: SOCK08.cl2))                                          
+IDENTIFICATION DIVISION.                                         
+PROGRAM-ID. SOCK08.                                              
+AUTHOR. Cowtown.                                                 
+DATE-COMPILED.                                                   
+*>SECURITY.   *****************************************************
+*>            *                                                   *
+*>            *   THIS PROGRAM IS THE PROPERTY OF CSO             *
+*>            *                                                   *
+*>            *   USE OF THIS PROGRAM BY OTHER THAN THE EMPLOYEES *
+*>            *   OF     CSO     IS EXPRESSLY PROHIBITED WITHOUT  *
+*>            *   THE PRIOR WRITTEN PERMISSION OF CSO.            *
+*>            *                                                   *
+*>            *****************************************************
+                                                                 
+*>*****************************************************************
+*>REMARKS.                                                        *
+*>  Broker program for webservices for premium rating.            *
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 020617   2017020300002   PEMA  New Program version 2 of SOCK07  
+*> 100917   2017020300002   PEMA  Add message003                   
+*>*****************************************************************
+ENVIRONMENT DIVISION.                                            
+data division.                                                   
+WORKING-STORAGE SECTION.                                         
+01  DFH-START PIC X(04).                                         
+77  FILLER  PIC X(32) VALUE '********************************'.  
+77  FILLER  PIC X(32) VALUE '   SOCK08   WORKING STORAGE     '.  
+77  FILLER  PIC X(32) VALUE '********************************'.  
+*>                                                                 
+*> program buffers                                                 
+*>                                                                 
+77 ws-send-msg-size             pic s9(8) comp value 512.        
+77 ws-recv-msg-size             pic s9(8) comp value 256.        
+77 ws-recv-buf                  pic x(256).                      
+77 ws-send-buf                  pic x(512) VALUE SPACES.         
+77 ws-recv-total                pic s9(8) comp value 0.          
+77 ws-recv-left                 pic s9(8) comp value 0.          
+77 ws-seq-num                   pic s9(8) comp value 0.          
+77 ws-flags                     pic s9(8) comp value 0.          
+77 WS-COMP-CD                   PIC X  VALUE LOW-VALUES.         
+77  ws-comp-id                  pic xxx value spaces.            
+77 WS-SAVE-ACCOUNT              PIC X(10)  VALUE SPACES.         
+77 WS-BIN-ORIG-EFF-DT           PIC XX  VALUE LOW-VALUES.        
+77 WS-ORIG-EFF-DT               PIC X(10)  VALUE SPACES.         
+77 WS-EFF-DATE                  PIC X(10)  VALUE SPACES.         
+77 WS-EXP-DATE                  PIC X(10)  VALUE SPACES.         
+77 X1                           PIC S999 COMP-3 VALUE +0.        
+77 S1                           PIC S999 COMP-3 VALUE +0.        
+77 S2                           PIC S999 COMP-3 VALUE +0.        
+77  b1                          pic s999 comp-3 value +0.        
+77 WS-BUILD-SW                  PIC X.                           
+   88  TIME-TO-BUILD               VALUE 'Y'.                    
+77 WS-SAVE-ERACCT               PIC X(2000).                     
+77 WS-DIS-RESP                  PIC 9(05) VALUE ZEROS.           
+77 WS-PERFORM-SW                PIC X VALUE SPACES.              
+   88  GET-RATES                    VALUE 'R'.                   
+   88  GET-ACT-ACCTS                VALUE 'A'.                   
+77  ws-bin-current-dt           pic xx  value low-values.        
+77 ws-bin-eff-dt                pic xx  value low-values.        
+77  ws-bin-exp-dt               pic xx  value low-values.        
+77 ws-bin-1st-pmt-dt            pic xx  value low-values.        
+77 ws-bin-pri-birth-dt          pic xx  value low-values.        
+77 ws-bin-cob-birth-dt          pic xx  value low-values.        
+77 WS-DISP-AMT                  PIC Z,ZZZ,Z99.99.                
+77 ws-disp-rate                 pic z9.99999.                    
+77  WS-ERACCT-SW                PIC X VALUE ' '.                 
+    88  END-OF-ERACCT                 VALUE 'Y'.                 
+77  WS-ERCTBL-SW                PIC X VALUE ' '.                 
+    88  END-OF-ERCTBL                 VALUE 'Y'.                 
+77  WS-STATUS                   PIC X.                           
+77  ws-socket-sw                pic x value ' '.                 
+    88  end-of-socket              value 'Y'.                    
+77  rec-cnt                     pic 9(5) value zeros.            
+77  ws-stop-sw                  pic x value ' '.                 
+    88  i-say-stop                 value 'Y'.                    
+77  ws-browse-sw                pic x value ' '.                 
+    88  browse-started            value 'Y'.                     
+77  ws-contract-sw              pic x  value ' '.                
+    88  contract-no-assigned      value 'Y'.                     
+77  ws-error-sw                 pic x value ' '.                 
+    88  error-in-one-coverage     value 'Y'.                     
+77  ws-connect-sw               pic x value ' '.                 
+    88  connected-to-db           value 'Y'.                     
+                                                                 
+01  a-angle-n                   pic s9(7)v9(11) comp-3 value +0. 
+01  a-angle-n-m                 pic s9(7)v9(11) comp-3 value +0. 
+01  a-prm-angle-n               pic s9(7)v9(11) comp-3 value +0. 
+01  a-prm-angle-n-m             pic s9(7)v9(11) comp-3 value +0. 
+01  gamma                       pic s9(7)v9(11) comp-3 value +0. 
+01  temp-value-1                pic s9(7)v9(11) comp-3 value +0. 
+01  temp-value-2                pic s9(7)v9(11) comp-3 value +0. 
+01  temp-value-3                pic s9(7)v9(11) comp-3 value +0. 
+01  temp-value-4                pic s9(7)v9(11) comp-3 value +0. 
+01  temp-value-5                pic s9(7)v9(11) comp-3 value +0. 
+01  temp-value-6                pic s9(7)v9(11) comp-3 value +0. 
+01  m                           pic s9(4)v9(4)  comp-3 value +0. 
+01  n                           pic s9(4)v9(4)  comp-3 value +0. 
+01  i                           pic s9(7)v9(11) comp-3 value +0. 
+01  ppy                         pic s9(5)       comp-3 value +0. 
+01  dpp                         pic s9(5)       comp-3 value +0. 
+                                                                 
+01  P pointer.                                                   
+01  KIXSYS                      pic X(7)  VALUE Z"KIXSYS".       
+01  var-ptr pointer.                                             
+01  env-var-len                 pic 9(4)  binary.                
+01  rc                          pic 9(9)  binary.                
+                                                                 
+01  WS-KIXSYS.                                                   
+    05  WS-KIX-FIL1             PIC X(10).                       
+    05  WS-KIX-APPS             PIC X(10).                       
+    05  WS-KIX-ENV              PIC X(10).                       
+    05  WS-KIX-MYENV            PIC X(10).                       
+    05  WS-KIX-SYS              PIC X(10).                       
+                                                                 
+01  ws-dealer-state             pic xx.                          
+01  ws-dealer-id                pic x(10).                       
+01  ws-contract-eff-dt          pic x(10).                       
+01  ws-contract-no              pic x(10) value spaces.          
+01  ws-contract-suffix          pic x     value spaces.          
+                                                                 
+01  ws-status-code-a            pic x(7) value zeros.            
+01  ws-status-code redefines                                     
+    ws-status-code-a            pic 9(7).                        
+01  ws-error-message            pic x(50) value spaces.          
+01  ws-status-date              pic x(10).                       
+                                                                 
+01  ws-bit                      pic x.                           
+01  ws-bit-comp redefines ws-bit pic s9(4) comp.                 
+01  indicator-vaiables-for-nulls.                                
+    05  nu-app-status           pic s9(4) comp value +0.         
+    05  nu-app-by               pic s9(4) comp value +0.         
+    05  nu-app-date             pic s9(4) comp value +0.         
+    05  nu-app-batch            pic s9(4) comp value +0.         
+    05  nu-fincar               pic s9(4) comp value +0.         
+    05  nu-batchno              pic s9(4) comp value +0.         
+    05  nu-error-message        pic s9(4) comp value +0.         
+                                                                 
+01  filler.                                                      
+    05  ws-last-suffix          pic x value low-values.          
+    05  ws-tbl-last-suffix      pic x value low-values.          
+    05  filler. *> Use X1 for this table.                        
+        10  ws-codes            pic x(26) value                  
+        ' ABCDEFGHIJKLMNOPQRSTUVWXY'.                            
+        10  ws-suffix-value redefines ws-codes                   
+          occurs 26             pic x.                           
+                                                                 
+01  ws-work-date.                                                
+    05  ws-work-ccyy            pic x(4).                        
+    05  ws-work-mm              pic xx.                          
+    05  ws-work-dd              pic xx.                          
+01  ws-work-date-num redefines ws-work-date                      
+                                pic 9(8).                        
+                                                                 
+01  soc-client-in-data.                                          
+    05  message-queuename       pic x(10).                       
+    05  message-area            pic x(1024).                     
+                                                                 
+                                                                 
+                                                                 
+01  WS-CID-NO                   PIC X(8).                        
+                                                                 
+01  WS-DISP-RESP                PIC 9(5).                        
+01  WS-RESPONSE                 PIC S9(8)   COMP.                
+    88  RESP-NORMAL                  VALUE +00.                  
+    88  RESP-NOTFND                  VALUE +13.                  
+    88  resp-duprec                  value +14.                  
+    88  resp-dupkey                  value +15.                  
+    88  RESP-NOTOPEN                 VALUE +19.                  
+    88  RESP-ENDFILE                 VALUE +20.                  
+                                                                 
+                                                                 
+01  ws-return-string            pic x(512).                      
+01  ws-mess001-length           pic s9(4) comp value +1024.      
+01  WS-MESS001-PASS-AREA        PIC X(1024).                     
+01  ws-mess002-length           pic s9(4) comp value +1024.      
+01  WS-MESS002-PASS-AREA        PIC X(1024).                     
+01  ws-mess003-length           pic s9(4) comp value +1024.      
+01  WS-MESS003-PASS-AREA        PIC X(1024).                     
+                                                                 
+*>                                 COPY ELCFUNDT.                  
+*>>>((file: ELCFUNDT))                                             
+*>**************************************************************** 
+*>                                                               * 
+*>                            ELCFUNDT.                          * 
+*>           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE *          
+*>                            VMOD=2.001                         * 
+*>                                                               * 
+*>           COPYBOOK FOR THE FUNCTION DATE FORMAT               * 
+*>                                                               * 
+*>**************************************************************** 
+                                                                 
+                                                                 
+01  FUNCTION-DATE.                                               
+    05  WS-FN-DATE                PIC 9(8)    VALUE ZEROS.       
+    05  WS-FN-CYMD  REDEFINES  WS-FN-DATE.                       
+        10  WS-FN-CCYR            PIC 9(4).                      
+        10  WS-FN-CCYY  REDEFINES  WS-FN-CCYR.                   
+            15  WS-FN-CC          PIC 99.                        
+            15  WS-FN-YR          PIC 99.                        
+        10  WS-FN-MO              PIC 99.                        
+        10  WS-FN-DA              PIC 99.                        
+    05  WS-FN-HOURS               PIC 99      VALUE ZEROS.       
+    05  WS-FN-MINUTES             PIC 99      VALUE ZEROS.       
+    05  WS-FN-SECONDS             PIC 99      VALUE ZEROS.       
+    05  WS-FN-HUNDSECS            PIC 99      VALUE ZEROS.       
+    05  WS-FN-GMT-IND             PIC X       VALUE SPACES.      
+        88  WS-BEHIND-GMT                     VALUE '-'.         
+        88  WS-AFTER-GMT                      VALUE '+'.         
+        88  WS-NO-GMT                         VALUE ZERO.        
+    05  WS-FN-GMT-HOURS           PIC 99      VALUE ZEROS.       
+    05  WS-FN-GMT-MINUTES         PIC 99      VALUE ZEROS.       
+                                                                 
+*><<((file: ELCFUNDT))                                             
+*>                                 COPY ELCDATE.                   
+*>>>((file: ELCDATE))                                              
+*>*****************************************************************
+*>                                                                *
+*>                                                                *
+*>                            ELCDATE.                            *
+*>           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+*>                            VMOD=2.003                           
+*>                                                                *
+*>                                                                *
+*>   DESCRIPTION:  DATA PASSED TO DATE CONVERSION ROUTINE.        *
+*>                 LENGTH = 200                                   *
+*>*****************************************************************
+                                                                 
+01  DATE-CONVERSION-DATA.                                        
+    12  DC-COMM-LENGTH                PIC S9(4) COMP VALUE +200. 
+    12  DC-OPTION-CODE                PIC X.                     
+        88  BIN-TO-GREG                VALUE ' '.                
+        88  ELAPSED-BETWEEN-BIN        VALUE '1'.                
+        88  EDIT-GREG-TO-BIN           VALUE '2'.                
+        88  YMD-GREG-TO-BIN            VALUE '3'.                
+        88  MDY-GREG-TO-BIN            VALUE '4'.                
+        88  JULIAN-TO-BIN              VALUE '5'.                
+        88  BIN-PLUS-ELAPSED           VALUE '6'.                
+        88  FIND-CENTURY               VALUE '7'.                
+        88  ELAPSED-BETWEEN-BIN-3      VALUE '8'.                
+        88  EDIT-GREG-TO-BIN-3         VALUE '9'.                
+        88  YMD-GREG-TO-BIN-3          VALUE 'A'.                
+        88  MDY-GREG-TO-BIN-3          VALUE 'B'.                
+        88  JULIAN-TO-BIN-3            VALUE 'C'.                
+        88  BIN-PLUS-ELAPSED-3         VALUE 'D'.                
+        88  JULIAN-EXPANDED-TO-BIN     VALUE 'E'.                
+        88  JULIAN-EXPANDED-TO-BIN-3   VALUE 'F'.                
+        88  BIN-TO-JULIAN-EXPANDED     VALUE 'G'.                
+        88  JULIAN-EXPANDED            VALUE 'E', 'F', 'G'.      
+        88  CHECK-LEAP-YEAR            VALUE 'H'.                
+        88  BIN-3-TO-GREG              VALUE 'I'.                
+        88  CYMD-GREG-TO-BIN-3         VALUE 'J'.                
+        88  MDCY-GREG-TO-BIN-3         VALUE 'K'.                
+        88  CYMD-GREG-TO-BIN           VALUE 'L'.                
+        88  MDCY-GREG-TO-BIN           VALUE 'M'.                
+        88  MDY-GREG-TO-JULIAN         VALUE 'N'.                
+        88  MDCY-GREG-TO-JULIAN        VALUE 'O'.                
+        88  YMD-GREG-TO-JULIAN         VALUE 'P'.                
+        88  CYMD-GREG-TO-JULIAN        VALUE 'Q'.                
+        88  THREE-CHARACTER-BIN                                  
+                 VALUES  '8' '9' 'A' 'B' 'C' 'D' 'I' 'J' 'K'.    
+        88  GREGORIAN-TO-BIN                                     
+                 VALUES '2' '3' '4' '9' 'A' 'B' 'J' 'K' 'L' 'M'. 
+        88  BIN-TO-GREGORIAN                                     
+                 VALUES ' ' '1' 'I' '8' 'G'.                     
+        88  JULIAN-TO-BINARY                                     
+                 VALUES '5' 'C' 'E' 'F'.                         
+    12  DC-ERROR-CODE                 PIC X.                     
+        88  NO-CONVERSION-ERROR        VALUE ' '.                
+        88  DATE-CONVERSION-ERROR                                
+                 VALUES '1' '2' '3' '4' '5' '9' 'A' 'B' 'C'.     
+        88  DATE-IS-ZERO               VALUE '1'.                
+        88  DATE-IS-NON-NUMERIC        VALUE '2'.                
+        88  DATE-IS-INVALID            VALUE '3'.                
+        88  DATE1-GREATER-DATE2        VALUE '4'.                
+        88  ELAPSED-PLUS-NEGATIVE      VALUE '5'.                
+        88  DATE-INVALID-OPTION        VALUE '9'.                
+        88  INVALID-CENTURY            VALUE 'A'.                
+        88  ONLY-CENTURY               VALUE 'B'.                
+        88  ONLY-LEAP-YEAR             VALUE 'C'.                
+        88  VALID-CENTURY-LEAP-YEAR    VALUE 'B', 'C'.           
+    12  DC-END-OF-MONTH               PIC X.                     
+        88  CALCULATE-END-OF-MONTH     VALUE '1'.                
+    12  DC-CENTURY-ADJUSTMENT         PIC X   VALUE SPACES.      
+        88  USE-NORMAL-PROCESS         VALUE ' '.                
+        88  ADJUST-DOWN-100-YRS        VALUE '1'.                
+        88  ADJUST-UP-100-YRS          VALUE '2'.                
+    12  FILLER                        PIC X.                     
+    12  DC-CONVERSION-DATES.                                     
+        16  DC-BIN-DATE-1             PIC XX.                    
+        16  DC-BIN-DATE-2             PIC XX.                    
+        16  DC-GREG-DATE-1-EDIT       PIC X(08).                 
+        16  DC-GREG-DATE-1-EDIT-R REDEFINES                      
+                      DC-GREG-DATE-1-EDIT.                       
+            20  DC-EDIT1-MONTH        PIC 99.                    
+            20  SLASH1-1              PIC X.                     
+            20  DC-EDIT1-DAY          PIC 99.                    
+            20  SLASH1-2              PIC X.                     
+            20  DC-EDIT1-YEAR         PIC 99.                    
+        16  DC-GREG-DATE-2-EDIT       PIC X(08).                 
+        16  DC-GREG-DATE-2-EDIT-R REDEFINES                      
+                    DC-GREG-DATE-2-EDIT.                         
+            20  DC-EDIT2-MONTH        PIC 99.                    
+            20  SLASH2-1              PIC X.                     
+            20  DC-EDIT2-DAY          PIC 99.                    
+            20  SLASH2-2              PIC X.                     
+            20  DC-EDIT2-YEAR         PIC 99.                    
+        16  DC-GREG-DATE-1-YMD        PIC 9(06).                 
+        16  DC-GREG-DATE-1-YMD-R  REDEFINES                      
+                    DC-GREG-DATE-1-YMD.                          
+            20  DC-YMD-YEAR           PIC 99.                    
+            20  DC-YMD-MONTH          PIC 99.                    
+            20  DC-YMD-DAY            PIC 99.                    
+        16  DC-GREG-DATE-1-MDY        PIC 9(06).                 
+        16  DC-GREG-DATE-1-MDY-R REDEFINES                       
+                     DC-GREG-DATE-1-MDY.                         
+            20  DC-MDY-MONTH          PIC 99.                    
+            20  DC-MDY-DAY            PIC 99.                    
+            20  DC-MDY-YEAR           PIC 99.                    
+        16  DC-GREG-DATE-1-ALPHA.                                
+            20  DC-ALPHA-MONTH        PIC X(10).                 
+            20  DC-ALPHA-DAY          PIC 99.                    
+            20  FILLER                PIC XX.                    
+            20  DC-ALPHA-CENTURY.                                
+                24 DC-ALPHA-CEN-N     PIC 99.                    
+            20  DC-ALPHA-YEAR         PIC 99.                    
+        16  DC-ELAPSED-MONTHS         PIC S9(4)     COMP.        
+        16  DC-ODD-DAYS-OVER          PIC S9(4)     COMP.        
+        16  DC-ELAPSED-DAYS           PIC S9(4)     COMP.        
+        16  DC-JULIAN-DATE            PIC 9(05).                 
+        16  DC-JULIAN-YYDDD REDEFINES DC-JULIAN-DATE             
+                                      PIC 9(05).                 
+        16  DC-JULIAN-DT REDEFINES DC-JULIAN-DATE.               
+            20  DC-JULIAN-YEAR        PIC 99.                    
+            20  DC-JULIAN-DAYS        PIC 999.                   
+        16  DC-DAYS-IN-MONTH          PIC S9(3)       COMP-3.    
+        16  DC-DAY-OF-WEEK            PIC S9  VALUE ZERO COMP-3. 
+        16  DC-DAY-OF-WEEK2           PIC S9  VALUE ZERO COMP-3. 
+    12  DATE-CONVERSION-VARIBLES.                                
+        16  HOLD-CENTURY-1            PIC 9(11) VALUE 0.         
+        16  HOLD-CENTURY-1-SPLIT REDEFINES HOLD-CENTURY-1.       
+            20  FILLER                PIC 9(3).                  
+            20  HOLD-CEN-1-CCYY.                                 
+                24  HOLD-CEN-1-CC     PIC 99.                    
+                24  HOLD-CEN-1-YY     PIC 99.                    
+            20  HOLD-CEN-1-MO         PIC 99.                    
+            20  HOLD-CEN-1-DA         PIC 99.                    
+        16  HOLD-CENTURY-1-R   REDEFINES HOLD-CENTURY-1.         
+            20  HOLD-CEN-1-R-MO       PIC 99.                    
+            20  HOLD-CEN-1-R-DA       PIC 99.                    
+            20  HOLD-CEN-1-R-CCYY.                               
+                24  HOLD-CEN-1-R-CC   PIC 99.                    
+                24  HOLD-CEN-1-R-YY   PIC 99.                    
+            20  FILLER                PIC 9(3).                  
+        16  HOLD-CENTURY-1-X.                                    
+            20  FILLER                PIC X(3)  VALUE SPACES.    
+            20  HOLD-CEN-1-X-CCYY.                               
+                24  HOLD-CEN-1-X-CC   PIC XX VALUE SPACES.       
+                24  HOLD-CEN-1-X-YY   PIC XX VALUE SPACES.       
+            20  HOLD-CEN-1-X-MO       PIC XX VALUE SPACES.       
+            20  HOLD-CEN-1-X-DA       PIC XX VALUE SPACES.       
+        16  HOLD-CENTURY-1-R-X REDEFINES HOLD-CENTURY-1-X.       
+            20  HOLD-CEN-1-R-X-MO     PIC XX.                    
+            20  HOLD-CEN-1-R-X-DA     PIC XX.                    
+            20  HOLD-CEN-1-R-X-CCYY.                             
+                24  HOLD-CEN-1-R-X-CC PIC XX.                    
+                24  HOLD-CEN-1-R-X-YY PIC XX.                    
+            20  FILLER                PIC XXX.                   
+        16  DC-BIN-DATE-EXPAND-1      PIC XXX.                   
+        16  DC-BIN-DATE-EXPAND-2      PIC XXX.                   
+        16  DC-JULIAN-DATE-1          PIC 9(07).                 
+        16  DC-JULIAN-DATE-1-R REDEFINES DC-JULIAN-DATE-1.       
+            20  DC-JULIAN-1-CCYY.                                
+                24  DC-JULIAN-1-CC    PIC 99.                    
+                24  DC-JULIAN-1-YR    PIC 99.                    
+            20  DC-JULIAN-DA-1        PIC 999.                   
+        16  DC-JULIAN-DATE-2          PIC 9(07).                 
+        16  DC-JULIAN-DATE-2-R REDEFINES DC-JULIAN-DATE-2.       
+            20  DC-JULIAN-2-CCYY.                                
+                24  DC-JULIAN-2-CC    PIC 99.                    
+                24  DC-JULIAN-2-YR    PIC 99.                    
+            20  DC-JULIAN-DA-2        PIC 999.                   
+        16  DC-GREG-DATE-A-EDIT.                                 
+            20  DC-EDITA-MONTH        PIC 99.                    
+            20  SLASHA-1              PIC X VALUE '/'.           
+            20  DC-EDITA-DAY          PIC 99.                    
+            20  SLASHA-2              PIC X VALUE '/'.           
+            20  DC-EDITA-CCYY.                                   
+                24  DC-EDITA-CENT     PIC 99.                    
+                24  DC-EDITA-YEAR     PIC 99.                    
+        16  DC-GREG-DATE-B-EDIT.                                 
+            20  DC-EDITB-MONTH        PIC 99.                    
+            20  SLASHB-1              PIC X VALUE '/'.           
+            20  DC-EDITB-DAY          PIC 99.                    
+            20  SLASHB-2              PIC X VALUE '/'.           
+            20  DC-EDITB-CCYY.                                   
+                24  DC-EDITB-CENT     PIC 99.                    
+                24  DC-EDITB-YEAR     PIC 99.                    
+        16  DC-GREG-DATE-CYMD         PIC 9(08).                 
+        16  DC-GREG-DATE-CYMD-R REDEFINES                        
+                             DC-GREG-DATE-CYMD.                  
+            20  DC-CYMD-CEN           PIC 99.                    
+            20  DC-CYMD-YEAR          PIC 99.                    
+            20  DC-CYMD-MONTH         PIC 99.                    
+            20  DC-CYMD-DAY           PIC 99.                    
+        16  DC-GREG-DATE-MDCY         PIC 9(08).                 
+        16  DC-GREG-DATE-MDCY-R REDEFINES                        
+                             DC-GREG-DATE-MDCY.                  
+            20  DC-MDCY-MONTH         PIC 99.                    
+            20  DC-MDCY-DAY           PIC 99.                    
+            20  DC-MDCY-CEN           PIC 99.                    
+            20  DC-MDCY-YEAR          PIC 99.                    
+   12  DC-FORCE-EL310-DATE-SW         PIC X    VALUE SPACE.      
+       88  DC-FORCE-EL310-DATE                 VALUE 'Y'.        
+   12  DC-EL310-DATE                  PIC X(21).                 
+   12  FILLER                         PIC X(28).                 
+*><<((file: ELCDATE))                                              
+*>                                 COPY ELCCALC.                   
+*>>>((file: ELCCALC))                                              
+*>*****************************************************************
+*>                                                                *
+*>                           ELCCALC.                            * 
+*>           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+*>                            VMOD=2.025                          *
+*>                                                                *
+*>   DESCRIPTION:  DATA TO BE PASSED TO REMAINING TERM ROUTINE    *
+*>                 REMAINING AMOUNT ROUTINE, LOSS RESERVE ROUTINE *
+*>                 REFUND CALCULATIONS ROUTINE, EARNINGS CALCU -  *
+*>                 LATIONS ROUTINE, AND THE RATING ROUTINE.       *
+*>                                                                *
+*>  PASSED TO ELRTRM                                              *
+*>  -----------------                                             *
+*>  METHOD CODE (I.E. FULL MONTH, HALF ADJ, ETC)                  *
+*>  ORIGINAL TERM                                                 *
+*>  BEGINNING DATE                                                *
+*>  ENDING DATE                                                   *
+*>  COMPANY I.D.                                                  *
+*>  ACCOUNT MASTER USER FIELD                                     *
+*>  PROCESS SWITCH (CANCEL, CLAIM)                                *
+*>  FREE LOOK DAYS                                                *
+*>                                                                *
+*>  RETURNED FROM ELRTRM                                          *
+*>  ---------------------                                         *
+*>  REMAINING TERM 1 - USED FOR EARNINGS                          *
+*>  REMAINING TERM 2 - USED FOR BENEFIT CALCULATIONS              *
+*>  REMAINING TERM 3 - USED FOR CLAIM BENEFITS                    *
+*>  ODD DAYS - REMAINING DAYS PAST FULL MONTHS                    *
+*>----------------------------------------------------------------*
+*>  PASSED TO ELRAMT                                              *
+*>  ----------------                                              *
+*>  REMAINING TERM 1 OR 2 OR 3 (FROM ELRTRM)                      *
+*>  ORIGINAL TERM (ADJUSTED IF SKIP MONTHS ARE USED)              *
+*>  ORIGINAL AMOUNT                                               *
+*>  ALTERNATE BENEFIT (BALLON)                                    *
+*>  A.P.R. - NET PAY ONLY                                         *
+*>  METHOD                                                         
+*>  PAYMENT FREQUENCY - FOR FARM PLAN                             *
+*>  COMPANY I.D.                                                  *
+*>  BENEFIT TYPE                                                  *
+*>                                                                *
+*>  RETURNED FROM ELRAMT                                          *
+*>  --------------------                                          *
+*>  REMAINING AMOUNT 1 - CURRENT                                  *
+*>  REMAINING AMOUNT 2 - PREVIOUS MONTH                           *
+*>  REMAINING AMOUNT FACTOR                                        
+*>----------------------------------------------------------------*
+*>  PASSED TO ELRESV                                              *
+*>  -----------------                                             *
+*>  CERTIFICATE EFFECTIVE DATE                                    *
+*>  VALUATION DATE                                                *
+*>  PAID THRU DATE                                                *
+*>  BENEFIT                                                       *
+*>  INCURRED DATE                                                 *
+*>  REPORTED DATE                                                 *
+*>  ISSUE AGE                                                     *
+*>  TERM                                                          *
+*>  CDT PERCENT                                                   *
+*>  CDT METHOD (I.E. INTERPOLATED, AVERAGE, ETC)                  *
+*> *CLAIM TYPE (LIFE, A/H)                                        *
+*> *REMAINING BENEFIT (FROM ELRAMT)                               *
+*> *ONLY FIELDS REQUIRED FOR LIFE CLAIMS                          *
+*>                                                                *
+*>  RETURNED FROM ELRESV                                          *
+*>  --------------------                                          *
+*>  CDT TABLE USED                                                *
+*>  CDT FACTOR USED                                               *
+*>  PAY TO CURRENT RESERVE                                        *
+*>  I.B.N.R. - A/H ONLY                                           *
+*>  FUTURE (ACCRUED) AH ONLY                                      *
+*>----------------------------------------------------------------*
+*>  PASSED TO ELRATE                                              *
+*>  ----------------                                              *
+*>  CERT ISSUE DATE                                               *
+*>  ORIGINAL TERM (ADJUSTED IF SKIP MONTHS ARE USED)              *
+*>  TERM OR EXT DAYS  (DAY TERM FOR SP CALC = 'D', ELSE EXT DAYS) *
+*>  CAPPED TERM   (ONLY FOR TRUNCATED LIFE)                       *
+*>  STATE CODE (CLIENT DEFINED)                                   *
+*>  STATE CODE (STANDARD P.O. ABBRV)                              *
+*>  CLASS CODE (FROM CERT OR ACCOUNT IF CERT ZERO OR SPACES)      *
+*>  DEVIATION CODE                                                *
+*>  ISSUE AGE                                                     *
+*>  ORIGINAL BENEFIT AMOUNT                                       *
+*>  RATING BENEFIT AMT (TOTAL BENEFIT AMT FOR BALLOONS)           *
+*>  PROCESS TYPE (ISSUE OR CANCEL)                                *
+*>  BENEFIT KIND (LIFE OR A/H)                                    *
+*>  A.P.R.                                                        *
+*>  METHOD                                                         
+*>  SPECIAL METHOD - (SPECIAL CODE FROM BENEFIT RECORD)           *
+*>  PAYMENT FREQUENCY  (FOR TEXAS IRREGULAR)                      *
+*>  COMPANY I.D. (3 CHARACTER)                                    *
+*>  BENEFIT CODE                                                  *
+*>  BENEFIT OVERRIDE CODE                                         *
+*>  MAXIMUM MONTHLY BENEFIT (FROM ACCT MASTER - CSL ONLY)         *
+*>  MAXIMUM TOTAL BENEFIT (FROM ACCT MASTER - CSL ONLY)           *
+*>  JOINT INDICATOR (CSL ONLY)                                    *
+*>  FIRST PAYMENT DATE (CSL ONLY)                                 *
+*>  PERIODIC PAYMENT AMOUNT (IN CP-REMAINING-TERM - CSL ONLY)     *
+*>                                                                *
+*>  RETURNED FROM ELRATE                                          *
+*>  --------------------                                          *
+*>  CALCULATED PREMIUM                                            *
+*>  PREMIUM RATE                                                  *
+*>  MORTALITY CODE                                                *
+*>  MAX ATTAINED AGE                                              *
+*>  MAX AGE                                                       *
+*>  MAX TERM                                                      *
+*>  MAX MONTHLY BENEFIT                                           *
+*>  MAX TOTAL BENIFIT                                             *
+*>  COMPOSITE RATE (OPEN-END ONLY)                                *
+*>----------------------------------------------------------------*
+*>  PASSED TO ELRFND                                              *
+*>  ----------------                                              *
+*>  CERT ISSUE DATE                                               *
+*>  REFUND DATE                                                   *
+*>  RULE OF 78 OPTION (FROM CONTROL RECORD)                       *
+*>  ORIGINAL TERM (ADJUSTED IF SKIP MONTHS ARE USED)              *
+*>  TERM OR EXT DAYS  (DAY TERM FOR SP CALC = 'D', ELSE EXT DAYS) *
+*>  REMAINING TERM (REMAINING TERM 1 FROM ELTERM)                 *
+*>  STATE CODE (CLIENT DEFINED)                                   *
+*>  STATE CODE (STANDARD P.O. ABBRV)                              *
+*>  CLASS CODE (FROM CERT OR ACCOUNT IF CERT ZERO OR SPACES)      *
+*>  DEVIATION CODE                                                *
+*>  ISSUE AGE                                                     *
+*>  ORIGINAL BENEFIT AMOUNT                                       *
+*>  RATING BENEFIT AMT (TOTAL BENEFIT AMT FOR BALLOONS)           *
+*>  PROCESS TYPE (CANCEL)                                         *
+*>  BENEFIT KIND (LIFE OR A/H)                                    *
+*>  A.P.R.                                                        *
+*>  EARNING METHOD - (CODE FROM BENEFIT, STATE OR ACCOUNT RECORD) *
+*>  RATING METHOD -  (CODE FROM BENEFIT)                          *
+*>  SPECIAL METHOD - (SPECIAL CODE FROM BENEFIT RECORD)           *
+*>  PAYMENT FREQUENCY  (FOR TEXAS IRREGULAR)                      *
+*>  COMPANY I.D. (3 CHARACTER)                                    *
+*>  BENEFIT CODE                                                  *
+*>  BENEFIT OVERRIDE CODE                                         *
+*>                                                                *
+*>  RETURNED FROM ELRFND                                          *
+*>  --------------------                                          *
+*>  CALCULATED REFUND                                             *
+*>----------------------------------------------------------------*
+*>  PASSED TO ELEARN                                              *
+*>  ----------------                                              *
+*>  CERT ISSUE DATE                                               *
+*>  ORIGINAL TERM (ADJUSTED IF SKIP MONTHS ARE USED)              *
+*>  REMAINING TERM (REMAINING TERM 1 FROM ELTERM)                 *
+*>  RULE OF 78 OPTION (FROM CONTROL RECORD)                       *
+*>  STATE CODE (CLIENT DEFINED)                                   *
+*>  STATE CODE (STANDARD P.O. ABBRV)                              *
+*>  CLASS CODE (FROM CERT OR ACCOUNT IF CERT ZERO OR SPACES)      *
+*>  DEVIATION CODE                                                *
+*>  ISSUE AGE                                                     *
+*>  ORIGINAL BENEFIT AMOUNT                                       *
+*>  BENEFIT KIND (LIFE OR A/H)                                    *
+*>  A.P.R.                                                        *
+*>  METHOD - (EARNING CODE FROM BENEFIT RECORD)                   *
+*>  SPECIAL METHOD - (SPECIAL CODE FROM BENEFIT RECORD)           *
+*>  PAYMENT FREQUENCY  (FOR TEXAS IRREGULAR)                      *
+*>  COMPANY I.D. (3 CHARACTER)                                    *
+*>  BENEFIT CODE                                                  *
+*>  BENEFIT OVERRIDE CODE                                         *
+*>                                                                *
+*>  RETURNED FROM ELEARN                                          *
+*>  --------------------                                          *
+*>  INDICATED  EARNINGS                                           *
+*>----------------------------------------------------------------*
+*>                 LENGTH = 450                                   *
+*>                                                                *
+*>*****************************************************************
+*>*****************************************************************
+*>                   C H A N G E   L O G                           
+*>                                                                 
+*> CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.                
+*>-----------------------------------------------------------------
+*>  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE            
+*> EFFECTIVE    NUMBER                                             
+*>-----------------------------------------------------------------
+*> 010303    2001061800003  PEMA  ADD DCC/MONTHLY PROCESSING       
+*> 033104    2003080800002  PEMA  ADD GAP NON REFUNDABLE OPTION    
+*> 101807    2007100100007  PEMA  EXPAND CLM RESERVE FIELDS        
+*> 010410    2008021200005  PEMA  ADD FIELDS FOR MN NET PAY BALLOON
+*> 010410    2009050700003  PEMA  ADD FIELDS FOR SPP-DD            
+*> 041310  CR2008021200005  PEMA  ADD CODE FOR MN LEVEL            
+*> 041710    2007111300001  AJRA  ADD CLAIM CALC SW FOR SC NP+6    
+*> 101110  CR2010012700001  PEMA ADD DDF REFUND/UEP PROCESSING     
+*> 071211  CR2009050700003  PEMA  ADD SPP DEALER DIRECT            
+*> 040615  CR2013072200002  PEMA  ADD EXTRA PERIODS                
+*> 010716    2015082500001  PEMA CHG POLICY FEE TO CANCEL FEE      
+*> 012820  CR2020012800001  PEMA ADD MIN LOAN TERM FOR EXT TERM.   
+*>*****************************************************************
+                                                                 
+01  CALCULATION-PASS-AREA.                                       
+    12  CP-COMM-LENGTH            PIC S9(4)         VALUE +450   
+                                    COMP.                        
+                                                                 
+    12  CP-RETURN-CODE            PIC X             VALUE ZERO.  
+      88  NO-CP-ERROR                             VALUE ZERO.    
+      88  CP-ERROR-OCCURED VALUE '1' '2' '3' '4' '5' '6' '7' '8' 
+                                 '9' 'A' 'B' 'C' 'D' 'E' 'H' 'I'.
+      88  CP-ERROR-IN-AMOUNTS                     VALUE '1'.     
+      88  CP-ERROR-IN-DATES                       VALUE '2'.     
+      88  CP-ERROR-IN-OPTIONS                     VALUE '3'.     
+      88  CP-ERROR-IN-TERMS                       VALUE '4'.     
+      88  CP-ERROR-IN-FREQUENCY                   VALUE '5'.     
+      88  CP-ERROR-RATE-NOT-FOUND                 VALUE '6'.     
+      88  CP-ERROR-RATE-IS-ZERO                   VALUE '7'.     
+      88  CP-ERROR-AMT-OUTSIDE-LIMIT              VALUE '8'.     
+      88  CP-ERROR-TERM-OUTSIDE-LIMIT             VALUE '9'.     
+      88  CP-ERROR-AGE-OUTSIDE-LIMIT              VALUE 'A'.     
+      88  CP-ERROR-ATT-OUTSIDE-LIMIT              VALUE 'B'.     
+      88  CP-ERROR-TOT-OUTSIDE-LIMIT              VALUE 'C'.     
+      88  CP-ERROR-RATE-FILE-NOTOPEN              VALUE 'D'.     
+      88  CP-ERROR-ISSUE-AGE-ZERO                 VALUE 'E'.     
+      88  CP-ERROR-NO-LIMITS-CRI                  VALUE 'F'.     
+      88  CP-ERROR-DIV-BY-ZERO                    VALUE 'G'.     
+      88  CP-ERROR-LOAN-TERM                      VALUE 'H'.     
+      88  CP-ERROR-TERM-BELOW-MINIMUM             VALUE 'I'.     
+                                                                 
+    12  CP-RETURN-CODE-2          PIC X             VALUE ZERO.  
+      88  NO-CP-ERROR-2                           VALUE ZERO.    
+*>**********************  INPUT AREAS **************************** 
+                                                                 
+    12  CP-CALCULATION-AREA.                                     
+        16  CP-ACCOUNT-NUMBER     PIC X(10)       VALUE SPACES.  
+        16  CP-CERT-EFF-DT        PIC XX.                        
+        16  CP-VALUATION-DT       PIC XX.                        
+        16  CP-PAID-THRU-DT       PIC XX.                        
+        16  CP-BENEFIT-TYPE       PIC X.                         
+          88  CP-AH                               VALUE 'A' 'D'  
+                                                  'I' 'U'.       
+          88  CP-REDUCING-LIFE                    VALUE 'R'.     
+          88  CP-LEVEL-LIFE                       VALUE 'L' 'P'. 
+        16  CP-INCURRED-DT        PIC XX.                        
+        16  CP-REPORTED-DT        PIC XX.                        
+        16  CP-ACCT-FLD-5         PIC XX            VALUE SPACE. 
+        16  CP-COMPANY-ID         PIC XXX           VALUE SPACE. 
+        16  CP-ISSUE-AGE          PIC S9(3)         VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-CDT-PERCENT        PIC S9(3)V99      VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-CDT-METHOD         PIC X.                         
+          88  CP-CDT-ROUND-NEAR                   VALUE '1'.     
+          88  CP-CDT-ROUND-HIGH                   VALUE '2'.     
+          88  CP-CDT-INTERPOLATED                 VALUE '3'.     
+        16  CP-CLAIM-TYPE         PIC X.                         
+          88  CP-AH-CLAIM                         VALUE 'A'.     
+          88  CP-LIFE-CLAIM                       VALUE 'L'.     
+        16  CP-ORIGINAL-TERM      PIC S9(3)         VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-ORIGINAL-BENEFIT   PIC S9(9)V99      VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-ORIGINAL-PREMIUM   PIC S9(7)V99      VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-REMAINING-TERM     PIC S9(3)V99      VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-REMAINING-BENEFIT  PIC S9(9)V99      VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-LOAN-APR           PIC S9(3)V9(4)    VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-PAY-FREQUENCY      PIC S9(3)         VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-REM-TERM-METHOD    PIC X.                         
+          88  CP-EARN-AFTER-15TH                  VALUE '1'.     
+          88  CP-EARN-ON-HALF-MONTH               VALUE '2'.     
+          88  CP-EARN-ON-1ST-DAY                  VALUE '3'.     
+          88  CP-EARN-ON-FULL-MONTH               VALUE '4'.     
+          88  CP-EARN-WITH-NO-DAYS                VALUE '5'.     
+          88  CP-EARN-AFTER-14TH                  VALUE '6'.     
+          88  CP-EARN-AFTER-16TH                  VALUE '7'.     
+        16  CP-EARNING-METHOD     PIC X.                         
+          88  CP-EARN-BY-R78                      VALUE '1' 'R'. 
+          88  CP-EARN-BY-PRORATA                  VALUE '2' 'P'. 
+          88  CP-EARN-AS-CALIF                    VALUE '3' 'C'. 
+          88  CP-EARN-AS-TEXAS                    VALUE '4' 'T'. 
+          88  CP-EARN-AS-FARM-PLAN                VALUE '4' 'T'. 
+          88  CP-EARN-AS-NET-PAY                  VALUE '5' 'N'. 
+          88  CP-EARN-ANTICIPATION                VALUE '6' 'A'. 
+          88  CP-EARN-AS-MEAN                     VALUE '8' 'M'. 
+          88  CP-EARN-AS-SUM-OF-DIGITS            VALUE '9'.     
+          88  CP-EARN-AS-REG-BALLOON              VALUE 'B'.     
+          88  CP-GAP-NON-REFUNDABLE               VALUE 'G'.     
+          88  CP-GAP-ACTUARIAL                    VALUE 'S'.     
+          88  CP-DCC-SPP-DDF                      VALUE 'D' 'I'. 
+          88  CP-DCC-SPP-DDF-IU                   VALUE 'I'.     
+        16  CP-PROCESS-TYPE       PIC X.                         
+          88  CP-CLAIM                            VALUE '1'.     
+          88  CP-CANCEL                           VALUE '2'.     
+          88  CP-ISSUE                            VALUE '3'.     
+        16  CP-SPECIAL-CALC-CD    PIC X.                         
+          88  CP-OUTSTANDING-BAL              VALUE 'O'.         
+          88  CP-1-MTH-INTEREST               VALUE ' '.         
+          88  CP-0-MTH-INTEREST               VALUE 'A'.         
+          88  CP-OB-OFFLINE-RESERVED          VALUE 'B'.         
+          88  CP-CRITICAL-PERIOD              VALUE 'C'.         
+          88  CP-TERM-IS-DAYS                 VALUE 'D'.         
+          88  CP-USE-PREM-AS-ENTERED          VALUE 'E'.         
+          88  CP-FARM-PLAN                    VALUE 'F'.         
+          88  CP-RATE-AS-STANDARD             VALUE 'G'.         
+          88  CP-2-MTH-INTEREST               VALUE 'I'.         
+          88  CP-3-MTH-INTEREST               VALUE 'J'.         
+          88  CP-4-MTH-INTEREST               VALUE 'K'.         
+          88  CP-BALLOON-LAST-PMT             VALUE 'L'.         
+          88  CP-MORTGAGE-REC                 VALUE 'M'.         
+          88  CP-OUTSTANDING-BALANCE          VALUE 'O'.         
+          88  CP-NET-PAY-PRUDENTIAL           VALUE 'P'.         
+          88  CP-NET-PAY-SIMPLE               VALUE 'S'.         
+          88  CP-TRUNCATED-LIFE               VALUE 'T' 'U' 'V'  
+                                                    'W' 'X'.     
+          88  CP-TRUNCATE-0-MTH               VALUE 'T'.         
+          88  CP-TRUNCATE-1-MTH               VALUE 'U'.         
+          88  CP-TRUNCATE-2-MTH               VALUE 'V'.         
+          88  CP-TRUNCATE-3-MTH               VALUE 'W'.         
+          88  CP-TRUNCATE-4-MTH               VALUE 'X'.         
+          88  CP-SUMMARY-REC                  VALUE 'Z'.         
+          88  CP-PROPERTY-BENEFIT             VALUE '2'.         
+          88  CP-UNEMPLOYMENT-BENEFIT         VALUE '3'.         
+          88  CP-AD-D-BENEFIT                 VALUE '4'.         
+          88  CP-CSL-METH-1                   VALUE '5'.         
+          88  CP-CSL-METH-2                   VALUE '6'.         
+          88  CP-CSL-METH-3                   VALUE '7'.         
+          88  CP-CSL-METH-4                   VALUE '8'.         
+                                                                 
+        16  CP-LOAN-TERM          PIC S9(3)       VALUE ZERO     
+                                    COMP-3.                      
+        16  CP-CLASS-CODE         PIC XX          VALUE ZERO.    
+        16  CP-DEVIATION-CODE     PIC XXX         VALUE ZERO.    
+        16  CP-STATE              PIC XX          VALUE SPACE.   
+        16  CP-STATE-STD-ABBRV    PIC XX          VALUE SPACE.   
+        16  CP-BENEFIT-CD         PIC XX          VALUE ZERO.    
+          88  CP-CSL-VALID-NP-BENEFIT-CD VALUES '12' '13'        
+              '34' '35' '36' '37' '44' '45' '46' '47' '72' '73'. 
+        16  CP-R78-OPTION         PIC X.                         
+          88  CP-TERM-TIMES-TERM-PLUS-1           VALUE ' '.     
+          88  CP-TERM-TIMES-TERM                  VALUE '1'.     
+                                                                 
+        16  CP-COMPANY-CD         PIC X             VALUE SPACE. 
+        16  CP-IBNR-RESERVE-SW    PIC X.                         
+        16  CP-CLAIM-STATUS       PIC X.                         
+        16  CP-RATE-FILE          PIC X.                         
+        16  CP-TERM-OR-EXT-DAYS   PIC S9(05)        VALUE ZERO   
+                                    COMP-3.                      
+                                                                 
+        16  CP-LIFE-OVERRIDE-CODE PIC X.                         
+        16  CP-AH-OVERRIDE-CODE   PIC X.                         
+                                                                 
+        16  CP-RATE-DEV-PCT       PIC S9V9(6)       VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-CLP-RATE-UP        REDEFINES CP-RATE-DEV-PCT      
+                                  PIC S9(5)V99 COMP-3.           
+        16  CP-CRITICAL-MONTHS    PIC S9(3)         VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-ALTERNATE-BENEFIT  PIC S9(9)V99      VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-ALTERNATE-PREMIUM  PIC S9(7)V99      VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-DDF-CSO-ADMIN-FEE REDEFINES CP-ALTERNATE-PREMIUM  
+                                 PIC S9(7)V99 COMP-3.            
+                                                                 
+        16  CP-PAID-FROM-DATE     PIC X(02).                     
+        16  CP-CLAIM-CALC-METHOD  PIC X(01).                     
+        16  CP-EXT-DAYS-CALC      PIC X.                         
+          88  CP-EXT-NO-CHG                   VALUE ' '.         
+          88  CP-EXT-CHG-LF                   VALUE '1'.         
+          88  CP-EXT-CHG-AH                   VALUE '2'.         
+          88  CP-EXT-CHG-LF-AH                VALUE '3'.         
+        16  CP-DOMICILE-STATE     PIC XX.                        
+        16  CP-CARRIER            PIC X.                         
+        16  CP-REIN-FLAG          PIC X.                         
+        16  CP-REM-TRM-CALC-OPTION PIC X.                        
+          88  VALID-REM-TRM-CALC-OPTION    VALUE '1'             
+                     '2' '3' '4' '5'.                            
+          88  CP-CALC-OPTION-DEFAULT       VALUE '4'.            
+          88  CP-CONSIDER-EXTENSION        VALUE '3' '4' '5'.    
+          88  CP-30-DAY-MONTH              VALUE '1' '3' '5'.    
+          88  CP-NO-EXT-30-DAY-MONTH       VALUE '1'.            
+          88  CP-NO-EXT-ACTUAL-DAYS        VALUE '2'.            
+          88  CP-EXT-30-DAY-MONTH          VALUE '3'.            
+          88  CP-EXT-ACTUAL-DAYS           VALUE '4'.            
+          88  CP-USE-EXP-AND-1ST-PMT       VALUE '5'.            
+        16  CP-SIG-SWITCH         PIC X.                         
+        16  CP-RATING-METHOD      PIC X.                         
+          88  CP-RATE-AS-R78                      VALUE '1' 'R'. 
+          88  CP-RATE-AS-PRORATA                  VALUE '2' 'P'. 
+          88  CP-RATE-AS-CALIF                    VALUE '3' 'C'. 
+          88  CP-RATE-AS-TEXAS                    VALUE '4' 'T'. 
+          88  CP-RATE-AS-FARM-PLAN                VALUE '4' 'T'. 
+          88  CP-RATE-AS-NET-PAY                  VALUE '5' 'N'. 
+          88  CP-RATE-AS-ANTICIPATION             VALUE '6' 'A'. 
+          88  CP-RATE-AS-MEAN                     VALUE '8' 'M'. 
+          88  CP-RATE-AS-REG-BALLOON              VALUE 'B'.     
+        16  CP-SALES-TAX          PIC S9V9999     VALUE  ZEROS   
+                                    COMP-3.                      
+        16  CP-BEN-CATEGORY       PIC X.                         
+        16  CP-DCC-LF-RATE        PIC S99V9(5) COMP-3 VALUE +0.  
+        16  CP-DCC-ACT-COMM REDEFINES CP-DCC-LF-RATE             
+                                  PIC S99V9(5) COMP-3.           
+        16  CP-DCC-AH-RATE        PIC S99V9(5) COMP-3 VALUE +0.  
+        16  CP-DCC-PMF-COMM REDEFINES CP-DCC-AH-RATE             
+                                  PIC S99V9(5) COMP-3.           
+        16  CP-DAYS-TO-1ST-PMT    PIC S999     COMP-3 VALUE +0.  
+        16  CP-AH-BALLOON-SW      PIC X  VALUE ' '.              
+        16  CP-EXPIRE-DT          PIC XX.                        
+        16  CP-LF-CLAIM-CALC-SW   PIC X  VALUE ' '.              
+        16  CP-DDF-HI-FACT        PIC S9V999   COMP-3 VALUE +0.  
+        16  CP-DDF-LO-FACT        PIC S9V999   COMP-3 VALUE +0.  
+        16  CP-DDF-CLP            PIC S9(5)V99 COMP-3 VALUE +0.  
+        16  CP-DDF-SPEC-CALC      PIC X.                         
+            88  CP-CALC-GROSS-FEE        VALUE 'G'.              
+            88  CP-CALC-CLP              VALUE 'C'.              
+        16  CP-IU-RATE-UP         PIC S9(5)V99   COMP-3 VALUE +0.
+        16  CP-CANCEL-REASON      PIC X.                         
+        16  CP-DDF-ADMIN-FEES     PIC S9(5)V99 COMP-3 VALUE +0.  
+        16  CP-PMT-MODE           PIC X.                         
+        16  CP-NO-OF-PMTS         PIC S999 COMP-3 VALUE +0.      
+        16  CP-1ST-YR-ALLOW       PIC S999V99 COMP-3 VALUE +0.   
+        16  CP-DDF-COMM-AND-MFEE  PIC S9(5)V99 COMP-3 VALUE +0.  
+        16  CP-DDF-YR1AF          PIC S9(5)V99 COMP-3 VALUE +0.  
+        16  FILLER                PIC X.                         
+                                                                 
+*>**************    OUTPUT FROM ELRESV   ************************  
+                                                                 
+        16  CP-CDT-TABLE          PIC 9             VALUE ZERO.  
+                                                                 
+        16  CP-CDT-FACTOR         PIC S9(5)V9(6)    VALUE ZERO   
+                                    COMP-3.                      
+        16  CP-PTC-RESERVE        PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-IBNR-RESERVE       PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-FUTURE-RESERVE     PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  FILLER                PIC X(09).                     
+*>**************    OUTPUT FROM ELRTRM   ************************* 
+                                                                 
+        16  CP-REMAINING-TERM-1   PIC S9(4)V9    VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-REMAINING-TERM-2   PIC S9(4)V9    VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-REMAINING-TERM-3   PIC S9(4)V9    VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-ODD-DAYS           PIC S9(3)      VALUE ZERO      
+                                    COMP-3.                      
+        16  FILLER                PIC X(12).                     
+                                                                 
+*>**************    OUTPUT FROM ELRAMT   ************************* 
+                                                                 
+        16  CP-REMAINING-AMT      PIC S9(9)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-REMAINING-AMT-PRV  PIC S9(9)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  FILLER                PIC X(12).                     
+                                                                 
+*>**************    OUTPUT FROM ELRATE   ************************* 
+                                                                 
+        16  CP-CALC-PREMIUM       PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-PREMIUM-RATE       PIC S9(2)V9(5) VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-MORTALITY-CODE     PIC X(4).                      
+        16  CP-RATE-EDIT-FLAG     PIC X.                         
+            88  CP-RATES-NEED-APR                  VALUE '1'.    
+        16  CP-COMPOSITE-RATE     PIC S99V999    VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-CANCEL-FEE         PIC S9(3)V99 VALUE +0 COMP-3.  
+        16  CP-LF-PREM            PIC S9(7)V99 VALUE +0 COMP-3.  
+        16  CP-LF-BALLOON-PREM REDEFINES CP-LF-PREM              
+                                  PIC S9(7)V99 COMP-3.           
+        16  FILLER                PIC X(07).                     
+                                                                 
+*>**************    OUTPUT FROM ELRFND   ************************* 
+                                                                 
+        16  CP-CALC-REFUND        PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-REFUND-TYPE-USED   PIC X.                         
+          88  CP-R-AS-R78                         VALUE '1'.     
+          88  CP-R-AS-PRORATA                     VALUE '2'.     
+          88  CP-R-AS-CALIF                       VALUE '3'.     
+          88  CP-R-AS-TEXAS                       VALUE '4'.     
+          88  CP-R-AS-FARM-PLAN                   VALUE '4'.     
+          88  CP-R-AS-NET-PAY                     VALUE '5'.     
+          88  CP-R-AS-ANTICIPATION                VALUE '6'.     
+          88  CP-R-AS-MEAN                        VALUE '8'.     
+          88  CP-R-AS-SUM-OF-DIGITS               VALUE '9'.     
+          88  CP-R-AS-GAP-NON-REFUND              VALUE 'G'.     
+          88  CP-R-AS-GAP-ACTUARIAL               VALUE 'S'.     
+          88  CP-R-AS-SPP-DDF                     VALUE 'D'.     
+          88  CP-R-AS-SPP-DDF-IU                  VALUE 'I'.     
+          88  CP-R-AS-REPOSSESSION                VALUE 'R'.     
+        16  FILLER                PIC X(12).                     
+                                                                 
+*>**************    OUTPUT FROM ELEARN   ************************* 
+                                                                 
+        16  CP-R78-U-PRM          PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-R78-U-PRM-ALT      PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-PRORATA-U-PRM      PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-PRORATA-U-PRM-ALT  PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-STATE-U-PRM        PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-DOMICILE-U-PRM     PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-EARNING-TYPE-USED  PIC X.                         
+          88  CP-E-AS-SPECIAL                     VALUE 'S'.     
+          88  CP-E-AS-R78                         VALUE '1'.     
+          88  CP-E-AS-PRORATA                     VALUE '2'.     
+          88  CP-E-AS-TEXAS                       VALUE '4'.     
+          88  CP-E-AS-FARM-PLAN                   VALUE '4'.     
+          88  CP-E-AS-NET-PAY                     VALUE '5'.     
+          88  CP-E-AS-ANTICIPATION                VALUE '6'.     
+          88  CP-E-AS-MEAN                        VALUE '8'.     
+          88  CP-E-AS-SUM-OF-DIGITS               VALUE '9'.     
+        16  FILLER                PIC X(12).                     
+                                                                 
+*>**************    OUTPUT FROM ELPMNT   ************************* 
+                                                                 
+        16  CP-ACTUAL-DAYS        PIC S9(05)     VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-CLAIM-PAYMENT      PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  FILLER                PIC X(12).                     
+                                                                 
+*>**************   MISC WORK AREAS    *****************************
+        16  CP-TOTAL-PAID         PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-R-MAX-ATT-AGE      PIC S9(3)      VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-R-MAX-AGE          PIC S9(3)      VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-R-MAX-TERM         PIC S9(5)      VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-R-MAX-TOT-BEN      PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-R-MAX-MON-BEN      PIC S9(7)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-IO-FUNCTION        PIC X          VALUE SPACE.    
+            88  OPEN-RATE-FILE                   VALUE 'O'.      
+            88  CLOSE-RATE-FILE                  VALUE 'C'.      
+            88  IO-ERROR                         VALUE 'E'.      
+                                                                 
+        16  CP-FIRST-PAY-DATE     PIC XX.                        
+                                                                 
+        16  CP-JOINT-INDICATOR    PIC X.                         
+                                                                 
+        16  CP-RESERVE-REMAINING-TERM                            
+                                  PIC S9(4)V9    VALUE ZERO      
+                                    COMP-3.                      
+                                                                 
+        16  CP-INSURED-BIRTH-DT   PIC XX.                        
+                                                                 
+        16  CP-INCURRED-AGE       PIC S9(3)      VALUE ZERO      
+                                    COMP-3.                      
+                                                                 
+        16  CP-MONTHLY-PAYMENT    PIC S9(5)V99   VALUE ZERO      
+                                    COMP-3.                      
+                                                                 
+        16  CP-RATING-BENEFIT-AMT PIC S9(9)V99   VALUE ZERO      
+                                    COMP-3.                      
+                                                                 
+        16  CP-ODD-DAYS-TO-PMT    PIC S9(3)      VALUE ZERO      
+                                    COMP-3.                      
+                                                                 
+        16  CP-MNTHS-TO-FIRST-PMT PIC S9(3)      VALUE ZERO      
+                                    COMP-3.                      
+                                                                 
+        16  CP-REMAMT-FACTOR      PIC S9(4)V9(9) VALUE ZEROS     
+                                    COMP-3.                      
+                                                                 
+        16  CP-FREE-LOOK          PIC S9(3)      VALUE ZERO      
+                                    COMP-3.                      
+                                                                 
+        16  CP-ROA-REFUND         PIC X          VALUE 'N'.      
+            88  CP-ROA-PREM-AT-REFUND            VALUE 'Y'.      
+                                                                 
+        16  CP-NET-BENEFIT-AMT    PIC S9(9)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-SCNP-6MO-AMT       PIC S9(9)V99   VALUE ZERO      
+                                    COMP-3.                      
+        16  CP-MONTH              PIC S999     COMP-3 VALUE +0.  
+        16  cp-extra-periods      pic 9 value zeros.             
+        16  cp-net-only-state     pic x value spaces.            
+        16  FILLER                PIC X(13).                     
+*>*****************************************************************
+*><<((file: ELCCALC))                                              
+                                                                 
+*>***************************************************************  
+*>                                                                 
+*> Copyright (c) 2016-2020 NTT DATA, Inc.                          
+*> All rights reserved.                                            
+*>                                                                 
+*>***************************************************************  
+01  DFHEIV.                                                      
+  02  DFHEIV0               PIC X(35).                           
+  02  DFHEIV1               PIC X(08).                           
+  02  DFHEIV2               PIC X(08).                           
+  02  DFHEIV3               PIC X(08).                           
+  02  DFHEIV4               PIC X(06).                           
+  02  DFHEIV5               PIC X(04).                           
+  02  DFHEIV6               PIC X(04).                           
+  02  DFHEIV7               PIC X(02).                           
+  02  DFHEIV8               PIC X(02).                           
+  02  DFHEIV9               PIC X(01).                           
+  02  DFHEIV10              PIC S9(7) COMP-3.                    
+  02  DFHEIV11              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV12              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV13              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV14              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV15              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV16              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV17              PIC X(04).                           
+  02  DFHEIV18              PIC X(04).                           
+  02  DFHEIV19              PIC X(04).                           
+  02  DFHEIV20              USAGE IS POINTER.                    
+  02  DFHEIV21              USAGE IS POINTER.                    
+  02  DFHEIV22              USAGE IS POINTER.                    
+  02  DFHEIV23              USAGE IS POINTER.                    
+  02  DFHEIV24              USAGE IS POINTER.                    
+  02  DFHEIV25              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV26              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV27              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV28              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV29              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV30              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV31              PIC S9(9) COMP SYNC.                 
+  02  DFHEIV32              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV33              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV34              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV35              PIC S9(4) COMP SYNC.                 
+  02  DFHEIV97              PIC S9(7) COMP-3 VALUE ZERO.         
+  02  DFHEIV98              PIC S9(4) COMP SYNC VALUE ZERO.      
+  02  FILLER                PIC X(02).                           
+  02  DFHEIV99              PIC X(08) VALUE SPACE.               
+  02  DFHEIVL0              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL1              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL2              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL3              PIC X(48) VALUE SPACE.               
+  02  DFHEIVL4              PIC X(255) VALUE SPACE.              
+  02  DFHEIVL5              PIC X(255) VALUE SPACE.              
+LINKAGE  SECTION.                                                
+*>**************************************************************** 
+*>                                                               * 
+*> Copyright (c) 2016-2020 NTT DATA, Inc.                        * 
+*> All rights reserved.                                          * 
+*>                                                               * 
+*>**************************************************************** 
+01  dfheiblk.                                                    
+    02  eibtime          pic s9(7) comp-3.                       
+    02  eibdate          pic s9(7) comp-3.                       
+    02  eibtrnid         pic x(4).                               
+    02  eibtaskn         pic s9(7) comp-3.                       
+    02  eibtrmid         pic x(4).                               
+    02  dfheigdi         pic s9(4) comp.                         
+    02  eibcposn         pic s9(4) comp.                         
+    02  eibcalen         pic s9(4) comp.                         
+    02  eibaid           pic x(1).                               
+    02  eibfiller1       pic x(1).                               
+    02  eibfn            pic x(2).                               
+    02  eibfiller2       pic x(2).                               
+    02  eibrcode         pic x(6).                               
+    02  eibfiller3       pic x(2).                               
+    02  eibds            pic x(8).                               
+    02  eibreqid         pic x(8).                               
+    02  eibrsrce         pic x(8).                               
+    02  eibsync          pic x(1).                               
+    02  eibfree          pic x(1).                               
+    02  eibrecv          pic x(1).                               
+    02  eibsend          pic x(1).                               
+    02  eibatt           pic x(1).                               
+    02  eibeoc           pic x(1).                               
+    02  eibfmh           pic x(1).                               
+    02  eibcompl         pic x(1).                               
+    02  eibsig           pic x(1).                               
+    02  eibconf          pic x(1).                               
+    02  eiberr           pic x(1).                               
+    02  eibrldbk         pic x(1).                               
+    02  eiberrcd         pic x(4).                               
+    02  eibsynrb         pic x(1).                               
+    02  eibnodat         pic x(1).                               
+    02  eibfiller5       pic x(2).                               
+    02  eibresp          pic s9(8) comp.                         
+    02  eibresp2         pic s9(8) comp.                         
+    02  dfheigdj         pic s9(4) comp.                         
+    02  dfheigdk         pic s9(4) comp.                         
+01  DFHCOMMAREA.                                                 
+  05 GIVE-TAKE-SOCKET         PIC 9(8) COMP.                     
+  05 LSTN-NAME                PIC X(8).                          
+  05 LSTN-SUBNAME             PIC X(8).                          
+*>***   client-in-data must be 36 characters.  ****                
+  05 CLIENT-IN-DATA.                                             
+     15  CLIENT-KICK-OFF      PIC X(8).                          
+     15  CLIENT-ID            PIC XXX.                           
+     15  FILLER               PIC X(25).                         
+  05 SOCKADDR-IN-PARM.                                           
+    15 SIN-FAMILY             PIC 9(4) COMP.                     
+    15 SIN-PORT               PIC 9(4) COMP.                     
+    15 SIN-ADDRESS            PIC 9(8) COMP.                     
+    15 SIN-ZERO               PIC X(8).                          
+                                                                 
+01  var  pic x(30).                                              
+                                                                 
+PROCEDURE DIVISION USING DFHEIBLK DFHCOMMAREA.                   
+0000-DFHEXIT SECTION.                                            
+    MOVE FUNCTION WHEN-COMPILED TO DFHEIVL0(1:21).               
+    MOVE '9#                    %   ' TO DFHEIV0.                
+    MOVE 'SOCK08' TO DFHEIV1.                                    
+    CALL 'kxdfhei1' USING DFHEIV0 DFH-START DFHEIV DFHEIV1       
+         DFHEIVL0.                                               
+VCOBOL-DUMMY-PROCEDURE.                                          
+                                                                 
+    display ' Entering program SOCK08.cl2 '                      
+*>    display 'SOCK08:transaction data =', CLIENT-IN-DATA '**'     
+*>    display 'SOCK08:socket number    =', GIVE-TAKE-SOCKET.       
+*>    display 'SOCK08:socket name      =', lstn-name ' '           
+*>       lstn-subname                                              
+                                                                 
+    perform 0000-init           thru 0000-exit                   
+                                                                 
+    perform 0010-init-contact   thru 0010-exit                   
+    perform 0100-process-socket thru 0100-exit until             
+       end-of-socket                                             
+                                                                 
+    go to 0300-close-socket                                      
+                                                                 
+    .                                                            
+0000-init.                                                       
+                                                                 
+    MOVE FUNCTION CURRENT-DATE  TO FUNCTION-DATE                 
+    move ws-fn-cymd             to dc-greg-date-cymd             
+    move 'L'                    to dc-option-code                
+    perform 9700-date-link      thru 9700-exit                   
+    if no-conversion-error                                       
+       move dc-bin-date-1       to ws-bin-current-dt             
+    else                                                         
+       display ' error current dt invalid ' dc-error-code        
+    end-if                                                       
+                                                                 
+    set P to address of KIXSYS                                   
+    CALL "getenv" using by value P returning var-ptr             
+    if var-ptr = null then                                       
+       display ' kixsys not set '                                
+    else                                                         
+       set address of var to var-ptr                             
+       move 0 to env-var-len                                     
+       inspect var tallying env-var-len                          
+         for characters before X'00'                             
+       unstring var (1:env-var-len) delimited by '/'             
+          into WS-KIX-FIL1 WS-KIX-APPS WS-KIX-ENV WS-KIX-MYENV   
+             WS-KIX-SYS                                          
+       end-unstring                                              
+    end-if                                                       
+                                                                 
+    .                                                            
+0000-exit.                                                       
+    exit.                                                        
+                                                                 
+0010-init-contact.                                               
+                                                                 
+    if client-kick-off = 'SOCKET08'                              
+       continue                                                  
+    else                                                         
+       move '9999;Unknown origin, who are you? '                 
+                                to ws-return-string              
+       PERFORM 0200-SEND-BUFFER thru 0200-exit                   
+       display ' Unknown origin ' client-in-data                 
+       go to 0300-close-socket                                   
+    end-if                                                       
+                                                                 
+    evaluate client-id                                           
+       when 'DCC'                                                
+          MOVE X'05'            TO WS-COMP-CD                    
+          MOVE 'DCC'            TO WS-COMP-ID                    
+       when 'CID'                                                
+          MOVE X'04'            TO WS-COMP-CD                    
+          MOVE 'CID'            TO WS-COMP-ID                    
+       when 'AHL'                                                
+          MOVE X'06'            TO WS-COMP-CD                    
+          MOVE 'AHL'            TO WS-COMP-ID                    
+       when other                                                
+          move '0113;Invalid company id ' to ws-return-string    
+          PERFORM 0200-SEND-BUFFER thru 0200-exit                
+          display ' Invalid company id ' client-id               
+          go to 0300-close-socket                                
+    END-evaluate                                                 
+                                                                 
+    move 'SOCKET08READY'        to ws-send-buf                   
+    move +25                    to ws-send-msg-size              
+                                                                 
+    call "send" using by value GIVE-TAKE-SOCKET,                 
+        by reference ws-send-buf,                                
+        by value ws-send-msg-size,                               
+        by value ws-flags                                        
+                                                                 
+    if return-code <= zero                                       
+       display 'SOCK08:send error ' return-code                  
+       perform 0250-socket-error thru 0250-exit                  
+       go to 0300-close-socket                                   
+    end-if                                                       
+                                                                 
+    .                                                            
+0010-exit.                                                       
+    exit.                                                        
+                                                                 
+0100-process-socket.                                             
+                                                                 
+    perform 0110-receive        thru 0110-exit                   
+    if end-of-socket                                             
+       go to 0100-exit                                           
+    end-if                                                       
+                                                                 
+    evaluate message-queuename                                   
+                                                                 
+       when 'message001'                                         
+          perform 1000-link-mess001                              
+                                thru 1000-exit                   
+          move ws-mess001-pass-area                              
+                                to ws-return-string              
+       when 'message002'                                         
+          perform 2000-link-mess002                              
+                                thru 2000-exit                   
+          move ws-mess002-pass-area                              
+                                to ws-return-string              
+       when 'message003'                                         
+          perform 3000-link-mess003                              
+                                thru 3000-exit                   
+          move ws-mess003-pass-area                              
+                                to ws-return-string              
+       when other                                                
+          move 'Invalid message number '                         
+                                to ws-return-string              
+          set end-of-socket to true                              
+    end-evaluate                                                 
+                                                                 
+    perform 0200-send-buffer    thru 0200-exit                   
+                                                                 
+    .                                                            
+0100-exit.                                                       
+    exit.                                                        
+                                                                 
+0110-receive.                                                    
+                                                                 
+    move spaces                 to ws-recv-buf                   
+                                                                 
+    call "recv" using by value GIVE-TAKE-SOCKET                  
+        by reference ws-recv-buf                                 
+        by value ws-recv-msg-size                                
+        by value ws-flags.                                       
+                                                                 
+    if return-code < zero                                        
+       display 'SOCK08:recv error ' return-code                  
+       perform 0250-socket-error thru 0250-exit                  
+       set end-of-socket to true                                 
+       go to 0110-exit                                           
+    end-if                                                       
+                                                                 
+    if return-code = zero                                        
+       display 'SOCK08:client disconnected',                     
+       perform 0250-socket-error thru 0250-exit                  
+       set end-of-socket to true                                 
+       go to 0110-exit                                           
+    end-if                                                       
+                                                                 
+    move +512                   to ws-send-msg-size              
+                                                                 
+    move ws-recv-buf (1:170)     to soc-client-in-data           
+                                                                 
+    if ws-recv-buf (1:4) = 'DONE' or 'done' or 'Done'            
+       set end-of-socket to true                                 
+    end-if                                                       
+                                                                 
+    .                                                            
+0110-exit.                                                       
+    exit.                                                        
+                                                                 
+0200-send-buffer.                                                
+                                                                 
+    move ws-return-string       to ws-send-buf                   
+                                                                 
+    call "send" using by value GIVE-TAKE-SOCKET,                 
+        by reference ws-send-buf,                                
+        by value ws-send-msg-size,                               
+        by value ws-flags.                                       
+                                                                 
+    if return-code <= zero                                       
+       display 'SOCK08:send error ',                             
+       perform 0250-socket-error thru 0250-exit                  
+       go to 0300-close-socket                                   
+    end-if                                                       
+                                                                 
+    .                                                            
+0200-exit.                                                       
+    exit.                                                        
+                                                                 
+0250-socket-error.                                               
+                                                                 
+    display "SOCK08:did not complete"                            
+    display 'SOCK08:transaction data =', CLIENT-IN-DATA '**'     
+    display 'SOCK08:socket number    =', GIVE-TAKE-SOCKET.       
+    display 'SOCK08:socket name      =', lstn-name ' '           
+       lstn-subname                                              
+    display ' return code = ' return-code                        
+                                                                 
+    .                                                            
+0250-exit.                                                       
+    exit.                                                        
+                                                                 
+0300-close-socket.                                               
+                                                                 
+                                                                 
+*> exec cics return end-exec.                                      
+*>    MOVE '.(                    ''   #00001330' TO DFHEIV0       
+    MOVE X'2E2820202020202020202020' &                           
+         X'202020202020202020202720' &                           
+         X'2020233030303031333330' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+*> goback.                                                         
+    MOVE '9%                    "   ' TO DFHEIV0                 
+    MOVE 'SOCK08' TO DFHEIV1                                     
+    CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1                        
+    goback.                                                      
+                                                                 
+    .                                                            
+0300-exit.                                                       
+    exit.                                                        
+                                                                 
+1000-link-mess001.                                               
+                                                                 
+    move soc-client-in-data     to ws-mess001-pass-area          
+                                                                 
+                                                                 
+*> EXEC CICS LINK                                                  
+*>         PROGRAM  ('WSMESS01')                                   
+*>         COMMAREA (WS-MESS001-PASS-AREA)                         
+*>         LENGTH   (ws-mess001-length)                            
+*>    END-EXEC.                                                    
+    MOVE 'WSMESS01' TO DFHEIV1                                   
+*>    MOVE '."C                   (   #00001341' TO DFHEIV0        
+    MOVE X'2E2243202020202020202020' &                           
+         X'202020202020202020202820' &                           
+         X'2020233030303031333431' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV1,                                               
+          WS-MESS001-PASS-AREA,                                  
+          ws-mess001-length,                                     
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+    .                                                            
+1000-exit.                                                       
+    exit.                                                        
+                                                                 
+2000-link-mess002.                                               
+                                                                 
+    move soc-client-in-data     to ws-mess002-pass-area          
+                                                                 
+                                                                 
+*> EXEC CICS LINK                                                  
+*>         PROGRAM  ('WSMESS02')                                   
+*>         COMMAREA (WS-MESS002-PASS-AREA)                         
+*>         LENGTH   (ws-mess002-length)                            
+*>    END-EXEC.                                                    
+    MOVE 'WSMESS02' TO DFHEIV1                                   
+*>    MOVE '."C                   (   #00001355' TO DFHEIV0        
+    MOVE X'2E2243202020202020202020' &                           
+         X'202020202020202020202820' &                           
+         X'2020233030303031333535' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV1,                                               
+          WS-MESS002-PASS-AREA,                                  
+          ws-mess002-length,                                     
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+    .                                                            
+2000-exit.                                                       
+    exit.                                                        
+                                                                 
+3000-link-mess003.                                               
+                                                                 
+    move soc-client-in-data     to ws-mess003-pass-area          
+                                                                 
+                                                                 
+*> EXEC CICS LINK                                                  
+*>         PROGRAM  ('WSMESS03')                                   
+*>         COMMAREA (WS-MESS003-PASS-AREA)                         
+*>         LENGTH   (ws-mess003-length)                            
+*>    END-EXEC.                                                    
+    MOVE 'WSMESS03' TO DFHEIV1                                   
+*>    MOVE '."C                   (   #00001369' TO DFHEIV0        
+    MOVE X'2E2243202020202020202020' &                           
+         X'202020202020202020202820' &                           
+         X'2020233030303031333639' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV1,                                               
+          WS-MESS003-PASS-AREA,                                  
+          ws-mess003-length,                                     
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+    .                                                            
+3000-exit.                                                       
+    exit.                                                        
+                                                                 
+9700-DATE-LINK.                                                  
+                                                                 
+                                                                 
+*> EXEC CICS LINK                                                  
+*>         PROGRAM  ('ELDATCV')                                    
+*>         COMMAREA (DATE-CONVERSION-DATA)                         
+*>         LENGTH   (DC-COMM-LENGTH)                               
+*>    END-EXEC.                                                    
+    MOVE 'ELDATCV' TO DFHEIV1                                    
+*>    MOVE '."C                   (   #00001381' TO DFHEIV0        
+    MOVE X'2E2243202020202020202020' &                           
+         X'202020202020202020202820' &                           
+         X'2020233030303031333831' TO DFHEIV0                    
+    CALL 'kxdfhei1' USING DFHEIV0,                               
+          DFHEIV1,                                               
+          DATE-CONVERSION-DATA,                                  
+          DC-COMM-LENGTH,                                        
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99,                                              
+          DFHEIV99                                               
+    GO TO 9999-DFHEXIT DEPENDING ON DFHEIGDK.                    
+                                                                 
+                                                                 
+9700-EXIT.                                                       
+     EXIT.                                                       
+                                                                 
+                                                                 
+9999-DFHBACK SECTION.                                            
+    MOVE '9%                    "   ' TO DFHEIV0                 
+    MOVE 'SOCK08' TO DFHEIV1                                     
+    CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1                        
+    GOBACK.                                                      
+9999-DFHEXIT.                                                    
+    IF DFHEIGDJ EQUAL 0001                                       
+        NEXT SENTENCE.                                           
+    MOVE '9%                    "   ' TO DFHEIV0                 
+    MOVE 'SOCK08' TO DFHEIV1                                     
+    CALL 'kxdfhei1' USING DFHEIV0 DFHEIV1                        
+    GOBACK.                                                      
+*> ------------------------------------------------------------------------------------------------------------------
+*> The source line number references in the following sections are either of
+*> the form <line-number> or <file-number>:<line-number>. The first form is
+*> used as an abbreviation for 0:<line-number>.
+*> The following is a key allowing the determination of the file name from
+*> the <file-number>.
+*>  
+*>          0: SOCK08.cl2
+*>          1: ELCFUNDT
+*>          2: ELCDATE
+*>          3: ELCCALC
+*>  
+*> ------------------------------------------------------------------------------------------------------------------
+*> DATA MAP KEY
+*>               Sec(Section) Fil = File Section                Type Flags: column O    ---> O = Occurs Item
+*>                            Wor = Working-Storage Section                 column R    ---> R = Redefines
+*>                            Loc = Local-Storage Section                   column X/G  ---> X = External
+*>                            Rep = Report Section                                           G = Global
+*>                            Lin = Linkage Section                         
+*> ------------------------------------------------------------------------------------------------------------------
+*> Data map for Program-Id: SOCK08
+*> ------------------------------------------------------------------------------------------------------------------
+*>     Line    Name                                                  Size Offset      Sec Flags Data Type
+*>                                                                                        O R X
+*>                                                                                            G
+*> ------------------------------------------------------------------------------------------------------------------
+*>       31 01 DFH-START                                                4             Wor       Display
+*>       32 77 FILLER                                                  32             Wor       Display
+*>       33 77 FILLER                                                  32             Wor       Display
+*>       34 77 FILLER                                                  32             Wor       Display
+*>       38 77 WS-SEND-MSG-SIZE                                         4             Wor       Binary
+*>       39 77 WS-RECV-MSG-SIZE                                         4             Wor       Binary
+*>       40 77 WS-RECV-BUF                                            256             Wor       Display
+*>       41 77 WS-SEND-BUF                                            512             Wor       Display
+*>       42 77 WS-RECV-TOTAL                                            4             Wor       Binary
+*>       43 77 WS-RECV-LEFT                                             4             Wor       Binary
+*>       44 77 WS-SEQ-NUM                                               4             Wor       Binary
+*>       45 77 WS-FLAGS                                                 4             Wor       Binary
+*>       46 77 WS-COMP-CD                                               1             Wor       Display
+*>       47 77 WS-COMP-ID                                               3             Wor       Display
+*>       48 77 WS-SAVE-ACCOUNT                                         10             Wor       Display
+*>       49 77 WS-BIN-ORIG-EFF-DT                                       2             Wor       Display
+*>       50 77 WS-ORIG-EFF-DT                                          10             Wor       Display
+*>       51 77 WS-EFF-DATE                                             10             Wor       Display
+*>       52 77 WS-EXP-DATE                                             10             Wor       Display
+*>       53 77 X1                                                       2             Wor       Packed Decimal
+*>       54 77 S1                                                       2             Wor       Packed Decimal
+*>       55 77 S2                                                       2             Wor       Packed Decimal
+*>       56 77 B1                                                       2             Wor       Packed Decimal
+*>       57 77 WS-BUILD-SW                                              1             Wor       Display
+*>       58   88 TIME-TO-BUILD                                                                  
+*>       59 77 WS-SAVE-ERACCT                                        2000             Wor       Display
+*>       60 77 WS-DIS-RESP                                              5             Wor       Display Numeric
+*>       61 77 WS-PERFORM-SW                                            1             Wor       Display
+*>       62   88 GET-RATES                                                                      
+*>       63   88 GET-ACT-ACCTS                                                                  
+*>       64 77 WS-BIN-CURRENT-DT                                        2             Wor       Display
+*>       65 77 WS-BIN-EFF-DT                                            2             Wor       Display
+*>       66 77 WS-BIN-EXP-DT                                            2             Wor       Display
+*>       67 77 WS-BIN-1ST-PMT-DT                                        2             Wor       Display
+*>       68 77 WS-BIN-PRI-BIRTH-DT                                      2             Wor       Display
+*>       69 77 WS-BIN-COB-BIRTH-DT                                      2             Wor       Display
+*>       70 77 WS-DISP-AMT                                             12             Wor       Display Numeric Edit
+*>       71 77 WS-DISP-RATE                                             8             Wor       Display Numeric Edit
+*>       72 77 WS-ERACCT-SW                                             1             Wor       Display
+*>       73   88 END-OF-ERACCT                                                                  
+*>       74 77 WS-ERCTBL-SW                                             1             Wor       Display
+*>       75   88 END-OF-ERCTBL                                                                  
+*>       76 77 WS-STATUS                                                1             Wor       Display
+*>       77 77 WS-SOCKET-SW                                             1             Wor       Display
+*>       78   88 END-OF-SOCKET                                                                  
+*>       79 77 REC-CNT                                                  5             Wor       Display Numeric
+*>       80 77 WS-STOP-SW                                               1             Wor       Display
+*>       81   88 I-SAY-STOP                                                                     
+*>       82 77 WS-BROWSE-SW                                             1             Wor       Display
+*>       83   88 BROWSE-STARTED                                                                 
+*>       84 77 WS-CONTRACT-SW                                           1             Wor       Display
+*>       85   88 CONTRACT-NO-ASSIGNED                                                           
+*>       86 77 WS-ERROR-SW                                              1             Wor       Display
+*>       87   88 ERROR-IN-ONE-COVERAGE                                                          
+*>       88 77 WS-CONNECT-SW                                            1             Wor       Display
+*>       89   88 CONNECTED-TO-DB                                                                
+*>       91 01 A-ANGLE-N                                               10             Wor       Packed Decimal
+*>       92 01 A-ANGLE-N-M                                             10             Wor       Packed Decimal
+*>       93 01 A-PRM-ANGLE-N                                           10             Wor       Packed Decimal
+*>       94 01 A-PRM-ANGLE-N-M                                         10             Wor       Packed Decimal
+*>       95 01 GAMMA                                                   10             Wor       Packed Decimal
+*>       96 01 TEMP-VALUE-1                                            10             Wor       Packed Decimal
+*>       97 01 TEMP-VALUE-2                                            10             Wor       Packed Decimal
+*>       98 01 TEMP-VALUE-3                                            10             Wor       Packed Decimal
+*>       99 01 TEMP-VALUE-4                                            10             Wor       Packed Decimal
+*>      100 01 TEMP-VALUE-5                                            10             Wor       Packed Decimal
+*>      101 01 TEMP-VALUE-6                                            10             Wor       Packed Decimal
+*>      102 01 M                                                        5             Wor       Packed Decimal
+*>      103 01 N                                                        5             Wor       Packed Decimal
+*>      104 01 I                                                       10             Wor       Packed Decimal
+*>      105 01 PPY                                                      3             Wor       Packed Decimal
+*>      106 01 DPP                                                      3             Wor       Packed Decimal
+*>      108 01 P                                                        4             Wor       Pointer
+*>      109 01 KIXSYS                                                   7             Wor       Display
+*>      110 01 VAR-PTR                                                  4             Wor       Pointer
+*>      111 01 ENV-VAR-LEN                                              2             Wor       Binary
+*>      112 01 RC                                                       4             Wor       Binary
+*>      114 01 WS-KIXSYS                                               50             Wor       Group
+*>      115   05 WS-KIX-FIL1                                           10 (000000000)           Display
+*>      116   05 WS-KIX-APPS                                           10 (000000010)           Display
+*>      117   05 WS-KIX-ENV                                            10 (000000020)           Display
+*>      118   05 WS-KIX-MYENV                                          10 (000000030)           Display
+*>      119   05 WS-KIX-SYS                                            10 (000000040)           Display
+*>      121 01 WS-DEALER-STATE                                          2             Wor       Display
+*>      122 01 WS-DEALER-ID                                            10             Wor       Display
+*>      123 01 WS-CONTRACT-EFF-DT                                      10             Wor       Display
+*>      124 01 WS-CONTRACT-NO                                          10             Wor       Display
+*>      125 01 WS-CONTRACT-SUFFIX                                       1             Wor       Display
+*>      127 01 WS-STATUS-CODE-A                                         7             Wor       Display
+*>      128 01 WS-STATUS-CODE                                           7             Wor   R   Display Numeric
+*>      130 01 WS-ERROR-MESSAGE                                        50             Wor       Display
+*>      131 01 WS-STATUS-DATE                                          10             Wor       Display
+*>      133 01 WS-BIT                                                   1             Wor       Display
+*>      134 01 WS-BIT-COMP                                              2             Wor   R   Binary
+*>      135 01 INDICATOR-VAIABLES-FOR-NULLS                            14             Wor       Group
+*>      136   05 NU-APP-STATUS                                          2 (000000000)           Binary
+*>      137   05 NU-APP-BY                                              2 (000000002)           Binary
+*>      138   05 NU-APP-DATE                                            2 (000000004)           Binary
+*>      139   05 NU-APP-BATCH                                           2 (000000006)           Binary
+*>      140   05 NU-FINCAR                                              2 (000000008)           Binary
+*>      141   05 NU-BATCHNO                                             2 (000000010)           Binary
+*>      142   05 NU-ERROR-MESSAGE                                       2 (000000012)           Binary
+*>      144 01 FILLER                                                  28             Wor       Group
+*>      145   05 WS-LAST-SUFFIX                                         1 (000000000)           Display
+*>      146   05 WS-TBL-LAST-SUFFIX                                     1 (000000001)           Display
+*>      147   05 FILLER                                                26 (000000002)           Group
+*>      148     10 WS-CODES                                            26 (000000002)           Display
+*>      150     10 WS-SUFFIX-VALUE                                      1 (000000002)     O R   Display
+*>      153 01 WS-WORK-DATE                                             8             Wor       Group
+*>      154   05 WS-WORK-CCYY                                           4 (000000000)           Display
+*>      155   05 WS-WORK-MM                                             2 (000000004)           Display
+*>      156   05 WS-WORK-DD                                             2 (000000006)           Display
+*>      157 01 WS-WORK-DATE-NUM                                         8             Wor   R   Display Numeric
+*>      160 01 SOC-CLIENT-IN-DATA                                    1034             Wor       Group
+*>      161   05 MESSAGE-QUEUENAME                                     10 (000000000)           Display
+*>      162   05 MESSAGE-AREA                                        1024 (000000010)           Display
+*>      166 01 WS-CID-NO                                                8             Wor       Display
+*>      168 01 WS-DISP-RESP                                             5             Wor       Display Numeric
+*>      169 01 WS-RESPONSE                                              4             Wor       Binary
+*>      170   88 RESP-NORMAL                                                                    
+*>      171   88 RESP-NOTFND                                                                    
+*>      172   88 RESP-DUPREC                                                                    
+*>      173   88 RESP-DUPKEY                                                                    
+*>      174   88 RESP-NOTOPEN                                                                   
+*>      175   88 RESP-ENDFILE                                                                   
+*>      178 01 WS-RETURN-STRING                                       512             Wor       Display
+*>      179 01 WS-MESS001-LENGTH                                        2             Wor       Binary
+*>      180 01 WS-MESS001-PASS-AREA                                  1024             Wor       Display
+*>      181 01 WS-MESS002-LENGTH                                        2             Wor       Binary
+*>      182 01 WS-MESS002-PASS-AREA                                  1024             Wor       Display
+*>      183 01 WS-MESS003-LENGTH                                        2             Wor       Binary
+*>      184 01 WS-MESS003-PASS-AREA                                  1024             Wor       Display
+*>     1:12 01 FUNCTION-DATE                                           21             Wor       Group
+*>     1:13   05 WS-FN-DATE                                             8 (000000000)           Display Numeric
+*>     1:14   05 WS-FN-CYMD                                             8 (000000000)       R   Group
+*>     1:15     10 WS-FN-CCYR                                           4 (000000000)       R   Display Numeric
+*>     1:16     10 WS-FN-CCYY                                           4 (000000000)       R   Group
+*>     1:17       15 WS-FN-CC                                           2 (000000000)       R   Display Numeric
+*>     1:18       15 WS-FN-YR                                           2 (000000002)       R   Display Numeric
+*>     1:19     10 WS-FN-MO                                             2 (000000004)       R   Display Numeric
+*>     1:20     10 WS-FN-DA                                             2 (000000006)       R   Display Numeric
+*>     1:21   05 WS-FN-HOURS                                            2 (000000008)           Display Numeric
+*>     1:22   05 WS-FN-MINUTES                                          2 (000000010)           Display Numeric
+*>     1:23   05 WS-FN-SECONDS                                          2 (000000012)           Display Numeric
+*>     1:24   05 WS-FN-HUNDSECS                                         2 (000000014)           Display Numeric
+*>     1:25   05 WS-FN-GMT-IND                                          1 (000000016)           Display
+*>     1:26     88 WS-BEHIND-GMT                                                                
+*>     1:27     88 WS-AFTER-GMT                                                                 
+*>     1:28     88 WS-NO-GMT                                                                    
+*>     1:29   05 WS-FN-GMT-HOURS                                        2 (000000017)           Display Numeric
+*>     1:30   05 WS-FN-GMT-MINUTES                                      2 (000000019)           Display Numeric
+*>     2:13 01 DATE-CONVERSION-DATA                                   200             Wor       Group
+*>     2:14   12 DC-COMM-LENGTH                                         2 (000000000)           Binary
+*>     2:15   12 DC-OPTION-CODE                                         1 (000000002)           Display
+*>     2:16     88 BIN-TO-GREG                                                                  
+*>     2:17     88 ELAPSED-BETWEEN-BIN                                                          
+*>     2:18     88 EDIT-GREG-TO-BIN                                                             
+*>     2:19     88 YMD-GREG-TO-BIN                                                              
+*>     2:20     88 MDY-GREG-TO-BIN                                                              
+*>     2:21     88 JULIAN-TO-BIN                                                                
+*>     2:22     88 BIN-PLUS-ELAPSED                                                             
+*>     2:23     88 FIND-CENTURY                                                                 
+*>     2:24     88 ELAPSED-BETWEEN-BIN-3                                                        
+*>     2:25     88 EDIT-GREG-TO-BIN-3                                                           
+*>     2:26     88 YMD-GREG-TO-BIN-3                                                            
+*>     2:27     88 MDY-GREG-TO-BIN-3                                                            
+*>     2:28     88 JULIAN-TO-BIN-3                                                              
+*>     2:29     88 BIN-PLUS-ELAPSED-3                                                           
+*>     2:30     88 JULIAN-EXPANDED-TO-BIN                                                       
+*>     2:31     88 JULIAN-EXPANDED-TO-BIN-3                                                     
+*>     2:32     88 BIN-TO-JULIAN-EXPANDED                                                       
+*>     2:33     88 JULIAN-EXPANDED                                                              
+*>     2:34     88 CHECK-LEAP-YEAR                                                              
+*>     2:35     88 BIN-3-TO-GREG                                                                
+*>     2:36     88 CYMD-GREG-TO-BIN-3                                                           
+*>     2:37     88 MDCY-GREG-TO-BIN-3                                                           
+*>     2:38     88 CYMD-GREG-TO-BIN                                                             
+*>     2:39     88 MDCY-GREG-TO-BIN                                                             
+*>     2:40     88 MDY-GREG-TO-JULIAN                                                           
+*>     2:41     88 MDCY-GREG-TO-JULIAN                                                          
+*>     2:42     88 YMD-GREG-TO-JULIAN                                                           
+*>     2:43     88 CYMD-GREG-TO-JULIAN                                                          
+*>     2:44     88 THREE-CHARACTER-BIN                                                          
+*>     2:46     88 GREGORIAN-TO-BIN                                                             
+*>     2:48     88 BIN-TO-GREGORIAN                                                             
+*>     2:50     88 JULIAN-TO-BINARY                                                             
+*>     2:52   12 DC-ERROR-CODE                                          1 (000000003)           Display
+*>     2:53     88 NO-CONVERSION-ERROR                                                          
+*>     2:54     88 DATE-CONVERSION-ERROR                                                        
+*>     2:56     88 DATE-IS-ZERO                                                                 
+*>     2:57     88 DATE-IS-NON-NUMERIC                                                          
+*>     2:58     88 DATE-IS-INVALID                                                              
+*>     2:59     88 DATE1-GREATER-DATE2                                                          
+*>     2:60     88 ELAPSED-PLUS-NEGATIVE                                                        
+*>     2:61     88 DATE-INVALID-OPTION                                                          
+*>     2:62     88 INVALID-CENTURY                                                              
+*>     2:63     88 ONLY-CENTURY                                                                 
+*>     2:64     88 ONLY-LEAP-YEAR                                                               
+*>     2:65     88 VALID-CENTURY-LEAP-YEAR                                                      
+*>     2:66   12 DC-END-OF-MONTH                                        1 (000000004)           Display
+*>     2:67     88 CALCULATE-END-OF-MONTH                                                       
+*>     2:68   12 DC-CENTURY-ADJUSTMENT                                  1 (000000005)           Display
+*>     2:69     88 USE-NORMAL-PROCESS                                                           
+*>     2:70     88 ADJUST-DOWN-100-YRS                                                          
+*>     2:71     88 ADJUST-UP-100-YRS                                                            
+*>     2:72   12 FILLER                                                 1 (000000006)           Display
+*>     2:73   12 DC-CONVERSION-DATES                                   65 (000000007)           Group
+*>     2:74     16 DC-BIN-DATE-1                                        2 (000000007)           Display
+*>     2:75     16 DC-BIN-DATE-2                                        2 (000000009)           Display
+*>     2:76     16 DC-GREG-DATE-1-EDIT                                  8 (000000011)           Display
+*>     2:77     16 DC-GREG-DATE-1-EDIT-R                                8 (000000011)       R   Group
+*>     2:79       20 DC-EDIT1-MONTH                                     2 (000000011)       R   Display Numeric
+*>     2:80       20 SLASH1-1                                           1 (000000013)       R   Display
+*>     2:81       20 DC-EDIT1-DAY                                       2 (000000014)       R   Display Numeric
+*>     2:82       20 SLASH1-2                                           1 (000000016)       R   Display
+*>     2:83       20 DC-EDIT1-YEAR                                      2 (000000017)       R   Display Numeric
+*>     2:84     16 DC-GREG-DATE-2-EDIT                                  8 (000000019)           Display
+*>     2:85     16 DC-GREG-DATE-2-EDIT-R                                8 (000000019)       R   Group
+*>     2:87       20 DC-EDIT2-MONTH                                     2 (000000019)       R   Display Numeric
+*>     2:88       20 SLASH2-1                                           1 (000000021)       R   Display
+*>     2:89       20 DC-EDIT2-DAY                                       2 (000000022)       R   Display Numeric
+*>     2:90       20 SLASH2-2                                           1 (000000024)       R   Display
+*>     2:91       20 DC-EDIT2-YEAR                                      2 (000000025)       R   Display Numeric
+*>     2:92     16 DC-GREG-DATE-1-YMD                                   6 (000000027)           Display Numeric
+*>     2:93     16 DC-GREG-DATE-1-YMD-R                                 6 (000000027)       R   Group
+*>     2:95       20 DC-YMD-YEAR                                        2 (000000027)       R   Display Numeric
+*>     2:96       20 DC-YMD-MONTH                                       2 (000000029)       R   Display Numeric
+*>     2:97       20 DC-YMD-DAY                                         2 (000000031)       R   Display Numeric
+*>     2:98     16 DC-GREG-DATE-1-MDY                                   6 (000000033)           Display Numeric
+*>     2:99     16 DC-GREG-DATE-1-MDY-R                                 6 (000000033)       R   Group
+*>    2:101       20 DC-MDY-MONTH                                       2 (000000033)       R   Display Numeric
+*>    2:102       20 DC-MDY-DAY                                         2 (000000035)       R   Display Numeric
+*>    2:103       20 DC-MDY-YEAR                                        2 (000000037)       R   Display Numeric
+*>    2:104     16 DC-GREG-DATE-1-ALPHA                                18 (000000039)           Group
+*>    2:105       20 DC-ALPHA-MONTH                                    10 (000000039)           Display
+*>    2:106       20 DC-ALPHA-DAY                                       2 (000000049)           Display Numeric
+*>    2:107       20 FILLER                                             2 (000000051)           Display
+*>    2:108       20 DC-ALPHA-CENTURY                                   2 (000000053)           Group
+*>    2:109         24 DC-ALPHA-CEN-N                                   2 (000000053)           Display Numeric
+*>    2:110       20 DC-ALPHA-YEAR                                      2 (000000055)           Display Numeric
+*>    2:111     16 DC-ELAPSED-MONTHS                                    2 (000000057)           Binary
+*>    2:112     16 DC-ODD-DAYS-OVER                                     2 (000000059)           Binary
+*>    2:113     16 DC-ELAPSED-DAYS                                      2 (000000061)           Binary
+*>    2:114     16 DC-JULIAN-DATE                                       5 (000000063)           Display Numeric
+*>    2:115     16 DC-JULIAN-YYDDD                                      5 (000000063)       R   Display Numeric
+*>    2:117     16 DC-JULIAN-DT                                         5 (000000063)       R   Group
+*>    2:118       20 DC-JULIAN-YEAR                                     2 (000000063)       R   Display Numeric
+*>    2:119       20 DC-JULIAN-DAYS                                     3 (000000065)       R   Display Numeric
+*>    2:120     16 DC-DAYS-IN-MONTH                                     2 (000000068)           Packed Decimal
+*>    2:121     16 DC-DAY-OF-WEEK                                       1 (000000070)           Packed Decimal
+*>    2:122     16 DC-DAY-OF-WEEK2                                      1 (000000071)           Packed Decimal
+*>    2:123   12 DATE-CONVERSION-VARIBLES                              78 (000000072)           Group
+*>    2:124     16 HOLD-CENTURY-1                                      11 (000000072)           Display Numeric
+*>    2:125     16 HOLD-CENTURY-1-SPLIT                                11 (000000072)       R   Group
+*>    2:126       20 FILLER                                             3 (000000072)       R   Display Numeric
+*>    2:127       20 HOLD-CEN-1-CCYY                                    4 (000000075)       R   Group
+*>    2:128         24 HOLD-CEN-1-CC                                    2 (000000075)       R   Display Numeric
+*>    2:129         24 HOLD-CEN-1-YY                                    2 (000000077)       R   Display Numeric
+*>    2:130       20 HOLD-CEN-1-MO                                      2 (000000079)       R   Display Numeric
+*>    2:131       20 HOLD-CEN-1-DA                                      2 (000000081)       R   Display Numeric
+*>    2:132     16 HOLD-CENTURY-1-R                                    11 (000000072)       R   Group
+*>    2:133       20 HOLD-CEN-1-R-MO                                    2 (000000072)       R   Display Numeric
+*>    2:134       20 HOLD-CEN-1-R-DA                                    2 (000000074)       R   Display Numeric
+*>    2:135       20 HOLD-CEN-1-R-CCYY                                  4 (000000076)       R   Group
+*>    2:136         24 HOLD-CEN-1-R-CC                                  2 (000000076)       R   Display Numeric
+*>    2:137         24 HOLD-CEN-1-R-YY                                  2 (000000078)       R   Display Numeric
+*>    2:138       20 FILLER                                             3 (000000080)       R   Display Numeric
+*>    2:139     16 HOLD-CENTURY-1-X                                    11 (000000083)           Group
+*>    2:140       20 FILLER                                             3 (000000083)           Display
+*>    2:141       20 HOLD-CEN-1-X-CCYY                                  4 (000000086)           Group
+*>    2:142         24 HOLD-CEN-1-X-CC                                  2 (000000086)           Display
+*>    2:143         24 HOLD-CEN-1-X-YY                                  2 (000000088)           Display
+*>    2:144       20 HOLD-CEN-1-X-MO                                    2 (000000090)           Display
+*>    2:145       20 HOLD-CEN-1-X-DA                                    2 (000000092)           Display
+*>    2:146     16 HOLD-CENTURY-1-R-X                                  11 (000000083)       R   Group
+*>    2:147       20 HOLD-CEN-1-R-X-MO                                  2 (000000083)       R   Display
+*>    2:148       20 HOLD-CEN-1-R-X-DA                                  2 (000000085)       R   Display
+*>    2:149       20 HOLD-CEN-1-R-X-CCYY                                4 (000000087)       R   Group
+*>    2:150         24 HOLD-CEN-1-R-X-CC                                2 (000000087)       R   Display
+*>    2:151         24 HOLD-CEN-1-R-X-YY                                2 (000000089)       R   Display
+*>    2:152       20 FILLER                                             3 (000000091)       R   Display
+*>    2:153     16 DC-BIN-DATE-EXPAND-1                                 3 (000000094)           Display
+*>    2:154     16 DC-BIN-DATE-EXPAND-2                                 3 (000000097)           Display
+*>    2:155     16 DC-JULIAN-DATE-1                                     7 (000000100)           Display Numeric
+*>    2:156     16 DC-JULIAN-DATE-1-R                                   7 (000000100)       R   Group
+*>    2:157       20 DC-JULIAN-1-CCYY                                   4 (000000100)       R   Group
+*>    2:158         24 DC-JULIAN-1-CC                                   2 (000000100)       R   Display Numeric
+*>    2:159         24 DC-JULIAN-1-YR                                   2 (000000102)       R   Display Numeric
+*>    2:160       20 DC-JULIAN-DA-1                                     3 (000000104)       R   Display Numeric
+*>    2:161     16 DC-JULIAN-DATE-2                                     7 (000000107)           Display Numeric
+*>    2:162     16 DC-JULIAN-DATE-2-R                                   7 (000000107)       R   Group
+*>    2:163       20 DC-JULIAN-2-CCYY                                   4 (000000107)       R   Group
+*>    2:164         24 DC-JULIAN-2-CC                                   2 (000000107)       R   Display Numeric
+*>    2:165         24 DC-JULIAN-2-YR                                   2 (000000109)       R   Display Numeric
+*>    2:166       20 DC-JULIAN-DA-2                                     3 (000000111)       R   Display Numeric
+*>    2:167     16 DC-GREG-DATE-A-EDIT                                 10 (000000114)           Group
+*>    2:168       20 DC-EDITA-MONTH                                     2 (000000114)           Display Numeric
+*>    2:169       20 SLASHA-1                                           1 (000000116)           Display
+*>    2:170       20 DC-EDITA-DAY                                       2 (000000117)           Display Numeric
+*>    2:171       20 SLASHA-2                                           1 (000000119)           Display
+*>    2:172       20 DC-EDITA-CCYY                                      4 (000000120)           Group
+*>    2:173         24 DC-EDITA-CENT                                    2 (000000120)           Display Numeric
+*>    2:174         24 DC-EDITA-YEAR                                    2 (000000122)           Display Numeric
+*>    2:175     16 DC-GREG-DATE-B-EDIT                                 10 (000000124)           Group
+*>    2:176       20 DC-EDITB-MONTH                                     2 (000000124)           Display Numeric
+*>    2:177       20 SLASHB-1                                           1 (000000126)           Display
+*>    2:178       20 DC-EDITB-DAY                                       2 (000000127)           Display Numeric
+*>    2:179       20 SLASHB-2                                           1 (000000129)           Display
+*>    2:180       20 DC-EDITB-CCYY                                      4 (000000130)           Group
+*>    2:181         24 DC-EDITB-CENT                                    2 (000000130)           Display Numeric
+*>    2:182         24 DC-EDITB-YEAR                                    2 (000000132)           Display Numeric
+*>    2:183     16 DC-GREG-DATE-CYMD                                    8 (000000134)           Display Numeric
+*>    2:184     16 DC-GREG-DATE-CYMD-R                                  8 (000000134)       R   Group
+*>    2:186       20 DC-CYMD-CEN                                        2 (000000134)       R   Display Numeric
+*>    2:187       20 DC-CYMD-YEAR                                       2 (000000136)       R   Display Numeric
+*>    2:188       20 DC-CYMD-MONTH                                      2 (000000138)       R   Display Numeric
+*>    2:189       20 DC-CYMD-DAY                                        2 (000000140)       R   Display Numeric
+*>    2:190     16 DC-GREG-DATE-MDCY                                    8 (000000142)           Display Numeric
+*>    2:191     16 DC-GREG-DATE-MDCY-R                                  8 (000000142)       R   Group
+*>    2:193       20 DC-MDCY-MONTH                                      2 (000000142)       R   Display Numeric
+*>    2:194       20 DC-MDCY-DAY                                        2 (000000144)       R   Display Numeric
+*>    2:195       20 DC-MDCY-CEN                                        2 (000000146)       R   Display Numeric
+*>    2:196       20 DC-MDCY-YEAR                                       2 (000000148)       R   Display Numeric
+*>    2:197   12 DC-FORCE-EL310-DATE-SW                                 1 (000000150)           Display
+*>    2:198     88 DC-FORCE-EL310-DATE                                                          
+*>    2:199   12 DC-EL310-DATE                                         21 (000000151)           Display
+*>    2:200   12 FILLER                                                28 (000000172)           Display
+*>    3:192 01 CALCULATION-PASS-AREA                                  450             Wor       Group
+*>    3:193   12 CP-COMM-LENGTH                                         2 (000000000)           Binary
+*>    3:196   12 CP-RETURN-CODE                                         1 (000000002)           Display
+*>    3:197     88 NO-CP-ERROR                                                                  
+*>    3:198     88 CP-ERROR-OCCURED                                                             
+*>    3:200     88 CP-ERROR-IN-AMOUNTS                                                          
+*>    3:201     88 CP-ERROR-IN-DATES                                                            
+*>    3:202     88 CP-ERROR-IN-OPTIONS                                                          
+*>    3:203     88 CP-ERROR-IN-TERMS                                                            
+*>    3:204     88 CP-ERROR-IN-FREQUENCY                                                        
+*>    3:205     88 CP-ERROR-RATE-NOT-FOUND                                                      
+*>    3:206     88 CP-ERROR-RATE-IS-ZERO                                                        
+*>    3:207     88 CP-ERROR-AMT-OUTSIDE-LIMIT                                                   
+*>    3:208     88 CP-ERROR-TERM-OUTSIDE-LIMIT                                                  
+*>    3:209     88 CP-ERROR-AGE-OUTSIDE-LIMIT                                                   
+*>    3:210     88 CP-ERROR-ATT-OUTSIDE-LIMIT                                                   
+*>    3:211     88 CP-ERROR-TOT-OUTSIDE-LIMIT                                                   
+*>    3:212     88 CP-ERROR-RATE-FILE-NOTOPEN                                                   
+*>    3:213     88 CP-ERROR-ISSUE-AGE-ZERO                                                      
+*>    3:214     88 CP-ERROR-NO-LIMITS-CRI                                                       
+*>    3:215     88 CP-ERROR-DIV-BY-ZERO                                                         
+*>    3:216     88 CP-ERROR-LOAN-TERM                                                           
+*>    3:217     88 CP-ERROR-TERM-BELOW-MINIMUM                                                  
+*>    3:219   12 CP-RETURN-CODE-2                                       1 (000000003)           Display
+*>    3:220     88 NO-CP-ERROR-2                                                                
+*>    3:223   12 CP-CALCULATION-AREA                                  446 (000000004)           Group
+*>    3:224     16 CP-ACCOUNT-NUMBER                                   10 (000000004)           Display
+*>    3:225     16 CP-CERT-EFF-DT                                       2 (000000014)           Display
+*>    3:226     16 CP-VALUATION-DT                                      2 (000000016)           Display
+*>    3:227     16 CP-PAID-THRU-DT                                      2 (000000018)           Display
+*>    3:228     16 CP-BENEFIT-TYPE                                      1 (000000020)           Display
+*>    3:229       88 CP-AH                                                                      
+*>    3:231       88 CP-REDUCING-LIFE                                                           
+*>    3:232       88 CP-LEVEL-LIFE                                                              
+*>    3:233     16 CP-INCURRED-DT                                       2 (000000021)           Display
+*>    3:234     16 CP-REPORTED-DT                                       2 (000000023)           Display
+*>    3:235     16 CP-ACCT-FLD-5                                        2 (000000025)           Display
+*>    3:236     16 CP-COMPANY-ID                                        3 (000000027)           Display
+*>    3:237     16 CP-ISSUE-AGE                                         2 (000000030)           Packed Decimal
+*>    3:239     16 CP-CDT-PERCENT                                       3 (000000032)           Packed Decimal
+*>    3:241     16 CP-CDT-METHOD                                        1 (000000035)           Display
+*>    3:242       88 CP-CDT-ROUND-NEAR                                                          
+*>    3:243       88 CP-CDT-ROUND-HIGH                                                          
+*>    3:244       88 CP-CDT-INTERPOLATED                                                        
+*>    3:245     16 CP-CLAIM-TYPE                                        1 (000000036)           Display
+*>    3:246       88 CP-AH-CLAIM                                                                
+*>    3:247       88 CP-LIFE-CLAIM                                                              
+*>    3:248     16 CP-ORIGINAL-TERM                                     2 (000000037)           Packed Decimal
+*>    3:250     16 CP-ORIGINAL-BENEFIT                                  6 (000000039)           Packed Decimal
+*>    3:252     16 CP-ORIGINAL-PREMIUM                                  5 (000000045)           Packed Decimal
+*>    3:254     16 CP-REMAINING-TERM                                    3 (000000050)           Packed Decimal
+*>    3:256     16 CP-REMAINING-BENEFIT                                 6 (000000053)           Packed Decimal
+*>    3:258     16 CP-LOAN-APR                                          4 (000000059)           Packed Decimal
+*>    3:260     16 CP-PAY-FREQUENCY                                     2 (000000063)           Packed Decimal
+*>    3:262     16 CP-REM-TERM-METHOD                                   1 (000000065)           Display
+*>    3:263       88 CP-EARN-AFTER-15TH                                                         
+*>    3:264       88 CP-EARN-ON-HALF-MONTH                                                      
+*>    3:265       88 CP-EARN-ON-1ST-DAY                                                         
+*>    3:266       88 CP-EARN-ON-FULL-MONTH                                                      
+*>    3:267       88 CP-EARN-WITH-NO-DAYS                                                       
+*>    3:268       88 CP-EARN-AFTER-14TH                                                         
+*>    3:269       88 CP-EARN-AFTER-16TH                                                         
+*>    3:270     16 CP-EARNING-METHOD                                    1 (000000066)           Display
+*>    3:271       88 CP-EARN-BY-R78                                                             
+*>    3:272       88 CP-EARN-BY-PRORATA                                                         
+*>    3:273       88 CP-EARN-AS-CALIF                                                           
+*>    3:274       88 CP-EARN-AS-TEXAS                                                           
+*>    3:275       88 CP-EARN-AS-FARM-PLAN                                                       
+*>    3:276       88 CP-EARN-AS-NET-PAY                                                         
+*>    3:277       88 CP-EARN-ANTICIPATION                                                       
+*>    3:278       88 CP-EARN-AS-MEAN                                                            
+*>    3:279       88 CP-EARN-AS-SUM-OF-DIGITS                                                   
+*>    3:280       88 CP-EARN-AS-REG-BALLOON                                                     
+*>    3:281       88 CP-GAP-NON-REFUNDABLE                                                      
+*>    3:282       88 CP-GAP-ACTUARIAL                                                           
+*>    3:283       88 CP-DCC-SPP-DDF                                                             
+*>    3:284       88 CP-DCC-SPP-DDF-IU                                                          
+*>    3:285     16 CP-PROCESS-TYPE                                      1 (000000067)           Display
+*>    3:286       88 CP-CLAIM                                                                   
+*>    3:287       88 CP-CANCEL                                                                  
+*>    3:288       88 CP-ISSUE                                                                   
+*>    3:289     16 CP-SPECIAL-CALC-CD                                   1 (000000068)           Display
+*>    3:290       88 CP-OUTSTANDING-BAL                                                         
+*>    3:291       88 CP-1-MTH-INTEREST                                                          
+*>    3:292       88 CP-0-MTH-INTEREST                                                          
+*>    3:293       88 CP-OB-OFFLINE-RESERVED                                                     
+*>    3:294       88 CP-CRITICAL-PERIOD                                                         
+*>    3:295       88 CP-TERM-IS-DAYS                                                            
+*>    3:296       88 CP-USE-PREM-AS-ENTERED                                                     
+*>    3:297       88 CP-FARM-PLAN                                                               
+*>    3:298       88 CP-RATE-AS-STANDARD                                                        
+*>    3:299       88 CP-2-MTH-INTEREST                                                          
+*>    3:300       88 CP-3-MTH-INTEREST                                                          
+*>    3:301       88 CP-4-MTH-INTEREST                                                          
+*>    3:302       88 CP-BALLOON-LAST-PMT                                                        
+*>    3:303       88 CP-MORTGAGE-REC                                                            
+*>    3:304       88 CP-OUTSTANDING-BALANCE                                                     
+*>    3:305       88 CP-NET-PAY-PRUDENTIAL                                                      
+*>    3:306       88 CP-NET-PAY-SIMPLE                                                          
+*>    3:307       88 CP-TRUNCATED-LIFE                                                          
+*>    3:309       88 CP-TRUNCATE-0-MTH                                                          
+*>    3:310       88 CP-TRUNCATE-1-MTH                                                          
+*>    3:311       88 CP-TRUNCATE-2-MTH                                                          
+*>    3:312       88 CP-TRUNCATE-3-MTH                                                          
+*>    3:313       88 CP-TRUNCATE-4-MTH                                                          
+*>    3:314       88 CP-SUMMARY-REC                                                             
+*>    3:315       88 CP-PROPERTY-BENEFIT                                                        
+*>    3:316       88 CP-UNEMPLOYMENT-BENEFIT                                                    
+*>    3:317       88 CP-AD-D-BENEFIT                                                            
+*>    3:318       88 CP-CSL-METH-1                                                              
+*>    3:319       88 CP-CSL-METH-2                                                              
+*>    3:320       88 CP-CSL-METH-3                                                              
+*>    3:321       88 CP-CSL-METH-4                                                              
+*>    3:323     16 CP-LOAN-TERM                                         2 (000000069)           Packed Decimal
+*>    3:325     16 CP-CLASS-CODE                                        2 (000000071)           Display
+*>    3:326     16 CP-DEVIATION-CODE                                    3 (000000073)           Display
+*>    3:327     16 CP-STATE                                             2 (000000076)           Display
+*>    3:328     16 CP-STATE-STD-ABBRV                                   2 (000000078)           Display
+*>    3:329     16 CP-BENEFIT-CD                                        2 (000000080)           Display
+*>    3:330       88 CP-CSL-VALID-NP-BENEFIT-CD                                                 
+*>    3:332     16 CP-R78-OPTION                                        1 (000000082)           Display
+*>    3:333       88 CP-TERM-TIMES-TERM-PLUS-1                                                  
+*>    3:334       88 CP-TERM-TIMES-TERM                                                         
+*>    3:336     16 CP-COMPANY-CD                                        1 (000000083)           Display
+*>    3:337     16 CP-IBNR-RESERVE-SW                                   1 (000000084)           Display
+*>    3:338     16 CP-CLAIM-STATUS                                      1 (000000085)           Display
+*>    3:339     16 CP-RATE-FILE                                         1 (000000086)           Display
+*>    3:340     16 CP-TERM-OR-EXT-DAYS                                  3 (000000087)           Packed Decimal
+*>    3:343     16 CP-LIFE-OVERRIDE-CODE                                1 (000000090)           Display
+*>    3:344     16 CP-AH-OVERRIDE-CODE                                  1 (000000091)           Display
+*>    3:346     16 CP-RATE-DEV-PCT                                      4 (000000092)           Packed Decimal
+*>    3:348     16 CP-CLP-RATE-UP                                       4 (000000092)       R   Packed Decimal
+*>    3:350     16 CP-CRITICAL-MONTHS                                   2 (000000096)           Packed Decimal
+*>    3:352     16 CP-ALTERNATE-BENEFIT                                 6 (000000098)           Packed Decimal
+*>    3:354     16 CP-ALTERNATE-PREMIUM                                 5 (000000104)           Packed Decimal
+*>    3:356     16 CP-DDF-CSO-ADMIN-FEE                                 5 (000000104)       R   Packed Decimal
+*>    3:359     16 CP-PAID-FROM-DATE                                    2 (000000109)           Display
+*>    3:360     16 CP-CLAIM-CALC-METHOD                                 1 (000000111)           Display
+*>    3:361     16 CP-EXT-DAYS-CALC                                     1 (000000112)           Display
+*>    3:362       88 CP-EXT-NO-CHG                                                              
+*>    3:363       88 CP-EXT-CHG-LF                                                              
+*>    3:364       88 CP-EXT-CHG-AH                                                              
+*>    3:365       88 CP-EXT-CHG-LF-AH                                                           
+*>    3:366     16 CP-DOMICILE-STATE                                    2 (000000113)           Display
+*>    3:367     16 CP-CARRIER                                           1 (000000115)           Display
+*>    3:368     16 CP-REIN-FLAG                                         1 (000000116)           Display
+*>    3:369     16 CP-REM-TRM-CALC-OPTION                               1 (000000117)           Display
+*>    3:370       88 VALID-REM-TRM-CALC-OPTION                                                  
+*>    3:372       88 CP-CALC-OPTION-DEFAULT                                                     
+*>    3:373       88 CP-CONSIDER-EXTENSION                                                      
+*>    3:374       88 CP-30-DAY-MONTH                                                            
+*>    3:375       88 CP-NO-EXT-30-DAY-MONTH                                                     
+*>    3:376       88 CP-NO-EXT-ACTUAL-DAYS                                                      
+*>    3:377       88 CP-EXT-30-DAY-MONTH                                                        
+*>    3:378       88 CP-EXT-ACTUAL-DAYS                                                         
+*>    3:379       88 CP-USE-EXP-AND-1ST-PMT                                                     
+*>    3:380     16 CP-SIG-SWITCH                                        1 (000000118)           Display
+*>    3:381     16 CP-RATING-METHOD                                     1 (000000119)           Display
+*>    3:382       88 CP-RATE-AS-R78                                                             
+*>    3:383       88 CP-RATE-AS-PRORATA                                                         
+*>    3:384       88 CP-RATE-AS-CALIF                                                           
+*>    3:385       88 CP-RATE-AS-TEXAS                                                           
+*>    3:386       88 CP-RATE-AS-FARM-PLAN                                                       
+*>    3:387       88 CP-RATE-AS-NET-PAY                                                         
+*>    3:388       88 CP-RATE-AS-ANTICIPATION                                                    
+*>    3:389       88 CP-RATE-AS-MEAN                                                            
+*>    3:390       88 CP-RATE-AS-REG-BALLOON                                                     
+*>    3:391     16 CP-SALES-TAX                                         3 (000000120)           Packed Decimal
+*>    3:393     16 CP-BEN-CATEGORY                                      1 (000000123)           Display
+*>    3:394     16 CP-DCC-LF-RATE                                       4 (000000124)           Packed Decimal
+*>    3:395     16 CP-DCC-ACT-COMM                                      4 (000000124)       R   Packed Decimal
+*>    3:397     16 CP-DCC-AH-RATE                                       4 (000000128)           Packed Decimal
+*>    3:398     16 CP-DCC-PMF-COMM                                      4 (000000128)       R   Packed Decimal
+*>    3:400     16 CP-DAYS-TO-1ST-PMT                                   2 (000000132)           Packed Decimal
+*>    3:401     16 CP-AH-BALLOON-SW                                     1 (000000134)           Display
+*>    3:402     16 CP-EXPIRE-DT                                         2 (000000135)           Display
+*>    3:403     16 CP-LF-CLAIM-CALC-SW                                  1 (000000137)           Display
+*>    3:404     16 CP-DDF-HI-FACT                                       3 (000000138)           Packed Decimal
+*>    3:405     16 CP-DDF-LO-FACT                                       3 (000000141)           Packed Decimal
+*>    3:406     16 CP-DDF-CLP                                           4 (000000144)           Packed Decimal
+*>    3:407     16 CP-DDF-SPEC-CALC                                     1 (000000148)           Display
+*>    3:408       88 CP-CALC-GROSS-FEE                                                          
+*>    3:409       88 CP-CALC-CLP                                                                
+*>    3:410     16 CP-IU-RATE-UP                                        4 (000000149)           Packed Decimal
+*>    3:411     16 CP-CANCEL-REASON                                     1 (000000153)           Display
+*>    3:412     16 CP-DDF-ADMIN-FEES                                    4 (000000154)           Packed Decimal
+*>    3:413     16 CP-PMT-MODE                                          1 (000000158)           Display
+*>    3:414     16 CP-NO-OF-PMTS                                        2 (000000159)           Packed Decimal
+*>    3:415     16 CP-1ST-YR-ALLOW                                      3 (000000161)           Packed Decimal
+*>    3:416     16 CP-DDF-COMM-AND-MFEE                                 4 (000000164)           Packed Decimal
+*>    3:417     16 CP-DDF-YR1AF                                         4 (000000168)           Packed Decimal
+*>    3:418     16 FILLER                                               1 (000000172)           Display
+*>    3:422     16 CP-CDT-TABLE                                         1 (000000173)           Display Numeric
+*>    3:424     16 CP-CDT-FACTOR                                        6 (000000174)           Packed Decimal
+*>    3:426     16 CP-PTC-RESERVE                                       5 (000000180)           Packed Decimal
+*>    3:428     16 CP-IBNR-RESERVE                                      5 (000000185)           Packed Decimal
+*>    3:430     16 CP-FUTURE-RESERVE                                    5 (000000190)           Packed Decimal
+*>    3:432     16 FILLER                                               9 (000000195)           Display
+*>    3:435     16 CP-REMAINING-TERM-1                                  3 (000000204)           Packed Decimal
+*>    3:437     16 CP-REMAINING-TERM-2                                  3 (000000207)           Packed Decimal
+*>    3:439     16 CP-REMAINING-TERM-3                                  3 (000000210)           Packed Decimal
+*>    3:441     16 CP-ODD-DAYS                                          2 (000000213)           Packed Decimal
+*>    3:443     16 FILLER                                              12 (000000215)           Display
+*>    3:447     16 CP-REMAINING-AMT                                     6 (000000227)           Packed Decimal
+*>    3:449     16 CP-REMAINING-AMT-PRV                                 6 (000000233)           Packed Decimal
+*>    3:451     16 FILLER                                              12 (000000239)           Display
+*>    3:455     16 CP-CALC-PREMIUM                                      5 (000000251)           Packed Decimal
+*>    3:457     16 CP-PREMIUM-RATE                                      4 (000000256)           Packed Decimal
+*>    3:459     16 CP-MORTALITY-CODE                                    4 (000000260)           Display
+*>    3:460     16 CP-RATE-EDIT-FLAG                                    1 (000000264)           Display
+*>    3:461       88 CP-RATES-NEED-APR                                                          
+*>    3:462     16 CP-COMPOSITE-RATE                                    3 (000000265)           Packed Decimal
+*>    3:464     16 CP-CANCEL-FEE                                        3 (000000268)           Packed Decimal
+*>    3:465     16 CP-LF-PREM                                           5 (000000271)           Packed Decimal
+*>    3:466     16 CP-LF-BALLOON-PREM                                   5 (000000271)       R   Packed Decimal
+*>    3:468     16 FILLER                                               7 (000000276)           Display
+*>    3:472     16 CP-CALC-REFUND                                       5 (000000283)           Packed Decimal
+*>    3:474     16 CP-REFUND-TYPE-USED                                  1 (000000288)           Display
+*>    3:475       88 CP-R-AS-R78                                                                
+*>    3:476       88 CP-R-AS-PRORATA                                                            
+*>    3:477       88 CP-R-AS-CALIF                                                              
+*>    3:478       88 CP-R-AS-TEXAS                                                              
+*>    3:479       88 CP-R-AS-FARM-PLAN                                                          
+*>    3:480       88 CP-R-AS-NET-PAY                                                            
+*>    3:481       88 CP-R-AS-ANTICIPATION                                                       
+*>    3:482       88 CP-R-AS-MEAN                                                               
+*>    3:483       88 CP-R-AS-SUM-OF-DIGITS                                                      
+*>    3:484       88 CP-R-AS-GAP-NON-REFUND                                                     
+*>    3:485       88 CP-R-AS-GAP-ACTUARIAL                                                      
+*>    3:486       88 CP-R-AS-SPP-DDF                                                            
+*>    3:487       88 CP-R-AS-SPP-DDF-IU                                                         
+*>    3:488       88 CP-R-AS-REPOSSESSION                                                       
+*>    3:489     16 FILLER                                              12 (000000289)           Display
+*>    3:493     16 CP-R78-U-PRM                                         5 (000000301)           Packed Decimal
+*>    3:495     16 CP-R78-U-PRM-ALT                                     5 (000000306)           Packed Decimal
+*>    3:497     16 CP-PRORATA-U-PRM                                     5 (000000311)           Packed Decimal
+*>    3:499     16 CP-PRORATA-U-PRM-ALT                                 5 (000000316)           Packed Decimal
+*>    3:501     16 CP-STATE-U-PRM                                       5 (000000321)           Packed Decimal
+*>    3:503     16 CP-DOMICILE-U-PRM                                    5 (000000326)           Packed Decimal
+*>    3:505     16 CP-EARNING-TYPE-USED                                 1 (000000331)           Display
+*>    3:506       88 CP-E-AS-SPECIAL                                                            
+*>    3:507       88 CP-E-AS-R78                                                                
+*>    3:508       88 CP-E-AS-PRORATA                                                            
+*>    3:509       88 CP-E-AS-TEXAS                                                              
+*>    3:510       88 CP-E-AS-FARM-PLAN                                                          
+*>    3:511       88 CP-E-AS-NET-PAY                                                            
+*>    3:512       88 CP-E-AS-ANTICIPATION                                                       
+*>    3:513       88 CP-E-AS-MEAN                                                               
+*>    3:514       88 CP-E-AS-SUM-OF-DIGITS                                                      
+*>    3:515     16 FILLER                                              12 (000000332)           Display
+*>    3:519     16 CP-ACTUAL-DAYS                                       3 (000000344)           Packed Decimal
+*>    3:521     16 CP-CLAIM-PAYMENT                                     5 (000000347)           Packed Decimal
+*>    3:523     16 FILLER                                              12 (000000352)           Display
+*>    3:526     16 CP-TOTAL-PAID                                        5 (000000364)           Packed Decimal
+*>    3:528     16 CP-R-MAX-ATT-AGE                                     2 (000000369)           Packed Decimal
+*>    3:530     16 CP-R-MAX-AGE                                         2 (000000371)           Packed Decimal
+*>    3:532     16 CP-R-MAX-TERM                                        3 (000000373)           Packed Decimal
+*>    3:534     16 CP-R-MAX-TOT-BEN                                     5 (000000376)           Packed Decimal
+*>    3:536     16 CP-R-MAX-MON-BEN                                     5 (000000381)           Packed Decimal
+*>    3:538     16 CP-IO-FUNCTION                                       1 (000000386)           Display
+*>    3:539       88 OPEN-RATE-FILE                                                             
+*>    3:540       88 CLOSE-RATE-FILE                                                            
+*>    3:541       88 IO-ERROR                                                                   
+*>    3:543     16 CP-FIRST-PAY-DATE                                    2 (000000387)           Display
+*>    3:545     16 CP-JOINT-INDICATOR                                   1 (000000389)           Display
+*>    3:547     16 CP-RESERVE-REMAINING-TERM                            3 (000000390)           Packed Decimal
+*>    3:551     16 CP-INSURED-BIRTH-DT                                  2 (000000393)           Display
+*>    3:553     16 CP-INCURRED-AGE                                      2 (000000395)           Packed Decimal
+*>    3:556     16 CP-MONTHLY-PAYMENT                                   4 (000000397)           Packed Decimal
+*>    3:559     16 CP-RATING-BENEFIT-AMT                                6 (000000401)           Packed Decimal
+*>    3:562     16 CP-ODD-DAYS-TO-PMT                                   2 (000000407)           Packed Decimal
+*>    3:565     16 CP-MNTHS-TO-FIRST-PMT                                2 (000000409)           Packed Decimal
+*>    3:568     16 CP-REMAMT-FACTOR                                     7 (000000411)           Packed Decimal
+*>    3:571     16 CP-FREE-LOOK                                         2 (000000418)           Packed Decimal
+*>    3:574     16 CP-ROA-REFUND                                        1 (000000420)           Display
+*>    3:575       88 CP-ROA-PREM-AT-REFUND                                                      
+*>    3:577     16 CP-NET-BENEFIT-AMT                                   6 (000000421)           Packed Decimal
+*>    3:579     16 CP-SCNP-6MO-AMT                                      6 (000000427)           Packed Decimal
+*>    3:581     16 CP-MONTH                                             2 (000000433)           Packed Decimal
+*>    3:582     16 CP-EXTRA-PERIODS                                     1 (000000435)           Display Numeric
+*>    3:583     16 CP-NET-ONLY-STATE                                    1 (000000436)           Display
+*>    3:584     16 FILLER                                              13 (000000437)           Display
+*>      189 01 DFHEIV                                                 882             Wor       Group
+*>      189   02 DFHEIV0                                               35 (000000000)           Display
+*>      189   02 DFHEIV1                                                8 (000000035)           Display
+*>      189   02 DFHEIV2                                                8 (000000043)           Display
+*>      189   02 DFHEIV3                                                8 (000000051)           Display
+*>      189   02 DFHEIV4                                                6 (000000059)           Display
+*>      189   02 DFHEIV5                                                4 (000000065)           Display
+*>      189   02 DFHEIV6                                                4 (000000069)           Display
+*>      189   02 DFHEIV7                                                2 (000000073)           Display
+*>      189   02 DFHEIV8                                                2 (000000075)           Display
+*>      189   02 DFHEIV9                                                1 (000000077)           Display
+*>      189   02 DFHEIV10                                               4 (000000078)           Packed Decimal
+*>      189   02 DFHEIV11                                               2 (000000082)           Binary
+*>      189   02 DFHEIV12                                               2 (000000084)           Binary
+*>      189   02 DFHEIV13                                               2 (000000086)           Binary
+*>      189   02 DFHEIV14                                               2 (000000088)           Binary
+*>      189   02 DFHEIV15                                               2 (000000090)           Binary
+*>      189   02 DFHEIV16                                               4 (000000092)           Binary
+*>      189   02 DFHEIV17                                               4 (000000096)           Display
+*>      189   02 DFHEIV18                                               4 (000000100)           Display
+*>      189   02 DFHEIV19                                               4 (000000104)           Display
+*>      189   02 DFHEIV20                                               4 (000000108)           Pointer
+*>      189   02 DFHEIV21                                               4 (000000112)           Pointer
+*>      189   02 DFHEIV22                                               4 (000000116)           Pointer
+*>      189   02 DFHEIV23                                               4 (000000120)           Pointer
+*>      189   02 DFHEIV24                                               4 (000000124)           Pointer
+*>      189   02 DFHEIV25                                               4 (000000128)           Binary
+*>      189   02 DFHEIV26                                               4 (000000132)           Binary
+*>      189   02 DFHEIV27                                               4 (000000136)           Binary
+*>      189   02 DFHEIV28                                               4 (000000140)           Binary
+*>      189   02 DFHEIV29                                               4 (000000144)           Binary
+*>      189   02 DFHEIV30                                               4 (000000148)           Binary
+*>      189   02 DFHEIV31                                               4 (000000152)           Binary
+*>      189   02 DFHEIV32                                               2 (000000156)           Binary
+*>      189   02 DFHEIV33                                               2 (000000158)           Binary
+*>      189   02 DFHEIV34                                               2 (000000160)           Binary
+*>      189   02 DFHEIV35                                               2 (000000162)           Binary
+*>      189   02 DFHEIV97                                               4 (000000164)           Packed Decimal
+*>      189   02 DFHEIV98                                               2 (000000168)           Binary
+*>      189   02 FILLER                                                 2 (000000170)           Display
+*>      189   02 DFHEIV99                                               8 (000000172)           Display
+*>      189   02 DFHEIVL0                                              48 (000000180)           Display
+*>      189   02 DFHEIVL1                                              48 (000000228)           Display
+*>      189   02 DFHEIVL2                                              48 (000000276)           Display
+*>      189   02 DFHEIVL3                                              48 (000000324)           Display
+*>      189   02 DFHEIVL4                                             255 (000000372)           Display
+*>      189   02 DFHEIVL5                                             255 (000000627)           Display
+*>      189 01 DFHEIBLK                                                96             Lin       Group
+*>      189   02 EIBTIME                                                4 (000000000)           Packed Decimal
+*>      189   02 EIBDATE                                                4 (000000004)           Packed Decimal
+*>      189   02 EIBTRNID                                               4 (000000008)           Display
+*>      189   02 EIBTASKN                                               4 (000000012)           Packed Decimal
+*>      189   02 EIBTRMID                                               4 (000000016)           Display
+*>      189   02 DFHEIGDI                                               2 (000000020)           Binary
+*>      189   02 EIBCPOSN                                               2 (000000022)           Binary
+*>      189   02 EIBCALEN                                               2 (000000024)           Binary
+*>      189   02 EIBAID                                                 1 (000000026)           Display
+*>      189   02 EIBFILLER1                                             1 (000000027)           Display
+*>      189   02 EIBFN                                                  2 (000000028)           Display
+*>      189   02 EIBFILLER2                                             2 (000000030)           Display
+*>      189   02 EIBRCODE                                               6 (000000032)           Display
+*>      189   02 EIBFILLER3                                             2 (000000038)           Display
+*>      189   02 EIBDS                                                  8 (000000040)           Display
+*>      189   02 EIBREQID                                               8 (000000048)           Display
+*>      189   02 EIBRSRCE                                               8 (000000056)           Display
+*>      189   02 EIBSYNC                                                1 (000000064)           Display
+*>      189   02 EIBFREE                                                1 (000000065)           Display
+*>      189   02 EIBRECV                                                1 (000000066)           Display
+*>      189   02 EIBSEND                                                1 (000000067)           Display
+*>      189   02 EIBATT                                                 1 (000000068)           Display
+*>      189   02 EIBEOC                                                 1 (000000069)           Display
+*>      189   02 EIBFMH                                                 1 (000000070)           Display
+*>      189   02 EIBCOMPL                                               1 (000000071)           Display
+*>      189   02 EIBSIG                                                 1 (000000072)           Display
+*>      189   02 EIBCONF                                                1 (000000073)           Display
+*>      189   02 EIBERR                                                 1 (000000074)           Display
+*>      189   02 EIBRLDBK                                               1 (000000075)           Display
+*>      189   02 EIBERRCD                                               4 (000000076)           Display
+*>      189   02 EIBSYNRB                                               1 (000000080)           Display
+*>      189   02 EIBNODAT                                               1 (000000081)           Display
+*>      189   02 EIBFILLER5                                             2 (000000082)           Display
+*>      189   02 EIBRESP                                                4 (000000084)           Binary
+*>      189   02 EIBRESP2                                               4 (000000088)           Binary
+*>      189   02 DFHEIGDJ                                               2 (000000092)           Binary
+*>      189   02 DFHEIGDK                                               2 (000000094)           Binary
+*>      191 01 DFHCOMMAREA                                             72             Lin       Group
+*>      192   05 GIVE-TAKE-SOCKET                                       4 (000000000)           Binary
+*>      193   05 LSTN-NAME                                              8 (000000004)           Display
+*>      194   05 LSTN-SUBNAME                                           8 (000000012)           Display
+*>      196   05 CLIENT-IN-DATA                                        36 (000000020)           Group
+*>      197     15 CLIENT-KICK-OFF                                      8 (000000020)           Display
+*>      198     15 CLIENT-ID                                            3 (000000028)           Display
+*>      199     15 FILLER                                              25 (000000031)           Display
+*>      200   05 SOCKADDR-IN-PARM                                      16 (000000056)           Group
+*>      201     15 SIN-FAMILY                                           2 (000000056)           Binary
+*>      202     15 SIN-PORT                                             2 (000000058)           Binary
+*>      203     15 SIN-ADDRESS                                          4 (000000060)           Binary
+*>      204     15 SIN-ZERO                                             8 (000000064)           Display
+*>      206 01 VAR                                                     30             Lin       Display
+*> ------------------------------------------------------------------------------------------------------------------
+*> --I: #14 Compiling SOCK08.cbl

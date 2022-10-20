@@ -1,0 +1,1032 @@
+      *****************************************************************
+      *                                                               *
+      * Copyright (c) 2013 by Central States Health and Life          *
+      * All rights reserved.                                          *
+      *                                                               *
+      *****************************************************************
+       identification division.
+       program-id. BSSRCH.
+      *
+      *AUTHOR.    Pablo.
+      *           Colleyville, TEXAS.
+
+      ********************************************
+      *   Balance sheet for month end balancing
+      ********************************************
+       environment division.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+       SELECT CID-ECS010-IN ASSIGN TO
+          '/data/seqfiles/cilgm15.ECS010.ME50.BAL.AMTS'
+          FILE STATUS IS ECS010-STATUS.
+
+       SELECT AHL-ECS010-IN ASSIGN TO
+          '/data/seqfiles/ahlgm15.ECS010.ME50.BAL.AMTS'
+          FILE STATUS IS ECS010-STATUS.
+
+       SELECT DCC-ECS010-IN ASSIGN TO
+          '/data/seqfiles/cidclgm15.ECS010.ME50.BAL.AMTS'
+          FILE STATUS IS ECS010-STATUS.
+
+       SELECT CID-CHKPOINT-OUT ASSIGN TO
+          '/data/test/mdoff/seqfiles/cidmechkpts.txt'
+          FILE STATUS IS CHKPNT-STATUS
+                                  ORGANIZATION IS LINE SEQUENTIAL.
+
+       SELECT ahl-CHKPOINT-OUT ASSIGN TO
+         '/data/test/mdoff/seqfiles/ahlmechkpts.txt'
+      *   '/data/test/mdoff/seqfiles/a1.txt'
+          FILE STATUS IS CHKPNT-STATUS
+                                  ORGANIZATION IS LINE SEQUENTIAL.
+
+       SELECT dcc-CHKPOINT-OUT ASSIGN TO
+          '/data/test/mdoff/seqfiles/dccmechkpts.txt'
+          FILE STATUS IS CHKPNT-STATUS
+                                  ORGANIZATION IS LINE SEQUENTIAL.
+
+       data division.
+       FILE SECTION.
+       FD  CID-ECS010-IN
+           BLOCK CONTAINS 0
+           RECORDING MODE F.
+       01  CID-ECS010-IN-REC           pic x(94).
+
+       FD  AHL-ECS010-IN
+           BLOCK CONTAINS 0
+           RECORDING MODE F.
+       01  AHL-ECS010-IN-REC           pic x(94).
+
+       FD  DCC-ECS010-IN
+           BLOCK CONTAINS 0
+           RECORDING MODE F.
+       01  DCC-ECS010-IN-REC           pic x(94).
+
+       FD  cid-CHKPOINT-OUT
+           BLOCK CONTAINS 0
+           RECORDING MODE F.
+       01  cid-CHKPOINT-OUT-REC        pic x(94).
+
+       FD  ahl-CHKPOINT-OUT
+           BLOCK CONTAINS 0
+           RECORDING MODE F.
+       01  ahl-CHKPOINT-OUT-REC        pic x(94).
+
+       FD  dcc-CHKPOINT-OUT
+           BLOCK CONTAINS 0
+           RECORDING MODE F.
+       01  dcc-CHKPOINT-OUT-REC        pic x(94).
+
+       working-storage section.
+
+       77  s1 pic s999 comp-3 value +0.
+       77  s2 pic s999 comp-3 value +0.
+       77  ws-pass-amount              pic s9(11) comp-3 value +0.
+       77  ws-low-amount               pic s9(11) value zeros.
+       77  ws-hi-amount                pic s9(11) value zeros.
+
+      ************************************************
+      * commarea passed to the business logic
+      ************************************************
+         
+       01  srch-commarea.
+                                       copy BSSRCH-COMMAREA.
+
+                                       copy ELCFUNDT.
+                                       COPY ELCDATE.
+
+      * 01  TRAN-DATA-LINE1             PIC X(80)    VALUE
+      *     'BEGINJOB mode=''MVS'''.
+      * 01  TRAN-DATA-LINE2             PIC X(80)    VALUE
+      *     'LABEL name=PERL1'.
+      * 01  TRAN-DATA-LINE3             PIC X(80)    VALUE
+      *     'ASSGNDD ddname=''SYSIN'' type=''INSTREAM''  << !'.
+      * 01  TRAN-DATA-LINE4             PIC X(80)    VALUE
+      *     'perl /export/home/pema/bin/bal_sheet_ss.pl $SEQFILES/a1.txt 
+      *-    '$SEQFILES/a2.xlsx'
+      * 01  TRAN-DATA-LINE5             PIC X(80)    VALUE '!'.
+      * 01  TRAN-DATA-LINE6             PIC X(80)    VALUE
+      *    'EXECPGM pgmname=''BPXBATCH'' stepname=''PERL1'' parm=''SH'''.
+      * 01  TRAN-DATA-LINE7             PIC X(80)    VALUE
+      *     'LABEL name=EMAIL'.
+      * 01  TRAN-DATA-LINE8             PIC X(80)    VALUE
+      *     'ASSGNDD ddname=''SYSIN'' type=''INSTREAM''  << !'.
+      * 01  TRAN-DATA-LINE9             PIC X(80)    VALUE
+      *     'mutt -s ''AHL chkpts'' -a $SEQFILES/ahlmechkpts.xlsx pema@cs
+      *-    'o.com < /dev/null'.
+      * 01  TRAN-DATA-LINE10            PIC X(80)    VALUE '!'.
+      * 01  TRAN-DATA-LINE11            PIC X(80)    VALUE
+      *    'EXECPGM pgmname=''BPXBATCH'' stepname=''EMAIL'' parm=''SH'''.
+      * 01  TRAN-DATA-LINE12            PIC X(80)    VALUE
+      *     'ENDJOB'.
+
+       01  TRAN-DATA-LINE1             PIC X(80)    VALUE
+           'cd /apps/test/mdoff/jcl'.
+       01  TRAN-DATA-LINE2.
+           05  filler                  pic x(10) value 'unikixjob '.
+           05  tran-comp-id            pic xxx   value '   '.
+           05  filler                 pic x(15) value 'chkpts -k mdoff'.
+           05  filler                  pic x(52) value spaces.
+
+       01  ECS010-IN-REC.
+           05  filler                  pic x(21).
+           05  ecs010-cert-cnt         pic x(11).
+           05  filler                  pic x(62).
+
+       01  cpo-out-record.
+           05  cpo-jobname             pic x(10)  value spaces.
+           05  f                       pic x value ';'.
+           05  cpo-stepname            pic x(6)   value spaces.
+           05  f                       pic x value ';'.
+           05  cpo-low-amount          pic -9(9)  value zeros.
+           05  f                       pic x value ';'.
+           05  cpo-hi-amount           pic -9(9)  value zeros.
+           05  f                       pic x value ';'.
+           05  cpo-desc                pic x(50)  value spaces.
+
+       01  ahl-table.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL524 ;Total Claims Paid                     
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Processable Written & Outstanding Bala
+      -        'nce         '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Non-Processable Written & Outstanding 
+      -        'Balance     '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Total Written & Outstanding Balance   
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Processable Cancelled                 
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Non-Processable Cancelled             
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Total Cancelled                       
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Processable Net Premium               
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Non-Processable Net Premium           
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Total Net Premium                     
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Processable Net Commission            
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Non-Processable Net Commission        
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM10   ;EL523 ;Total Net Commission                  
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM15   ;ECS010;Life Claims Paid                      
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM15   ;ECS010;A&H Claims Paid                       
+      -        '            '.
+           05 f                        pic x(68) value
+               'AHLGM15   ;ECS010;Output Certificate Master Records Prio
+      -        'r Month     '.
+           05 f                        pic x(68) value
+               'AHLGM17   ;ECS080;Gross Reserve                         
+      -        '            '.
+
+       01  dcc-table.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL524 ;Total Claims Paid                     
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Processable Written & Outstanding Bala
+      -        'nce         '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Non-Processable Written & Outstanding 
+      -        'Balance     '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Total Written & Outstanding Balance   
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Processable Cancelled                 
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Non-Processable Cancelled             
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Total Cancelled                       
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Processable Net Premium               
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Non-Processable Net Premium           
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Total Net Premium                     
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Processable Net Commission            
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Non-Processable Net Commission        
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM10 ;EL523 ;Total Net Commission                  
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM15 ;ECS010;Life Claims Paid                      
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM15 ;ECS010;A&H Claims Paid                       
+      -        '            '.
+           05 f                        pic x(68) value
+               'CIDCLGM15 ;ECS010;Output Certificate Master Records Prio
+      -        'r Month     '.
+           05 f                        pic x(68) value
+               'CIDCLGM17 ;ECS080;Gross Reserve                         
+      -        '            '.
+
+       01  cid-table.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL524 ;Total Claims Paid                     
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Processable Written & Outstanding Bala
+      -        'nce         '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Non-Processable Written & Outstanding 
+      -        'Balance     '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Total Written & Outstanding Balance   
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Processable Cancelled                 
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Non-Processable Cancelled             
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Total Cancelled                       
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Processable Net Premium               
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Non-Processable Net Premium           
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Total Net Premium                     
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Processable Net Commission            
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Non-Processable Net Commission        
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM10   ;EL523 ;Total Net Commission                  
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM15   ;ECS010;Life Claims Paid                      
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM15   ;ECS010;A&H Claims Paid                       
+      -        '            '.
+           05 f                        pic x(68) value
+               'CILGM15   ;ECS010;Output Certificate Master Records Prio
+      -        'r Month     '.
+           05 f                        pic x(68) value
+               'CILGM17   ;ECS080;Gross Reserve                         
+      -        '            '.
+
+       01  filler redefines cid-table.
+           05  filler occurs 17.
+               10  tbl-jobname             pic x(10).
+               10  f                       pic x.
+               10  tbl-stepname            pic x(6).
+               10  f                       pic x.
+               10  tbl-desc                pic x(50).
+
+       01  filler.
+           05  filler occurs 17.
+               10  tbl-low-amount      pic s9(9).
+               10  tbl-hi-amount       pic s9(9).
+
+      ************************************
+      * fields used to read web data
+      ************************************
+      
+       01  w-form-name       pic x(80).
+       01  w-form-value      pic x(80).
+       01  w-form-name-len   pic s9(8) comp.
+       01  w-form-value-len  pic s9(8) comp.
+       01  w-resp            pic s9(8) comp.
+       01  w-doctoken        pic x(16).
+
+       01  filler.
+           05  ECS010-STATUS           PIC XX VALUE ZEROS.
+           05  CHKPNT-STATUS           pic xx value zeros.
+           05  work-cert-cnt           pic x(11).
+           05  numeric-cert-cnt        pic 9(9).
+           05  work-mort-resv-lo       pic x(11).
+           05  work-mort-resv-hi       pic x(11).
+           05  numeric-mort-resv       pic 9(9).
+
+      *****************************************
+      * symbol list for the BSDETAIL template
+      *****************************************
+      
+       01 output-data.
+          05  filler                   pic x(7) value"COMPID=".
+          05  out-comp-id              pic xxx.
+          05  filler                   pic x(8) value"&EOMDTE=".
+          05  out-eom-date             pic x(10).
+          05  filler                   pic x(9) value"&COMPNME=".
+          05  out-comp-name            pic x(30).
+          05  filler                   pic x(7) value"&FDATE=".
+          05  out-format-date          pic x(20).
+          05  filler                   pic x(10) value"&LFISSPRM=".
+          05  out-lf-iss-prem          pic zzz99,999.99.
+          05  filler                   pic x(10) value"&LFREFPRM=".
+          05  out-lf-ref-prem          pic zz,z99,999.99.
+          05  filler                   pic x(10) value"&LFNETPRM=".
+          05  out-lf-net-prem          pic -zz,zz9,999.99.
+          05  filler                   pic x(10) value"&AHISSPRM=".
+          05  out-ah-iss-prem          pic zz,zz9,999.99.
+          05  filler                   pic x(10) value"&AHREFPRM=".
+          05  out-ah-ref-prem          pic zz,z99,999.99.
+          05  filler                   pic x(10) value"&AHNETPRM=".
+          05  out-ah-net-prem          pic -zz,z99,999.99.
+          05  filler                   pic x(10) value"&LFISSCOM=".
+          05  out-lf-iss-comm          pic zz,zz9,999.99.
+          05  filler                   pic x(10) value"&LFREFCOM=".
+          05  out-lf-ref-comm          pic zz,zz9,999.99.
+          05  filler                   pic x(10) value"&LFNETCOM=".
+          05  out-lf-net-comm          pic -zz,zz9,999.99.
+          05  filler                   pic x(10) value"&AHISSCOM=".
+          05  out-ah-iss-comm          pic zz,zzz,999.99.
+          05  filler                   pic x(10) value"&AHREFCOM=".
+          05  out-ah-ref-comm          pic zz,z99,999.99.
+          05  filler                   pic x(10) value"&AHNETCOM=".
+          05  out-ah-net-comm          pic -zz,z99,999.99.
+          05  filler                   pic x(9) value "&TOTPREM=".
+          05  out-tot-prem             pic zz,z99,999.99.
+          05  filler                   pic x(9) value "&TOTREFS=".
+          05  out-tot-refs             pic zz,z99,999.99.
+          05  filler                   pic x(9) value"&TOTNETP=".
+          05  out-tot-netp             pic -zz,z99,999.99.
+          05  filler                   pic x(8) value"&ISSCOM=".
+          05  out-iss-comm             pic zz,zz9,999.99.
+          05  filler                   pic x(8) value"&REFCOM=".
+          05  out-ref-comm             pic zz,z99,999.99.
+          05  filler                   pic x(9) value"&TOTNCOM=".
+          05  out-net-comm             pic -zz,z99,999.99.
+          05  filler                   pic x(8) value "&ISSCNT=".
+          05  out-iss-cnt              pic zzzz,z99.
+          05  filler                   pic x(8) value "&REFCNT=".
+          05  out-ref-cnt              pic zzzz,999.
+          05  filler                   pic x(8) value "&NETCNT=".
+          05  out-net-cnt              pic -zzzz,999.
+          05  filler                   pic x(8) value"&LFCLMS=".
+          05  out-lf-clms-pd           pic zz,z99,999.99.
+          05  filler                   pic x(9) value"&LFVOIDS=".
+          05  out-lf-clms-void         pic zz,zz9,999.99.
+          05  filler                   pic x(11) value"&TOTLFCLMS=".
+          05  out-lf-tot-clms          pic -zz,z99,999.99.
+          05  filler                   pic x(8) value"&AHCLMS=".
+          05  out-ah-clms-pd           pic zz,z99,999.99.
+          05  filler                   pic x(9) value"&AHVOIDS=".
+          05  out-ah-clms-void         pic zz,zz9,999.99.
+          05  filler                   pic x(11) value"&TOTAHCLMS=".
+          05  out-ah-tot-clms          pic -zz,z99,999.99.
+          05  filler                   pic x(8) value"&PDCLMS=".
+          05  out-clms-pd              pic zz,z99,999.99.
+          05  filler                   pic x(8) value"&VDCLMS=".
+          05  out-clms-void            pic zz,z99,999.99.
+          05  filler                   pic x(9) value"&TOTCLMS=".
+          05  out-tot-clms             pic -zz,z99,999.99.
+          05  filler                   pic x(8) value"&LORESV=".
+          05  out-lo-resv              pic zzz,z99,999.
+          05  filler                   pic x(8) value"&HIRESV=".
+          05  out-hi-resv              pic zzz,z99,999.
+          05  filler                   pic x(8) value"&CRTCNT=".
+          05  out-crt-cnt              pic z,zz9,999.
+          05  filler                   pic x(5) value "&MSG=".
+          05  output-msg               pic x(50).
+      
+       01 bl-index               pic s9(8) comp.
+       
+       procedure division.
+
+       0000-begin.
+
+           MOVE FUNCTION CURRENT-DATE  TO FUNCTION-DATE
+
+           exec cics web
+              startbr formfield resp(w-resp)
+           end-exec
+           
+           perform 0200-read-form      thru 0200-exit until
+              w-resp not = dfhresp(normal)
+           
+           exec cics web 
+              endbr formfield 
+           end-exec
+
+           display ' input date   ' bl-input-eom-date
+           display ' comp id      ' bl-input-comp-id
+           display ' mort resv lo ' work-mort-resv-lo
+           display ' mort resv hi ' work-mort-resv-hi
+           display ' build file   ' bl-input-bld-file
+
+           evaluate bl-input-comp-id
+              when 'AHL'
+                 open input AHL-ECS010-IN
+                 if ecs010-status not = '00'
+                    move ' Cant open AHL ecs010 file '
+                                       to bl-output-message
+                    go to 0100-send-document
+                 end-if
+                 READ AHL-ECS010-IN into ecs010-in-rec
+                    display ' ecs010 cert cnt ' ecs010-cert-cnt
+                    move ecs010-cert-cnt
+                                       to work-cert-cnt
+                 close ahl-ecs010-in
+              when 'CID'
+                 open input CID-ECS010-IN
+                 if ecs010-status not = '00'
+                    move ' Cant open AHL ecs010 file '
+                                       to bl-output-message
+                    go to 0100-send-document
+                 end-if
+                 READ CID-ECS010-IN into ecs010-in-rec
+                    display ' ecs010 cert cnt ' ecs010-cert-cnt
+                    move ecs010-cert-cnt
+                                       to work-cert-cnt
+                 close cid-ecs010-in
+              when 'DCC'
+                 open input DCC-ECS010-IN
+                 if ecs010-status not = '00'
+                    move ' Cant open AHL ecs010 file '
+                                       to bl-output-message
+                    go to 0100-send-document
+                 end-if
+                 READ DCC-ECS010-IN into ecs010-in-rec
+                    display ' ecs010 cert cnt ' ecs010-cert-cnt
+                    move ecs010-cert-cnt
+                                       to work-cert-cnt
+                 close dcc-ecs010-in
+           end-evaluate
+
+           move zeros                  to numeric-cert-cnt
+           inspect work-cert-cnt replacing all spaces by zeros
+           move +9 to s2
+           perform varying s1 from +11 by -1 until s1 < +1
+              if work-cert-cnt (s1:1) numeric
+                 move work-cert-cnt (s1:1)
+                                       to numeric-cert-cnt (s2:1)
+                 subtract +1 from s2
+              end-if
+           end-perform
+           move numeric-cert-cnt       to bl-out-cm-cnt
+
+           move zeros                  to numeric-mort-resv
+      *    inspect work-mort-resv replacing all spaces by zeros
+           move +9 to s2
+           perform varying s1 from +11 by -1 until s1 < +1
+              if work-mort-resv-lo (s1:1) numeric
+                 move work-mort-resv-lo (s1:1)
+                                       to numeric-mort-resv (s2:1)
+                 subtract +1 from s2
+              end-if
+           end-perform
+           move numeric-mort-resv      to bl-input-lo-resv
+           display ' bl lo reserve ' bl-input-lo-resv
+
+           move zeros                  to numeric-mort-resv
+      *    inspect work-mort-resv replacing all spaces by zeros
+           move +9 to s2
+           perform varying s1 from +11 by -1 until s1 < +1
+              if work-mort-resv-hi (s1:1) numeric
+                 move work-mort-resv-hi (s1:1)
+                                       to numeric-mort-resv (s2:1)
+                 subtract +1 from s2
+              end-if
+           end-perform
+           move numeric-mort-resv      to bl-input-hi-resv
+           display ' bl hi reserve ' bl-input-hi-resv
+
+           exec cics link
+              program  ('BSSRCHBL')
+              commarea (srch-commarea)
+           end-exec
+
+           .
+       0100-send-document.
+      ***********************************************************
+      * Build output document.
+      ***********************************************************
+           move bl-input-comp-id       to out-comp-id
+           move bl-input-eom-date      to out-eom-date
+           move bl-input-lo-resv       to out-lo-resv
+           move bl-input-hi-resv       to out-hi-resv
+           move bl-out-company-name    to out-comp-name
+           move bl-out-formated-date   to out-format-date
+           move bl-out-lf-prem (1)     to out-lf-iss-prem
+           move bl-out-ah-prem (1)     to out-ah-iss-prem
+           move bl-out-tot-prm (1)     to out-tot-prem
+           move bl-out-lf-ref  (1)     to out-lf-ref-prem
+           move bl-out-ah-ref  (1)     to out-ah-ref-prem
+           move bl-out-tot-ref (1)     to out-tot-refs
+           move bl-out-lf-net  (1)     to out-lf-net-prem
+           move bl-out-ah-net  (1)     to out-ah-net-prem
+           move bl-out-lf-iss-com (1)  to out-lf-iss-comm
+           move bl-out-ah-iss-com (1)  to out-ah-iss-comm
+           move bl-out-lf-ref-com (1)  to out-lf-ref-comm
+           move bl-out-ah-ref-com (1)  to out-ah-ref-comm
+           move bl-out-lf-net-com (1)  to out-lf-net-comm
+           move bl-out-ah-net-com (1)  to out-ah-net-comm
+           move bl-out-iss-com    (1)  to out-iss-comm
+           move bl-out-ref-com    (1)  to out-ref-comm
+           move bl-out-net-com    (1)  to out-net-comm
+           move bl-out-iss-cnt    (1)  to out-iss-cnt
+           move bl-out-can-cnt    (1)  to out-ref-cnt
+           move bl-out-net-cnt    (1)  to out-net-cnt
+           move bl-out-net-tot    (1)  to out-tot-netp
+           move bl-out-cm-cnt          to out-crt-cnt
+           move bl-out-lf-clms-pd      to out-lf-clms-pd
+           move bl-out-lf-clms-void    to out-lf-clms-void
+           move bl-out-lf-tot-clms     to out-lf-tot-clms
+           move bl-out-ah-clms-pd      to out-ah-clms-pd
+           move bl-out-ah-clms-void    to out-ah-clms-void
+           move bl-out-ah-tot-clms     to out-ah-tot-clms
+           move bl-out-clms-pd         to out-clms-pd
+           move bl-out-clms-void       to out-clms-void
+           move bl-out-tot-clms        to out-tot-clms
+           
+           move bl-output-message      to output-msg
+
+           if bl-input-bld-file = 'YES'
+              move 'Balance File Created'
+                                       to output-msg
+           end-if
+           exec cics document create
+              doctoken   (w-doctoken)
+              template   ('BSDETAIL')
+              symbollist (output-data)
+              listlength (length of output-data)
+           end-exec
+
+           move 1                      to bl-index
+
+      *    exec cics document insert
+      *       doctoken (w-doctoken)
+      *       template ('BSFTR')
+      *    end-exec
+
+          if bl-fail
+             exec cics syncpoint rollback
+             end-exec
+          end-if
+
+      ****************************************
+      * Send the document and return.
+      ****************************************
+
+           exec cics web send
+              doctoken(w-doctoken)
+           end-exec
+
+           if bl-input-bld-file = 'YES'
+              evaluate bl-input-comp-id
+                 when 'AHL'
+                    move ahl-table     to cid-table
+                    perform 0300-build-cid
+                                       thru 0300-exit
+                    perform 0400-write-ahl
+                                       thru 0400-exit
+                 when 'CID'
+                    perform 0300-build-cid
+                                       thru 0300-exit
+                    perform 0500-write-cid
+                                       thru 0500-exit
+                 when 'DCC'
+                    move dcc-table     to cid-table
+                    perform 0300-build-cid
+                                       thru 0300-exit
+                    perform 0600-write-dcc
+                                       thru 0600-exit
+              end-evaluate
+           end-if
+
+           exec cics return
+           end-exec
+
+           .
+       0200-read-form.
+
+           move spaces                 to w-form-name
+           move length of w-form-name  to w-form-name-len
+           move spaces                 to w-form-value
+           move length of w-form-value to w-form-value-len
+           exec cics web readnext 
+              formfield   (w-form-name)
+              namelength  (w-form-name-len)
+              value       (w-form-value)
+              valuelength (w-form-value-len)
+              resp        (w-resp)
+           end-exec
+
+           evaluate w-resp
+              when dfhresp(normal)
+                 evaluate w-form-name(1:w-form-name-len)
+                    when 'eom_dte'
+                       if w-form-value-len not = 0
+                          move w-form-value(1:w-form-value-len)
+                                       to bl-input-eom-date
+                       else
+                          move spaces  to bl-input-eom-date
+                      end-if
+                    when 'comp_id'
+                       if w-form-value-len not = 0
+                          move w-form-value(1:w-form-value-len)
+                                       to bl-input-comp-id
+                       else
+                          move spaces  to bl-input-comp-id
+                      end-if
+                    when 'lo_resv'
+                       if w-form-value-len not = 0
+                          move w-form-value(1:w-form-value-len)
+                                       to work-mort-resv-lo
+                       else
+                          move zeros   to work-mort-resv-lo
+                      end-if
+                    when 'hi_resv'
+                       if w-form-value-len not = 0
+                          move w-form-value(1:w-form-value-len)
+                                       to work-mort-resv-hi
+                       else
+                          move zeros   to work-mort-resv-hi
+                      end-if
+                    when 'bld_file'
+                       if w-form-value-len not = 0
+                          move w-form-value(1:w-form-value-len)
+                                       to bl-input-bld-file
+                       else
+                          move spaces  to bl-input-bld-file
+                      end-if
+                 end-evaluate
+              when other
+                 continue
+           end-evaluate
+
+           .
+       0200-exit.
+           exit.
+
+       0300-build-cid.
+
+           perform varying s1 from +1 by +1 until s1 > +17
+              move -999999999          to tbl-low-amount (s1)
+              move +999999999          to tbl-hi-amount  (s1)
+           end-perform
+
+           move bl-out-tot-clms        to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (1)
+           move ws-hi-amount           to tbl-hi-amount (1)
+
+           move bl-out-tot-prm (1)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (2)
+           move ws-hi-amount           to tbl-hi-amount (2)
+
+           move bl-out-tot-prm (2)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (3)
+           move ws-hi-amount           to tbl-hi-amount (3)
+
+           move bl-out-tot-prm (3)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (4)
+           move ws-hi-amount           to tbl-hi-amount (4)
+
+           move bl-out-tot-ref (1)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (5)
+           move ws-hi-amount           to tbl-hi-amount (5)
+
+           move bl-out-tot-ref (2)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (6)
+           move ws-hi-amount           to tbl-hi-amount (6)
+
+           move bl-out-tot-ref (3)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (7)
+           move ws-hi-amount           to tbl-hi-amount (7)
+
+           move bl-out-net-tot (1)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (8)
+           move ws-hi-amount           to tbl-hi-amount (8)
+
+           move bl-out-net-tot (2)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (9)
+           move ws-hi-amount           to tbl-hi-amount (9)
+
+           move bl-out-net-tot (3)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (10)
+           move ws-hi-amount           to tbl-hi-amount (10)
+
+           move bl-out-net-com (1)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (11)
+           move ws-hi-amount           to tbl-hi-amount (11)
+
+           move bl-out-net-com (2)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (12)
+           move ws-hi-amount           to tbl-hi-amount (12)
+
+           move bl-out-net-com (3)     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (13)
+           move ws-hi-amount           to tbl-hi-amount (13)
+
+           move bl-out-lf-tot-clms     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (14)
+           move ws-hi-amount           to tbl-hi-amount (14)
+
+           move bl-out-ah-tot-clms     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move ws-low-amount          to tbl-low-amount (15)
+           move ws-hi-amount           to tbl-hi-amount (15)
+
+           move bl-out-cm-cnt          to tbl-low-amount (16)
+                                          tbl-hi-amount  (16)
+
+           move bl-input-lo-resv       to tbl-low-amount (17)
+           move bl-input-hi-resv       to tbl-hi-amount (17)
+
+           .
+       0300-exit.
+           exit.
+
+       0310-calc-tol.
+
+           if ws-pass-amount > zeros
+              compute ws-low-amount = ws-pass-amount * .98
+              compute ws-hi-amount  = ws-pass-amount * 1.02
+           else
+              compute ws-low-amount = ws-pass-amount * 1.02
+              compute ws-hi-amount  = ws-pass-amount * .98
+           end-if
+
+           .
+       0310-exit.
+           exit.
+
+       0400-write-ahl.
+
+           open output ahl-chkpoint-out
+           if chkpnt-status not = '00'
+              move ' Cant open AHL CHKPNT file '
+                 to bl-output-message
+              go to 0100-send-document
+           end-if
+
+           move bl-input-eom-date      to cpo-jobname
+           move 'AHL'                  to cpo-stepname
+           string ws-fn-mo '/' ws-fn-da '/' ws-fn-ccyy ' - '
+              ws-fn-hours ':' ws-fn-minutes ':' ws-fn-seconds
+              delimited by size into cpo-desc
+           end-string
+           write ahl-chkpoint-out-rec  from cpo-out-record
+
+           move spaces                 to cpo-jobname
+                                          cpo-stepname
+
+           move 'Proc Cnt'             to cpo-desc
+           move bl-out-iss-cnt (1)     to cpo-low-amount
+           move bl-out-can-cnt (1)     to cpo-hi-amount
+           write ahl-chkpoint-out-rec  from cpo-out-record
+           move 'NonProcCnt'           to cpo-desc
+           move bl-out-iss-cnt (2)     to cpo-low-amount
+           move bl-out-can-cnt (2)     to cpo-hi-amount
+           write ahl-chkpoint-out-rec  from cpo-out-record
+           move 'Total Cnt'            to cpo-desc
+           move bl-out-iss-cnt (3)     to cpo-low-amount
+           move bl-out-can-cnt (3)     to cpo-hi-amount
+           write ahl-chkpoint-out-rec  from cpo-out-record
+
+
+           move bl-out-lf-clms-cur     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move 'LF Claims Paid Curr'  to cpo-desc
+           move ws-low-amount          to cpo-low-amount
+           move ws-hi-amount           to cpo-hi-amount
+           write ahl-chkpoint-out-rec  from cpo-out-record
+
+           move bl-out-ah-clms-cur     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move 'AH Claims Paid Curr'  to cpo-desc
+           move ws-low-amount          to cpo-low-amount
+           move ws-hi-amount           to cpo-hi-amount
+           write ahl-chkpoint-out-rec  from cpo-out-record
+
+           move bl-out-tot-clms-cur    to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move 'TOT Claims Paid Curr' to cpo-desc
+           move ws-low-amount          to cpo-low-amount
+           move ws-hi-amount           to cpo-hi-amount
+           write ahl-chkpoint-out-rec  from cpo-out-record
+
+           perform varying s1 from 1 by 1 until s1 > 17
+              move tbl-jobname    (s1) to cpo-jobname
+              move tbl-stepname   (s1) to cpo-stepname
+              move tbl-desc       (s1) to cpo-desc
+              move tbl-low-amount (s1) to cpo-low-amount
+              move tbl-hi-amount  (s1) to cpo-hi-amount
+              write ahl-chkpoint-out-rec from cpo-out-record
+           end-perform
+
+           close ahl-chkpoint-out
+           perform 0700-submit-job     thru 0700-exit
+
+           .
+       0400-exit.
+           exit.
+
+       0500-write-cid.
+
+           open output cid-chkpoint-out
+
+           if chkpnt-status not = '00'
+              move ' Cant open CID CHKPNT file '
+                 to bl-output-message
+              go to 0100-send-document
+           end-if
+
+           move bl-input-eom-date      to cpo-jobname
+           move 'CID'                  to cpo-stepname
+           string ws-fn-mo '/' ws-fn-da '/' ws-fn-ccyy ' - '
+              ws-fn-hours ':' ws-fn-minutes ':' ws-fn-seconds
+              delimited by size into cpo-desc
+           end-string
+           write cid-chkpoint-out-rec  from cpo-out-record
+
+           move spaces                 to cpo-jobname
+                                          cpo-stepname
+
+           move 'Proc Cnt'             to cpo-desc
+           move bl-out-iss-cnt (1)     to cpo-low-amount
+           move bl-out-can-cnt (1)     to cpo-hi-amount
+           write cid-chkpoint-out-rec  from cpo-out-record
+           move 'NonProcCnt'           to cpo-desc
+           move bl-out-iss-cnt (2)     to cpo-low-amount
+           move bl-out-can-cnt (2)     to cpo-hi-amount
+           write cid-chkpoint-out-rec  from cpo-out-record
+           move 'Total Cnt'            to cpo-desc
+           move bl-out-iss-cnt (3)     to cpo-low-amount
+           move bl-out-can-cnt (3)     to cpo-hi-amount
+           write cid-chkpoint-out-rec  from cpo-out-record
+
+
+           move bl-out-lf-clms-cur     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move 'LF Claims Paid Curr'  to cpo-desc
+           move ws-low-amount          to cpo-low-amount
+           move ws-hi-amount           to cpo-hi-amount
+           write cid-chkpoint-out-rec  from cpo-out-record
+
+           move bl-out-ah-clms-cur     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move 'AH Claims Paid Curr'  to cpo-desc
+           move ws-low-amount          to cpo-low-amount
+           move ws-hi-amount           to cpo-hi-amount
+           write cid-chkpoint-out-rec  from cpo-out-record
+
+           move bl-out-tot-clms-cur    to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move 'TOT Claims Paid Curr' to cpo-desc
+           move ws-low-amount          to cpo-low-amount
+           move ws-hi-amount           to cpo-hi-amount
+           write cid-chkpoint-out-rec  from cpo-out-record
+
+           perform varying s1 from 1 by 1 until s1 > 17
+              move tbl-jobname    (s1) to cpo-jobname
+              move tbl-stepname   (s1) to cpo-stepname
+              move tbl-desc       (s1) to cpo-desc
+              move tbl-low-amount (s1) to cpo-low-amount
+              move tbl-hi-amount  (s1) to cpo-hi-amount
+              write cid-chkpoint-out-rec
+                                       from cpo-out-record
+           end-perform
+
+           close cid-chkpoint-out
+           perform 0700-submit-job     thru 0700-exit
+
+           .
+       0500-exit.
+           exit.
+
+       0600-write-dcc.
+
+           open output dcc-chkpoint-out
+
+           if chkpnt-status not = '00'
+              move ' Cant open DCC CHKPNT file '
+                 to bl-output-message
+              go to 0100-send-document
+           end-if
+
+           move bl-input-eom-date      to cpo-jobname
+           move 'DCC'                  to cpo-stepname
+           string ws-fn-mo '/' ws-fn-da '/' ws-fn-ccyy ' - '
+              ws-fn-hours ':' ws-fn-minutes ':' ws-fn-seconds
+              delimited by size into cpo-desc
+           end-string
+           write dcc-chkpoint-out-rec  from cpo-out-record
+
+           move spaces                 to cpo-jobname
+                                          cpo-stepname
+
+           move 'Proc Cnt'             to cpo-desc
+           move bl-out-iss-cnt (1)     to cpo-low-amount
+           move bl-out-can-cnt (1)     to cpo-hi-amount
+           write dcc-chkpoint-out-rec  from cpo-out-record
+           move 'NonProcCnt'           to cpo-desc
+           move bl-out-iss-cnt (2)     to cpo-low-amount
+           move bl-out-can-cnt (2)     to cpo-hi-amount
+           write dcc-chkpoint-out-rec  from cpo-out-record
+           move 'Total Cnt'            to cpo-desc
+           move bl-out-iss-cnt (3)     to cpo-low-amount
+           move bl-out-can-cnt (3)     to cpo-hi-amount
+           write dcc-chkpoint-out-rec  from cpo-out-record
+
+
+           move bl-out-lf-clms-cur     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move 'LF Claims Paid Curr'  to cpo-desc
+           move ws-low-amount          to cpo-low-amount
+           move ws-hi-amount           to cpo-hi-amount
+           write dcc-chkpoint-out-rec  from cpo-out-record
+
+           move bl-out-ah-clms-cur     to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move 'AH Claims Paid Curr'  to cpo-desc
+           move ws-low-amount          to cpo-low-amount
+           move ws-hi-amount           to cpo-hi-amount
+           write dcc-chkpoint-out-rec  from cpo-out-record
+
+           move bl-out-tot-clms-cur    to ws-pass-amount
+           perform 0310-calc-tol       thru 0310-exit
+           move 'TOT Claims Paid Curr' to cpo-desc
+           move ws-low-amount          to cpo-low-amount
+           move ws-hi-amount           to cpo-hi-amount
+           write dcc-chkpoint-out-rec  from cpo-out-record
+
+           perform varying s1 from 1 by 1 until s1 > 16
+              move tbl-jobname    (s1) to cpo-jobname
+              move tbl-stepname   (s1) to cpo-stepname
+              move tbl-desc       (s1) to cpo-desc
+              move tbl-low-amount (s1) to cpo-low-amount
+              move tbl-hi-amount  (s1) to cpo-hi-amount
+              write dcc-chkpoint-out-rec from cpo-out-record
+           end-perform
+
+           close dcc-chkpoint-out
+
+           perform 0700-submit-job     thru 0700-exit
+
+           .
+       0600-exit.
+           exit.
+
+       0700-submit-job.
+
+           move function lower-case(bl-input-comp-id)
+                                       to tran-comp-id
+
+           EXEC CICS WRITEQ TD
+              QUEUE ('BTCH')
+              FROM (TRAN-DATA-LINE1)
+              LENGTH (80)
+           END-EXEC
+
+           EXEC CICS WRITEQ TD
+              QUEUE ('BTCH')
+              FROM (TRAN-DATA-LINE2)
+              LENGTH (80)
+           END-EXEC
+
+           .
+       0700-exit.
+           exit.

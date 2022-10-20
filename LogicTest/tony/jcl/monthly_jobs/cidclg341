@@ -1,0 +1,97 @@
+################################################################################
+#
+#  Job:  cidclg341
+#
+################################################################################
+BEGINJOB mode='MVS'
+
+#*******************************************************************************
+#*****
+#* This job is submitted via a job script <dccmth...> that may submit other
+#* jobs. Files beginning with DC.DL.CIADM... are ftp'd at the start of the next
+#* job script.  Other files not starting with DC.DL.. that are being
+#* transferred should be noted below.
+#*****
+#*******************************************************************************
+
+################################################################################
+LABEL name=TRLRBKP1 
+################################################################################
+ASSGNDD ddname='ELTRLR' dataset='CI.DD.LG.ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='OUTPUT' dataset='DC.XX.LG.ELTRLR' gdg='+1' filename='\${SEQFILES}/DC.XX.LG.ELTRLR' disp='o' normal='k' abend='d' recfmt='F' recsize='200' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+    REPRO IFILE(ELTRLR) -
+          OFILE(OUTPUT)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='TRLRBKP1' 
+
+################################################################################
+LABEL name=REPTBKP1 
+################################################################################
+ASSGNDD ddname='ELREPT' dataset='CI.DD.LG.ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='OUTPUT' dataset='DC.XX.ELREPT.BKPONLY' gdg='+1' filename='\${SEQFILES}/DC.XX.ELREPT.BKPONLY' disp='o' normal='k' abend='d' recfmt='F' recsize='146' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+    REPRO IFILE(ELREPT) -
+          OFILE(OUTPUT)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='REPTBKP1' 
+
+################################################################################
+LABEL name=EL341 
+################################################################################
+ASSGNDD ddname='SYS018' filename='\${SEQFILES}/DC.DD.DET010.TEMP' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS020' filename='\${SEQFILES}/DC.EX.EL341.FCH' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS015' filename='/tmp/CIDCLG341_WORK' recfmt='F' recsize='510' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/DC.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='ELTRLR' dataset='CI.DD.LG.ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ELREPT' dataset='CI.DD.LG.ELREPT' type='VS' filename='ELREPT' disp='i-o' 
+ASSGNDD ddname='ERMEBL' dataset='CI.DD.LG.ERMEBL' type='VS' filename='ERMEBL' disp='i-o'
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='B' 
+
+EXECPGM pgmname='EL341' stepname='EL341' 
+
+################################################################################
+LABEL name=CPY341
+################################################################################
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/DC.EX.EL341.FCH' disp='i'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/DC.DL.CIADM.FICH341' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY341' parm='ALL' 
+
+################################################################################
+LABEL name=TRLRBKP2 
+################################################################################
+ASSGNDD ddname='ELTRLR' dataset='CI.DD.LG.ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='OUTPUT' dataset='DC.XX.LG.ELTRLR' gdg='+2' filename='\${SEQFILES}/DC.XX.LG.ELTRLR' disp='o' normal='k' abend='d' recfmt='F' recsize='200' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+    REPRO IFILE(ELTRLR) -
+          OFILE(OUTPUT)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='TRLRBKP2' 
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+
+    "cp $SYSOUTDIR/$JOBNAME/EL341/SYS008_$JON /data/test/convertin"
+    "perl /export/home/mtpadmin/bin/dcc_new_paper_test.pl /export/home/mtpadmin/bin/dcc_paper_rpt_hash"
+    "cp /data/test/convertin/SYS008_${JON}.CVT /data/test/convertout/SYS008_${JON}_341"
+    "exelpr.sh l133std.parms '-oti=EL341 -ode=DCCI' /data/test/convertout/SYS008_${JON}_341"
+    "rm /data/test/convertin/*"
+
+else
+    echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 042503                 SMVA   NEW JOB FOR DCC, MODELED AFTER CID JOB
+# 071103                 SMVA   ADD VERBIAGE CONVERSION PROCESS FOR PAPER RPTS

@@ -1,0 +1,54 @@
+################################################################################
+#                                                                              #
+#     JOB: ahlg590                                                             #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=EL590
+################################################################################
+#
+# Creates Open Credit Life Claims over $20,000 report
+#
+################################################################################
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS010' dataset='CI.XX.CLMDLY.EXTR' gdg='0' filename='$SEQFILES/CI.XX.CLMDLY.EXTR' disp='i-o' normal='k' abend='k' recfmt='F' recsize='314' 
+ASSGNDD  ddname='SYS008' type='SYSOUT' 
+
+EXECPGM pgmname='EL590' stepname='EL590' 
+
+################################################################################
+LABEL name=CPY590
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL590/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.CIADM.FICH590' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY590' parm='ALL' 
+
+################################################################################
+
+################################################################################
+LABEL name=FTP590
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntis1.cso.local < $JCLLIB/ftp-ahlg590
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTP590' parm='SH'
+
+
+
+if ($JOBSTATUS == 0) then
+   "exelpr.sh p60w1s.parms '-ode=AHL' $SYSOUTDIR/$JOBNAME/EL590/SYS008_$JON"
+else
+   echo "job aborted print not released"
+endif
+
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 032812                 PEMA   NEW JOB

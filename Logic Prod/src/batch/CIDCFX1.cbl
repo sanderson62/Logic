@@ -1,0 +1,372 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. CIDCFX1.
+       AUTHOR.     PABLO.
+       DATE-COMPILED.
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+
+           SELECT ELCNTL           ASSIGN TO ELCNTL
+                                   ORGANIZATION IS INDEXED
+                                   ACCESS IS DYNAMIC
+                                   RECORD KEY IS CF-CONTROL-PRIMARY
+                                   FILE STATUS IS ELCNTL-FILE-STATUS.
+
+           SELECT DISK-DATE        ASSIGN TO SYS019.
+
+           SELECT ELCNTL-OUT       ASSIGN TO ELCNTLOT
+               ORGANIZATION IS LINE SEQUENTIAL.
+
+           EJECT
+       DATA DIVISION.
+       FILE SECTION.
+
+       FD  ELCNTL.
+
+           COPY ELCCNTL.
+
+       FD  DISK-DATE
+                                       COPY ELCDTEFD.
+
+       FD  ELCNTL-OUT
+           RECORDING MODE V
+           LABEL RECORDS STANDARD
+           BLOCK CONTAINS 0 RECORDS.
+
+       01  CF-STATE-REC                PIC X(155).
+
+       WORKING-STORAGE SECTION.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+       77  FILLER  PIC X(32) VALUE '   PEMCFX3  WORKING STORAGE     '.
+       77  FILLER  PIC X(32) VALUE '********************************'.
+
+       77  WS-EOF-SW                   PIC X VALUE SPACES.
+           88  END-OF-ELCNTL                 VALUE 'Y'.
+       77  ELCNTL-RECS-IN              PIC 9(9) VALUE ZEROS.
+       77  ELCNTL-RECS-OUT             PIC 9(9) VALUE ZEROS.
+       77  PGM-SUB                     PIC S9(5) COMP-3 VALUE +515.
+       01  WS-ABEND-AREA.
+           05  WS-ABEND-FILE-STATUS    PIC X(02).
+           05  WS-ABEND-MESSAGE        PIC X(80) VALUE SPACES.
+           05  WS-RETURN-CODE          PIC S9(04)  COMP VALUE +0.
+           05  WS-ZERO                 PIC S9(01) VALUE +0 COMP-3.
+
+       01  WS-EX3-INIT                 PIC X(155) VALUE LOW-VALUES.
+       01  EX-STATE-REC.
+           12  EX3-STATE               PIC XX.
+           12  EX3-TAB1                PIC X.
+           12  EX3-STATE-NAME          PIC X(25).
+           12  EX3-TAB2                PIC X.
+           12  EX3-SL-COMM-CAP         PIC 9.9999.
+           12  EX3-TAB3                PIC X.
+           12  EX3-JL-COMM-CAP         PIC 9.9999.
+           12  EX3-TAB4                PIC X.
+           12  EX3-SA-COMM-CAP         PIC 9.9999.
+           12  EX3-TAB5                PIC X.
+           12  EX3-JA-COMM-CAP         PIC 9.9999.
+           12  EX3-TAB6                PIC X.
+           12  EX3-LF-PREM-TAX         PIC 9.9999.
+           12  EX3-TAB7                PIC X.
+           12  EX3-AH-PREM-TAX-I       PIC 9.9999.
+           12  EX3-TAB8                PIC X.
+           12  EX3-AH-PREM-TAX-G       PIC 9.9999.
+           12  EX3-TAB9                PIC X.
+           12  EX3-LAST-MAINT-DT       PIC X(10).
+           12  EX3-TAB10               PIC X.
+           12  EX3-LAST-MAINT-BY       PIC X(04).
+           12  EX3-TAB11               PIC X.
+110817     12  EX3-SL-GA-COMM-CAP      PIC 9.9999.
+110817     12  EX3-TAB12               PIC X.
+110817     12  EX3-JL-GA-COMM-CAP      PIC 9.9999.
+110817     12  EX3-TAB13               PIC X.
+110817     12  EX3-SA-GA-COMM-CAP      PIC 9.9999.
+110817     12  EX3-TAB14               PIC X.
+110817     12  EX3-JA-GA-COMM-CAP      PIC 9.9999.
+110817     12  EX3-TAB15               PIC X.
+110817     12  EX3-SL-TOT-COMM-CAP     PIC 9.9999.
+110817     12  EX3-TAB16               PIC X.
+110817     12  EX3-JL-TOT-COMM-CAP     PIC 9.9999.
+110817     12  EX3-TAB17               PIC X.
+110817     12  EX3-SA-TOT-COMM-CAP     PIC 9.9999.
+110817     12  EX3-TAB18               PIC X.
+110817     12  EX3-JA-TOT-COMM-CAP     PIC 9.9999.
+110817     12  EX3-TAB19               PIC X.
+110817     12  EX3-COMM-CAP-REQUIRED   PIC X.
+110817     12  EX3-TAB20               PIC X.
+110817     12  EX3-COMM-CAP-TYPE       PIC X.
+110817     12  EX3-TAB21               PIC X.
+           12  EX3-EOR                 PIC X.
+
+      ******************************************************************
+       01  WS-MISC.
+           05  WS-CNTR                 PIC 9(4) VALUE ZEROS.
+           05  ELCNTL-FILE-STATUS      PIC XX    VALUE ZEROS.
+           05  WS-DATE                 PIC 9(11) VALUE ZEROS.
+
+                                       COPY ELCDATE.
+                                       COPY ELCDTECX.
+                                       COPY ELCDTEVR.
+
+       PROCEDURE DIVISION.
+
+                                       COPY ELCDTERX.
+
+           PERFORM 4000-OPEN-FILES     THRU 4000-EXIT
+
+           PERFORM 5020-INITIALIZE     THRU 5020-EXIT
+
+           PERFORM 0100-PROCESS-ELCNTL THRU 0100-EXIT UNTIL
+              (END-OF-ELCNTL)
+
+           PERFORM 5000-CLOSE-FILES    THRU 5000-EXIT
+
+           DISPLAY ' ELCNTL RECORDS READ    '  ELCNTL-RECS-IN
+           DISPLAY ' ELCNTL RECORDS WRITTEN '  ELCNTL-RECS-OUT
+           GOBACK
+
+           .
+       0100-PROCESS-ELCNTL.
+
+           IF CF-RECORD-TYPE = '3'
+               PERFORM 0600-BUILD-STATE-REC THRU 0600-EXIT
+           END-IF.
+                            
+           PERFORM 0200-READ-ELCNTL    THRU 0200-EXIT.
+
+
+       0100-EXIT.
+           EXIT.
+
+       0200-READ-ELCNTL.
+
+           READ ELCNTL NEXT RECORD
+
+           IF ELCNTL-FILE-STATUS = '10' OR '23'
+              SET END-OF-ELCNTL        TO TRUE
+           ELSE
+              IF ELCNTL-FILE-STATUS NOT = '00'
+                 DISPLAY 'ELCNTL READ NEXT ' ELCNTL-FILE-STATUS
+                 SET END-OF-ELCNTL     TO TRUE
+              ELSE
+                 IF (CF-COMPANY-ID NOT = DTE-CLIENT)
+                    OR (CF-RECORD-TYPE > '3')
+                    SET END-OF-ELCNTL TO TRUE
+                 END-IF
+              END-IF
+           END-IF
+
+           IF NOT END-OF-ELCNTL
+              ADD 1 TO ELCNTL-RECS-IN
+           END-IF
+
+           .
+       0200-EXIT.
+           EXIT.
+
+       0600-BUILD-STATE-REC.
+
+           MOVE WS-EX3-INIT         TO EX-STATE-REC
+           MOVE CF-STATE-CODE       TO EX3-STATE
+           MOVE CF-STATE-NAME       TO EX3-STATE-NAME
+
+           IF CF-ST-COMM-CAP-SL NOT NUMERIC
+               MOVE 0  TO EX3-SL-COMM-CAP
+           ELSE
+               MOVE CF-ST-COMM-CAP-SL   TO EX3-SL-COMM-CAP
+           END-IF.
+           IF CF-ST-COMM-CAP-JL NOT NUMERIC
+               MOVE 0  TO EX3-JL-COMM-CAP
+           ELSE
+               MOVE CF-ST-COMM-CAP-JL   TO EX3-JL-COMM-CAP
+           END-IF.
+           IF CF-ST-COMM-CAP-SA NOT NUMERIC
+               MOVE 0  TO EX3-SA-COMM-CAP
+           ELSE
+               MOVE CF-ST-COMM-CAP-SA   TO EX3-SA-COMM-CAP
+           END-IF.
+           IF CF-ST-COMM-CAP-JA NOT NUMERIC
+               MOVE 0  TO EX3-JA-COMM-CAP
+           ELSE
+               MOVE CF-ST-COMM-CAP-JA   TO EX3-JA-COMM-CAP
+           END-IF.
+           IF CF-ST-LF-PREM-TAX NOT NUMERIC
+               MOVE 0  TO EX3-LF-PREM-TAX
+           ELSE
+               MOVE CF-ST-LF-PREM-TAX   TO EX3-LF-PREM-TAX
+           END-IF.
+           IF CF-ST-AH-PREM-TAX-I NOT NUMERIC
+               MOVE 0  TO EX3-AH-PREM-TAX-I
+           ELSE
+               MOVE CF-ST-AH-PREM-TAX-I TO EX3-AH-PREM-TAX-I
+           END-IF.
+           IF CF-ST-AH-PREM-TAX-G NOT NUMERIC
+               MOVE 0  TO EX3-AH-PREM-TAX-G
+           ELSE
+               MOVE CF-ST-AH-PREM-TAX-G TO EX3-AH-PREM-TAX-G
+           END-IF.
+           MOVE CF-LAST-MAINT-DT    TO DC-BIN-DATE-1
+           MOVE ' '                 TO DC-OPTION-CODE
+           PERFORM 8510-DATE-CONVERSION
+                                       THRU 8590-EXIT
+           IF NO-CONVERSION-ERROR
+              MOVE DC-GREG-DATE-A-EDIT TO EX3-LAST-MAINT-DT
+           END-IF
+           MOVE CF-LAST-MAINT-BY   TO EX3-LAST-MAINT-BY
+
+110817     IF CF-ST-GA-COMM-CAP-SL NOT NUMERIC
+110817         MOVE 0                  TO EX3-SL-GA-COMM-CAP
+110817     ELSE
+110817         MOVE CF-ST-GA-COMM-CAP-SL
+110817                                 TO EX3-SL-GA-COMM-CAP
+110817     END-IF
+110817     IF CF-ST-GA-COMM-CAP-JL NOT NUMERIC
+110817         MOVE 0                  TO EX3-JL-GA-COMM-CAP
+110817     ELSE
+110817         MOVE CF-ST-GA-COMM-CAP-JL
+110817                                 TO EX3-JL-GA-COMM-CAP
+110817     END-IF
+110817     IF CF-ST-GA-COMM-CAP-SA NOT NUMERIC
+110817         MOVE 0                  TO EX3-SA-GA-COMM-CAP
+110817     ELSE
+110817         MOVE CF-ST-GA-COMM-CAP-SA
+110817                                 TO EX3-SA-GA-COMM-CAP
+110817     END-IF
+110817     IF CF-ST-GA-COMM-CAP-JA NOT NUMERIC
+110817         MOVE 0                  TO EX3-JA-GA-COMM-CAP
+110817     ELSE
+110817         MOVE CF-ST-GA-COMM-CAP-JA
+110817                                 TO EX3-JA-GA-COMM-CAP
+110817     END-IF
+110817
+110817     IF CF-ST-TOT-COMM-CAP-SL NOT NUMERIC
+110817         MOVE 0                  TO EX3-SL-TOT-COMM-CAP
+110817     ELSE
+110817         MOVE CF-ST-TOT-COMM-CAP-SL
+110817                                 TO EX3-SL-TOT-COMM-CAP
+110817     END-IF
+110817     IF CF-ST-TOT-COMM-CAP-JL NOT NUMERIC
+110817         MOVE 0                  TO EX3-JL-TOT-COMM-CAP
+110817     ELSE
+110817         MOVE CF-ST-TOT-COMM-CAP-JL
+110817                                 TO EX3-JL-TOT-COMM-CAP
+110817     END-IF
+110817     IF CF-ST-TOT-COMM-CAP-SA NOT NUMERIC
+110817         MOVE 0                  TO EX3-SA-TOT-COMM-CAP
+110817     ELSE
+110817         MOVE CF-ST-TOT-COMM-CAP-SA
+110817                                 TO EX3-SA-TOT-COMM-CAP
+110817     END-IF
+110817     IF CF-ST-TOT-COMM-CAP-JA NOT NUMERIC
+110817         MOVE 0                  TO EX3-JA-TOT-COMM-CAP
+110817     ELSE
+110817         MOVE CF-ST-TOT-COMM-CAP-JA
+110817                                 TO EX3-JA-TOT-COMM-CAP
+110817     END-IF
+110817
+110817     IF CF-COMMISSION-CAP-REQUIRED = 'Y'
+110817        MOVE 'Y'                 TO EX3-COMM-CAP-REQUIRED
+110817     ELSE
+110817        MOVE 'N'                 TO EX3-COMM-CAP-REQUIRED
+110817     END-IF
+110817     IF CF-COMM-CAP-LIMIT-TO = 'A' OR 'G' OR 'B'
+110817        MOVE CF-COMM-CAP-LIMIT-TO
+110817                                 TO EX3-COMM-CAP-TYPE
+110817     ELSE
+110817        MOVE ' '                 TO EX3-COMM-CAP-TYPE
+110817     END-IF
+
+           INSPECT EX-STATE-REC REPLACING
+              ALL ';'               BY ' '
+              ALL X'00'             BY ' '
+              ALL X'09'             BY ';'
+
+           WRITE CF-STATE-REC       FROM EX-STATE-REC
+           ADD 1 TO ELCNTL-RECS-OUT
+
+           .
+       0600-EXIT.
+           EXIT.
+
+       4000-OPEN-FILES.
+
+           OPEN INPUT ELCNTL
+               OUTPUT ELCNTL-OUT
+
+           .
+       4000-EXIT.
+           EXIT.
+
+       5000-CLOSE-FILES.
+
+           CLOSE ELCNTL ELCNTL-OUT
+
+           .
+       5000-EXIT.
+           EXIT.
+
+       5010-START-ELCNTL.
+
+           MOVE LOW-VALUES             TO CF-CONTROL-PRIMARY
+           MOVE DTE-CLIENT             TO CF-COMPANY-ID
+           MOVE '3'                    TO CF-RECORD-TYPE
+           START ELCNTL KEY >= CF-CONTROL-PRIMARY
+
+           IF ELCNTL-FILE-STATUS = '10' OR '23'
+              SET END-OF-ELCNTL        TO TRUE
+           ELSE
+              IF ELCNTL-FILE-STATUS NOT = '00'
+                 DISPLAY 'ELCNTL START     ' ELCNTL-FILE-STATUS
+                 SET END-OF-ELCNTL     TO TRUE
+              END-IF
+           END-IF
+
+           .
+       5010-EXIT.
+           EXIT.
+
+
+       5020-INITIALIZE.
+
+           MOVE SPACES                 TO EX-STATE-REC
+           MOVE X'09'                  TO EX3-TAB1
+                                          EX3-TAB2
+                                          EX3-TAB3
+                                          EX3-TAB4
+                                          EX3-TAB5
+                                          EX3-TAB6
+                                          EX3-TAB7
+                                          EX3-TAB8
+                                          EX3-TAB9
+                                          EX3-TAB10
+                                          EX3-TAB11
+                                          EX3-TAB12
+                                          EX3-TAB13
+                                          EX3-TAB14
+                                          EX3-TAB15
+                                          EX3-TAB16
+                                          EX3-TAB17
+                                          EX3-TAB18
+                                          EX3-TAB19
+                                          EX3-TAB20
+                                          EX3-TAB21
+
+           MOVE 'E'                    TO EX3-EOR
+           MOVE EX-STATE-REC           TO WS-EX3-INIT
+
+           PERFORM 5010-START-ELCNTL   THRU 5010-EXIT
+           PERFORM 0200-READ-ELCNTL    THRU 0200-EXIT
+
+           .
+       5020-EXIT.
+           EXIT.
+
+       8510-DATE-CONVERSION.
+
+           CALL 'ELDATCX' USING DATE-CONVERSION-DATA
+
+           .
+       8590-EXIT.
+           EXIT.
+
+       ABEND-PGM.
+                                       COPY ELCABEND.

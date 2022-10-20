@@ -1,0 +1,43 @@
+################################################################################
+#                       
+#     JOB: fllgm360    
+#                      
+################################################################################
+BEGINJOB mode='MVS'
+
+################################################################################
+LABEL name=CPY360
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+cp $SEQFILES/FL.DD.MTD.AUDIT.ELBENE $SEQFILES/FL.DL.CIADM.AUDIT.ELBENE
+rm -f $SEQFILES/FL.DD.MTD.AUDIT.ELBENE
+!
+EXECPGM pgmname='BPXBATCH' stepname='CPY360' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/el3602pdf $SEQFILES/FL.DL.CIADM.AUDIT.ELBENE $SEQFILES/FNL.BENE.AUDIT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+if ($JOBSTATUS == 0) then
+    "ftp -n ntcso1 < $JCLLIB/ftp-fllgm360"
+    "smtp -f slunikix -t dcpsbeneaudit -s 'FNL Beneficiary Master Audit is ready' -ml 'Audit is ready '"
+    "mutt -s 'FNL BENE Audit Report Attached' -a $SEQFILES/FNL.BENE.AUDIT.pdf dcpsbeneaudit@cso.com  -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"
+else
+    echo " Job aborted, print not released "
+endif
+
+################################################################################
+ENDJOB 
+
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################

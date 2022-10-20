@@ -1,0 +1,66 @@
+BEGINJOB mode='MVS' jobclass='J' 
+
+################################################################################
+LABEL name=AHLCLMSP
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='ELTRLR' type='VS' filename='ELTRLR' disp='i-o' 
+ASSGNDD ddname='ELCERT' type='VS' filename='ELCERT' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/AH.DL.FX.AHLCLAJ' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/AH.DD.ER.DATECARD' disp='i-o' 
+
+EXECPGM pgmname='AHLCLMSP' stepname='AHLCLMSP' parm='@AHLYYYYMMDD@MEYYYYMMDD'
+
+################################################################################
+LABEL name=FNB170
+################################################################################
+#  *                                                                     
+#  *-------------------------------------------------------------------  
+#  *               SUMMARY REPORT BY TYPE/SUB-TYPE                       
+#  *-------------------------------------------------------------------  
+ASSGNDD ddname='SYS007' filename='$SEQFILES/AHFRM58' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AH.DL.FX.AHLCLAJ' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+
+EXECPGM pgmname='FNB170LR' stepname='FNB170'
+
+################################################################################
+LABEL name=CPYM58
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/AHFRM58' disp='i'
+ASSGNDD  ddname='SYS011' filename='$SEQFILES/AH.DL.FX.FRM58' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPYM58' parm='ALL'
+
+################################################################################
+LABEL name=COPY1   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR AHL CLAIMS 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' filename='$SEQFILES/AH.DL.FX.AHLCLAJ' disp='i' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/AHLCLAJ_@MEMM-DD-YY.DAT' disp='o' abend='d' normal='k' recfmt='F' recsize='250'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY1'   
+
+################################################################################
+LABEL name=FTPM58
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ftp -n ntfree2 < $JCLLIB/ftp-ahfrm58
+!
+EXECPGM pgmname='BPXBATCH' stepname='FTPM58' parm='SH'
+
+
+################################################################################
+ENDJOB 
+
+

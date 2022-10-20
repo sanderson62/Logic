@@ -1,0 +1,363 @@
+################################################################################
+#                                                                              #
+#     JOB: cilgcrltrs            Created     : Wed Oct 26 08:34:16 2005        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS'
+ONRETCODE GT 7 GOTO END_JOB 
+
+#if ($EBMSYS != "cid1t") then
+#   echo "Job aborting, not TEST"
+#   exit 1
+#endif
+
+################################################################################
+LABEL name=BACKUP1 
+################################################################################
+ASSGNDD ddname='SYSUT1' type='VS' filename='ERARCH' disp='i-o' 
+ASSGNDD ddname='SYSUT2' filename='$SEQFILES/CI.TEMP.ERARCH.BACKUP' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+ REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+!
+
+EXECPGM pgmname='IDCAMS' stepname='BACKUP1' 
+
+################################################################################
+LABEL name=BKPCRTO
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ELCRTO -s $SEQFILES/$JOBNAME.elcrto.bkporig
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPCRTO' parm='SH'
+
+################################################################################
+LABEL name=BKPCERT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ELCERT -s $SEQFILES/$JOBNAME.elcert.bkpcert
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPCERT' parm='SH'
+
+################################################################################
+LABEL name=BKPCNOT
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERCNOT -s $SEQFILES/$JOBNAME.ercnot.bkpcnot
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPCNOT' parm='SH'
+
+################################################################################
+LABEL name=BKPPNDB
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+unikixbld -t s -d ERPNDB -s $SEQFILES/$JOBNAME.erpndb.bkppend
+!
+EXECPGM pgmname='BPXBATCH' stepname='BKPPNDB' parm='SH'
+
+################################################################################
+LABEL name=ELDAT10 
+################################################################################
+ASSGNDD ddname='ELCNTL' dataset='CI.DD.LG.ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ELPGMN' dataset='CI.DD.LG.ELPGMN' type='VS' filename='ELPGMN' disp='i-o' 
+ASSGNDD ddname='ELPGMO' dataset='CI.DD.LG.ELPGMO' type='VS' filename='ELPGMO' disp='i-o' 
+ASSGNDD ddname='ELPGMS' dataset='CI.DD.LG.ELPGMS' type='VS' filename='ELPGMS' disp='i-o' 
+ASSGNDD ddname='SYS019' dataset='CI.DD.LG.CIDNSAFA.DATECARD' filename='\${SEQFILES}/CI.DD.LG.CIDNSAFA.DATECARD' disp='o' normal='k' abend='k' recfmt='F' recsize='100' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+COLCCID1
+CLAS@CCLDMMDDYY                          1
+!
+
+EXECPGM pgmname='EL300' stepname='ELDAT10' 
+
+################################################################################
+LABEL name=CIDOCUPD
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='ELCRTO' type='VS' filename='ELCRTO' disp='i-o' 
+ASSGNDD ddname='ERPNDB2' type='VS' filename='ERPNDB2' disp='i-o' 
+ASSGNDD ddname='SYS012' filename='\${SEQFILES}/CI.ELCRTO.RPT.UPDATE' disp='o' normal='k' abend='d' recsize='133' recfmt='f' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.LG.CIDNSAFA.DATECARD' disp='i-o' normal='k' abend='k'
+
+EXECPGM pgmname='CIDOCUPD' stepname='CIDOCUPD' parm='ALL' 
+
+################################################################################
+LABEL name=CIDNSARE
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.TEMP.ERARCH.BACKUP' disp='i-o' normal='k' abend='k' recfmt='F'
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERARCH' type='VS' filename='ERARCH' disp='i-o' 
+ASSGNDD ddname='ELCERT' type='VS' filename='ELCERT' disp='i-o'
+ASSGNDD ddname='ERARCT' type='VS' filename='ERARCT' disp='i-o' 
+ASSGNDD ddname='NSASEXTR' type='VS' filename='NSASEXTR' disp='i-o' 
+ASSGNDD ddname='ELLETR' type='VS' filename='ELLETR' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.RESEND.REPORT' disp='o' normal='k' abend='d' recsize='132' recfmt='F' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.CIDNSAFA.DATECARD' disp='i-o' normal='k' abend='k'
+
+EXECPGM pgmname='CIDNSARE' stepname='CIDNSARE' parm='@CCYYYYMMDD'
+
+################################################################################
+LABEL name=CIDNSASX
+################################################################################
+ASSGNDD ddname='ERARCH' type='VS' filename='ERARCH' disp='i-o' 
+ASSGNDD ddname='NSASEXTR' type='VS' filename='NSASEXTR' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/NSASEXTR_CPS.TXT' disp='o' normal='k' abend='d' recsize='4500' recfmt='F' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/NSASEXTR_VADISC_CPS.TXT' disp='o' normal='k' abend='d' recsize='4500' recfmt='F' 
+ASSGNDD ddname='STOPQWS' filename='$SEQFILES/ASSTOPQWS_CPS.TXT' disp='o' normal='k' abend='d' recsize='50' recfmt='F' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.CIDNSAFA.DATECARD' disp='i-o' normal='k' abend='k'
+
+EXECPGM pgmname='CIDNSASX' stepname='CIDNSASX' parm='@CCYYYYMMDD'
+
+################################################################################
+LABEL name=CIDNSAFA
+################################################################################
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERARCH' type='VS' filename='ERARCH' disp='i-o' 
+ASSGNDD ddname='ELCERT' type='VS' filename='ELCERT' disp='i-o'
+ASSGNDD ddname='ERPNDB2' type='VS' filename='ERPNDB2' disp='i-o'
+ASSGNDD ddname='ERCNOT' type='VS' filename='ERCNOT' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.FINALACT.CANCELS' disp='o' normal='k' abend='d' recsize='80' recfmt='F' 
+ASSGNDD ddname='SYS012' filename='\${SEQFILES}/CI.DL.FINALACT.REPORT' disp='o' normal='k' abend='d' recsize='133' recfmt='F' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.LG.CIDNSAFA.DATECARD' disp='i-o' normal='k' abend='k'
+
+EXECPGM pgmname='CIDNSAFA' stepname='CIDNSAFA' parm='@CCLDYYYYMMDD@YYYYMMDD'
+
+################################################################################
+LABEL name=EL512 
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYSDBOUT' type='SYSOUT' class='Y' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS006' type='INSTREAM'  << !
+!
+ASSGNDD  ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='\${SEQFILES}/CI.DL.FINALACT.CANCELS' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DD.FINALACT.EL512' disp='o' normal='k' abend='d' recfmt='F' recsize='585' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/CI.DD.LG.CIDNSAFA.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='CFCNTL' disp='i-o' normal='k' 
+ASSGNDD ddname='ELREPT' type='DUMMY' 
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='EL512' stepname='EL512' 
+
+################################################################################
+LABEL name=CPY512
+################################################################################
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M' 
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL512/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/CI.DL.CIADM.FICH512.FINALACT' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY512' parm='ALL' 
+
+################################################################################
+
+################################################################################
+LABEL name=EL513 
+################################################################################
+#  ********************************************************************* 
+#  *                                                                   * 
+#  *    LOAD FPB CANCELS INTO PEND. BUS. FILE                          * 
+#  *                                                                   * 
+#  ********************************************************************* 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS009' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/CI.DD.FINALACT.EL512' disp='i-o' normal='k' abend='k' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.LG.CIDNSAFA.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS020' type='DUMMY' 
+ASSGNDD ddname='ERPNDB' type='VS' filename='ERPNDB' disp='i-o' 
+ASSGNDD ddname='ELCNTL' type='VS' filename='ELCNTL' disp='i-o' 
+ASSGNDD ddname='ERACCT2' type='VS' filename='ERACCT2' disp='i-o' 
+ASSGNDD ddname='ERPNDM' type='VS' filename='ERPNDM' disp='i-o' 
+ASSGNDD ddname='SYS024' type='DUMMY' 
+ASSGNDD ddname='SYS025' type='DUMMY' 
+ASSGNDD ddname='SYS026' type='DUMMY' 
+ASSGNDD ddname='SYS027' type='DUMMY' 
+ASSGNDD ddname='SYS011' type='DUMMY' 
+ASSGNDD ddname='SYS006' type='DUMMY' 
+
+EXECPGM pgmname='EL513' stepname='EL513' 
+
+################################################################################
+LABEL name=CPY513
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL513/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH513.FINALACT' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY513' parm='ALL' 
+
+################################################################################
+LABEL name=CPY513A
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL513/SYS009_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH513A.FINALACT' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+
+EXECPGM pgmname='CIB009L' stepname='CPY513A' parm='ALL' 
+
+################################################################################
+LABEL name=EL551
+################################################################################
+
+ASSGNDD ddname='ERARCH' type='VS' filename='ERARCH' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/CI.DD.ER.DATECARD' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.WW.LETTER.PENDING' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYS012' filename='$SEQFILES/CI.WW.LETTER.ACTIVITY' disp='o' normal='k' abend='d' recfmt='F' recsize='250' 
+ASSGNDD ddname='SYS020' filename='$SEQFILES/CI.WW.FICH551' disp='o' normal='k' abend='d' recfmt='F' recsize='133' 
+ASSGNDD ddname='SYS008' type='SYSOUT' class='A' 
+
+EXECPGM pgmname='EL551NS' stepname='EL551' parm='@CCYYYYMMDD@NCYYYYMMDD'
+
+################################################################################
+LABEL name=CPY551
+################################################################################
+
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='M'
+ASSGNDD ddname='SYSPRINT' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/EL551/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/CI.DL.CIADM.FICH551' disp='o' normal='k' abend='d' recfmt='F' recsize='132' 
+EXECPGM pgmname='CIB009L' stepname='CPY551' parm='ALL'
+
+################################################################################
+LABEL name=CSREL551
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+rm -f $SEQFILES/*EL551.txt
+rm -f $SEQFILES/*EL551.pdf
+perl $HOME/bin/create_el551_csr.pl $SEQFILES/CI.DL.CIADM.FICH551 $SEQFILES/
+!
+EXECPGM pgmname='BPXBATCH' stepname='CSREL551' parm='SH'
+
+################################################################################
+LABEL name=EMAILEL551
+################################################################################
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+perl $HOME/bin/email_el551_csr.pl $SEQFILES/
+!
+EXECPGM pgmname='BPXBATCH' stepname='EMAILEL551' parm='SH'
+
+################################################################################
+LABEL name=PERL1
+################################################################################
+#
+# This step reads the file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/CI.DL.CIADM.FICH551 $SEQFILES/CI.EL551.JLMC.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL1' parm='SH'
+
+################################################################################
+################################################################################
+LABEL name=PERL2
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/cidrpt2pdf $SEQFILES/CI.DL.RESEND.REPORT $SEQFILES/CID_RESEND_REPORT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL2' parm='SH'
+
+################################################################################
+################################################################################
+LABEL name=PERL3
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/cidrpt2pdf $SEQFILES/CI.DL.FINALACT.REPORT $SEQFILES/CID_FINALACT_REPORT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL3' parm='SH'
+
+################################################################################
+################################################################################
+LABEL name=PERL4
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/CI.DL.CIADM.FICH512.FINALACT $SEQFILES/CID_FICH512_FINALACT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL4' parm='SH'
+
+################################################################################
+################################################################################
+LABEL name=PERL5
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/CI.DL.CIADM.FICH513.FINALACT $SEQFILES/CID_FICH513_FINALACT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL5' parm='SH'
+
+################################################################################
+################################################################################
+LABEL name=PERL6
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/elrpt2pdf $SEQFILES/CI.DL.CIADM.FICH513A.FINALACT $SEQFILES/CID_FICH513A_FINALACT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL6' parm='SH'
+
+################################################################################
+################################################################################
+LABEL name=PERL7
+################################################################################
+#
+# This step reads a file from above and creates a pdf file
+#
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+$HOME/bin/cidrpt2pdf $SEQFILES/CI.ELCRTO.RPT.UPDATE $SEQFILES/ELCRTO_REPORT.pdf
+!
+EXECPGM pgmname='BPXBATCH' stepname='PERL7' parm='SH'
+
+
+
+if ($JOBSTATUS == 0) then
+   ftp -n ntis2 < /apps/prod/cid1p/jcl/ish/ftp-cilgcrltrs-ntis2
+   ftp -n ntcso1 < /apps/prod/cid1p/jcl/ish/ftp-cilgcrltrs
+#   "exelpr.sh l133std.parms '-ode=CI' $SYSOUTDIR/$JOBNAME/EL551/SYS008_$JON"
+#   "uuencode $SEQFILES/CI.EL551.JLMC.pdf CI.EL551.JLMC.pdf|mailx -s 'EL551 Report Attached' -r 'slunikix@cso.com' pema@cso.com,jlmc@cso.com"
+#   "uuencode $SEQFILES/CID_RESEND_REPORT.pdf CID_RESEND_REPORT.pdf|mailx -s 'CID Resend Letter Report Attached' -r 'slunikix@cso.com' dcpsnapersoftdaily@cso.com"
+#   "uuencode $SEQFILES/CID_FINALACT_REPORT.pdf CID_FINALACT_REPORT.pdf|mailx -s 'CID Final Action Report Attached' -r 'slunikix@cso.com' dcpsnapersoftdaily@cso.com"
+#   "uuencode $SEQFILES/CID_FICH512_FINALACT.pdf CID_FICH512_FINALACT.pdf|mailx -s 'CID Final Action EL512 Report Attached' -r 'slunikix@cso.com' dcpsnapersoftdaily@cso.com"
+#   "uuencode $SEQFILES/CID_FICH513_FINALACT.pdf CID_FICH513_FINALACT.pdf|mailx -s 'CID Final Action EL513 Report Attached' -r 'slunikix@cso.com' dcpsnapersoftdaily@cso.com"
+#   "uuencode $SEQFILES/CID_FICH513A_FINALACT.pdf CID_FICH513A_FINALACT.pdf|mailx -s 'CID Final Action EL513A Report Attached' -r 'slunikix@cso.com' dcpsnapersoftdaily@cso.com"
+#   "uuencode $SEQFILES/ELCRTO_REPORT.pdf ELCRTO_REPORT.pdf|mailx -s 'ELCRTO Report Attached' -r 'slunikix@cso.com' ajra@cso.com,djwb@cso.com"
+   "mutt -s 'EL551 Report Attached' -a $SEQFILES/CI.EL551.JLMC.pdf pema@cso.com,jlmc@cso.com -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"
+   "mutt -s 'CID Resend Letter Report Attached' -a $SEQFILES/CID_RESEND_REPORT.pdf dcpsnapersoftdaily@cso.com -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"
+   "mutt -s 'CID Final Action Report Attached' -a $SEQFILES/CID_FINALACT_REPORT.pdf dcpsnapersoftdaily@cso.com -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"   
+   "mutt -s 'CID Final Action EL512 Report Attached' -a $SEQFILES/CID_FICH512_FINALACT.pdf dcpsnapersoftdaily@cso.com -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"   
+   "mutt -s 'CID Final Action EL513 Report Attached' -a $SEQFILES/CID_FICH513_FINALACT.pdf dcpsnapersoftdaily@cso.com -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"   
+   "mutt -s 'CID Final Action EL513A Report Attached' -a $SEQFILES/CID_FICH513A_FINALACT.pdf dcpsnapersoftdaily@cso.com -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"   
+   "mutt -s 'ELCRTO Report Attached' -a $SEQFILES/ELCRTO_REPORT.pdf ajra@cso.com,djwb@cso.com,tana@cso.com -e 'my_hdr FROM:slunikix<pema@cso.com>' < /dev/null"   
+else
+	echo " Job aborted, print not released "
+endif
+
+ENDJOB 
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 102605                 PEMA   NEW JOBS
+# 080408                 PEMA   ADD NEW STEP EL694B
+# 082608 2008082500002   SDGA   ADD NEW STEP CVTBLUE
+# 061511 2011061300002   PEMA   ADD STEP PERL1 AND uuencode stmt
+# 090312 2011022800001   AJRA   NAPERSOFT ACCOUNT SERVICES
+# 052914 2014042300003   TANA   CHANGE MAILX TO MUTT EMAIL

@@ -1,0 +1,79 @@
+################################################################################
+#                                                                              #
+#     JOB: flfrd52               Created  :  06/17/2021                        #
+#                                                                              #
+################################################################################
+BEGINJOB mode='MVS' 
+
+################################################################################
+LABEL name=DELETE 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *       FREEDOM INTERFACE FOR CID PAYMENTS AND ADJUSTMENTS 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  DELETE FN.DL.FX.FNLPYAJ
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='DELETE' 
+
+################################################################################
+LABEL name=FNB165 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='CI.DD.LG.ERPYAJ' type='VS' filename='ERPYAJ' disp='i-o' 
+ASSGNDD ddname='SYS019' filename='\${SEQFILES}/FL.DD.ER.DATECARD' disp='i-o' 
+
+#  DOWNLOAD
+ASSGNDD ddname='SYS011' dataset='FN.DL.FX.FNLPYAJ' filename='\${SEQFILES}/FN.DL.FX.FNLPYAJ' disp='o' normal='k' abend='d' 
+
+EXECPGM pgmname='FNB165' stepname='FNB165' parm='10182022_10192022' 
+
+################################################################################
+LABEL name=FNB170 
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                     PRINT SUMMARY REPORT 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYS007' dataset='FN.DD.PRINT.DATA' member='FLFRD52' filename='\${SEQFILES}/FLFRD52' disp='i-o' 
+ASSGNDD ddname='SYS010' dataset='FN.DL.FX.FNLPYAJ' filename='\${SEQFILES}/FN.DL.FX.FNLPYAJ' disp='i-o' 
+ASSGNDD ddname='SORTWK1' type='TEMP' 
+ASSGNDD ddname='SORTWK2' type='TEMP' 
+
+EXECPGM pgmname='FNB170' stepname='FNB170' parm='FNLPYADJ'
+
+################################################################################
+LABEL name=PRINT1 
+################################################################################
+ASSGNDD ddname='SYS010' dataset='FN.DD.PRINT.DATA' member='FLFRD52' filename='\${SEQFILES}/FLFRD52' disp='i-o' 
+ASSGNDD ddname='SYS011' filename='\${SEQFILES}/FN.DL.FNLPYAJ.FLFRD52' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='PRINT1' 
+
+################################################################################
+LABEL name=COPY   
+################################################################################
+#  *------------------------------------------------------------------- 
+#  *                 FREEDOM INTERFACE FOR CID pyaj 
+#  *------------------------------------------------------------------- 
+ASSGNDD ddname='SYSUT1' dataset='FN.DL.FX.FNLPYAJ' filename='\${SEQFILES}/FN.DL.FX.FNLPYAJ' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYSUT2' filename='\${SEQFILES}/FNLPYAJ_10-19-22.DAT' disp='o' abend='d' normal='k' recsize='250' recfmt='F'
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+  REPRO IFILE(SYSUT1) OFILE(SYSUT2)
+  SET MAXCC = 0
+!
+
+EXECPGM pgmname='IDCAMS' stepname='COPY'   
+
+################################################################################
+
+ftp -n ntis1.cso.local < $JCLLIB/ftp-flfrd52
+
+################################################################################
+
+ENDJOB
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################

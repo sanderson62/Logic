@@ -1,0 +1,105 @@
+################################################################################
+#
+# Job cidclgm057
+# 
+# This job creates a special offline cert master file used as input to 
+#   program ECS057 that creates the periodic fee payment history report for DCC.
+#
+################################################################################
+BEGINJOB mode='MVS' 
+ONRETCODE GT 7 GOTO END_JOB 
+
+################################################################################
+LABEL name=ECS057
+################################################################################
+ASSGNDD ddname='SYS010' dataset='DC.XX.CERT' gdg='0' filename='$SEQFILES/DC.XX.CERT' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o'
+ASSGNDD  ddname='SYS008' type='SYSOUT' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS057' stepname='ECS057' parm='@CCLDYYYYMMDD' 
+
+################################################################################
+LABEL name=CPY057
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/ECS057/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.DL.CIADM.FICH057' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPY057' parm='ALL'
+
+################################################################################
+LABEL name=DCCCRM1
+################################################################################
+
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='SYSOUT' type='SYSOUT' class='JOBCLASS' 
+ASSGNDD ddname='SYSLST' type='SYSOUT' class='A' 
+ASSGNDD ddname='SYS010' filename='$SEQFILES/DC.XX.CERT_00' disp='i-o' 
+ASSGNDD ddname='ERACCTT' type='VS' filename='ERACCTD'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.WW.CLP.CERT.TEMP' disp='o' normal='k' abend='d' recsize='1056' recfmt='F' 
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o' 
+
+EXECPGM pgmname='DCCCRM1' stepname='DCCCRM1' 
+
+################################################################################
+LABEL name=SORT1
+################################################################################
+ASSGNDD ddname='SORTIN' filename='$SEQFILES/DC.WW.CLP.CERT.TEMP' disp='i-o'
+ASSGNDD  ddname='SORTOUT' filename='$SEQFILES/DC.WW.CERT.CLP' disp='o' normal='k' abend='d' recsize='1056' recfmt='F'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+ASSGNDD ddname='SORTWK04' type='TEMP' 
+ASSGNDD ddname='SYSIN' type='INSTREAM'  << !
+RECORD:
+       KEYS=(4 36 CHAR)
+ENDSORT:
+!
+EXECPGM pgmname='SORT' stepname='SORT1'
+
+################################################################################
+LABEL name=ECS057C
+################################################################################
+#LIBDEF scope='STEP' type='PGM' lib='/apps/test/cid1s/exe/bat'
+ASSGNDD ddname='SYS010' filename='$SEQFILES/DC.WW.CERT.CLP' disp='i-o' normal='k' abend='k'
+ASSGNDD ddname='SYS019' filename='$SEQFILES/DC.DD.ER.DATECARD' disp='i-o'
+ASSGNDD  ddname='SYS008' type='SYSOUT' recfmt='F' recsize='133'
+ASSGNDD ddname='SORTWK01' type='TEMP' 
+ASSGNDD ddname='SORTWK02' type='TEMP' 
+ASSGNDD ddname='SORTWK03' type='TEMP' 
+
+EXECPGM pgmname='ECS057' stepname='ECS057C' parm='@CCLDYYYYMMDDCLP' 
+
+################################################################################
+LABEL name=CPY057
+################################################################################
+ASSGNDD ddname='SYS010' filename='$SYSOUTDIR/$JOBNAME/ECS057C/SYS008_$JON' disp='i-o'
+ASSGNDD ddname='SYS011' filename='$SEQFILES/DC.DL.CIADM.FICH057.CLP' disp='o' normal='k' abend='d' recfmt='F' recsize='132'
+
+EXECPGM pgmname='CIB009L' stepname='CPY057' parm='ALL'
+
+################################################################################
+
+if ($JOBSTATUS == 0) then
+   echo " Nothing to print  "
+#     "exelpr.sh p60w1s.parms '-ode=DCCI' $SYSOUTDIR/$JOBNAME/ECS057/SYS008_$JON"
+else
+   echo "job aborted print not released "
+endif
+
+################################################################################
+
+ENDJOB 
+  
+################################################################################
+#        C H A N G E    L O G
+################################################################################
+# DATE     IR/CR         PGMR   DESCRIPTION
+################################################################################
+# 040303   2001061800003 SMVA   NEW JOB
+# 033104                 SMVA   ADD ME DATE PARM TO ECS057 STEP
+# 062504                 PEMA   ADD SORTWKS TO ECS057
+# 060508 IR2008050500002 PEMA   REMOVE SORT, ADD FILTER TO ECS057 PGM
+# 121114 CR2014120900001 PEMA   REMOVE PRINT OF ECS057

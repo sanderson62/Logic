@@ -1,0 +1,1285 @@
+00001 ****************************************************************  
+00002 *                                                              *  
+00003 *                            ELCRFNDP.                         *  
+00004 *           COPYBOOK REVIEWED FOR YEAR 2000 COMPLIANCE            
+00005 *                            VMOD=2.028                        *  
+00006 *                                                              *  
+00007 ****************************************************************. 
+042203*                   C H A N G E   L O G
+042203*
+042203* CHANGES ARE MARKED BY THE CHANGE EFFECTIVE DATE.
+042203*-----------------------------------------------------------------
+042203*  CHANGE   CHANGE REQUEST PGMR  DESCRIPTION OF CHANGE
+042203* EFFECTIVE    NUMBER
+042203*-----------------------------------------------------------------
+042203* 042203                   PEMA ADD SPECIAL IN CALC FOR CID
+033104* 033104    2003080800002  PEMA ADD GAP NON REFUNDABLE OPTION
+042904* 042904    2003080800002  PEMA ADD ACTUARIAL EARNING METHOD
+110609* 110609  CR2009092300002  PEMA CHANGE MN REFUNDS
+000000* 000000  CR2008042200001  PEMA ADD 0 APR PROCESSING
+071910* 071910  IR2010062900001  PEMA ADD MN NET BALLOON REFUND CALC
+101110* 101110  CR2010012700001  PEMA ADD DDF REFUND/UEP PROCESSING
+032612* 032612  CR2011110200001  PEMA AHL CHANGES
+050713* 050713  CR2008042200001  PEMA  ADD CODE FOR ZERO APR NET PAY
+020816* 020816  CR2015082500001  PEMA  ADD NEW VPP COMPANY
+011317* 011317  IR2017011000002  PEMA  REMOVE 'CT' HARDCODING
+042203******************************************************************
+00008                                                                   
+00009      MOVE ZERO                   TO  CP-RETURN-CODE               
+00010                                      CP-CALC-REFUND.              
+00011      MOVE SPACE                  TO  CP-REFUND-TYPE-USED.         
+00012                                                                   
+00013  0001-GET-CANCEL-TYPE.                                            
+00014      IF CP-CERT-EFF-DT = CP-VALUATION-DT
+00015         MOVE CP-ORIGINAL-PREMIUM TO CP-CALC-REFUND                
+00016         GO TO 1999-CALC-REF-AMT-X.                                
+00017                                                                   
+           IF CP-CANCEL-REASON = 'R'
+              IF CP-CALC-CLP
+                 MOVE CP-ORIGINAL-PREMIUM
+                                       TO CP-CALC-REFUND
+              ELSE
+                 COMPUTE CP-CALC-REFUND = CP-ORIGINAL-PREMIUM - 
+                    CP-DDF-ADMIN-FEES
+              END-IF
+              MOVE 'R'                 TO CP-REFUND-TYPE-USED
+              GO TO 1999-CALC-REF-AMT-X
+           END-IF
+
+00018      IF CP-REMAINING-TERM = ZERO   OR                             
+00019         CP-REMAINING-TERM NEGATIVE                                
+00020           MOVE ZERO TO CP-CALC-REFUND                             
+00021           GO TO 1999-CALC-REF-AMT-X.                              
+00022                                                                   
+00023      MOVE CP-CERT-EFF-DT     TO DC-BIN-DATE-1.                    
+00024      MOVE SPACE              TO DC-OPTION-CODE.                   
+00025      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                    
+00026                                                                   
+00027      IF DATE-CONVERSION-ERROR                                     
+00028          MOVE '2' TO CP-RETURN-CODE                               
+00029          GO TO 1999-CALC-REF-AMT-X.                               
+00030                                                                   
+00031      IF CP-AH                                                     
+00032         GO TO 1030-GET-AH-REFUND.                                 
+00033                                                                   
+00034 ********************    LIFE REFUNDS    **************************
+00035                                                                   
+00036      IF CP-TERM-OR-EXT-DAYS NOT NUMERIC                           
+00037          MOVE +0                TO CP-TERM-OR-EXT-DAYS.           
+00038                                                                   
+00039      IF CP-LOAN-TERM NOT NUMERIC                                  
+00040          MOVE +0                TO CP-LOAN-TERM.                  
+00041                                                                   
+00042      COMPUTE PR-FACTOR = CP-REMAINING-TERM / CP-ORIGINAL-TERM.    
+00043                                                                   
+00044      COMPUTE R78-FACTOR =                                         
+00045             (CP-REMAINING-TERM * (CP-REMAINING-TERM + 1)) /       
+00046               (CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM + 1)).        
+CIDVAO************************************************************
+CIDVAO***       ADDED IF CONDITION FOR TESTING PURPOSES.       ***      
+CIDVAO***---------------------------------------------------------      
+CIDVAO     IF CP-TRUNCATED-LIFE                                         
+CIDVAO        MOVE  CP-LOAN-TERM         TO  WS-RATE-TERM               
+CIDVAO     ELSE                                                         
+CIDVAO        MOVE  CP-ORIGINAL-TERM     TO  WS-RATE-TERM.              
+CIDVAO***                                                               
+CIDVAO************************************************************
+00048 **** THE FOLLOWING IF STATEMENT FOR NCL ONLY SHOULD DO THE        
+00049 **** FOLLOWING.                                                   
+00050 ****       FOR NC. LIFE..                                         
+00051 ****  LEVEL LIFE COVERAGES   --- REFUND AS PRO RATA.              
+00052 ****  TRUNCATED NET COVERAGE --- TERM > 60 USE RULE OF ANTIC.     
+00053 ****                             TERM <= 60 USE SUM OF DIGITS.    
+00054 ****  DECREASING COVERAGE    --- EFF DATE > 093081 AND            
+00055 ****                             TERM > 60 USE RULE OF ANTIC      
+00056 ****                             OTHERWISE USE RULE OF 78.        
+00057 ****                                                              
+00058 ****                                                              
+00059                                                                   
+00060      IF (CP-COMPANY-ID = 'NCL') AND                               
+00061         (CP-STATE-STD-ABBRV = 'NC')                               
+00062         IF CP-LEVEL-LIFE                                          
+00063            GO TO 1023-REF-PR                                      
+00064         ELSE                                                      
+00065         IF CP-EARN-AS-NET-PAY AND                                 
+00066            CP-TRUNCATED-LIFE                                      
+00067            IF CP-ORIGINAL-TERM GREATER THAN 60                    
+00068               GO TO 1021-ANTICIPATION-REF                         
+00069            ELSE                                                   
+00070               GO TO 1026-REF-R78                                  
+00071         ELSE                                                      
+00072         IF CP-REDUCING-LIFE                                       
+00073            IF (DC-GREG-DATE-CYMD  GREATER 19810930 AND            
+00074               CP-ORIGINAL-TERM GREATER THAN 60)                   
+00075               GO TO 1021-ANTICIPATION-REF                         
+00076            ELSE                                                   
+00077               GO TO 1075-SUM-OF-DIGITS.                           
+00078                                                                   
+CIDMOD****                                                              
+CIDMOD**** THE FOLLOWING IF STATEMENT FOR CID ONLY SHOULD DO THE        
+CIDMOD**** FOLLOWING.                                                   
+CIDMOD****       FOR OH. LIFE..                                         
+CIDMOD****  LEVEL LIFE COVERAGES   --- REFUND AS PRO RATA.              
+CIDMOD****  NET/NET TRUNCATED      --- TERM > 60 USE RULE OF ANTIC.     
+CIDMOD****  GROSS DECREASING       --- RULE OF 78                       
+CIDMOD****                                                              
+CIDMOD****                                                              
+CIDMOD                                                                  
+CIDMOD     IF (CP-COMPANY-ID = 'CID') AND                               
+CIDMOD        (CP-STATE-STD-ABBRV = 'OH') AND                           
+CIDMOD        (CP-CLASS-CODE NOT = 'L ')
+CIDMOD        IF CP-LEVEL-LIFE                                          
+CIDMOD           GO TO 1023-REF-PR                                      
+CIDMOD        ELSE                                                      
+CIDMOD           IF (CP-ORIGINAL-TERM > 60) OR                          
+CIDMOD              (CP-EARN-AS-NET-PAY)
+CIDMOD              GO TO 1028-NET-PAY-REFUND                           
+CIDMOD           ELSE                                                   
+CIDMOD              GO TO 1026-REF-R78                                  
+CIDMOD           END-IF
+CIDMOD        END-IF
+CIDMOD     END-IF                                                       
+00078                                                                   
+00079 **** THE FOLLOWING IF STATEMENT FOR NCL ONLY SHOULD DO THE        
+00080 **** FOLLOWING.                                                   
+00081 ****       FOR VA. LIFE..                                         
+00082 ****  LEVEL LIFE COVERAGES   --- REFUND AS PRO RATA.              
+00083 ****           NET COVERAGES --- USE RULE OF ANTIC.               
+00084 ****  DECREASING COVERAGE    --- EFF DATE < 010193 USE R78.       
+00085 ****                         --- EFF DATE > 123194 USE ANTIC.     
+00086 ****                         --- EFF DATE BETWEEN 010193 AND 12319
+00087 ****                             WITH TERM > 61 USE RULE OF ANTIC 
+00088 ****                             OTHERWISE USE RULE OF 78.        
+00089 ****                                                              
+00090 ****    NOTE... PER NCL WE SHOULD NOT INCLUDE THEM IN ANY         
+00091 ****            OF THE SYSTEM DEFAULT STATUTORY REFUND RULES.     
+00092 ****            NCL WILL SUPPLY US WITH THE STATUTORY RULES THEY  
+00093 ****            WILL FOLLOW.                                      
+00094 ****                                                              
+00095 ****                                                              
+00096 ****                                                              
+00097                                                                   
+00098      IF (CP-COMPANY-ID = 'NCL') AND                               
+00099         (CP-STATE-STD-ABBRV = 'VA')                               
+00100         IF CP-LEVEL-LIFE                                          
+00101            GO TO 1023-REF-PR                                      
+00102         ELSE                                                      
+00103         IF CP-EARN-AS-NET-PAY                                     
+00104            GO TO 1021-ANTICIPATION-REF                            
+00105         ELSE                                                      
+00106         IF CP-REDUCING-LIFE                                       
+00107            IF DC-GREG-DATE-CYMD LESS THAN 19930101                
+00108               GO TO 1026-REF-R78                                  
+00109            ELSE                                                   
+00110            IF DC-GREG-DATE-CYMD GREATER THAN 19941231             
+00111               GO TO 1021-ANTICIPATION-REF                         
+00112            ELSE                                                   
+00113            IF CP-ORIGINAL-TERM GREATER THAN 61                    
+00114               GO TO 1021-ANTICIPATION-REF                         
+00115            ELSE                                                   
+00116               GO TO 1026-REF-R78.                                 
+00117                                                                   
+042203     IF (CP-COMPANY-ID = 'CID')
+042203        AND (CP-STATE-STD-ABBRV = 'IN')
+042203        AND (DC-GREG-DATE-CYMD < 20030401)
+042203        IF CP-REDUCING-LIFE
+042203           GO TO 1026-REF-R78
+042203        ELSE
+042203           IF CP-LEVEL-LIFE
+042203              GO TO 1023-REF-PR
+042203           END-IF
+042203        END-IF
+042203     END-IF
+042203              
+072403     IF (CP-COMPANY-ID = 'CID')
+072403        AND (CP-STATE-STD-ABBRV = 'FL')
+072403        AND (DC-GREG-DATE-CYMD > 20030630)
+072403        IF CP-RATE-AS-NET-PAY
+072403           GO TO 1028-NET-PAY-REFUND                           
+072403        END-IF
+072403     END-IF
+072403              
+071910     IF (CP-COMPANY-ID = 'CID')
+071910        AND (CP-STATE-STD-ABBRV = 'MN')
+071910        AND (CP-EARN-AS-NET-PAY)
+071910        AND (CP-RATE-AS-REG-BALLOON)
+071910        AND (DC-GREG-DATE-CYMD > 20091231)
+071910        GO TO 1028-NET-PAY-REFUND
+071910     END-IF
+
+110609     IF (CP-COMPANY-ID = 'CID')
+110609        AND (CP-STATE-STD-ABBRV = 'MN')
+110609        AND (DC-GREG-DATE-CYMD > 20091231)
+110609        AND (CP-RATE-AS-NET-PAY)
+110609        GO TO 1021-ANTICIPATION-REF
+110609     END-IF
+
+072403     IF (CP-COMPANY-ID = 'CID')
+072403        AND (CP-STATE-STD-ABBRV = 'MO')
+072403        AND (DC-GREG-DATE-CYMD > 20030630)
+072403        AND (CP-LOAN-TERM < +121)
+072403        IF CP-RATE-AS-NET-PAY
+072403           GO TO 1028-NET-PAY-REFUND                           
+072403        END-IF
+072403     END-IF
+072403              
+010304     IF (CP-COMPANY-ID = 'CID')
+010304        AND (CP-STATE-STD-ABBRV = 'ND')
+010304        AND (DC-GREG-DATE-CYMD > 20011231)
+042203        AND (CP-REDUCING-LIFE)
+010304        GO TO 1021-ANTICIPATION-REF                            
+010304     END-IF
+072403              
+00118      IF CP-CRITICAL-PERIOD                                        
+00119         IF CP-COMPANY-ID = 'NCL'                                  
+00120            NEXT SENTENCE                                          
+00121         ELSE                                                      
+00122            GO TO 1022-REF-CRITICAL-PERIOD-LF.                     
+00123                                                                   
+00124      IF CP-TERM-IS-DAYS  AND                                      
+00125         CP-TERM-OR-EXT-DAYS GREATER ZERO                          
+00126          GO TO 1024-REF-PR-DAYS.                                  
+00127                                                                   
+CIDMOD     IF CP-STATE-STD-ABBRV = 'NM'                                 
+CIDMOD       IF CP-REDUCING-LIFE                                        
+CIDMOD*        IF DC-GREG-DATE-1-YMD LESS THAN '980901'                 
+CIDMOD         IF DC-GREG-DATE-CYMD LESS THAN 19980901                  
+CIDMOD             GO TO 1026-REF-R78.                                  
+CIDMOD                                                                  
+00128      IF CP-EARN-ANTICIPATION
+00129          GO TO 1021-ANTICIPATION-REF.                             
+00130                                                                   
+00131      IF CP-STATE-STD-ABBRV = 'ME'                                 
+00132          IF CP-COMPANY-ID = 'NCL' OR 'CVL'                        
+00133             NEXT SENTENCE                                         
+00134          ELSE                                                     
+00135             IF CP-REDUCING-LIFE                                   
+00136                GO TO 1021-ANTICIPATION-REF.                       
+00137                                                                   
+CIDMOD     IF CP-COMPANY-ID EQUAL 'CID' OR 'CSO'                        
+CIDMOD        IF CP-STATE-STD-ABBRV = 'TX'                              
+CIDMOD            GO TO SKIP-CSO-TEXAS-LIFE-PROCESSING                  
+CIDMOD        END-IF                                                    
+CIDMOD     END-IF.                                                      
+CIDMOD                                                                  
+00138      IF CP-STATE-STD-ABBRV = 'TX'                                 
+00139        IF CP-COMPANY-ID EQUAL 'HER' OR 'NCL'                      
+00140           NEXT SENTENCE                                           
+00141        END-IF                                                     
+00142         IF DC-GREG-DATE-CYMD GREATER 19920629  AND                
+00143            CP-ORIGINAL-TERM NOT GREATER THAN 120                  
+00144            GO TO 1021-ANTICIPATION-REF.                           
+00145                                                                   
+CIDMOD SKIP-CSO-TEXAS-LIFE-PROCESSING.                                  
+CIDMOD                                                                  
+00146      IF CP-EARN-BY-PRORATA                                        
+00147          GO TO 1023-REF-PR.                                       
+00148                                                                   
+00149      IF CP-EARN-AS-MEAN                                           
+00150          GO TO 1025-REF-MEAN.                                     
+00151                                                                   
+00152      IF CP-EARN-AS-TEXAS                                          
+00153          GO TO 1027-TEXAS-REFUND.                                 
+00154                                                                   
+00155      IF CP-EARN-AS-NET-PAY                                        
+00156          GO TO 1028-NET-PAY-REFUND.                               
+00157                                                                   
+00158      IF CP-LIFE-OVERRIDE-CODE NOT = 'L'                           
+00159          GO TO 1000-NO-NET-PAY.                                   
+00160                                                                   
+CIDMOD     IF  CP-COMPANY-ID IS EQUAL TO 'CID' OR 'CSO'                 
+CIDMOD       IF CP-STATE-STD-ABBRV = 'NC'                               
+CIDMOD         IF CP-REDUCING-LIFE                                      
+CIDMOD           IF CP-ORIGINAL-TERM GREATER 60  AND                    
+CIDMOD              DC-GREG-DATE-CYMD GREATER 19810930                  
+CIDMOD                GO TO 1028-NET-PAY-REFUND                         
+CIDMOD           ELSE                                                   
+CIDMOD              GO TO 1026-REF-R78.                                 
+CIDMOD                                                                  
+CIDMOD                                                                  
+00161      IF CP-STATE-STD-ABBRV = 'NC'                                 
+00162        IF CP-COMPANY-ID EQUAL 'NCL'                               
+00163           NEXT SENTENCE                                           
+00164        END-IF                                                     
+00165        IF CP-REDUCING-LIFE                                        
+00166          IF CP-ORIGINAL-TERM GREATER 60  AND                      
+00167             DC-GREG-DATE-CYMD GREATER 19810930                    
+00168              GO TO 1021-ANTICIPATION-REF                          
+00169          ELSE                                                     
+00170              GO TO 1026-REF-R78.                                  
+00171                                                                   
+00172      IF CP-STATE-STD-ABBRV = 'UT'                                 
+00173        IF CP-COMPANY-ID EQUAL 'NCL'                               
+00174           NEXT SENTENCE                                           
+00175        END-IF                                                     
+00176          IF CP-ORIGINAL-TERM GREATER 62         AND               
+00177             CP-LOAN-APR GREATER ZERO            AND               
+00178             DC-GREG-DATE-CYMD GREATER 19810831 AND                
+00179             DC-GREG-DATE-CYMD LESS    19830901                    
+00180              GO TO 1028-NET-PAY-REFUND                            
+00181          ELSE                                                     
+00182              GO TO 1026-REF-R78.                                  
+00183                                                                   
+00184      IF CP-STATE-STD-ABBRV = 'OH'                                 
+00185        IF CP-COMPANY-ID EQUAL 'NCL' OR 'HER'                      
+00186           NEXT SENTENCE                                           
+00187        END-IF                                                     
+00188            IF CP-ORIGINAL-TERM GREATER 60         AND             
+CIDMOD              CP-CLASS-CODE NOT = 'L '            AND
+00189               CP-LOAN-APR GREATER ZERO            AND             
+00190               DC-GREG-DATE-CYMD GREATER 19831031                  
+00191               GO TO 1028-NET-PAY-REFUND                           
+00192            ELSE                                                   
+00193               GO TO 1026-REF-R78.                                 
+CIDMOD                                                                  
+CIDMOD     IF CP-COMPANY-ID EQUAL 'CID' OR 'CSO'                        
+CIDMOD       IF CP-STATE-STD-ABBRV = 'MT'                               
+CIDMOD         GO TO SKIP-CSO-MT-LF-PROCESSING.                         
+CIDMOD                                                                  
+00194                                                                   
+00195      IF CP-STATE-STD-ABBRV = 'MT'                                 
+00196        IF CP-COMPANY-ID EQUAL 'NCL'                               
+00197           NEXT SENTENCE                                           
+00198        END-IF                                                     
+00199          IF CP-ORIGINAL-TERM GREATER 61         AND               
+00200             CP-LOAN-APR GREATER ZERO            AND               
+00201             DC-GREG-DATE-CYMD GREATER 19830318                    
+00202              GO TO 1028-NET-PAY-REFUND                            
+00203          ELSE                                                     
+00204              GO TO 1026-REF-R78.                                  
+00205                                                                   
+CIDMOD SKIP-CSO-MT-LF-PROCESSING.                                       
+CIDMOD                                                                  
+00206      IF CP-STATE-STD-ABBRV = 'RI'                                 
+00207        IF CP-COMPANY-ID EQUAL 'NCL'                               
+00208           NEXT SENTENCE                                           
+00209        END-IF                                                     
+00210          IF CP-ORIGINAL-TERM GREATER 60         AND               
+00211             CP-LOAN-APR GREATER ZERO            AND               
+00212             DC-GREG-DATE-CYMD GREATER 19831231                    
+00213              GO TO 1028-NET-PAY-REFUND                            
+00214          ELSE                                                     
+00215              GO TO 1026-REF-R78.                                  
+00216                                                                   
+00217                                                                   
+00218  1000-NO-NET-PAY.                                                 
+00219                                                                   
+00220      IF CP-STATE-STD-ABBRV = 'WY'                                 
+00221        IF CP-COMPANY-ID EQUAL 'NCL'                               
+00222           NEXT SENTENCE                                           
+00223        END-IF                                                     
+00224         IF CP-COMPANY-ID = 'TMS'                                  
+00225            GO TO 1026-REF-R78                                     
+00226         ELSE                                                      
+00227            GO TO 1023-REF-PR.                                     
+00228                                                                   
+00229      IF CP-EARN-BY-R78                                            
+00230          GO TO 1026-REF-R78.                                      
+00231                                                                   
+00232      IF CP-EARN-AS-SUM-OF-DIGITS                                  
+00233          GO TO 1075-SUM-OF-DIGITS.                                
+00234                                                                   
+00235      IF CP-LEVEL-LIFE                                             
+00236          GO TO 1023-REF-PR                                        
+00237      ELSE                                                         
+00238          GO TO 1026-REF-R78.                                      
+00239                                                                   
+00240 *-----------------------------------------------------------------
+00241  1021-ANTICIPATION-REF.                                           
+00242      MOVE '6'                  TO CP-REFUND-TYPE-USED.            
+00243                                                                   
+00244      MOVE CP-LOAN-TERM         TO WS-SAVE-LOAN-TERM.              
+           IF CP-LOAN-TERM = ZEROS
+              MOVE CP-ORIGINAL-TERM TO CP-LOAN-TERM
+           END-IF
+
+00245      COMPUTE CP-LOAN-TERM = CP-LOAN-TERM - CP-ORIGINAL-TERM +     
+00246                             CP-REMAINING-TERM.                    
+00247                                                                   
+00248      MOVE CP-ORIGINAL-BENEFIT  TO WS-SAVE-BENEFIT.                
+00249      MOVE CP-ORIGINAL-TERM     TO WS-SAVE-TERM.                   
+00250      MOVE CP-EARNING-METHOD    TO WS-SAVE-EARN-METHOD.            
+051713     move cp-term-or-ext-days  to ws-save-ext-days
+00251                                                                   
+00252      MOVE CP-REMAINING-BENEFIT TO CP-ORIGINAL-BENEFIT.            
+00253      MOVE CP-REMAINING-TERM    TO CP-ORIGINAL-TERM.               
+00254      MOVE CP-RATING-METHOD     TO CP-EARNING-METHOD.              
+00255                                                                   
+00256      IF CP-REMAINING-TERM = WS-SAVE-TERM                          
+00257          MOVE 'N'              TO CP-ROA-REFUND                   
+00258      ELSE                                                         
+00259          MOVE 'Y'              TO CP-ROA-REFUND.                  
+00260                                                                   
+00261 ******    TO COMPUTE PREMIUM AT REFUND DATE                       
+
+00262      PERFORM 2500-GET-RATE.                                       
+00263                                                                   
+00264      MOVE 'N'                  TO CP-ROA-REFUND.                  
+00265      MOVE WS-SAVE-BENEFIT      TO CP-ORIGINAL-BENEFIT.            
+00266      MOVE WS-SAVE-TERM         TO CP-ORIGINAL-TERM.               
+00267      MOVE WS-SAVE-LOAN-TERM    TO CP-LOAN-TERM.                   
+051713     move ws-save-ext-days     to cp-term-or-ext-days
+00268                                                                   
+00269      IF CP-PREMIUM-RATE = ZEROS                                   
+00270         MOVE '7'                 TO CP-RETURN-CODE                
+00271         MOVE WS-SAVE-EARN-METHOD TO CP-EARNING-METHOD             
+00272         GO TO 1999-CALC-REF-AMT-X.                                
+00273                                                                   
+00274      MOVE CP-CALC-PREMIUM         TO WS-REMAIN-PREM.              
+00275                                                                   
+00276 ******    TO COMPUTE PREMIUM AT ORIGINAL ISSUE DATE               
+
+00277      PERFORM 2500-GET-RATE.                                       
+00278                                                                   
+00279      MOVE WS-SAVE-EARN-METHOD     TO CP-EARNING-METHOD.           
+00280                                                                   
+00281      IF CP-PREMIUM-RATE = ZEROS                                   
+00282         MOVE '7'            TO CP-RETURN-CODE                     
+00283         GO TO 1999-CALC-REF-AMT-X.                                
+00284                                                                   
+00285      MOVE CP-CALC-PREMIUM         TO WS-ORIG-PREM.                
+00286                                                                   
+00287      IF  WS-ORIG-PREM = ZEROS                                     
+00288          MOVE ZEROS TO WS-NP-REF-FACTOR                           
+00289         ELSE                                                      
+00290          COMPUTE WS-NP-REF-FACTOR ROUNDED = WS-REMAIN-PREM /      
+00291                                             WS-ORIG-PREM.         
+00292                                                                   
+00293      COMPUTE CP-CALC-REFUND ROUNDED = WS-NP-REF-FACTOR *          
+00294                                         CP-ORIGINAL-PREMIUM.      
+00295                                                                   
+00296      GO TO 1999-CALC-REF-AMT-X.                                   
+00297                                                                   
+00298 *---------------------------------------------------------------  
+00299  1022-REF-CRITICAL-PERIOD-LF.                                     
+00300      GO TO 1023-REF-PR.                                           
+00301                                                                   
+00302 *---------------------------------------------------------------  
+00303  1023-REF-PR.                                                     
+00304      MOVE '2'               TO CP-REFUND-TYPE-USED.               
+00305      COMPUTE CP-CALC-REFUND ROUNDED =                             
+00306             CP-ORIGINAL-PREMIUM * PR-FACTOR.                      
+00307                                                                   
+00308      GO TO 1999-CALC-REF-AMT-X.                                   
+00309                                                                   
+00310 *---------------------------------------------------------------  
+00311  1024-REF-PR-DAYS.                                                
+00312      MOVE CP-CERT-EFF-DT     TO DC-BIN-DATE-1.                    
+00313      MOVE CP-VALUATION-DT    TO DC-BIN-DATE-2.                    
+00314      MOVE '1'                TO DC-OPTION-CODE.                   
+00315      PERFORM 9100-CONVERT-DATE THRU 9100-EXIT.                    
+00316                                                                   
+00317      IF DATE-CONVERSION-ERROR                                     
+00318          MOVE '2' TO CP-RETURN-CODE                               
+00319          GO TO 1999-CALC-REF-AMT-X.                               
+00320                                                                   
+00321      COMPUTE CP-CALC-REFUND ROUNDED =                             
+00322          (CP-ORIGINAL-PREMIUM / CP-TERM-OR-EXT-DAYS) *            
+00323                  (CP-TERM-OR-EXT-DAYS - DC-ELAPSED-DAYS).         
+00324                                                                   
+00325      GO TO 1999-CALC-REF-AMT-X.                                   
+00326                                                                   
+00327 *---------------------------------------------------------------  
+00328  1025-REF-MEAN.                                                   
+00329      MOVE '8'               TO CP-REFUND-TYPE-USED.               
+00330      COMPUTE CP-CALC-REFUND ROUNDED =                             
+00331           ((CP-ORIGINAL-PREMIUM * PR-FACTOR) +                    
+00332            (CP-ORIGINAL-PREMIUM * R78-FACTOR)) * +.5.             
+00333                                                                   
+00334      GO TO 1999-CALC-REF-AMT-X.                                   
+00335                                                                   
+00336 *---------------------------------------------------------------  
+00337  1026-REF-R78.                                                    
+00338      MOVE '1'               TO CP-REFUND-TYPE-USED.               
+00339 *    IF CP-TERM-TIMES-TERM                                        
+00340 *        COMPUTE R78-FACTOR =                                     
+00341 *            (CP-REMAINING-TERM * CP-REMAINING-TERM) /            
+00342 *               (CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM + 1)).      
+00343 *                                                                 
+00344      COMPUTE CP-CALC-REFUND ROUNDED =                             
+00345         CP-ORIGINAL-PREMIUM * R78-FACTOR.                         
+00346                                                                   
+00347      GO TO 1999-CALC-REF-AMT-X.                                   
+00348                                                                   
+00349 *---------------------------------------------------------------  
+00350  1027-TEXAS-REFUND.                                               
+00351      MOVE '4'               TO CP-REFUND-TYPE-USED.               
+00352      IF CP-PAY-FREQUENCY = ZERO                                   
+00353         MOVE ZERO TO CP-CALC-REFUND                               
+00354         MOVE '5'  TO CP-RETURN-CODE                               
+00355         GO TO 1999-CALC-REF-AMT-X.                                
+00356                                                                   
+00357      COMPUTE TEX-FACT-4 = (CP-ORIGINAL-TERM * CP-ORIGINAL-TERM) + 
+00358          (CP-PAY-FREQUENCY * CP-ORIGINAL-TERM).                   
+00359                                                                   
+00360      DIVIDE CP-REMAINING-TERM BY CP-PAY-FREQUENCY                 
+00361          GIVING TEX-FACT-5                                        
+00362              REMAINDER TEX-FACT-6.                                
+00363                                                                   
+00364      COMPUTE TEX-FACT-5 = TEX-FACT-5 * CP-PAY-FREQUENCY.          
+00365                                                                   
+00366      COMPUTE TEX-FACT-7 = (TEX-FACT-5 * TEX-FACT-5) +             
+00367          (TEX-FACT-5 * CP-PAY-FREQUENCY) +                        
+00368          (2 * (TEX-FACT-6 * (TEX-FACT-5 + CP-PAY-FREQUENCY))).    
+00369                                                                   
+00370      COMPUTE TEX-FACT-8 ROUNDED = TEX-FACT-7 / TEX-FACT-4.        
+00371                                                                   
+00372      COMPUTE CP-CALC-REFUND ROUNDED = CP-ORIGINAL-PREMIUM         
+00373                                         * TEX-FACT-8.             
+00374                                                                   
+00375      GO TO 1999-CALC-REF-AMT-X.                                   
+00376                                                                   
+00377 *---------------------------------------------------------------  
+00378  1028-NET-PAY-REFUND.                                             
+
+00379      MOVE '5'               TO CP-REFUND-TYPE-USED.               
+102808     IF CP-LOAN-APR = ZERO                                        
+051713        move '1'                 to cp-refund-type-used
+051713        compute cp-calc-refund rounded = 
+051713           cp-original-premium * r78-factor
+051713        go to 1999-calc-ref-amt-x
+051713     end-if
+
+051713*       MOVE ZERO TO CP-CALC-REFUND                               
+051713*       MOVE '1'  TO CP-RETURN-CODE                               
+051713*       GO TO 1999-CALC-REF-AMT-X.                                
+00384                                                                   
+00385      MOVE CP-LOAN-APR           TO N-P-APR.                       
+00386      MOVE CP-ORIGINAL-TERM      TO N-P-ORIG  N-P-LOAN.            
+00387      MOVE CP-REMAINING-TERM     TO N-P-REM.                       
+00388                                                                   
+00389      IF CP-TRUNCATED-LIFE                                         
+00390         MOVE CP-LOAN-TERM     TO N-P-LOAN.                        
+00391                                                                   
+00392      MOVE 'R'                   TO N-P-OPT.                       
+00393                                                                   
+00394      PERFORM 10000-NET-TERM THRU 99999-EXIT.                      
+00395                                                                   
+00396      COMPUTE CP-CALC-REFUND ROUNDED = N-P-FACTOR *                
+00397                                         CP-ORIGINAL-PREMIUM.      
+00398                                                                   
+00400  1029-UTAH-REFUND.                                                
+CIDMOD*                                                                 
+CIDMOD*---------------------------------------------------------------  
+CIDMOD* FOLLOWING IS FOR TRISH - 10/26/98  (FOR UTAH ONLY).             
+CIDMOD*---------------------------------------------------------------  
+CIDMOD*                                                                 
+CIDMOD     GO TO 1999-CALC-REF-AMT-X.                                   
+CIDMOD*                                                                 
+CIDMOD*---------------------------------------------------------------  
+00401      IF (CP-STATE-STD-ABBRV NOT = 'UT')                           
+00402                       OR                                          
+00403         (CP-COMPANY-ID EQUAL 'NCL')                               
+00404          GO TO 1999-CALC-REF-AMT-X.                               
+00405      MOVE '3'               TO CP-REFUND-TYPE-USED.               
+00406                                                                   
+00407      IF (CP-ORIGINAL-TERM - CP-REMAINING-TERM)                    
+00408         GREATER ZERO AND LESS 13                                  
+00409          COMPUTE CP-CALC-REFUND = CP-CALC-REFUND -                
+00410                  (CP-CALC-REFUND * .05).                          
+00411                                                                   
+00412      IF (CP-ORIGINAL-TERM - CP-REMAINING-TERM)                    
+00413         GREATER 12 AND LESS 25                                    
+00414          COMPUTE CP-CALC-REFUND = CP-CALC-REFUND -                
+00415                  (CP-CALC-REFUND * .025).                         
+00416                                                                   
+00417      GO TO 1999-CALC-REF-AMT-X.                                   
+00418 *---------------------------------------------------------------  
+00419      EJECT                                                        
+00420 *---------------------------------------------------------------  
+00421  1030-GET-AH-REFUND.                                              
+00422      COMPUTE PR-FACTOR = CP-REMAINING-TERM / CP-ORIGINAL-TERM.    
+00423                                                                   
+00424      COMPUTE R78-FACTOR =                                         
+00425             ((CP-REMAINING-TERM * (CP-REMAINING-TERM + 1)) /      
+00426                 (CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM + 1))).     
+00427                                                                   
+00428 *    IF CP-TERM-TIMES-TERM                                        
+00429 *        COMPUTE R78-FACTOR =                                     
+00430 *            (CP-REMAINING-TERM * CP-REMAINING-TERM) /            
+00431 *            (CP-ORIGINAL-TERM * (CP-ORIGINAL-TERM + 1)).         
+00432 *                                                                 
+00433                                                                   
+00434 **** THE FOLLOWING IF STATEMENT FOR NCL ONLY SHOULD DO THE        
+00435 **** FOLLOWING.                                                   
+00436 ****       FOR VA. DISABILITY                                     
+00437 ****                         --- EFF DATE > 123192 AND            
+00438 ****                             TERM > 61 USE RULE OF ANTIC      
+00439 ****                             OTHERWISE USE RULE OF 78.        
+00440 ****                                                              
+00441 ****    NOTE... PER NCL WE SHOULD NOT INCLUDE THEM IN ANY         
+00442 ****            OF THE SYSTEM DEFAULT STATUTORY REFUND RULES.     
+00443 ****            NCL WILL SUPPLY US WITH THE STATUTORY RULES THEY  
+00444 ****            WILL FOLLOW.                                      
+00445 ****                                                              
+00446 ****                                                              
+00447 ****                                                              
+032612     IF CP-COMPANY-ID = 'NCL' or 'AHL'                                 
+00449         IF CP-STATE-STD-ABBRV = 'VA'                              
+00450            IF (DC-GREG-DATE-CYMD GREATER 19921231) AND            
+00451               (CP-ORIGINAL-TERM GREATER THAN 61)                  
+00452                MOVE '6'        TO CP-EARNING-METHOD               
+00453                GO TO 1060-ANTICIPATION-REF                        
+00454             ELSE                                                  
+00455                MOVE '1'        TO CP-EARNING-METHOD               
+00456                GO TO 1050-R78-REF.                                
+00457                                                                   
+00458      IF CP-STATE-STD-ABBRV = 'WY'                                 
+00459         IF CP-COMPANY-ID = 'TMS'                                  
+00460            GO TO 1050-R78-REF.                                    
+00461                                                                   
+032612     IF CP-COMPANY-ID = 'NCL' OR 'WDS' OR 'CID' OR 'DCC'
+020816                     OR 'AHL' OR 'VPP'
+00463          NEXT SENTENCE                                            
+00464      ELSE                                                         
+00465          IF CP-CRITICAL-PERIOD                                    
+00466              GO TO 1035-REF-AH-CRITICAL-PERIOD.                   
+00467                                                                   
+
+033104*      THE FOLLOWING HAPPENS WHEN THE REFUND METHOD FOR THE
+033104*    BENEFIT CODE IS A NON REFUNDABLE METHOD
+033104*    I AM CHECKING THE TERM AND REM TERM BECAUSE OF THE 30
+033104*    DAY FREE LOOK PERIOD. ALSO, 55 AND 56 ARE THE BIU CODES
+
+033104     IF (CP-GAP-NON-REFUNDABLE)
+033104        IF (CP-ORIGINAL-TERM NOT = CP-REMAINING-TERM)
+051909           OR (CP-BENEFIT-CD = '55' OR '56')
+033014           MOVE ZEROS            TO CP-CALC-REFUND
+033104           MOVE 'G'              TO CP-REFUND-TYPE-USED
+033104           GO TO 1999-CALC-REF-AMT-X
+033104        END-IF
+033104     END-IF
+
+042904     IF CP-GAP-ACTUARIAL
+042904         GO TO 1070-NET-PAY-REFUND
+042904     END-IF
+
+110609     IF (CP-COMPANY-ID = 'CID')
+110609        AND (CP-STATE-STD-ABBRV = 'MN')
+110609        AND (DC-GREG-DATE-CYMD > 20091231)
+110609        IF (CP-CRITICAL-PERIOD)
+110609           GO TO 1040-PR-REF
+110609        ELSE
+110609           GO TO 1055-MEAN-REF
+110609     END-IF
+
+020816     IF CP-COMPANY-ID EQUAL 'CID' OR 'DCC' OR 'VPP'                        
+CIDMOD        IF CP-STATE-STD-ABBRV = 'NC'                              
+CIDMOD           GO TO SKIP-CSO-NC-AH-PROCESSING.                       
+CIDMOD                                                                  
+042203     IF (CP-COMPANY-ID = 'CID')
+042203        AND (CP-STATE-STD-ABBRV = 'IN')
+042203        AND (DC-GREG-DATE-CYMD < 20030401)
+042203        GO TO 1026-REF-R78
+042203     END-IF
+042203              
+072403     IF (CP-COMPANY-ID = 'CID')
+072403        AND (CP-STATE-STD-ABBRV = 'FL')
+072403        AND (DC-GREG-DATE-CYMD > 20030630)
+072403        AND (CP-CRITICAL-PERIOD)
+072403        GO TO 1040-PR-REF                                   
+072403     END-IF
+072403              
+072403     IF (CP-COMPANY-ID = 'CID')
+072403        AND (CP-STATE-STD-ABBRV = 'MO')
+072403        AND (DC-GREG-DATE-CYMD > 20030630)
+072403        AND (CP-CRITICAL-PERIOD)
+072403        GO TO 1040-PR-REF                                   
+072403     END-IF
+072403              
+010304     IF (CP-COMPANY-ID = 'CID')
+010304        AND (CP-STATE-STD-ABBRV = 'ND')
+010304        AND (CP-CRITICAL-PERIOD)
+010304        AND (DC-GREG-DATE-CYMD > 20011231)
+010304        GO TO 1040-PR-REF                                   
+010304     END-IF
+010304              
+010304     IF (CP-COMPANY-ID = 'CID')
+010304        AND (CP-STATE-STD-ABBRV = 'ND')
+010304        AND (DC-GREG-DATE-CYMD > 20011231)
+010304        GO TO 1060-ANTICIPATION-REF                       
+010304     END-IF
+010304              
+00468      IF CP-STATE-STD-ABBRV = 'NC'                                 
+00469        IF CP-COMPANY-ID = 'NCL' OR 'NCB'
+00470           NEXT SENTENCE                                           
+00471        END-IF                                                     
+00472          IF DC-GREG-DATE-CYMD GREATER 19810930                    
+00473             IF CP-EARN-ANTICIPATION                               
+00474                 GO TO 1060-ANTICIPATION-REF                       
+00475             ELSE                                                  
+00476                 GO TO 1055-MEAN-REF.                              
+00477                                                                   
+CIDMOD SKIP-CSO-NC-AH-PROCESSING.                                       
+CIDMOD                                                                  
+00478      IF CP-STATE-STD-ABBRV = 'NM'                                 
+020816       IF CP-COMPANY-ID = 'NCL' OR 'DCC' OR 'AHL' OR 'VPP'
+00480           NEXT SENTENCE                                           
+00481        END-IF                                                     
+00482          IF DC-GREG-DATE-CYMD GREATER THAN 19871231               
+00483             IF CP-COMPANY-ID = 'MON'                              
+00484               MOVE '6'             TO CP-EARNING-METHOD           
+00485               GO TO 1060-ANTICIPATION-REF                         
+00486              ELSE                                                 
+00487               GO TO 1055-MEAN-REF.                                
+00488                                                                   
+011317*    IF CP-STATE-STD-ABBRV = 'CT'                                 
+011317*      IF CP-COMPANY-ID EQUAL 'NCL' OR 'DCC' OR 'VPP'
+011317*         NEXT SENTENCE                                           
+011317*      END-IF                                                     
+011317*         MOVE '6'              TO CP-EARNING-METHOD              
+011317*         GO TO 1060-ANTICIPATION-REF.                            
+00495                                                                   
+00496      IF CP-STATE-STD-ABBRV = 'ME'                                 
+020816       IF CP-COMPANY-ID = 'NCL' OR 'CVL' OR 'DCC' OR 'VPP'
+00498           NEXT SENTENCE                                           
+00499        END-IF                                                     
+00500            IF CP-EARN-BY-PRORATA                                  
+00501               GO TO 1040-PR-REF                                   
+00502            ELSE                                                   
+00503               MOVE '6'           TO CP-EARNING-METHOD             
+00504               GO TO 1060-ANTICIPATION-REF.                        
+00505                                                                   
+CIDMOD                                                                  
+020816     IF CP-COMPANY-ID = 'CID' OR 'DCC' OR 'VPP'
+CIDMOD        IF CP-STATE-STD-ABBRV = 'TX' OR 'VA'                      
+CIDMOD            GO TO SKIP-CSO-TX-VA-AH-PROCESSING.                   
+CIDMOD                                                                  
+00506      IF CP-STATE-STD-ABBRV = 'TX'                                 
+00507        IF CP-COMPANY-ID = 'NCL' OR 'HER'                      
+00508           NEXT SENTENCE                                           
+00509        END-IF                                                     
+00510         IF DC-GREG-DATE-CYMD GREATER 19920629  AND                
+00511            CP-ORIGINAL-TERM NOT GREATER THAN 120                  
+00512            MOVE '6'              TO CP-EARNING-METHOD             
+00513            GO TO 1060-ANTICIPATION-REF.                           
+00514                                                                   
+00515      IF CP-STATE-STD-ABBRV = 'VA'                                 
+00516        IF CP-COMPANY-ID EQUAL 'NCL'                               
+00517           NEXT SENTENCE                                           
+00518        END-IF                                                     
+00519        IF CP-COMPANY-ID = 'NCB'                                   
+00520            MOVE '6'                TO CP-EARNING-METHOD           
+00521            GO TO 1060-ANTICIPATION-REF                            
+00522        ELSE                                                       
+00523            IF DC-GREG-DATE-CYMD GREATER 19921231                  
+00524                IF CP-ORIGINAL-TERM GREATER THAN 61                
+00525                    MOVE '6'        TO CP-EARNING-METHOD           
+00526                    GO TO 1060-ANTICIPATION-REF                    
+00527                ELSE                                               
+00528                    MOVE '1'        TO CP-EARNING-METHOD           
+00529                    GO TO 1050-R78-REF.                            
+00530                                                                   
+CIDMOD SKIP-CSO-TX-VA-AH-PROCESSING.                                    
+CIDMOD                                                                  
+00531      IF CP-EARN-BY-PRORATA                                        
+00532          GO TO 1040-PR-REF.                                       
+00533                                                                   
+00534      IF CP-EARN-BY-R78                                            
+00535          GO TO 1050-R78-REF.                                      
+00536                                                                   
+00537      IF CP-EARN-AS-MEAN                                           
+00538         GO TO 1055-MEAN-REF.                                      
+00539                                                                   
+00540      IF CP-EARN-AS-SUM-OF-DIGITS                                  
+00541          GO TO 1075-SUM-OF-DIGITS.                                
+
+           IF CP-DCC-SPP-DDF
+              GO TO 1080-DCC-DDF-SPECIAL
+           END-IF
+
+00543      IF CP-EARN-AS-CALIF                                          
+00544          GO TO 1060-ANTICIPATION-REF.                             
+00545                                                                   
+00546      IF CP-EARN-ANTICIPATION                                      
+00547          GO TO 1060-ANTICIPATION-REF.                             
+00548                                                                   
+00549      IF CP-EARN-AS-NET-PAY                                        
+00550          GO TO 1070-NET-PAY-REFUND.                               
+00551                                                                   
+00552      GO TO 1050-R78-REF.                                          
+00553                                                                   
+00554 *---------------------------------------------------------------  
+00555  1035-REF-AH-CRITICAL-PERIOD.                                     
+00556      IF CP-REMAINING-TERM GREATER +6                              
+00557         COMPUTE CP-CALC-REFUND ROUNDED =                          
+00558           CP-ORIGINAL-PREMIUM * (((CP-REMAINING-TERM * +2) - +5) /
+00559                        ((CP-ORIGINAL-TERM * +2) - + 5))           
+00560       ELSE                                                        
+00561         COMPUTE CP-CALC-REFUND ROUNDED =                          
+00562           CP-ORIGINAL-PREMIUM * ((CP-REMAINING-TERM *             
+00563                                            CP-REMAINING-TERM + 1) 
+00564                               /  (+12 * CP-ORIGINAL-TERM) - +30). 
+00565                                                                   
+00566      IF CP-CALC-REFUND LESS ZERO                                  
+00567          MOVE ZERO TO CP-CALC-REFUND.                             
+00568                                                                   
+00569      GO TO 1999-CALC-REF-AMT-X.                                   
+00570                                                                   
+00571 *---------------------------------------------------------------  
+00572  1040-PR-REF.                                                     
+00573      MOVE '2'               TO CP-REFUND-TYPE-USED.               
+00574      COMPUTE CP-CALC-REFUND = CP-ORIGINAL-PREMIUM * PR-FACTOR.    
+00575                                                                   
+00576      GO TO 1999-CALC-REF-AMT-X.                                   
+00577                                                                   
+00578 *---------------------------------------------------------------  
+00579  1050-R78-REF.                                                    
+00580      MOVE '1'               TO CP-REFUND-TYPE-USED.               
+00581      COMPUTE CP-CALC-REFUND ROUNDED =                             
+00582            CP-ORIGINAL-PREMIUM * R78-FACTOR.                      
+00583                                                                   
+00584      GO TO 1999-CALC-REF-AMT-X.                                   
+00585                                                                   
+00586 *---------------------------------------------------------------  
+00587  1055-MEAN-REF.                                                   
+00588      MOVE '8'               TO CP-REFUND-TYPE-USED.               
+00589      COMPUTE CP-CALC-REFUND ROUNDED =                             
+00590          ((CP-ORIGINAL-PREMIUM * R78-FACTOR) +                    
+00591           (CP-ORIGINAL-PREMIUM * PR-FACTOR)) * .5.                
+00592                                                                   
+00593      GO TO 1999-CALC-REF-AMT-X.                                   
+00594                                                                   
+00595 *---------------------------------------------------------------  
+00596  1060-ANTICIPATION-REF.                                           
+00597      MOVE '6'               TO CP-REFUND-TYPE-USED.               
+00598                                                                   
+00599      MOVE CP-ORIGINAL-TERM  TO WS-SAVE-TERM.                      
+00600      MOVE CP-LOAN-TERM      TO WS-SAVE-LOAN-TERM.                 
+00601      MOVE CP-EARNING-METHOD TO WS-SAVE-EARN-METHOD.               
+00602                                                                   
+00603      MOVE CP-REMAINING-TERM TO CP-ORIGINAL-TERM                   
+00604                                CP-LOAN-TERM.                      
+00605      MOVE CP-RATING-METHOD  TO CP-EARNING-METHOD.                 
+00606                                                                   
+00607      PERFORM 2500-GET-RATE.                                       
+00608                                                                   
+00609      MOVE WS-SAVE-TERM      TO CP-ORIGINAL-TERM.                  
+00610      MOVE WS-SAVE-LOAN-TERM TO CP-LOAN-TERM.                      
+00611                                                                   
+00612      IF CP-PREMIUM-RATE = ZEROS                                   
+00613         MOVE '7'                 TO CP-RETURN-CODE                
+00614         MOVE WS-SAVE-EARN-METHOD TO CP-EARNING-METHOD             
+00615         GO TO 1999-CALC-REF-AMT-X.                                
+00616                                                                   
+00617      MOVE CP-CALC-PREMIUM         TO WS-REMAIN-PREM.              
+00618                                                                   
+00619      PERFORM 2500-GET-RATE.                                       
+00620                                                                   
+00621      MOVE WS-SAVE-EARN-METHOD     TO CP-EARNING-METHOD.           
+00622                                                                   
+00623      IF CP-PREMIUM-RATE = ZEROS                                   
+00624         MOVE '7'            TO CP-RETURN-CODE                     
+00625         GO TO 1999-CALC-REF-AMT-X.                                
+00626                                                                   
+00627      MOVE CP-CALC-PREMIUM         TO WS-ORIG-PREM.                
+00628                                                                   
+00629      IF  WS-ORIG-PREM = ZERO                                      
+00630          MOVE ZERO                TO WS-NP-REF-FACTOR             
+00631         ELSE                                                      
+00632          COMPUTE WS-NP-REF-FACTOR ROUNDED = WS-REMAIN-PREM /      
+00633                                             WS-ORIG-PREM.         
+00634                                                                   
+00635      COMPUTE CP-CALC-REFUND ROUNDED = WS-NP-REF-FACTOR *          
+00636                                         CP-ORIGINAL-PREMIUM.      
+00637                                                                   
+00638      IF NOT CP-EARN-AS-CALIF                                      
+00639          GO TO 1999-CALC-REF-AMT-X.                               
+00640                                                                   
+00641 *---------------------------------------------------------------  
+00642  1065-CALIF-REGS.                                                 
+00643      MOVE '3'               TO CP-REFUND-TYPE-USED.               
+00644      SUBTRACT CP-REMAINING-TERM FROM CP-ORIGINAL-TERM             
+00645          GIVING FACTOR-5.                                         
+00646                                                                   
+00647      IF FACTOR-5 NOT GREATER +6  AND                              
+00648         CP-CLASS-CODE = 'A '                                      
+00649          GO TO 1050-R78-REF.                                      
+00650                                                                   
+00651      IF FACTOR-5 = ZERO                                           
+00652          MOVE CP-ORIGINAL-PREMIUM   TO CP-CALC-REFUND             
+00653          GO TO 1999-CALC-REF-AMT-X.                               
+00654                                                                   
+00655      IF CP-ORIGINAL-TERM LESS +014                                
+00656          GO TO 1999-CALC-REF-AMT-X.                               
+00657                                                                   
+00658      MULTIPLY CP-ORIGINAL-TERM BY CP-ORIGINAL-TERM                
+00659                                    GIVING FACTOR-5 ROUNDED.       
+00660                                                                   
+00661      MULTIPLY FACTOR-5 BY +0.0000045573 GIVING FACTOR-1 ROUNDED.  
+00662                                                                   
+00663      MULTIPLY +0.001125 BY CP-ORIGINAL-TERM                       
+00664                                    GIVING FACTOR-2 ROUNDED.       
+00665                                                                   
+00666      SUBTRACT FACTOR-2 FROM FACTOR-1.                             
+00667      ADD +0.099375 TO FACTOR-1.                                   
+00668                                                                   
+00669      SUBTRACT CP-REMAINING-TERM FROM CP-ORIGINAL-TERM             
+00670                                    GIVING FACTOR-5 ROUNDED.       
+00671                                                                   
+00672      SUBTRACT +1.00 FROM FACTOR-5.                                
+00673                                                                   
+00674      IF CP-ORIGINAL-TERM LESS +049                                
+00675          SUBTRACT +013 FROM CP-ORIGINAL-TERM                      
+00676                                    GIVING FACTOR-6 ROUNDED        
+00677      ELSE                                                         
+00678          MOVE +035 TO FACTOR-6.                                   
+00679                                                                   
+00680      MOVE +001 TO FACTOR-2.                                       
+00681                                                                   
+00682      DIVIDE FACTOR-5 BY FACTOR-6 GIVING FACTOR-4 ROUNDED.         
+00683      SUBTRACT FACTOR-4 FROM FACTOR-2.                             
+00684      MULTIPLY FACTOR-1 BY FACTOR-2 GIVING FACTOR-3 ROUNDED.       
+00685      MOVE +001 TO FACTOR-2.                                       
+00686      SUBTRACT FACTOR-3 FROM FACTOR-2 GIVING FACTOR-1 ROUNDED.     
+00687                                                                   
+00688      MULTIPLY FACTOR-1 BY CP-CALC-REFUND                          
+00689          GIVING CAL-RFND ROUNDED.                                 
+00690                                                                   
+00691      IF CAL-RFND LESS +0.01                                       
+00692          MOVE ZEROS TO CAL-RFND.                                  
+00693                                                                   
+00694      IF CAL-RFND LESS CP-CALC-REFUND                              
+00695          MOVE CAL-RFND TO CP-CALC-REFUND.                         
+00696                                                                   
+00697      GO TO 1999-CALC-REF-AMT-X.                                   
+00698                                                                   
+00699 *-----------------------------------------------------------------
+00700  1070-NET-PAY-REFUND.                                             
+00701      MOVE '5'                    TO  CP-REFUND-TYPE-USED.         
+102808     IF CP-LOAN-APR = ZERO                                        
+00704          MOVE ZEROS              TO  CP-CALC-REFUND               
+00705          MOVE '1'                TO  CP-RETURN-CODE               
+00706          GO TO 1999-CALC-REF-AMT-X.                               
+00707                                                                   
+00708      MOVE CP-LOAN-APR            TO  N-P-APR.                     
+00709      MOVE CP-ORIGINAL-TERM       TO  N-P-ORIG  N-P-LOAN.          
+00710      MOVE CP-REMAINING-TERM      TO  N-P-REM.                     
+00711                                                                   
+00712      MOVE 'R'                    TO  N-P-OPT.                     
+00713                                                                   
+00714      PERFORM 10000-NET-TERM THRU 99999-EXIT.                      
+00715                                                                   
+00716      COMPUTE CP-CALC-REFUND ROUNDED = N-P-FACTOR *                
+00717                                         CP-ORIGINAL-PREMIUM.      
+00718                                                                   
+00719      GO TO 1999-CALC-REF-AMT-X.                                   
+00720 *---------------------------------------------------------------  
+00721                                                                   
+00722  1075-SUM-OF-DIGITS.                                              
+00723                                                                   
+00724      MOVE '9'               TO CP-REFUND-TYPE-USED.               
+00725                                                                   
+00726      COMPUTE RSUM-REMAINING-TERM =                                
+00727              CP-LOAN-TERM -                                       
+00728                   (CP-ORIGINAL-TERM - (CP-REMAINING-TERM + 1))    
+00729                                                                   
+00730      COMPUTE RSUM-FACTOR =                                        
+00731         ((RSUM-REMAINING-TERM * (RSUM-REMAINING-TERM + 1)) -      
+00732                ((CP-LOAN-TERM - CP-ORIGINAL-TERM)          *      
+00733                  (CP-LOAN-TERM - CP-ORIGINAL-TERM + 1)))   /      
+00734             ((CP-LOAN-TERM * (CP-LOAN-TERM + 1))           -      
+00735                ((CP-LOAN-TERM - CP-ORIGINAL-TERM)          *      
+00736                  (CP-LOAN-TERM - CP-ORIGINAL-TERM  + 1))).        
+00737                                                                   
+00738      COMPUTE CP-CALC-REFUND ROUNDED =                             
+00739            CP-ORIGINAL-PREMIUM * RSUM-FACTOR.                     
+00740                                                                   
+00741      GO TO 1999-CALC-REF-AMT-X
+
+           .
+       1080-DCC-DDF-SPECIAL.
+
+           COMPUTE CP-MONTH =
+              FUNCTION REM(CP-ORIGINAL-TERM - CP-REMAINING-TERM, 12)
+      *    DISPLAY ' BEGIN ELCRFNDP ************** '
+      *    DISPLAY ' SPEC       ' CP-DDF-SPEC-CALC
+      *    DISPLAY ' MONTH      ' CP-MONTH
+      *    DISPLAY ' ORIG TERM  ' CP-ORIGINAL-TERM
+      *    DISPLAY ' REM TERM   ' CP-REMAINING-TERM
+      *    DISPLAY ' ORIG PREM  ' CP-ORIGINAL-PREMIUM
+      *    DISPLAY ' 1YR EXP AL ' CP-1ST-YR-ALLOW
+      *    DISPLAY ' HI FACT    ' CP-DDF-HI-FACT
+      *    DISPLAY ' LO FACT    ' CP-DDF-LO-FACT
+      *    DISPLAY ' RATE UP    ' CP-IU-RATE-UP
+      *    DISPLAY ' CLP RAT UP ' CP-CLP-RATE-UP
+      *    DISPLAY ' EARM METH  ' CP-EARNING-METHOD
+      *    DISPLAY '   END ELCRFNDP ************** '
+
+           IF CP-MONTH = 0
+              MOVE 12                  TO CP-MONTH
+           END-IF
+           MOVE CP-MONTH               TO WS-MONTH
+
+           MOVE 'D'                    TO CP-REFUND-TYPE-USED
+
+           IF CP-DCC-SPP-DDF-IU
+              GO TO 1090-DCC-DDF-IU
+           END-IF
+
+           IF CP-CALC-CLP
+              GO TO 1085-DCC-DDF-SPECIAL-CLP
+           END-IF
+
+           EVALUATE TRUE
+              WHEN ((CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 1)
+                 OR (CP-ORIGINAL-PREMIUM = ZEROS)
+                 MOVE CP-ORIGINAL-PREMIUM
+                                       TO CP-CALC-REFUND
+
+              WHEN (CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 4
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1150-UE-GROSS-LT-4
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+
+              WHEN (CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 13
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1160-UE-GROSS-LT-13
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+ 
+              WHEN OTHER
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1170-UE-GROSS-GT-12
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+           END-EVALUATE
+
+           GO TO 1999-CALC-REF-AMT-X
+
+           .
+       1085-DCC-DDF-SPECIAL-CLP.
+
+           EVALUATE TRUE
+              WHEN ((CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 1)
+                 OR (CP-ORIGINAL-PREMIUM = ZEROS)
+                 MOVE CP-ORIGINAL-PREMIUM
+                                       TO CP-CALC-REFUND
+
+              WHEN (CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 4
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1100-UE-CLP-LT-4
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+
+              WHEN (CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 13
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1110-UE-CLP-LT-13
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+
+              WHEN OTHER
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1120-UE-CLP-GT-12
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+           END-EVALUATE
+
+           GO TO 1999-CALC-REF-AMT-X
+
+           .
+       1090-DCC-DDF-IU.
+
+           MOVE 'I'                    TO CP-REFUND-TYPE-USED
+
+           IF CP-CALC-CLP
+              GO TO 1095-DCC-DDF-IU-SPECIAL-CLP
+           END-IF
+
+           EVALUATE TRUE
+              WHEN ((CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 1)
+                 OR (CP-ORIGINAL-PREMIUM = ZEROS)
+                 MOVE CP-ORIGINAL-PREMIUM
+                                       TO CP-CALC-REFUND
+
+              WHEN (CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 4
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1250-IU-UE-GROSS-LT-4
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+
+              WHEN (CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 13
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1260-IU-UE-GROSS-LT-13
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+
+              WHEN OTHER
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1270-IU-UE-GROSS-GT-12
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+
+           END-EVALUATE
+
+           GO TO 1999-CALC-REF-AMT-X
+
+           .
+       1095-DCC-DDF-IU-SPECIAL-CLP.
+
+           EVALUATE TRUE
+              WHEN ((CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 1)
+                 OR (CP-DDF-CLP = ZEROS)
+                 MOVE CP-DDF-CLP       TO CP-CALC-REFUND
+
+              WHEN (CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 4
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1200-IU-UE-CLP-LT-4
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+
+              WHEN (CP-ORIGINAL-TERM - CP-REMAINING-TERM) < 13
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1210-IU-UE-CLP-LT-13
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+
+              WHEN OTHER
+                 MOVE CP-MONTH         TO WS-MONTH
+                 PERFORM 1220-IU-UE-CLP-GT-12
+                 COMPUTE CP-CALC-REFUND ROUNDED = WS-TEMP-RESULT * 1
+
+           END-EVALUATE
+
+           GO TO 1999-CALC-REF-AMT-X
+
+           .
+       1100-UE-CLP-LT-4.
+
+      *****  (CLP-Yr1 Exp)-CLP*{((CLP-Yr1 Exp)/CLP - UEF1)*mo/12}
+
+           COMPUTE WS-TEMP-RESULT ROUNDED = (CP-DDF-CLP - 0)
+              - CP-DDF-CLP * (((CP-DDF-CLP - 0)
+              / CP-DDF-CLP - CP-DDF-HI-FACT)
+              * WS-MONTH / 12)
+
+           .
+       1110-UE-CLP-LT-13.
+
+      *****  (CLP-Yr1 Exp)-CLP*{((CLP-Yr1 Exp)/CLP - UEF1)*3/12}
+      *****  -[(CLP-Yr1 Exp)-CLP*{((CLP-Yr1 Exp)/CLP - UEF1)*3/12
+      *****  -CLP*UEF1}*(mo-3)/9]
+
+           COMPUTE WS-TEMP-RESULT ROUNDED = (CP-DDF-CLP - 0)
+              - CP-DDF-CLP * (((CP-DDF-CLP - 0)
+              / CP-DDF-CLP - CP-DDF-HI-FACT) * 3 / 12)
+              -  ((CP-DDF-CLP - 0) - CP-DDF-CLP
+              * (((CP-DDF-CLP - 0) / CP-DDF-CLP
+              - CP-DDF-HI-FACT) * 3 / 12) - CP-DDF-CLP
+              * CP-DDF-HI-FACT) * (WS-MONTH - 3) / 9
+
+           .
+       1120-UE-CLP-GT-12.
+
+      *****  CLP * {UEF1 - (UEF1 -UEF2)*mo/12}
+
+           COMPUTE WS-TEMP-RESULT ROUNDED = CP-DDF-CLP *
+              (CP-DDF-HI-FACT - (CP-DDF-HI-FACT - CP-DDF-LO-FACT)
+              * WS-MONTH / 12)
+
+           .
+       1150-UE-GROSS-LT-4.
+
+           COMPUTE CP-1ST-YR-ALLOW = CP-1ST-YR-ALLOW - CP-DDF-YR1AF
+           COMPUTE WS-TEMP-RESULT ROUNDED =
+              (CP-ORIGINAL-PREMIUM - CP-1ST-YR-ALLOW - CP-DDF-YR1AF
+              * WS-MONTH / 3) - (CP-ORIGINAL-PREMIUM -
+              CP-1ST-YR-ALLOW - CP-DDF-YR1AF) * (1 - CP-DDF-HI-FACT)
+              * WS-MONTH / 12
+
+           .
+       1160-UE-GROSS-LT-13.
+
+           MOVE 3                      TO WS-MONTH
+           PERFORM 1150-UE-GROSS-LT-4
+           COMPUTE WS-GFR3 ROUNDED = WS-TEMP-RESULT * 1
+           MOVE CP-MONTH               TO WS-MONTH
+           COMPUTE WS-TEMP-RESULT ROUNDED = WS-GFR3 - (WS-GFR3
+              - (CP-ORIGINAL-PREMIUM - CP-1ST-YR-ALLOW - CP-DDF-YR1AF)
+              * (CP-DDF-HI-FACT)) * ((WS-MONTH - 3) / 9)
+
+           .
+       1170-UE-GROSS-GT-12.
+
+      *****  (GF-Yr1 Texp) * {UEF1 - (UEF1 -UEF2)*mo/12} 
+
+           COMPUTE WS-TEMP-RESULT ROUNDED =
+              (CP-ORIGINAL-PREMIUM - CP-1ST-YR-ALLOW)
+              * (CP-DDF-HI-FACT - (CP-DDF-HI-FACT
+              - CP-DDF-LO-FACT) * WS-MONTH / 12)
+
+           .
+       1200-IU-UE-CLP-LT-4.
+
+      *****  no changes with < 4  pema 08/03/11
+      *****  (CLPCounty-Yr1 Exp)-(CLP*(UEF1 - UEF2)*mo/12)
+
+           COMPUTE WS-TEMP-RESULT ROUNDED =
+              (CP-DDF-CLP - 0)
+              - (CP-DDF-CLP - CP-CLP-RATE-UP)
+              * (CP-DDF-HI-FACT - CP-DDF-LO-FACT)
+              * WS-MONTH / 12
+
+           .
+       1210-IU-UE-CLP-LT-13.
+
+
+      *****  (CLPCounty-Yr1 Exp)-(CLP*(UEF1 - UEF2)*3/12)
+      *****  -[(CLPCounty-Yr1 Exp)-(CLP*(UEF1 - UEF2)*3/12)
+      *****  - CLP*UEF1]*(mo-3)/9
+
+           MOVE 3                      TO WS-MONTH
+           PERFORM 1200-IU-UE-CLP-LT-4
+           COMPUTE WS-UE-CLP ROUNDED = WS-TEMP-RESULT * 1
+           MOVE CP-MONTH               TO WS-MONTH
+           COMPUTE WS-TEMP-RESULT ROUNDED =
+              WS-UE-CLP - (WS-UE-CLP - (CP-DDF-CLP - CP-CLP-RATE-UP)
+                * CP-DDF-HI-FACT) * (WS-MONTH - 3) / 9
+
+           .
+       1220-IU-UE-CLP-GT-12.
+
+      *****  CLP*{UEF1 - (UEF1 -UEF2)*mo/12}
+
+           COMPUTE WS-TEMP-RESULT ROUNDED =
+              (CP-DDF-CLP - CP-CLP-RATE-UP)
+              * (CP-DDF-HI-FACT - (CP-DDF-HI-FACT
+              - CP-DDF-LO-FACT) * WS-MONTH / 12)
+
+           .
+       1250-IU-UE-GROSS-LT-4.
+
+      *****  (Comm+MngtFee)*UECLPmo/CLPCounty+CLPCounty+AdminFee-
+      *****  Yr1 AF*(mo/3)-[CLP*(UEF1-UEF2)+(AdminFee-Yr1AF)*
+      *****  (1-UEF1)]*mo/12
+
+           PERFORM 1200-IU-UE-CLP-LT-4
+           COMPUTE WS-UE-CLP ROUNDED = WS-TEMP-RESULT * 1
+
+           COMPUTE WS-TEMP-RESULT = CP-DDF-COMM-AND-MFEE *
+              WS-UE-CLP / CP-DDF-CLP + CP-DDF-CLP +
+              CP-DDF-CSO-ADMIN-FEE - CP-DDF-YR1AF *
+              WS-MONTH / 3 - ((CP-DDF-CLP - CP-CLP-RATE-UP)
+              * (CP-DDF-HI-FACT - CP-DDF-LO-FACT)
+              + (CP-DDF-CSO-ADMIN-FEE - CP-DDF-YR1AF)
+              * (1 - CP-DDF-HI-FACT)) * WS-MONTH / 12
+
+           .
+       1260-IU-UE-GROSS-LT-13.
+
+      ***** uegf3-(uegf3-(gf - 1st yr - clprateu)*hi))*(mo-3)/9
+
+           MOVE 3                      TO WS-MONTH
+           PERFORM 1250-IU-UE-GROSS-LT-4
+           move cp-month               to ws-month
+           COMPUTE WS-GFR3 ROUNDED = WS-TEMP-RESULT * 1
+           COMPUTE WS-TEMP-RESULT ROUNDED =
+              WS-GFR3 - (WS-GFR3 - ((CP-ORIGINAL-PREMIUM
+              - CP-1ST-YR-ALLOW - cp-clp-rate-up))
+              * CP-DDF-HI-FACT) * (WS-MONTH - 3) / 9
+
+           .
+       1270-IU-UE-GROSS-GT-12.
+
+      ***** (gf - 1st yr - clprateu)*(hi-(hi-lo)*mo/12)
+
+           COMPUTE WS-TEMP-RESULT ROUNDED =
+              (CP-ORIGINAL-PREMIUM - CP-1ST-YR-ALLOW
+              - CP-CLP-RATE-UP) *
+              (CP-DDF-HI-FACT - (CP-DDF-HI-FACT - CP-DDF-LO-FACT)
+              * WS-MONTH / 12)
+
+           .
+       1299-END-DDF-CALCS.
+           .
+00745  1999-CALC-REF-AMT-X.                                             
